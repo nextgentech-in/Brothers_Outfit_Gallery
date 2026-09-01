@@ -57,7 +57,7 @@ export default function ProductInfo({ product }) {
   const productTotalStock = product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10)||0), 0) : (product.stock || 0);
 
   const {
-    name, rating = 4.8, offer_enabled, offer_end_at
+    name, rating = 4.8, offer_enabled, offer_end_at, description, shortDescription
   } = product;
 
   // Validation
@@ -240,7 +240,7 @@ export default function ProductInfo({ product }) {
         <details className="accordion-block" open>
           <summary>DESCRIPTION</summary>
           <div className="accordion-content">
-            Premium men's fashion staple. Crafted for comfort, styled for high-end casual appearances combining elegant aesthetics effortlessly alongside reliable structures.
+            {description || shortDescription || "No description provided."}
           </div>
         </details>
         

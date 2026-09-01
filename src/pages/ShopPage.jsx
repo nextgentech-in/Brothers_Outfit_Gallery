@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useShop } from '../context/ShopContext';
+import { useCart } from '../context/CartContext';
 import { getShopProducts } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import './ShopPage.css';
@@ -37,6 +38,8 @@ export default function ShopPage() {
     sortBy, setSortBy,
     scrollPosition, setScrollPosition
   } = useShop();
+
+  const { addToCart } = useCart();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const mounted = useRef(false);
@@ -170,9 +173,12 @@ export default function ShopPage() {
 
   const hasActiveFilters = search || category !== 'All' || priceRange !== 0 || selectedSize || selectedColor || sortBy !== 'featured';
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
-    // Cart integration point
+  const handleAddToCart = (productData) => {
+    const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
+    const color = productData.colors?.[0]?.name || productData.variants?.[0]?.color || 'Default';
+    addToCart(productData, size, color);
+    
+    // Optional: could implement a toast notification here later
   };
 
   return (

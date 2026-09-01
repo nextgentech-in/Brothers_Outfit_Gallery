@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useShop } from '../context/ShopContext';
@@ -24,9 +24,10 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const searchInputRef = useRef(null);
+  const navigate = useNavigate();
   const { currentUser, userProfile } = useAuth() || {};
   const { totalItems } = useCart() || { totalItems: 0 };
-  const { resetShopState } = useShop() || {};
+  const { resetShopState, setSearch } = useShop() || {};
 
   const authAccountLink = currentUser ? '/profile' : '/login';
 
@@ -167,6 +168,16 @@ export default function Navbar() {
               type="text"
               className="search-overlay__input"
               placeholder="Search products..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = e.target.value.trim();
+                  if (val) {
+                    setSearchOpen(false);
+                    if (setSearch) setSearch(val);
+                    navigate('/shop');
+                  }
+                }
+              }}
             />
             <button
               className="search-overlay__close"

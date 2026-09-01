@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { optimizeImage } from '../utils/imageUtils';
 import './ProductCard.css';
 
 /**
@@ -106,7 +107,7 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
       {/* Image */}
       <Link to={`/product/${product.slug}`} className="product-card__image-wrap">
         <img
-          src={product.image}
+          src={optimizeImage(product.image || product.thumbnailUrl, 400)}
           alt={product.name}
           className="product-card__image"
           loading="lazy"

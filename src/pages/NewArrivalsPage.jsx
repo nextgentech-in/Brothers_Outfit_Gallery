@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 import { getNewArrivals } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import './NewArrivalsPage.css';
@@ -7,6 +8,7 @@ import './NewArrivalsPage.css';
 export default function NewArrivalsPage() {
   const [newArrivals, setNewArrivals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const loadData = async () => {
@@ -27,8 +29,10 @@ export default function NewArrivalsPage() {
     return <div className="new-arrivals-page" style={{padding: '5rem', textAlign: 'center'}}>Loading New Arrivals...</div>;
   }
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart:', product);
+  const handleAddToCart = (productData) => {
+    const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
+    const color = productData.colors?.[0]?.name || productData.variants?.[0]?.color || 'Default';
+    addToCart(productData, size, color);
   };
 
   return (

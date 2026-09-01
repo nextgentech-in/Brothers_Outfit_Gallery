@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useCart } from '../../context/CartContext';
 import ProductCard from '../ProductCard';
 import { getRelatedProducts } from '../../services/productService';
 
 export default function RelatedProducts({ currentProductId, category }) {
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
+
+  const handleAddToCart = (productData) => {
+    const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
+    const color = productData.colors?.[0]?.name || productData.variants?.[0]?.color || 'Default';
+    addToCart(productData, size, color);
+  };
 
   useEffect(() => {
     const fetchRelated = async () => {
@@ -60,7 +68,7 @@ export default function RelatedProducts({ currentProductId, category }) {
         gap: '24px'
       }}>
         {related.map(product => (
-          <ProductCard key={product.id} product={product} />
+          <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
         ))}
       </div>
     </div>

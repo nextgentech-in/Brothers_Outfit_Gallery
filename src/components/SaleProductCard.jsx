@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import OfferCountdown from './OfferCountdown';
+import { optimizeImage } from '../utils/imageUtils';
 import './SaleProductCard.css';
 
 export default function SaleProductCard({ product, onAddToCart, onOfferExpire }) {
@@ -28,15 +29,16 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
   };
 
   // Pricing calculations
-  const originalPrice = product.compareAtPrice || product.price;
-  const salePrice = Math.round(originalPrice * (1 - product.offer_discount_percentage / 100));
+  const originalPrice = product.mrp || product.compareAtPrice || product.price || 0;
+  const baseForDiscount = product.mrp || product.compareAtPrice || product.salePrice || product.price || 0;
+  const salePrice = Math.round(baseForDiscount * (1 - (product.offer_discount_percentage || 0) / 100));
 
   return (
     <div className={`sale-card ${isOutOfStock ? 'sale-card--oos' : ''}`}>
       {/* Image Container */}
       <Link to={`/product/${product.slug}`} className="sale-card__image-wrap">
         <img
-          src={product.image}
+          src={optimizeImage(product.image || product.thumbnailUrl, 400)}
           alt={product.name}
           className="sale-card__image"
           loading="lazy"

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useCart } from '../context/CartContext';
 import Hero from '../components/Hero';
 import TrendingCarousel from '../components/TrendingCarousel';
 import SaleProductCard from '../components/SaleProductCard';
@@ -12,6 +13,13 @@ export default function HomePage() {
   const [newArrivals, setNewArrivals] = useState([]);
   const [shopProducts, setShopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
+
+  const handleAddToCart = (productData) => {
+    const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
+    const color = productData.colors?.[0]?.name || productData.variants?.[0]?.color || 'Default';
+    addToCart(productData, size, color);
+  };
 
   useEffect(() => {
     const fetchHomeData = async () => {
@@ -70,7 +78,7 @@ export default function HomePage() {
             
             <div className="product-grid">
               {saleProducts.map(product => (
-                <SaleProductCard key={product.id} product={product} />
+                <SaleProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
               ))}
             </div>
             
@@ -92,7 +100,7 @@ export default function HomePage() {
             
             <div className="product-grid">
               {newArrivals.map(product => (
-                <ProductCard key={product.id} product={product} showNewBadge={true} />
+                <ProductCard key={product.id} product={product} showNewBadge={true} onAddToCart={handleAddToCart} />
               ))}
             </div>
             
@@ -113,7 +121,7 @@ export default function HomePage() {
           
           <div className="product-grid">
             {shopProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
             ))}
           </div>
           

@@ -23,6 +23,3 @@ export const googleProvider = new GoogleAuthProvider();
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
 
-// Initialize Cloud Storage
-import { getStorage } from "firebase/storage";
-export const storage = getStorage(app);

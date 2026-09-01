@@ -1,19 +1,21 @@
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from '../firebase/firebaseConfig';
 
 const PRODUCTS = 'products';
 
-// Delete a single image from Storage
-export const deleteProductImage = async (path) => {
-  if (!path) return;
+// Delete a single image from ImageKit
+export const deleteProductImage = async (fileId) => {
+  if (!fileId) return;
   try {
-    const storageRef = ref(storage, path);
-    await deleteObject(storageRef);
+    // Calling our new backend safely
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
+       method: 'DELETE',
+       headers: { 'x-admin-request': 'true' }
+    });
   } catch (err) {
-    console.error("Firebase Storage delete error:", err);
-    // Ignore not-found errors in case it's already deleted
+    console.error("ImageKit delete error:", err);
+    // Ignore not-found errors
   }
 };
 
@@ -22,14 +24,9 @@ export const generateProductId = () => {
   return doc(collection(db, PRODUCTS)).id;
 };
 
-// Upload a single image
-// Notice we accept a custom path/filename logic if provided
-export const uploadProductImage = async (file, path = null) => {
-  const fileName = path || `products/temp/${Date.now()}_${file.name}`;
-  const storageRef = ref(storage, fileName);
-  await uploadBytes(storageRef, file);
-  return await getDownloadURL(storageRef);
-};
+
+
+
 
 // Admin fetching all products without active filters
 export const getAdminProducts = async () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
+import { optimizeImage } from '../../utils/imageUtils';
 import './ProductGallery.css';
 
 export default function ProductGallery({ images }) {
@@ -35,7 +36,7 @@ export default function ProductGallery({ images }) {
               onClick={() => setCurrentIndex(idx)}
               aria-label={`View image ${idx + 1}`}
             >
-              <img src={thumbUrl} alt={`Thumbnail ${idx + 1}`} />
+              <img loading="lazy" src={optimizeImage(thumbUrl, 200)} alt={`Thumbnail ${idx + 1}`} />
             </button>
           )
         })}
@@ -44,7 +45,7 @@ export default function ProductGallery({ images }) {
       {/* Main Large Image Block */}
       <div className="product-gallery-main">
         <ImageZoom 
-          src={currentImage} 
+          src={optimizeImage(currentImage, 1000)} 
           alt={`Product view ${currentIndex + 1}`} 
           onClick={() => setLightboxOpen(true)}
         />
@@ -64,7 +65,7 @@ export default function ProductGallery({ images }) {
       {/* Lightbox Wrapper */}
       {lightboxOpen && (
         <ImageLightbox 
-          images={images.map(extractUrl)} 
+          images={images.map(img => optimizeImage(extractUrl(img), 1400))} 
           currentIndex={currentIndex}
           onClose={() => setLightboxOpen(false)}
           onNavigate={handleNavigate}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 import { getSaleProducts } from '../services/productService';
 import SaleProductCard from '../components/SaleProductCard';
 import './SalePage.css';
@@ -8,6 +9,7 @@ export default function SalePage() {
   const [saleProducts, setSaleProducts] = useState([]);
 
   const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
 
   const fetchActiveSales = async () => {
     try {
@@ -40,8 +42,10 @@ export default function SalePage() {
     setSaleProducts((prev) => prev.filter((p) => p.id !== productId));
   };
 
-  const handleAddToCart = (product) => {
-    console.log('Added to cart from sale:', product);
+  const handleAddToCart = (productData) => {
+    const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
+    const color = productData.colors?.[0]?.name || productData.variants?.[0]?.color || 'Default';
+    addToCart(productData, size, color);
   };
 
   const scrollToSales = () => {
