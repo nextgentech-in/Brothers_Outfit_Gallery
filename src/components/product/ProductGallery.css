@@ -1,0 +1,86 @@
+.product-gallery-wrapper {
+  display: flex;
+  gap: 24px;
+  height: 100%;
+}
+
+.product-gallery-thumbnails {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.thumbnail-btn {
+  width: 100%;
+  aspect-ratio: 3/4;
+  background: none;
+  border: 1px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.2s, opacity 0.2s;
+  opacity: 0.6;
+}
+
+.thumbnail-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumbnail-btn:hover {
+  opacity: 0.9;
+}
+
+.thumbnail-btn.active {
+  opacity: 1;
+  border-color: var(--color-heading); /* Clear border highlight when active */
+}
+
+.product-gallery-main {
+  flex: 1;
+  position: relative;
+  aspect-ratio: 3/4; /* Match typical fashion aspect ratio constraints cleanly */
+  overflow: hidden;
+}
+
+.product-gallery-dots {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .product-gallery-wrapper {
+    flex-direction: column-reverse;
+    gap: 16px;
+  }
+  
+  .product-gallery-thumbnails {
+    display: none; /* Hide vertical thumbnails on mobile entirely */
+  }
+
+  .product-gallery-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+    position: absolute;
+    bottom: 24px;
+    width: 100%;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: background 0.3s, transform 0.3s;
+  }
+
+  .dot.active {
+    background: var(--color-heading);
+    transform: scale(1.4);
+  }
+}

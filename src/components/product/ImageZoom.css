@@ -1,0 +1,55 @@
+.image-zoom-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: zoom-in;
+  background-color: #f7f7f7;
+}
+
+.image-zoom-base {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* or contain depending on explicit aspect ratio needs */
+  display: block;
+}
+
+.image-zoom-lens {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background-repeat: no-repeat;
+  /* Assuming the original high-res image is ~2.5x larger than the displayed box for zoom scale */
+  background-size: 250%; 
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  z-index: 10;
+  transition: opacity 0.15s ease-out;
+}
+
+.image-zoom-hint {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  background: rgba(255,255,255,0.9);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-heading);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* Strip zoom logic completely off smaller views maintaining basic image rendering gracefully */
+@media (max-width: 1024px) {
+  .image-zoom-lens {
+    display: none !important;
+  }
+}

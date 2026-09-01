@@ -1,0 +1,381 @@
+/* ───────── Hero Section ───────── */
+.hero {
+  position: relative;
+  width: 100%;
+  height: 90vh;
+  min-height: 600px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+/* Background Image */
+.hero__image-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0;
+  transform: scale(1.05);
+  transition: opacity 1.2s ease, transform 1.8s ease;
+}
+
+.hero--visible .hero__image {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hero__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.65) 0%,
+    rgba(0, 0, 0, 0.4) 40%,
+    rgba(0, 0, 0, 0.15) 70%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
+}
+
+/* Content */
+.hero__content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 64px;
+}
+
+.hero__text {
+  max-width: 600px;
+}
+
+/* Eyebrow */
+.hero__eyebrow {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 20px;
+  padding: 8px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s;
+}
+
+.hero--visible .hero__eyebrow {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Heading */
+.hero__heading {
+  font-family: var(--font-heading);
+  font-size: clamp(36px, 5.5vw, 72px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -1px;
+  color: #fff;
+  margin: 0 0 24px;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s ease 0.5s, transform 0.8s ease 0.5s;
+}
+
+.hero--visible .hero__heading {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Description */
+.hero__description {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 40px;
+  max-width: 440px;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease 0.7s, transform 0.8s ease 0.7s;
+}
+
+.hero--visible .hero__description {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Actions */
+.hero__actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease 0.9s, transform 0.8s ease 0.9s;
+}
+
+.hero--visible .hero__actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Buttons */
+.hero__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 16px 36px;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.hero__btn--primary {
+  background: #fff;
+  color: #0a0a0a;
+}
+
+.hero__btn--primary:hover {
+  background: #0a0a0a;
+  color: #fff;
+}
+
+.hero__btn--primary svg {
+  transition: transform 0.3s ease;
+}
+
+.hero__btn--primary:hover svg {
+  transform: translateX(4px);
+}
+
+.hero__btn--secondary {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.hero__btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Sale Button — High Interaction */
+.hero__btn--sale {
+  background: linear-gradient(135deg, #ff416c, #ff4b2b);
+  color: #fff;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  animation: saleGlow 2s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(255, 65, 108, 0.4), 0 0 40px rgba(255, 75, 43, 0.2);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.hero__btn--sale:hover {
+  background: linear-gradient(135deg, #ff4b2b, #ff416c);
+  box-shadow: 0 0 30px rgba(255, 65, 108, 0.6), 0 0 60px rgba(255, 75, 43, 0.3);
+  transform: scale(1.05);
+  animation: saleShake 0.4s ease-in-out;
+}
+
+.hero__btn--sale svg {
+  transition: transform 0.3s ease;
+}
+
+.hero__btn--sale:hover svg {
+  transform: translateX(6px);
+}
+
+/* Pulse ring behind the sale button */
+.hero__sale-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid rgba(255, 65, 108, 0.5);
+  animation: salePulseRing 2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes saleGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 65, 108, 0.4), 0 0 40px rgba(255, 75, 43, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 65, 108, 0.6), 0 0 60px rgba(255, 75, 43, 0.35);
+  }
+}
+
+@keyframes salePulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@keyframes saleShake {
+  0%, 100% { transform: translateX(0) scale(1.05); }
+  25% { transform: translateX(-4px) scale(1.05); }
+  50% { transform: translateX(4px) scale(1.05); }
+  75% { transform: translateX(-2px) scale(1.05); }
+}
+
+/* Scroll Indicator */
+.hero__scroll-indicator {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 1s ease 1.2s;
+}
+
+.hero--visible .hero__scroll-indicator {
+  opacity: 0.5;
+}
+
+.hero__scroll-line {
+  width: 1px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero__scroll-line::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  animation: scrollLine 2s ease-in-out infinite;
+}
+
+@keyframes scrollLine {
+  0% { top: -100%; }
+  50% { top: 100%; }
+  100% { top: 100%; }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .hero__image,
+  .hero__eyebrow,
+  .hero__heading,
+  .hero__description,
+  .hero__actions,
+  .hero__scroll-indicator {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero__scroll-line::after {
+    animation: none;
+  }
+}
+
+/* ───────── Responsive ───────── */
+@media (max-width: 1024px) {
+  .hero__content {
+    padding: 0 40px;
+  }
+
+  .hero__heading {
+    font-size: clamp(32px, 5vw, 56px);
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    height: 85vh;
+    min-height: 500px;
+    align-items: flex-end;
+  }
+
+  .hero__overlay {
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.7) 0%,
+      rgba(0, 0, 0, 0.4) 40%,
+      rgba(0, 0, 0, 0.1) 100%
+    );
+  }
+
+  .hero__content {
+    padding: 0 24px 60px;
+    text-align: center;
+  }
+
+  .hero__text {
+    max-width: 100%;
+  }
+
+  .hero__heading {
+    font-size: clamp(28px, 8vw, 44px);
+  }
+
+  .hero__description {
+    font-size: 14px;
+    max-width: 100%;
+  }
+
+  .hero__actions {
+    justify-content: center;
+  }
+
+  .hero__btn {
+    padding: 14px 28px;
+    font-size: 12px;
+  }
+
+  .hero__scroll-indicator {
+    bottom: 20px;
+  }
+}
+
+@media (max-width: 414px) {
+  .hero {
+    height: 80vh;
+  }
+
+  .hero__content {
+    padding: 0 20px 50px;
+  }
+
+  .hero__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero__btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

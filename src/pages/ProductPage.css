@@ -1,0 +1,93 @@
+/* --------- Product Page Container --------- */
+
+.product-page-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 100px 24px 60px;
+}
+
+/* Breadcrumbs */
+.product-breadcrumbs {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+}
+
+.product-breadcrumbs a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.product-breadcrumbs a:hover {
+  color: var(--color-heading);
+}
+
+.breadcrumb-separator {
+  margin: 0 8px;
+  opacity: 0.5;
+}
+
+.breadcrumb-current {
+  color: var(--color-heading);
+  font-weight: 600;
+}
+
+/* Main Spilt layout */
+.product-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 60px;
+}
+
+/* Error States */
+.product-not-found {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
+
+.product-not-found h1 {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  color: var(--color-heading);
+  margin: 0 0 16px;
+}
+
+.product-not-found p {
+  font-family: var(--font-body);
+  color: var(--color-text-muted);
+  font-size: 15px;
+  margin-bottom: 32px;
+}
+
+.btn-back-shop {
+  display: inline-block;
+  padding: 14px 32px;
+  background: var(--color-heading);
+  color: #fff;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.btn-back-shop:hover {
+  background: #222;
+}
+
+/* Responsive Rules */
+@media (max-width: 1024px) {
+  .product-main-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}

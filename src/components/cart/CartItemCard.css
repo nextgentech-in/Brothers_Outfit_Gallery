@@ -1,0 +1,124 @@
+.cart-item-card {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.cart-item-image-link {
+  width: 120px;
+  flex-shrink: 0;
+  aspect-ratio: 3/4;
+}
+
+.cart-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cart-item-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cart-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.cart-item-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-heading);
+  text-decoration: none;
+  letter-spacing: 0.5px;
+}
+.cart-item-title:hover {
+  text-decoration: underline;
+}
+
+.cart-item-price {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-heading);
+}
+
+.cart-item-variants {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: auto; /* Pushes actions to the bottom */
+  font-family: var(--font-body);
+}
+
+.cart-item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.cart-quantity-selector {
+  display: flex;
+  border: 1px solid #ddd;
+  border-radius: 2px;
+  width: 100px;
+  height: 36px;
+}
+
+.cart-quantity-selector button {
+  background: #f9f9f9;
+  border: none;
+  width: 32px;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-heading);
+}
+
+.cart-quantity-selector button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.cart-quantity-selector span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  font-size: 13px;
+}
+
+.btn-cart-remove {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+
+.btn-cart-remove:hover {
+  color: #c0392b;
+}
+
+@media (max-width: 500px) {
+  .cart-item-card {
+    gap: 16px;
+    padding: 16px;
+  }
+  .cart-item-image-link { width: 90px; }
+  .cart-item-title { font-size: 14px; }
+  .cart-item-price { font-size: 14px; }
+}

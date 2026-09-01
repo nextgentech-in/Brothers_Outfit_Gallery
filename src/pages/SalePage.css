@@ -1,0 +1,220 @@
+/* ───────── Sale Page ───────── */
+.sale-page {
+  min-height: 100vh;
+  background: #fdfdfd;
+}
+
+/* ───────── Sale Hero ───────── */
+.sale-hero {
+  background: #f51b02;
+  color: #fff;
+  padding: 180px 24px 120px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.sale-hero::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, rgba(192, 57, 43, 0.4) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.sale-hero__content {
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sale-hero__label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  background: #c0392b;
+  color: #fff;
+  padding: 6px 18px;
+  border-radius: 4px;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+}
+
+.sale-hero__title {
+  font-family: var(--font-heading);
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin: 0 0 24px;
+  text-transform: uppercase;
+}
+
+.sale-hero__desc {
+  font-family: var(--font-body);
+  font-size: clamp(16px, 2vw, 20px);
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 0 40px;
+  max-width: 600px;
+}
+
+.sale-hero__cta {
+  background: #fff;
+  color: var(--color-heading);
+  border: none;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 16px 40px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.sale-hero__cta:hover {
+  background: #c0392b;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* ───────── Sale Content & Grid ───────── */
+.sale-content {
+  max-width: 1320px;
+  margin: -40px auto 100px;
+  padding: 0 24px;
+  position: relative;
+  z-index: 5;
+}
+
+/* Urgency Banner */
+.sale-urgency-banner {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 40px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.04);
+}
+
+.sale-urgency-banner h2 {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-heading);
+  margin: 0 0 8px;
+}
+
+.sale-urgency-banner p {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* Grid layout strictly forcing required layout format */
+.sale-grid-container {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+
+/* ───────── Empty State ───────── */
+.sale-empty {
+  text-align: center;
+  padding: 80px 24px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 12px;
+  margin-top: 60px;
+}
+
+.sale-empty__title {
+  font-family: var(--font-heading);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-heading);
+  margin: 0 0 16px;
+  letter-spacing: 1px;
+}
+
+.sale-empty__text {
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--color-text);
+  margin: 0 auto 32px;
+  max-width: 500px;
+}
+
+.sale-empty__btn {
+  display: inline-block;
+  background: var(--color-heading);
+  color: #fff;
+  text-decoration: none;
+  padding: 16px 40px;
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: background 0.3s;
+}
+
+.sale-empty__btn:hover {
+  background: #c0392b;
+}
+
+/* ───────── Responsive ───────── */
+@media (max-width: 1024px) {
+  .sale-grid-container {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sale-hero {
+    padding: 140px 20px 80px;
+  }
+  
+  .sale-content {
+    margin-top: -20px;
+    margin-bottom: 60px;
+  }
+
+  .sale-grid-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  
+  .sale-urgency-banner {
+    padding: 16px 20px;
+    margin-bottom: 24px;
+  }
+  
+  .sale-urgency-banner h2 {
+    font-size: 20px;
+  }
+  
+  .sale-urgency-banner p {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 414px) {
+  .sale-grid-container {
+    padding: 0 8px; /* tiny additional padding if necessary */
+    gap: 12px;
+  }
+}

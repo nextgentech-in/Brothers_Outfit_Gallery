@@ -1,0 +1,248 @@
+/* ───────── Trending Section ───────── */
+.trending {
+  padding: 100px 0 120px;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+/* Header */
+.trending__header {
+  text-align: center;
+  padding: 0 24px;
+  margin-bottom: 56px;
+}
+
+.trending__label {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.trending__title {
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--color-heading);
+  margin: 0 0 16px;
+}
+
+.trending__subtitle {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+/* Carousel Container */
+.trending__carousel {
+  width: 100%;
+  overflow: hidden;
+  cursor: default;
+}
+
+/* Track — scrolls right-to-left */
+.trending__track {
+  display: flex;
+  gap: 24px;
+  width: fit-content;
+  animation: scrollTrack 40s linear infinite;
+}
+
+.trending__track--paused {
+  animation-play-state: paused;
+}
+
+@keyframes scrollTrack {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    /* Move exactly half (5 cards + 5 gaps) so the duplicate set replaces seamlessly */
+    transform: translateX(calc(-50% - 12px));
+  }
+}
+
+/* Card */
+.trending__card {
+  flex-shrink: 0;
+  width: 340px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.trending__card:hover {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+}
+
+/* Card Image */
+.trending__card-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+}
+
+.trending__card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.trending__card:hover .trending__card-image {
+  transform: scale(1.06);
+}
+
+.trending__card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.05) 50%,
+    transparent 100%
+  );
+  transition: opacity 0.3s ease;
+}
+
+.trending__card:hover .trending__card-overlay {
+  opacity: 0.85;
+}
+
+/* Card Info */
+.trending__card-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.trending__card-title {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #fff;
+  margin: 0 0 4px;
+}
+
+.trending__card-subtitle {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.trending__card-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  flex-shrink: 0;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.trending__card:hover .trending__card-arrow {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateX(4px);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .trending__track {
+    animation: none;
+  }
+
+  .trending__card-image,
+  .trending__card-arrow {
+    transition: none;
+  }
+}
+
+/* ───────── Responsive ───────── */
+@media (max-width: 1024px) {
+  .trending {
+    padding: 80px 0 100px;
+  }
+
+  .trending__track {
+    gap: 20px;
+    animation-duration: 35s;
+  }
+
+  .trending__card {
+    width: 300px;
+  }
+
+  .trending__header {
+    margin-bottom: 44px;
+  }
+}
+
+@media (max-width: 768px) {
+  .trending {
+    padding: 64px 0 80px;
+  }
+
+  .trending__track {
+    gap: 16px;
+    animation-duration: 30s;
+  }
+
+  .trending__card {
+    width: 260px;
+  }
+
+  .trending__header {
+    margin-bottom: 36px;
+  }
+
+  .trending__subtitle {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 414px) {
+  .trending {
+    padding: 52px 0 64px;
+  }
+
+  .trending__card {
+    width: 240px;
+  }
+
+  .trending__card-title {
+    font-size: 15px;
+  }
+
+  .trending__card-info {
+    padding: 18px;
+  }
+}
