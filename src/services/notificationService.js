@@ -1,5 +1,6 @@
 import { collection, doc, setDoc, getDocs, query, orderBy, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { getBackendUrl } from '../utils/apiConfig';
 
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
@@ -23,10 +24,29 @@ export const createAdminOrderNotification = async (orderId, orderPayload) => {
       read: false,
       createdAt: serverTimestamp(),
     });
+
+    // Send email alert to admin email addresses via server backend
+    try {
+      const backendUrl = getBackendUrl();
+      await fetch(`${backendUrl}/api/notifications/send-admin-alert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          customerName: orderPayload.shippingAddress?.fullName || 'Customer',
+          totalAmount: orderPayload.totalAmount || orderPayload.finalTotal || 0,
+          paymentMethod: orderPayload.paymentMethod || 'Razorpay',
+          shippingAddress: orderPayload.shippingAddress
+        })
+      });
+    } catch (e) {
+      console.warn('Backend admin alert call warning:', e.message);
+    }
   } catch (err) {
     console.error('Error creating order notification:', err);
   }
 };
+
 
 /**
  * Subscribe to real-time admin notifications

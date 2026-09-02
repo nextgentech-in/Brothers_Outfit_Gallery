@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import nodemailer from 'nodemailer';
 
 // Basic .env parsing for local dev without requiring dotenv package
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +28,51 @@ const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Admin Notification Emails
+const ADMIN_EMAILS = [
+  process.env.VITE_ADMIN_EMAIL || 'setupatel01@gmail.com',
+  'setupatel441@gmail.com'
+];
+
+const mailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
+});
+
+// Send Admin Email & Log Alert when a new order is placed
+app.post('/api/notifications/send-admin-alert', async (req, res) => {
+  const { orderId, customerName, totalAmount, paymentMethod, shippingAddress } = req.body;
+  if (!orderId) return res.status(400).json({ error: 'Order ID required.' });
+
+  const alertMsg = `🚨 NEW ORDER RECEIVED!\n\nOrder ID: #${orderId}\nCustomer: ${customerName || 'Guest'}\nTotal Amount: ₹${totalAmount}\nPayment Method: ${paymentMethod}\nAddress: ${shippingAddress?.addressLine || ''}, ${shippingAddress?.city || ''} - ${shippingAddress?.pincode || ''}\nPhone: ${shippingAddress?.phone || ''}`;
+
+  console.log(`\n======================================================`);
+  console.log(`[ADMIN ALERT] New Order Created! Notifying Admins (${ADMIN_EMAILS.join(', ')}):\n${alertMsg}`);
+  console.log(`======================================================\n`);
+
+  try {
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await mailTransporter.sendMail({
+        from: '"Brothers Outfit" <noreply@brothersoutfit.com>',
+        to: ADMIN_EMAILS.join(', '),
+        subject: `🚨 NEW ORDER RECEIVED: #${orderId} (₹${totalAmount})`,
+        text: alertMsg,
+      });
+      console.log('Admin Email notification sent successfully.');
+    }
+    res.json({ success: true, message: 'Admin alert triggered.' });
+  } catch (err) {
+    console.warn('Admin Email notification error:', err.message);
+    res.json({ success: true, message: 'Alert logged.' });
+  }
+});
+
 
 const imagekit = new ImageKit({
   publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
