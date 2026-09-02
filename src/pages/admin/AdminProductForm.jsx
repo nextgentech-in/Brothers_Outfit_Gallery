@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { createProduct, updateProduct, getAdminProductById, deleteProductImage, generateProductId } from '../../services/adminService';
 import './AdminProductForm.css';
 
+import { getBackendUrl } from '../../utils/apiConfig';
+
 const AVAILABLE_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 const STANDARD_COLORS = [
   { name: 'Black', hex: '#000000' },
@@ -294,7 +296,7 @@ export default function AdminProductForm() {
       // 2. Upload pending images via ImageKit API
       const newlyUploaded = [];
       if (pendingImages.length > 0) {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+        const backendUrl = getBackendUrl();
 
         for (let i = 0; i < pendingImages.length; i++) {
           const authRes = await fetch(`${backendUrl}/api/imagekit/auth`);

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
+import { getBackendUrl } from '../utils/apiConfig';
 import './CheckoutPage.css';
 
 export default function CheckoutPage() {
@@ -66,7 +67,7 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
 
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
 
     if (paymentMethod === 'cod') {
       // Cash on Delivery

@@ -1,5 +1,6 @@
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { getBackendUrl } from '../utils/apiConfig';
 
 const PRODUCTS = 'products';
 
@@ -7,8 +8,7 @@ const PRODUCTS = 'products';
 export const deleteProductImage = async (fileId) => {
   if (!fileId) return;
   try {
-    // Calling our new backend safely
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = getBackendUrl();
     await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
        method: 'DELETE',
        headers: { 'x-admin-request': 'true' }
