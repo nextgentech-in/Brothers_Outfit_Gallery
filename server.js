@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import ImageKit from 'imagekit';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -30,6 +32,11 @@ const imagekit = new ImageKit({
   publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "dummy_private_key",
   urlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/dummy",
+});
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || '',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
 });
 
 app.get('/api/imagekit/auth', (req, res) => {
@@ -69,6 +76,46 @@ app.delete('/api/imagekit/delete/:fileId', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`ImageKit Backend listening on port ${port}`);
+// ─── Razorpay: Create Order ────────────────────────────────────────────────
+app.post('/api/razorpay/create-order', async (req, res) => {
+  const { amount } = req.body;
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Valid amount required' });
+  try {
+    const order = await razorpay.orders.create({
+      amount: Math.round(amount * 100), // rupees → paise
+      currency: 'INR',
+      receipt: `rcpt_${Date.now()}`,
+    });
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID,
+    });
+  } catch (error) {
+    console.error('Razorpay create-order error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
+
+// ─── Razorpay: Verify Payment Signature ─────────────────────────────────────
+app.post('/api/razorpay/verify', (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const secret = process.env.RAZORPAY_KEY_SECRET || '';
+  const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+  if (expected === razorpay_signature) {
+    res.json({ success: true, paymentId: razorpay_payment_id });
+  } else {
+    res.status(400).json({ success: false, error: 'Signature mismatch — possible fraud attempt.' });
+  }
+});
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Brothers Outfit Backend listening on port ${port}`);
+  });
+}
+
+export default app;
+

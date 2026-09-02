@@ -6,19 +6,25 @@ import './SaleProductCard.css';
 
 export default function SaleProductCard({ product, onAddToCart, onOfferExpire }) {
   const [selectedSize, setSelectedSize] = useState(null);
+  const [addedAnimation, setAddedAnimation] = useState(false);
   const isOutOfStock = product.stock === 0;
   const lowStock = product.stock > 0 && product.stock <= 5;
   const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (isOutOfStock) return;
+    
+    const sizeToUse = selectedSize || availableSizes[0] || 'M';
     if (onAddToCart) {
       onAddToCart({
         ...product,
-        selectedSize: selectedSize || availableSizes[0],
+        selectedSize: sizeToUse,
         finalPrice: salePrice,
       });
+      setAddedAnimation(true);
+      setTimeout(() => setAddedAnimation(false), 1500);
     }
   };
 
@@ -95,8 +101,9 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
           className={`sale-card__add-btn ${isOutOfStock ? 'sale-card__add-btn--disabled' : ''}`}
           onClick={handleAddToCart}
           disabled={isOutOfStock}
+          style={addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}}
         >
-          {isOutOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}
+          {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED TO CART ✓' : 'ADD TO CART')}
         </button>
       </div>
     </div>

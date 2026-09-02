@@ -20,11 +20,24 @@ import { CartProvider } from './context/CartContext';
 import { ShopProvider } from './context/ShopContext';
 import WhatsAppFloat from './components/WhatsAppFloat';
 
+import CheckoutPage from './pages/CheckoutPage';
+import OrderConfirmationPage from './pages/OrderConfirmationPage';
+
 import AdminRoute from './components/auth/AdminRoute';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProducts from './pages/admin/AdminProducts';
 import AdminProductForm from './pages/admin/AdminProductForm';
+import AdminOrders from './pages/admin/AdminOrders';
+import AdminCustomers from './pages/admin/AdminCustomers';
+import AdminInventory from './pages/admin/AdminInventory';
+import AdminCoupons from './pages/admin/AdminCoupons';
+import AdminSettings from './pages/admin/AdminSettings';
+import AdminReviews from './pages/admin/AdminReviews';
+import AdminHomepage from './pages/admin/AdminHomepage';
+
+// ErrorBoundary component remains intact
+
 
 
 class ErrorBoundary extends Component {
@@ -83,6 +96,8 @@ function AppContent() {
             <Route path="/sale" element={<SalePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/order-confirmation/:orderId" element={<OrderConfirmationPage />} />
             
             {/* Standard Auth Routes */}
             <Route path="/login" element={<Login />} />
@@ -109,6 +124,13 @@ function AppContent() {
             <Route path="products" element={<AdminProducts />} />
             <Route path="products/new" element={<AdminProductForm />} />
             <Route path="products/:id/edit" element={<AdminProductForm />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="customers" element={<AdminCustomers />} />
+            <Route path="inventory" element={<AdminInventory />} />
+            <Route path="coupons" element={<AdminCoupons />} />
+            <Route path="homepage" element={<AdminHomepage />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="reviews" element={<AdminReviews />} />
           </Route>
         </Routes>
       </main>

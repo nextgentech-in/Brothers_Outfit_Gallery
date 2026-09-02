@@ -100,8 +100,141 @@ export const getAdminStats = async (products) => {
         else if (p.stock > 0 && p.stock <= 5) lowStock++;
     });
 
-    return { total, active, activeSales, outOfStock, lowStock, totalOrders: 0 }; 
+    let totalOrders = 0;
+    try {
+      const ordersSnap = await getDocs(collection(db, 'orders'));
+      totalOrders = ordersSnap.size;
+    } catch (e) {
+      console.log('No orders yet or security rule restriction:', e.message);
+    }
+
+    return { total, active, activeSales, outOfStock, lowStock, totalOrders }; 
 }
+
+// ─── ADMIN: ORDERS ────────────────────────────────────────────────────────────
+export const getAdminOrders = async () => {
+  try {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('Error fetching admin orders:', err);
+    return [];
+  }
+};
+
+export const updateOrderStatus = async (orderId, status) => {
+  const docRef = doc(db, 'orders', orderId);
+  await updateDoc(docRef, { status, updatedAt: serverTimestamp() });
+};
+
+// ─── ADMIN: CUSTOMERS ─────────────────────────────────────────────────────────
+export const getAdminCustomers = async () => {
+  try {
+    const snap = await getDocs(collection(db, 'users'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('Error fetching customers:', err);
+    return [];
+  }
+};
+
+// ─── ADMIN: INVENTORY ─────────────────────────────────────────────────────────
+export const updateProductVariantStock = async (productId, variants, totalStock) => {
+  const docRef = doc(db, PRODUCTS, productId);
+  await updateDoc(docRef, {
+    variants: variants,
+    stock: totalStock,
+    updatedAt: serverTimestamp()
+  });
+};
+
+// ─── ADMIN: COUPONS ───────────────────────────────────────────────────────────
+export const getAdminCoupons = async () => {
+  try {
+    const snap = await getDocs(collection(db, 'coupons'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    return [];
+  }
+};
+
+export const createCoupon = async (couponData) => {
+  const docRef = doc(collection(db, 'coupons'));
+  await setDoc(docRef, {
+    ...couponData,
+    code: couponData.code.toUpperCase().trim(),
+    createdAt: serverTimestamp()
+  });
+  return docRef.id;
+};
+
+export const deleteCoupon = async (id) => {
+  await deleteDoc(doc(db, 'coupons', id));
+};
+
+// ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
+export const getStoreSettings = async () => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'store'));
+    return snap.exists() ? snap.data() : {
+      storeName: "Brothers Outfit Gallery",
+      phone: "+91 98765 43210",
+      email: "contact@brothersoutfit.com",
+      address: "Main Market, India",
+      whatsappNumber: "919876543210",
+      freeShippingMin: 1500,
+      autoDiscountThreshold: 2000,
+      autoDiscountAmount: 250
+    };
+  } catch (err) {
+    return {};
+  }
+};
+
+export const saveStoreSettings = async (settingsData) => {
+  await setDoc(doc(db, 'settings', 'store'), {
+    ...settingsData,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+};
+
+// ─── ADMIN: REVIEWS ───────────────────────────────────────────────────────────
+export const getAdminReviews = async () => {
+  try {
+    const snap = await getDocs(collection(db, 'reviews'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    return [];
+  }
+};
+
+export const deleteReview = async (id) => {
+  await deleteDoc(doc(db, 'reviews', id));
+};
+
+// ─── ADMIN: HOMEPAGE SECTIONS ──────────────────────────────────────────────────
+export const getHomepageConfig = async () => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'homepage'));
+    return snap.exists() ? snap.data() : {
+      showHero: true,
+      showTrending: true,
+      showSaleSection: true,
+      showNewArrivals: true,
+      showShopCollection: true,
+      showAboutPreview: true,
+      showTrustBadges: true,
+      showReviews: true
+    };
+  } catch (err) {
+    return {};
+  }
+};
+
+export const saveHomepageConfig = async (config) => {
+  await setDoc(doc(db, 'settings', 'homepage'), config, { merge: true });
+};
 
 // Temporary Seeder
 export const seedDemoProducts = async () => {

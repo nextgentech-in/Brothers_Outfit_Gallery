@@ -1,0 +1,27 @@
+.admin-orders-page {
+  padding: 0;
+}
+
+.admin-orders-controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-filter-select {
+  padding: 10px 16px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+}
+
+.admin-status-dropdown {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  font-weight: 600;
+  background: white;
+  cursor: pointer;
+}

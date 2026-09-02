@@ -86,19 +86,25 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
   
   const displayDiscount = offerActive
     ? product.offer_discount_percentage
-    : (product.discountPercentage || (displayCompare ? Math.round(((displayCompare - displaySale) / displayCompare) * 100) : 0));
+    : (product.discountPercentage || (displayCompare ? Math.round(((displayCompare - displayPrice) / displayCompare) * 100) : 0));
     
   const hasDiscount = displayCompare && displayCompare > displayPrice;
+  const [addedAnimation, setAddedAnimation] = useState(false);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (isOutOfStock) return;
+    
+    const sizeToUse = selectedSize || availableSizes[0] || 'M';
     if (onAddToCart) {
       onAddToCart({
         ...product,
-        selectedSize: selectedSize || availableSizes[0],
+        selectedSize: sizeToUse,
         finalPrice: displayPrice,
       });
+      setAddedAnimation(true);
+      setTimeout(() => setAddedAnimation(false), 1500);
     }
   };
 
@@ -187,11 +193,12 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
 
         {/* Add to Cart */}
         <button
-          className={`product-card__add-btn ${isOutOfStock ? 'product-card__add-btn--disabled' : ''}`}
+          className={`product-card__add-btn ${isOutOfStock ? 'product-card__add-btn--disabled' : ''} ${addedAnimation ? 'product-card__add-btn--added' : ''}`}
           onClick={handleAddToCart}
           disabled={isOutOfStock}
+          style={addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}}
         >
-          {isOutOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}
+          {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED TO CART ✓' : 'ADD TO CART')}
         </button>
       </div>
     </div>
