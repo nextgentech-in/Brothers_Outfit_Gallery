@@ -80,8 +80,15 @@ export default function Signup() {
       await loginWithGoogle();
       navigate('/profile');
     } catch (err) {
-      if (err.code !== 'auth/popup-closed-by-user') {
-        setError('Unable to connect to Google. Please try again.');
+      console.error("Google signin error:", err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Google sign-in window was closed.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('This domain is not authorized in Firebase Console > Authentication > Settings > Authorized domains.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Google Sign-In is not enabled in your Firebase Console > Authentication > Sign-in method.');
+      } else {
+        setError(`Google sign-in failed: ${err.message || 'Unable to connect to Google.'}`);
       }
       setLoading(false);
     }
