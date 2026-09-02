@@ -123,10 +123,23 @@ export const getAdminOrders = async () => {
   }
 };
 
-export const updateOrderStatus = async (orderId, status) => {
+export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
   const docRef = doc(db, 'orders', orderId);
-  await updateDoc(docRef, { status, updatedAt: serverTimestamp() });
+  await updateDoc(docRef, { status, ...extraPayload, updatedAt: serverTimestamp() });
 };
+
+export const updateOrderShipment = async (orderId, shipmentData) => {
+  const docRef = doc(db, 'orders', orderId);
+  await updateDoc(docRef, {
+    status: 'Shipped',
+    waybill: shipmentData.waybill,
+    courier: shipmentData.courier || 'Delhivery Express',
+    trackingUrl: shipmentData.trackingUrl,
+    shippedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+};
+
 
 // ─── ADMIN: CUSTOMERS ─────────────────────────────────────────────────────────
 export const getAdminCustomers = async () => {

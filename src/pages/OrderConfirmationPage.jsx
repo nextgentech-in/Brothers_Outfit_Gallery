@@ -45,6 +45,31 @@ export default function OrderConfirmationPage() {
               <strong>{order.paymentMethod || 'Online Payment'}</strong>
             </div>
             <div className="order-info-row">
+              <span>Logistics Partner:</span>
+              <strong>🚚 {order.courier || 'Delhivery Express'}</strong>
+            </div>
+            {order.waybill ? (
+              <div className="order-info-row">
+                <span>Delhivery Waybill (AWB):</span>
+                <span>
+                  <strong>{order.waybill}</strong>{' '}
+                  <a
+                    href={order.trackingUrl || `https://www.delhivery.com/track/package/${order.waybill}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ marginLeft: '8px', color: '#0284c7', textDecoration: 'underline', fontSize: '13px', fontWeight: 'bold' }}
+                  >
+                    Track Package ↗
+                  </a>
+                </span>
+              </div>
+            ) : (
+              <div className="order-info-row">
+                <span>Shipping Status:</span>
+                <span style={{ color: '#0284c7', fontWeight: 600 }}>📦 Preparing for Delhivery Dispatch</span>
+              </div>
+            )}
+            <div className="order-info-row">
               <span>Total Amount Paid:</span>
               <strong>₹{order.totalAmount || order.finalTotal}</strong>
             </div>
@@ -54,6 +79,7 @@ export default function OrderConfirmationPage() {
             </div>
           </div>
         )}
+
 
         <div className="confirm-actions">
           <Link to="/shop" className="btn-auth-primary" style={{ width: 'auto' }}>

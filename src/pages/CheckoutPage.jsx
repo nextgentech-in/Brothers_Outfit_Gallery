@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
+import { checkPincodeServiceability } from '../services/delhiveryService';
 import { getBackendUrl } from '../utils/apiConfig';
 import './CheckoutPage.css';
 
@@ -13,6 +14,8 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [delhiveryStatus, setDelhiveryStatus] = useState(null);
+  const [checkingPincode, setCheckingPincode] = useState(false);
 
   const [shippingAddress, setShippingAddress] = useState({
     fullName: userProfile?.fullName || '',
@@ -23,6 +26,7 @@ export default function CheckoutPage() {
     state: userProfile?.address?.state || '',
     pincode: userProfile?.address?.pincode || '',
   });
+
 
   const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
 
@@ -53,10 +57,30 @@ export default function CheckoutPage() {
     );
   }
 
+  // Auto-verify Delhivery pincode serviceability
+  useEffect(() => {
+    if (shippingAddress.pincode && shippingAddress.pincode.trim().length === 6) {
+      const pin = shippingAddress.pincode.trim();
+      setCheckingPincode(true);
+      checkPincodeServiceability(pin)
+        .then(res => {
+          setDelhiveryStatus(res);
+          setCheckingPincode(false);
+        })
+        .catch(() => {
+          setDelhiveryStatus({ serviceable: true, estimatedDays: '3-5 Days' });
+          setCheckingPincode(false);
+        });
+    } else {
+      setDelhiveryStatus(null);
+    }
+  }, [shippingAddress.pincode]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setShippingAddress(prev => ({ ...prev, [name]: value }));
   };
+
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
@@ -283,10 +307,36 @@ export default function CheckoutPage() {
                 value={shippingAddress.pincode}
                 onChange={handleInputChange}
                 required
+                maxLength={6}
                 placeholder="380001"
               />
             </div>
           </div>
+
+          {/* Delhivery Express Serviceability Badge */}
+          {checkingPincode && (
+            <div className="delhivery-status-banner checking">
+              <span>🔄 Checking Delhivery express courier serviceability...</span>
+            </div>
+          )}
+          {!checkingPincode && delhiveryStatus && (
+            <div className={`delhivery-status-banner ${delhiveryStatus.serviceable ? 'success' : 'warning'}`}>
+              <div className="delhivery-badge-header">
+                <strong>📦 Delhivery Express Logistics</strong>
+                {delhiveryStatus.serviceable ? (
+                  <span className="badge-available">✓ Serviceable</span>
+                ) : (
+                  <span className="badge-unavailable">⚠ Standard Shipping</span>
+                )}
+              </div>
+              <p>
+                {delhiveryStatus.serviceable
+                  ? `Fast doorstep delivery available! Estimated arrival: ${delhiveryStatus.estimatedDays || '2-4 Business Days'}.`
+                  : 'Pincode not directly covered by Delhivery Express; standard delivery will apply.'}
+              </p>
+            </div>
+          )}
+
 
           <h3 style={{ marginTop: '32px' }}>2. Select Payment Method</h3>
           <div className="payment-options">
