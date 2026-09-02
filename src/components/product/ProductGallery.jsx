@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
 import { optimizeImage } from '../../utils/imageUtils';
@@ -7,6 +7,7 @@ import './ProductGallery.css';
 export default function ProductGallery({ images }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const touchStartX = useRef(null);
   
   if (!images || images.length === 0) return <div className="product-gallery-empty">No Images Available</div>;
 
@@ -22,10 +23,30 @@ export default function ProductGallery({ images }) {
     }
   };
 
+  // Touch swipe support for main product gallery (Mobile)
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartX.current) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX;
+
+    if (Math.abs(diff) > 35) { // minimum swipe distance
+      if (diff > 0) {
+        handleNavigate('next');
+      } else {
+        handleNavigate('prev');
+      }
+    }
+    touchStartX.current = null;
+  };
+
   return (
     <div className="product-gallery-wrapper">
       
-      {/* Desktop Vertical Thumbnails */}
+      {/* Thumbnails list (Vertical on Desktop, Horizontal Scroll on Mobile) */}
       <div className="product-gallery-thumbnails">
         {images.map((imgObj, idx) => {
           const thumbUrl = extractUrl(imgObj);
@@ -43,26 +64,52 @@ export default function ProductGallery({ images }) {
       </div>
 
       {/* Main Large Image Block */}
-      <div className="product-gallery-main">
+      <div 
+        className="product-gallery-main"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <ImageZoom 
           src={optimizeImage(currentImage, 1000)} 
           alt={`Product view ${currentIndex + 1}`} 
           onClick={() => setLightboxOpen(true)}
         />
+
+        {/* Previous / Next Arrow Overlay Controls */}
+        {images.length > 1 && (
+          <>
+            <button 
+              className="gallery-nav-arrow gallery-nav-prev" 
+              onClick={(e) => { e.stopPropagation(); handleNavigate('prev'); }}
+              aria-label="Previous image"
+            >
+              ‹
+            </button>
+            <button 
+              className="gallery-nav-arrow gallery-nav-next" 
+              onClick={(e) => { e.stopPropagation(); handleNavigate('next'); }}
+              aria-label="Next image"
+            >
+              ›
+            </button>
+          </>
+        )}
         
         {/* Mobile Swipe Indicators (Dots) */}
-        <div className="product-gallery-dots">
-          {images.map((_, idx) => (
-            <span 
-              key={idx}
-              className={`dot ${idx === currentIndex ? 'active' : ''}`}
-              onClick={() => setCurrentIndex(idx)}
-            />
-          ))}
-        </div>
+        {images.length > 1 && (
+          <div className="product-gallery-dots">
+            {images.map((_, idx) => (
+              <span 
+                key={idx}
+                className={`dot ${idx === currentIndex ? 'active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Lightbox Wrapper */}
+      {/* Lightbox Modal */}
       {lightboxOpen && (
         <ImageLightbox 
           images={images.map(img => optimizeImage(extractUrl(img), 1400))} 
@@ -76,3 +123,4 @@ export default function ProductGallery({ images }) {
     </div>
   );
 }
+

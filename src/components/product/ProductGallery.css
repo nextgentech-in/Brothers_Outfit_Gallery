@@ -44,6 +44,45 @@
   position: relative;
   aspect-ratio: 3/4; /* Match typical fashion aspect ratio constraints cleanly */
   overflow: hidden;
+  border-radius: 8px;
+  background-color: #f7f7f7;
+  touch-action: pan-y;
+}
+
+/* Gallery Navigation Arrows */
+.gallery-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: #111827;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 15;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.gallery-nav-arrow:hover {
+  background: #ffffff;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.gallery-nav-prev {
+  left: 12px;
+}
+
+.gallery-nav-next {
+  right: 12px;
 }
 
 .product-gallery-dots {
@@ -52,35 +91,52 @@
 
 @media (max-width: 1024px) {
   .product-gallery-wrapper {
-    flex-direction: column-reverse;
-    gap: 16px;
+    flex-direction: column;
+    gap: 12px;
   }
   
   .product-gallery-thumbnails {
-    display: none; /* Hide vertical thumbnails on mobile entirely */
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 6px 0;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .thumbnail-btn {
+    width: 64px;
+    height: 80px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    scroll-snap-align: start;
   }
 
   .product-gallery-dots {
     display: flex;
     justify-content: center;
     gap: 8px;
-    margin-top: 16px;
     position: absolute;
-    bottom: 24px;
+    bottom: 16px;
     width: 100%;
+    z-index: 10;
   }
 
   .dot {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: rgba(0,0,0,0.2);
+    background: rgba(0, 0, 0, 0.3);
     cursor: pointer;
     transition: background 0.3s, transform 0.3s;
   }
 
   .dot.active {
-    background: var(--color-heading);
-    transform: scale(1.4);
+    background: #111827;
+    transform: scale(1.3);
   }
 }
+
