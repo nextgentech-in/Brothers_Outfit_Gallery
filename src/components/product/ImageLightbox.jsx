@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import './ImageLightbox.css';
 
 export default function ImageLightbox({ images, currentIndex, onClose, onNavigate, onSelectIndex }) {
@@ -43,12 +44,12 @@ export default function ImageLightbox({ images, currentIndex, onClose, onNavigat
     touchStartX.current = null;
   };
 
-  return (
+  const content = (
     <div className="lightbox-overlay" onClick={onClose}>
       <div className="lightbox-header">
         <span className="lightbox-counter">IMAGE {currentIndex + 1} OF {total}</span>
         <button className="lightbox-close" onClick={onClose} aria-label="Close Gallery">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -102,5 +103,8 @@ export default function ImageLightbox({ images, currentIndex, onClose, onNavigat
       )}
     </div>
   );
+
+  return ReactDOM.createPortal(content, document.body);
 }
+
 

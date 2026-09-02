@@ -207,6 +207,13 @@ async function getDelhiveryAuthToken() {
   }
 }
 
+function getEstimatedDeliveryDate(transitDays = 3) {
+  const d = new Date();
+  d.setDate(d.getDate() + transitDays);
+  const options = { weekday: 'short', day: 'numeric', month: 'short' };
+  return d.toLocaleDateString('en-IN', options);
+}
+
 // ─── Delhivery One: Check Pincode Serviceability ─────────────────────────
 app.post('/api/delhivery/pincode/check', async (req, res) => {
   const { pincode } = req.body;
@@ -252,7 +259,8 @@ app.post('/api/delhivery/pincode/check', async (req, res) => {
               state: details.state_code || 'India',
               codAvailable: details.cod === 'Y',
               prepaidAvailable: details.pre_paid === 'Y',
-              estimatedDays: '2 - 4 Business Days'
+              estimatedDays: '2 - 4 Business Days',
+              estimatedDeliveryDate: getEstimatedDeliveryDate(3)
             });
           } else {
             return res.json({
@@ -282,13 +290,15 @@ app.post('/api/delhivery/pincode/check', async (req, res) => {
             area: po.Name,
             codAvailable: true,
             prepaidAvailable: true,
-            estimatedDays: '2 - 4 Business Days'
+            estimatedDays: '2 - 4 Business Days',
+            estimatedDeliveryDate: getEstimatedDeliveryDate(3)
           });
         }
       }
     } catch (pErr) {
       console.warn('India Post API call warning:', pErr.message);
     }
+
 
     // 3. If neither Delhivery nor India Post recognizes the pincode, it is invalid!
     return res.json({

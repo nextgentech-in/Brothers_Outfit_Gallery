@@ -32,10 +32,11 @@ export default function CheckoutPage() {
 
   const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
 
-  // Pricing math
-  const discount = cartSubtotal > 2000 ? 250 : 0;
-  const shippingCost = cartSubtotal > 1500 ? 0 : 99;
+  // Pricing math: Free delivery for orders >= ₹1000, else ₹70
+  const discount = cartSubtotal >= 2500 ? 250 : 0;
+  const shippingCost = cartSubtotal >= 1000 ? 0 : 70;
   const finalTotal = cartSubtotal - discount + shippingCost;
+
 
   // Load Razorpay Script onto page
   useEffect(() => {
@@ -384,20 +385,39 @@ export default function CheckoutPage() {
           {!checkingPincode && delhiveryStatus && (
             <div className={`delhivery-status-banner ${delhiveryStatus.serviceable ? 'success' : 'warning'}`}>
               <div className="delhivery-badge-header">
-                <strong>📦 Delhivery Express Logistics</strong>
+                <strong>📦 Delhivery Express Courier Coverage</strong>
                 {delhiveryStatus.serviceable ? (
                   <span className="badge-available">✓ Serviceable</span>
                 ) : (
                   <span className="badge-unavailable">⚠ Standard Shipping</span>
                 )}
               </div>
-              <p>
+              <p style={{ marginTop: '4px' }}>
                 {delhiveryStatus.serviceable
-                  ? `Fast doorstep delivery available! Estimated arrival: ${delhiveryStatus.estimatedDays || '2-4 Business Days'}.`
+                  ? `🚚 Fast Doorstep Delivery Available! Expected Arrival: ${delhiveryStatus.estimatedDeliveryDate ? delhiveryStatus.estimatedDeliveryDate : (delhiveryStatus.estimatedDays || '2-4 Days')}.`
                   : 'Pincode not directly covered by Delhivery Express; standard delivery will apply.'}
               </p>
             </div>
           )}
+
+          {/* Free Shipping Banner */}
+          <div className={`free-shipping-bar ${cartSubtotal >= 1000 ? 'unlocked' : 'pending'}`} style={{
+            marginTop: '16px',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: '700',
+            background: cartSubtotal >= 1000 ? '#f0fdf4' : '#fffbeb',
+            color: cartSubtotal >= 1000 ? '#15803d' : '#b45309',
+            border: `1px solid ${cartSubtotal >= 1000 ? '#bbf7d0' : '#fde68a'}`
+          }}>
+            {cartSubtotal >= 1000 ? (
+              <span>🎉 Congratulations! You unlocked FREE Delivery (Order over ₹1,000)!</span>
+            ) : (
+              <span>🚚 Add ₹{(1000 - cartSubtotal).toLocaleString('en-IN')} more for FREE Express Shipping!</span>
+            )}
+          </div>
+
 
 
           <h3 style={{ marginTop: '32px' }}>2. Select Payment Method</h3>

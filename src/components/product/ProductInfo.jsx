@@ -282,7 +282,9 @@ export default function ProductInfo({ product }) {
               <>
                 <div className="res-title">✓ Delivery Available for PIN {deliveryPincode}</div>
                 {deliveryStatus.city && <div className="res-location">📍 Location: {deliveryStatus.city}, {deliveryStatus.state}</div>}
-                <div className="res-time">🚚 Estimated Doorstep Delivery: {deliveryStatus.estimatedDays || '2-4 Business Days'}</div>
+                <div className="res-time">
+                  🚚 Expected Delivery: <strong>{deliveryStatus.estimatedDeliveryDate ? deliveryStatus.estimatedDeliveryDate : (deliveryStatus.estimatedDays || '2-4 Days')}</strong>
+                </div>
               </>
             ) : (
               <>
@@ -292,6 +294,7 @@ export default function ProductInfo({ product }) {
             )}
           </div>
         )}
+
       </div>
 
 
