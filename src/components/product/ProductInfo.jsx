@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useCart } from '../../context/CartContext';
+import { checkPincodeServiceability } from '../../services/delhiveryService';
 import './ProductInfo.css';
+
 
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
 function MiniCountdown({ targetDate }) {
@@ -87,13 +89,21 @@ export default function ProductInfo({ product }) {
     alert(`Redirecting to Checkout with ${quantity}x ${name} (${selectedSize} - ${selectedColor})`);
   };
 
-  const handleDeliveryCheck = (e) => {
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
+
+  const handleDeliveryCheck = async (e) => {
     e.preventDefault();
-    if(deliveryPincode.length === 6) {
-      setDeliveryStatus('Delivery available in 3-5 days ✓');
-    } else {
-      setDeliveryStatus('Please enter a valid 6-digit Pincode.');
+    if (!deliveryPincode || deliveryPincode.length !== 6) {
+      setDeliveryStatus({ error: 'Please enter a valid 6-digit PIN Code.' });
+      return;
     }
+
+    setCheckingDelivery(true);
+    setDeliveryStatus(null);
+
+    const res = await checkPincodeServiceability(deliveryPincode);
+    setCheckingDelivery(false);
+    setDeliveryStatus(res);
   };
 
   return (
@@ -220,20 +230,43 @@ export default function ProductInfo({ product }) {
         BUY NOW
       </button>
 
-
       <div className="delivery-checker">
-        <h4 className="checker-title">CHECK DELIVERY</h4>
+        <h4 className="checker-title">📦 CHECK DELHIVERY EXPRESS SERVICEABILITY</h4>
         <form className="checker-form" onSubmit={handleDeliveryCheck}>
           <input 
             type="text" 
-            placeholder="Enter Pincode" 
+            placeholder="Enter 6-digit Pincode" 
             value={deliveryPincode}
+            maxLength={6}
             onChange={(e) => setDeliveryPincode(e.target.value.replace(/\D/g, '').slice(0,6))}
           />
-          <button type="submit">CHECK</button>
+          <button type="submit" disabled={checkingDelivery}>
+            {checkingDelivery ? 'CHECKING...' : 'CHECK'}
+          </button>
         </form>
-        {deliveryStatus && <p className="delivery-status-msg">{deliveryStatus}</p>}
+
+        {checkingDelivery && (
+          <p className="delivery-status-msg checking">🔄 Checking Delhivery courier coverage...</p>
+        )}
+
+        {deliveryStatus && (
+          <div className={`delivery-result-badge ${deliveryStatus.serviceable ? 'success' : 'error'}`}>
+            {deliveryStatus.serviceable ? (
+              <>
+                <div className="res-title">✓ Delivery Available for PIN {deliveryPincode}</div>
+                {deliveryStatus.city && <div className="res-location">📍 Location: {deliveryStatus.city}, {deliveryStatus.state}</div>}
+                <div className="res-time">🚚 Estimated Doorstep Delivery: {deliveryStatus.estimatedDays || '2-4 Business Days'}</div>
+              </>
+            ) : (
+              <>
+                <div className="res-title">❌ Delivery NOT Available</div>
+                <div className="res-msg">{deliveryStatus.error || `PIN code ${deliveryPincode} is currently invalid or unserviceable.`}</div>
+              </>
+            )}
+          </div>
+        )}
       </div>
+
 
       {/* Accordions / Details */}
       <div className="product-details-accordions">

@@ -6,8 +6,13 @@ import { getBackendUrl } from '../utils/apiConfig';
  * @returns {Promise<{serviceable: boolean, estimatedDays?: string, error?: string}>}
  */
 export const checkPincodeServiceability = async (pincode) => {
-  if (!pincode || pincode.length !== 6) {
-    return { serviceable: false, error: 'Enter a valid 6-digit Indian PIN code.' };
+  if (!pincode || pincode.length !== 6 || !/^\d{6}$/.test(pincode)) {
+    return { serviceable: false, error: 'Please enter a valid 6-digit Indian PIN code.' };
+  }
+
+  // Client-side quick filter for known invalid test codes
+  if (/^000|^999|000000|123456|999999/.test(pincode)) {
+    return { serviceable: false, pincode, error: `PIN Code ${pincode} is invalid.` };
   }
 
   try {
@@ -19,21 +24,43 @@ export const checkPincodeServiceability = async (pincode) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to reach delivery serviceability server.');
+      return { serviceable: false, error: 'Delivery service check unavailable.' };
     }
 
     return await response.json();
   } catch (error) {
     console.error('Delhivery pincode check error:', error);
-    // Graceful fallback for UI continuity
     return {
-      serviceable: true,
+      serviceable: false,
       pincode,
-      estimatedDays: '3 - 5 Business Days',
-      fallback: true
+      error: 'Unable to verify pincode. Please double-check your entry.'
     };
   }
 };
+
+/**
+ * Lookup PIN codes by City / Place Name
+ * @param {string} place 
+ * @returns {Promise<Array<{pincode: string, area: string, city: string, state: string}>>}
+ */
+export const lookupPincodeByPlace = async (place) => {
+  if (!place || place.trim().length < 3) return [];
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/api/delhivery/pincode/lookup-by-place`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ place }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.suggestions || [];
+  } catch (err) {
+    console.error('Error looking up place:', err);
+    return [];
+  }
+};
+
 
 /**
  * Create shipment with Delhivery One for an order

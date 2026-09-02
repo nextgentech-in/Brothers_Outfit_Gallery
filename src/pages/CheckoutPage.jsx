@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
-import { checkPincodeServiceability } from '../services/delhiveryService';
+import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
+import { createAdminOrderNotification } from '../services/notificationService';
 import { getBackendUrl } from '../utils/apiConfig';
 import './CheckoutPage.css';
+
 
 export default function CheckoutPage() {
   const { cartItems, cartSubtotal, clearCart } = useCart();
@@ -57,7 +59,10 @@ export default function CheckoutPage() {
     );
   }
 
-  // Auto-verify Delhivery pincode serviceability
+  const [placeSuggestions, setPlaceSuggestions] = useState([]);
+  const [searchingPlace, setSearchingPlace] = useState(false);
+
+  // Auto-verify Delhivery pincode serviceability & auto-fill city/state
   useEffect(() => {
     if (shippingAddress.pincode && shippingAddress.pincode.trim().length === 6) {
       const pin = shippingAddress.pincode.trim();
@@ -66,9 +71,17 @@ export default function CheckoutPage() {
         .then(res => {
           setDelhiveryStatus(res);
           setCheckingPincode(false);
+          // Auto fill city and state if returned from pincode lookup
+          if (res && res.serviceable) {
+            setShippingAddress(prev => ({
+              ...prev,
+              city: prev.city || res.city || '',
+              state: prev.state || res.state || ''
+            }));
+          }
         })
         .catch(() => {
-          setDelhiveryStatus({ serviceable: true, estimatedDays: '3-5 Days' });
+          setDelhiveryStatus({ serviceable: false, error: 'Pincode check failed.' });
           setCheckingPincode(false);
         });
     } else {
@@ -79,13 +92,39 @@ export default function CheckoutPage() {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setShippingAddress(prev => ({ ...prev, [name]: value }));
+
+    // Auto-search pincode if user types city or place (>= 3 chars)
+    if (name === 'city' && value.trim().length >= 3) {
+      setSearchingPlace(true);
+      lookupPincodeByPlace(value)
+        .then(results => {
+          setPlaceSuggestions(results);
+          setSearchingPlace(false);
+        })
+        .catch(() => setSearchingPlace(false));
+    } else if (name === 'city' && value.trim().length < 3) {
+      setPlaceSuggestions([]);
+    }
   };
 
+  const handleSelectPlaceSuggestion = (suggestion) => {
+    setShippingAddress(prev => ({
+      ...prev,
+      city: suggestion.city || suggestion.area,
+      state: suggestion.state || prev.state,
+      pincode: suggestion.pincode
+    }));
+    setPlaceSuggestions([]);
+  };
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
       return setError('Please fill in all required shipping address fields.');
+    }
+
+    if (delhiveryStatus && !delhiveryStatus.serviceable) {
+      return setError('Cannot place order: Please enter a valid and serviceable PIN code.');
     }
 
     setLoading(true);
@@ -113,6 +152,9 @@ export default function CheckoutPage() {
         };
 
         await createOrder(newOrderId, orderPayload);
+        // Trigger Admin Alert
+        await createAdminOrderNotification(newOrderId, orderPayload);
+
         clearCart();
         navigate(`/order-confirmation/${newOrderId}`);
       } catch (err) {
@@ -180,6 +222,9 @@ export default function CheckoutPage() {
               };
 
               await createOrder(newOrderId, orderPayload);
+              // Trigger Admin Alert
+              await createAdminOrderNotification(newOrderId, orderPayload);
+
               clearCart();
               navigate(`/order-confirmation/${newOrderId}`);
             } else {
@@ -191,6 +236,7 @@ export default function CheckoutPage() {
             setLoading(false);
           }
         },
+
         prefill: {
           name: shippingAddress.fullName,
           email: shippingAddress.email,
@@ -277,17 +323,33 @@ export default function CheckoutPage() {
           </div>
 
           <div className="checkout-form-row">
-            <div className="checkout-form-group">
-              <label>City *</label>
+            <div className="checkout-form-group" style={{ position: 'relative' }}>
+              <label>City / Place *</label>
               <input
                 type="text"
                 name="city"
                 value={shippingAddress.city}
                 onChange={handleInputChange}
                 required
-                placeholder="City"
+                placeholder="Type City or Area..."
               />
+              {placeSuggestions.length > 0 && (
+                <div className="place-suggestions-dropdown">
+                  <div className="suggestions-header">Click to select PIN code & location:</div>
+                  {placeSuggestions.map((s, idx) => (
+                    <div 
+                      key={idx} 
+                      className="suggestion-item"
+                      onClick={() => handleSelectPlaceSuggestion(s)}
+                    >
+                      <strong>📍 {s.area || s.city} ({s.pincode})</strong>
+                      <span>{s.city}, {s.state}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+
             <div className="checkout-form-group">
               <label>State *</label>
               <input

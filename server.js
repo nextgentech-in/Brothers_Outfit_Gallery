@@ -168,12 +168,17 @@ app.post('/api/delhivery/pincode/check', async (req, res) => {
     return res.status(400).json({ serviceable: false, error: 'Valid 6-digit Indian PIN code required.' });
   }
 
+  // Known invalid dummy pincodes
+  if (/^000|^999|000000|123456|999999/.test(pincode)) {
+    return res.json({ serviceable: false, pincode, error: 'Invalid PIN code. Please enter a valid Indian postal code.' });
+  }
+
   try {
     const apiKey = process.env.DELHIVERY_API_KEY;
     const token = await getDelhiveryAuthToken();
     const cmsClient = process.env.D1_CLIENT_CMS || '';
 
-    // Attempt Delhivery live serviceability API fetch
+    // 1. Attempt Delhivery live serviceability API fetch
     const headers = { 'Content-Type': 'application/json' };
     if (apiKey) {
       headers['Authorization'] = `Token ${apiKey}`;
@@ -186,41 +191,99 @@ app.post('/api/delhivery/pincode/check', async (req, res) => {
       ? `https://track.delhivery.com/c/api/pin-codes/json/?token=${apiKey}&filter_codes=${pincode}`
       : `https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pincode}`;
 
-    const response = await fetch(url, { headers });
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.delivery_codes && data.delivery_codes.length > 0) {
-        const details = data.delivery_codes[0].postal_code;
-        return res.json({
-          serviceable: details.is_sda === 'Y' || details.pre_paid === 'Y' || details.cod === 'Y',
-          pincode,
-          city: details.city || 'Available City',
-          state: details.state_code || 'India',
-          codAvailable: details.cod === 'Y',
-          prepaidAvailable: details.pre_paid === 'Y',
-          estimatedDays: '2 - 4 Business Days'
-        });
+    try {
+      const response = await fetch(url, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.delivery_codes && data.delivery_codes.length > 0) {
+          const details = data.delivery_codes[0].postal_code;
+          const isServiceable = details.is_sda === 'Y' || details.pre_paid === 'Y' || details.cod === 'Y';
+          if (isServiceable) {
+            return res.json({
+              serviceable: true,
+              pincode,
+              city: details.city || 'Available City',
+              state: details.state_code || 'India',
+              codAvailable: details.cod === 'Y',
+              prepaidAvailable: details.pre_paid === 'Y',
+              estimatedDays: '2 - 4 Business Days'
+            });
+          } else {
+            return res.json({
+              serviceable: false,
+              pincode,
+              error: `Delivery is currently not available for PIN code ${pincode}.`
+            });
+          }
+        }
       }
+    } catch (dErr) {
+      console.warn('Delhivery direct API call warning:', dErr.message);
     }
 
-    // Fallback for valid Indian pincodes
+    // 2. Dual-Layer Validation via India Post Official API
+    try {
+      const postResponse = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+      if (postResponse.ok) {
+        const postData = await postResponse.json();
+        if (postData && postData[0] && postData[0].Status === 'Success' && postData[0].PostOffice && postData[0].PostOffice.length > 0) {
+          const po = postData[0].PostOffice[0];
+          return res.json({
+            serviceable: true,
+            pincode,
+            city: po.District || po.Block || po.Name,
+            state: po.State,
+            area: po.Name,
+            codAvailable: true,
+            prepaidAvailable: true,
+            estimatedDays: '2 - 4 Business Days'
+          });
+        }
+      }
+    } catch (pErr) {
+      console.warn('India Post API call warning:', pErr.message);
+    }
+
+    // 3. If neither Delhivery nor India Post recognizes the pincode, it is invalid!
     return res.json({
-      serviceable: true,
+      serviceable: false,
       pincode,
-      city: 'Delhivery Covered Zone',
-      codAvailable: true,
-      prepaidAvailable: true,
-      estimatedDays: '3 - 5 Business Days'
+      error: `Invalid PIN Code: ${pincode} does not exist or is not serviceable for delivery.`
     });
   } catch (error) {
     console.error('Pincode serviceability check error:', error);
-    res.json({
-      serviceable: true,
-      pincode,
-      estimatedDays: '3 - 5 Business Days'
-    });
+    res.status(500).json({ serviceable: false, error: 'Serviceability check failed.' });
   }
 });
+
+// ─── Delhivery One: Lookup Pincode by City / Place Name ────────────────────
+app.post('/api/delhivery/pincode/lookup-by-place', async (req, res) => {
+  const { place } = req.body;
+  if (!place || place.trim().length < 3) {
+    return res.status(400).json({ suggestions: [] });
+  }
+
+  try {
+    const postResponse = await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(place.trim())}`);
+    if (postResponse.ok) {
+      const postData = await postResponse.json();
+      if (postData && postData[0] && postData[0].Status === 'Success' && postData[0].PostOffice) {
+        const suggestions = postData[0].PostOffice.slice(0, 5).map(po => ({
+          pincode: po.Pincode,
+          area: po.Name,
+          city: po.District || po.Block || po.Name,
+          state: po.State
+        }));
+        return res.json({ suggestions });
+      }
+    }
+    res.json({ suggestions: [] });
+  } catch (error) {
+    console.error('Place lookup error:', error);
+    res.json({ suggestions: [] });
+  }
+});
+
 
 // ─── Delhivery One: Create Order Shipment (Generate AWB) ──────────────────
 app.post('/api/delhivery/create-shipment', async (req, res) => {
