@@ -33,9 +33,9 @@
 .accessories-subtitle {
   display: inline-block;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 3px;
-  color: #facc15;
+  color: #facc15 !important;
   margin-bottom: 12px;
   text-transform: uppercase;
 }
@@ -45,14 +45,17 @@
   font-weight: 900;
   letter-spacing: -1px;
   margin: 0 0 16px 0;
+  color: #ffffff !important;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .accessories-hero p {
   font-size: 15px;
-  color: #94a3b8;
+  color: #f1f5f9 !important;
   line-height: 1.6;
   margin: 0;
 }
+
 
 /* Tabs Filter Row */
 .accessories-tabs-container {

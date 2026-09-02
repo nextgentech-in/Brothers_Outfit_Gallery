@@ -6,9 +6,9 @@
 
 /* ───────── Sale Hero ───────── */
 .sale-hero {
-  background: linear-gradient(135deg, #0c0a09 0%, #1c1917 40%, #7f1d1d 100%);
-  color: #fff;
-  padding: 160px 24px 100px;
+  background: linear-gradient(135deg, #18181b 0%, #3f0707 50%, #7f1d1d 100%);
+  color: #ffffff;
+  padding: 150px 24px 90px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -18,10 +18,9 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.2) 0%, transparent 70%);
   pointer-events: none;
 }
-
 
 .sale-hero__content {
   max-width: 800px;
@@ -35,55 +34,61 @@
 
 .sale-hero__label {
   font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 6px;
-  background: #c0392b;
-  color: #fff;
-  padding: 6px 18px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  background: #dc2626;
+  color: #ffffff !important;
+  padding: 6px 20px;
   border-radius: 4px;
   margin-bottom: 24px;
   text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
 }
 
 .sale-hero__title {
   font-family: var(--font-heading);
-  font-size: clamp(40px, 6vw, 72px);
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -1px;
-  margin: 0 0 24px;
+  font-size: clamp(38px, 6vw, 68px);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  margin: 0 0 20px;
   text-transform: uppercase;
+  color: #ffffff !important;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .sale-hero__desc {
   font-family: var(--font-body);
-  font-size: clamp(16px, 2vw, 20px);
-  color: rgba(255, 255, 255, 0.85);
-  margin: 0 0 40px;
-  max-width: 600px;
+  font-size: clamp(15px, 2vw, 18px);
+  color: #f1f5f9 !important;
+  margin: 0 0 36px;
+  max-width: 620px;
+  line-height: 1.6;
 }
 
 .sale-hero__cta {
-  background: #fff;
-  color: var(--color-heading);
+  background: #ffffff;
+  color: #0f172a !important;
   border: none;
   font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   letter-spacing: 2px;
-  padding: 16px 40px;
-  border-radius: 4px;
+  padding: 16px 36px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-transform: uppercase;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .sale-hero__cta:hover {
-  background: #c0392b;
-  color: #fff;
+  background: #facc15;
+  color: #0f172a !important;
   transform: translateY(-2px);
 }
+
 
 /* ───────── Sale Content & Grid ───────── */
 .sale-content {
