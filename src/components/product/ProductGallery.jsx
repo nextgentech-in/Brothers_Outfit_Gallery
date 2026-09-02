@@ -69,8 +69,10 @@ export default function ProductGallery({ images }) {
           currentIndex={currentIndex}
           onClose={() => setLightboxOpen(false)}
           onNavigate={handleNavigate}
+          onSelectIndex={(idx) => setCurrentIndex(idx)}
         />
       )}
+
     </div>
   );
 }

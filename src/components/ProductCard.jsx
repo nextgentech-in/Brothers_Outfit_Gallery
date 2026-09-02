@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
+import { isClothingProduct } from '../utils/productUtils';
 import './ProductCard.css';
+
 
 /**
  * Calculates the offer price based on compareAtPrice (base) and offer discount.
@@ -91,12 +93,14 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
   const hasDiscount = displayCompare && displayCompare > displayPrice;
   const [addedAnimation, setAddedAnimation] = useState(false);
 
+  const isClothing = isClothingProduct(product);
+
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (isOutOfStock) return;
     
-    const sizeToUse = selectedSize || availableSizes[0] || 'M';
+    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     if (onAddToCart) {
       onAddToCart({
         ...product,
@@ -107,6 +111,7 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
       setTimeout(() => setAddedAnimation(false), 1500);
     }
   };
+
 
   return (
     <div className={`product-card ${isOutOfStock ? 'product-card--oos' : ''}`}>

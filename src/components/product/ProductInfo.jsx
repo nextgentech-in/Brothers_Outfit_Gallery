@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
+import { isClothingProduct } from '../../utils/productUtils';
 import './ProductInfo.css';
-
 
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
 function MiniCountdown({ targetDate }) {
@@ -37,6 +38,7 @@ function MiniCountdown({ targetDate }) {
 }
 
 export default function ProductInfo({ product }) {
+  const navigate = useNavigate();
   const initialColor = product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black';
   const [selectedColor, setSelectedColor] = useState(initialColor);
   const [selectedSize, setSelectedSize] = useState(null);
@@ -44,6 +46,9 @@ export default function ProductInfo({ product }) {
   const [added, setAdded] = useState(false);
   const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
+
+  // Determine if item is Clothing (where size selection is mandatory) vs Accessories
+  const isClothing = isClothingProduct(product);
 
   // Guard against missing properties gracefully reading legacy vs new admin schema
   const activeMrp = product.mrp || product.compareAtPrice || 0;
@@ -78,16 +83,27 @@ export default function ProductInfo({ product }) {
   };
 
   const handleAddToCart = () => {
-    if (!selectedSize) return alert('PLEASE SELECT A SIZE');
-    addToCart(product, selectedSize, selectedColor);
+    // Only require mandatory size selection if item is Clothing/Apparel and has size options
+    if (isClothing && productSizes.length > 0 && !selectedSize) {
+      return alert('PLEASE SELECT A SIZE FOR THIS CLOTHING ITEM');
+    }
+
+    const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    addToCart(product, sizeToUse, selectedColor);
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
   };
 
   const handleBuyNow = () => {
-    if (!selectedSize) return alert('PLEASE SELECT A SIZE');
-    alert(`Redirecting to Checkout with ${quantity}x ${name} (${selectedSize} - ${selectedColor})`);
+    if (isClothing && productSizes.length > 0 && !selectedSize) {
+      return alert('PLEASE SELECT A SIZE FOR THIS CLOTHING ITEM');
+    }
+
+    const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    addToCart(product, sizeToUse, selectedColor);
+    navigate('/checkout');
   };
+
 
   const [checkingDelivery, setCheckingDelivery] = useState(false);
 
@@ -171,34 +187,45 @@ export default function ProductInfo({ product }) {
         </div>
       </div>
 
+      {/* Size Selection Group */}
       <div className="product-selector-group">
         <div className="size-header">
-          <h3 className="selector-title">SELECT SIZE</h3>
-          <button className="btn-size-guide" onClick={() => alert("Size Guide Modal Trigger")}>SIZE GUIDE</button>
+          <h3 className="selector-title">
+            {isClothing ? 'SELECT SIZE *' : 'SIZE'}
+          </h3>
+          {isClothing && <button className="btn-size-guide" onClick={() => alert("Size Guide Modal Trigger")}>SIZE GUIDE</button>}
         </div>
-        <div className="size-buttons">
-          {productSizes.map(size => {
-            // Read active stock distinct to color+size from variants matrix!
-            let variantStock = null;
-            if (product.variants?.length > 0) {
-              const matchedVariant = product.variants.find(v => v.color === selectedColor && v.size === size);
-              variantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : 0;
-            }
-            const isSizeOos = variantStock !== null ? variantStock === 0 : outOfStock;
 
-            return (
-              <button 
-                key={size}
-                className={`size-btn ${selectedSize === size ? 'selected' : ''} ${isSizeOos ? 'disabled' : ''}`}
-                disabled={isSizeOos}
-                onClick={() => setSelectedSize(size)}
-              >
-                {size}
-              </button>
-            )
-          })}
-        </div>
+        {productSizes.length > 0 ? (
+          <div className="size-buttons">
+            {productSizes.map(size => {
+              // Read active stock distinct to color+size from variants matrix!
+              let variantStock = null;
+              if (product.variants?.length > 0) {
+                const matchedVariant = product.variants.find(v => v.color === selectedColor && v.size === size);
+                variantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : 0;
+              }
+              const isSizeOos = variantStock !== null ? variantStock === 0 : outOfStock;
+
+              return (
+                <button 
+                  key={size}
+                  className={`size-btn ${selectedSize === size ? 'selected' : ''} ${isSizeOos ? 'disabled' : ''}`}
+                  disabled={isSizeOos}
+                  onClick={() => setSelectedSize(size)}
+                >
+                  {size}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="one-size-badge" style={{ fontSize: '13px', fontWeight: '700', color: '#4b5563', padding: '8px 12px', background: '#f3f4f6', borderRadius: '4px', display: 'inline-block' }}>
+            ONE SIZE / STANDARD FIT
+          </div>
+        )}
       </div>
+
 
       <div className="product-stock-status">
         {outOfStock ? (
