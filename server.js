@@ -26,8 +26,49 @@ if (fs.existsSync(envPath)) {
 const app = express();
 const port = process.env.PORT || 3001;
 
+// ───────────── SECURITY ENHANCEMENTS ─────────────
+// 1. Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  next();
+});
+
+// 2. In-Memory Rate Limiter Middleware to protect against DDoS & Brute-Force
+const ipRateLimits = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 60; // 60 req/min per IP
+
+app.use((req, res, next) => {
+  // Allow health check without rate limit
+  if (req.path === '/api/health') return next();
+
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+
+  let ipRecord = ipRateLimits.get(clientIp);
+  if (!ipRecord || now > ipRecord.resetTime) {
+    ipRecord = { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS };
+    ipRateLimits.set(clientIp, ipRecord);
+  } else {
+    ipRecord.count += 1;
+  }
+
+  if (ipRecord.count > MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({ error: 'Too many requests. Please slow down and try again.' });
+  }
+
+  next();
+});
+
+// 3. Secure Payload Body Parsing
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
 
 // Admin Notification Emails
 const ADMIN_EMAILS = [

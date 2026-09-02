@@ -1,19 +1,22 @@
 .checkout-page-container {
   max-width: 1200px;
-  margin: 40px auto;
-  padding: 0 20px;
+  margin: 0 auto 60px;
+  padding: 110px 20px 0;
 }
 
 .checkout-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 48px;
 }
 
 .checkout-header h1 {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #0c0a09;
+  margin: 0 0 8px 0;
 }
+
 
 .checkout-error-banner {
   background: #fef2f2;

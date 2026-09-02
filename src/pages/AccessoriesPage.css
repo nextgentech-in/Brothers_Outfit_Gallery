@@ -7,9 +7,9 @@
 
 /* Hero Section */
 .accessories-hero {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: linear-gradient(135deg, #0c0a09 0%, #1c1917 50%, #0f172a 100%);
   color: #ffffff;
-  padding: 80px 24px;
+  padding: 120px 24px 70px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -20,9 +20,10 @@
   position: absolute;
   bottom: 0;
   left: 0; right: 0;
-  height: 4px;
+  height: 3px;
   background: linear-gradient(90deg, #facc15, #eab308, #ca8a04);
 }
+
 
 .accessories-hero-content {
   max-width: 800px;

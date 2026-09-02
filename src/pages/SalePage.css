@@ -6,9 +6,9 @@
 
 /* ───────── Sale Hero ───────── */
 .sale-hero {
-  background: #f51b02;
+  background: linear-gradient(135deg, #0c0a09 0%, #1c1917 40%, #7f1d1d 100%);
   color: #fff;
-  padding: 180px 24px 120px;
+  padding: 160px 24px 100px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -18,9 +18,10 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: radial-gradient(circle at center, rgba(192, 57, 43, 0.4) 0%, transparent 60%);
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.15) 0%, transparent 70%);
   pointer-events: none;
 }
+
 
 .sale-hero__content {
   max-width: 800px;
