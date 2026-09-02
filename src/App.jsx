@@ -1,42 +1,73 @@
-import React, { Component } from 'react';
+import React, { Component, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useParams, Link, useLocation, Outlet } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
-import HomePage from './pages/HomePage';
 import Footer from './components/Footer';
-import ShopPage from './pages/ShopPage';
-import NewArrivalsPage from './pages/NewArrivalsPage';
-import SalePage from './pages/SalePage';
-import AboutPage from './pages/AboutPage';
-import AccessoriesPage from './pages/AccessoriesPage';
 import { AuthProvider } from './context/AuthContext';
-
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Profile from './pages/Profile';
-import CompleteProfile from './pages/CompleteProfile';
-import ProductPage from './pages/ProductPage';
-import CartPage from './pages/CartPage';
 import { CartProvider } from './context/CartContext';
 import { ShopProvider } from './context/ShopContext';
 import WhatsAppFloat from './components/WhatsAppFloat';
 
-import CheckoutPage from './pages/CheckoutPage';
-import OrderConfirmationPage from './pages/OrderConfirmationPage';
+// Critical First-Paint Pages
+import HomePage from './pages/HomePage';
 
-import AdminRoute from './components/auth/AdminRoute';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminProducts from './pages/admin/AdminProducts';
-import AdminProductForm from './pages/admin/AdminProductForm';
-import AdminOrders from './pages/admin/AdminOrders';
-import AdminCustomers from './pages/admin/AdminCustomers';
-import AdminInventory from './pages/admin/AdminInventory';
-import AdminCoupons from './pages/admin/AdminCoupons';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminReviews from './pages/admin/AdminReviews';
-import AdminHomepage from './pages/admin/AdminHomepage';
+// Lazy Loaded Non-Critical & Heavy Routes for Ultra-Fast Initial Load Time
+const ShopPage = lazy(() => import('./pages/ShopPage'));
+const NewArrivalsPage = lazy(() => import('./pages/NewArrivalsPage'));
+const SalePage = lazy(() => import('./pages/SalePage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const AccessoriesPage = lazy(() => import('./pages/AccessoriesPage'));
+const ProductPage = lazy(() => import('./pages/ProductPage'));
+const CartPage = lazy(() => import('./pages/CartPage'));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
+const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage'));
+
+// Auth Pages (Lazy)
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Profile = lazy(() => import('./pages/Profile'));
+const CompleteProfile = lazy(() => import('./pages/CompleteProfile'));
+import ProtectedRoute from './components/auth/ProtectedRoute';
+
+// Admin Dashboards (Heaviest chunks - Isolated via Lazy Loading)
+const AdminRoute = lazy(() => import('./components/auth/AdminRoute'));
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
+const AdminProductForm = lazy(() => import('./pages/admin/AdminProductForm'));
+const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
+const AdminCustomers = lazy(() => import('./pages/admin/AdminCustomers'));
+const AdminInventory = lazy(() => import('./pages/admin/AdminInventory'));
+const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const AdminReviews = lazy(() => import('./pages/admin/AdminReviews'));
+const AdminHomepage = lazy(() => import('./pages/admin/AdminHomepage'));
+
+// Elegant Minimalist Route Fallback Loader
+function PageLoadingFallback() {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '60vh',
+      color: '#0f172a',
+      fontSize: '14px',
+      fontWeight: 600,
+      letterSpacing: '1px'
+    }}>
+      <div style={{
+        width: '32px',
+        height: '32px',
+        border: '3px solid #e2e8f0',
+        borderTopColor: '#0f172a',
+        borderRadius: '50%',
+        animation: 'spin 0.6s linear infinite'
+      }} />
+    </div>
+  );
+}
+
 
 // ErrorBoundary component remains intact
 
@@ -76,11 +107,14 @@ function RouteLayout() {
     <>
       <ScrollToTop />
       <div key={location.pathname} className="page-transition">
-        <Outlet />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <Outlet />
+        </Suspense>
       </div>
     </>
   );
 }
+
 
 function AppContent() {
   const location = useLocation();
@@ -123,7 +157,11 @@ function AppContent() {
           </Route>
 
           {/* Admin Routes */}
-          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+          <Route path="/admin" element={
+            <Suspense fallback={<PageLoadingFallback />}>
+              <AdminRoute><AdminLayout /></AdminRoute>
+            </Suspense>
+          }>
             <Route index element={<AdminDashboard />} />
             <Route path="products" element={<AdminProducts />} />
             <Route path="products/new" element={<AdminProductForm />} />
@@ -136,6 +174,7 @@ function AppContent() {
             <Route path="settings" element={<AdminSettings />} />
             <Route path="reviews" element={<AdminReviews />} />
           </Route>
+
         </Routes>
       </main>
       {!isAdmin && <Footer />}

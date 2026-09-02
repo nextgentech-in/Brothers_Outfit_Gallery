@@ -43,6 +43,16 @@ const ipRateLimits = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 60; // 60 req/min per IP
 
+// Periodic cleanup every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of ipRateLimits.entries()) {
+    if (now > record.resetTime) {
+      ipRateLimits.delete(ip);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
 app.use((req, res, next) => {
   // Allow health check without rate limit
   if (req.path === '/api/health') return next();
@@ -64,6 +74,7 @@ app.use((req, res, next) => {
 
   next();
 });
+
 
 // 3. Secure Payload Body Parsing
 app.use(cors());
