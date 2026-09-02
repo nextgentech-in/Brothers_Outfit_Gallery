@@ -7,7 +7,7 @@ import './SaleProductCard.css';
 
 export default function SaleProductCard({ product, onAddToCart, onOfferExpire }) {
   const navigate = useNavigate();
-  const { addToCart: contextAddToCart } = useCart();
+  const { addToCart: contextAddToCart, buyNowDirect } = useCart();
   const [selectedSize, setSelectedSize] = useState(null);
   const [addedAnimation, setAddedAnimation] = useState(false);
   const isOutOfStock = product.stock === 0;
@@ -39,9 +39,10 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     if (isOutOfStock) return;
     
     const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
-    contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default');
+    buyNowDirect(product, sizeToUse, product.colors?.[0] || 'Default');
     navigate('/checkout');
   };
+
 
   const handleExpire = () => {
     if (onOfferExpire) {

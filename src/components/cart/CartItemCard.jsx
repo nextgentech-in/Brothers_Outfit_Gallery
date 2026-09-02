@@ -24,9 +24,10 @@ export default function CartItemCard({ item }) {
         </div>
 
         <div className="cart-item-variants">
-          <span>Color: {item.color}</span>
-          <span>Size: {item.size}</span>
+          <span>Color: {typeof item.color === 'object' && item.color !== null ? (item.color.name || item.color.color || 'Standard') : (item.color || 'Standard')}</span>
+          <span>Size: {typeof item.size === 'object' && item.size !== null ? (item.size.name || item.size.size || 'One Size') : (item.size || 'One Size')}</span>
         </div>
+
 
         <div className="cart-item-actions">
           <div className="cart-quantity-selector">

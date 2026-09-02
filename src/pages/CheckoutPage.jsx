@@ -461,9 +461,10 @@ export default function CheckoutPage() {
                 <img src={item.image} alt={item.name} className="checkout-item-thumb" />
                 <div className="checkout-item-details">
                   <strong>{item.name}</strong>
-                  <span>Size: {item.size} | Qty: {item.quantity}</span>
+                  <span>Size: {typeof item.size === 'object' && item.size !== null ? (item.size.name || item.size.size || 'One Size') : (item.size || 'One Size')} | Qty: {item.quantity}</span>
                   <span className="checkout-item-price">₹{item.price * item.quantity}</span>
                 </div>
+
               </div>
             ))}
           </div>

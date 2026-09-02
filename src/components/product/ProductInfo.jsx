@@ -71,8 +71,8 @@ export default function ProductInfo({ product }) {
   const outOfStock = productTotalStock === 0;
   const stock = productTotalStock;
   
-  const { addToCart } = useCart();
-  
+  const { addToCart, buyNowDirect } = useCart();
+
   const handleQuantity = (delta) => {
     setQuantity(prev => {
       const next = prev + delta;
@@ -89,7 +89,7 @@ export default function ProductInfo({ product }) {
     }
 
     const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
-    addToCart(product, sizeToUse, selectedColor);
+    addToCart(product, sizeToUse, selectedColor, quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
   };
@@ -100,9 +100,10 @@ export default function ProductInfo({ product }) {
     }
 
     const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
-    addToCart(product, sizeToUse, selectedColor);
+    buyNowDirect(product, sizeToUse, selectedColor, quantity);
     navigate('/checkout');
   };
+
 
 
   const [checkingDelivery, setCheckingDelivery] = useState(false);

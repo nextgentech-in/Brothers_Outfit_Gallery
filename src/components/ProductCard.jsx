@@ -71,7 +71,7 @@ function useCountdown(endDateStr) {
 
 export default function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
   const navigate = useNavigate();
-  const { addToCart: contextAddToCart } = useCart();
+  const { addToCart: contextAddToCart, buyNowDirect } = useCart();
   const [selectedSize, setSelectedSize] = useState(null);
   const isOutOfStock = product.stock === 0;
   const lowStock = product.stock > 0 && product.stock <= 5;
@@ -124,9 +124,10 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
     if (isOutOfStock) return;
     
     const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
-    contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default');
+    buyNowDirect(product, sizeToUse, product.colors?.[0] || 'Default');
     navigate('/checkout');
   };
+
 
   return (
     <div className={`product-card ${isOutOfStock ? 'product-card--oos' : ''}`}>
