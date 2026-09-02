@@ -8,7 +8,9 @@ import ShopPage from './pages/ShopPage';
 import NewArrivalsPage from './pages/NewArrivalsPage';
 import SalePage from './pages/SalePage';
 import AboutPage from './pages/AboutPage';
+import AccessoriesPage from './pages/AccessoriesPage';
 import { AuthProvider } from './context/AuthContext';
+
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -93,7 +95,9 @@ function AppContent() {
             <Route path="/" element={<HomePage />} />
             <Route path="/shop" element={<ShopPage />} />
             <Route path="/new-arrivals" element={<NewArrivalsPage />} />
+            <Route path="/accessories" element={<AccessoriesPage />} />
             <Route path="/sale" element={<SalePage />} />
+
             <Route path="/about" element={<AboutPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />

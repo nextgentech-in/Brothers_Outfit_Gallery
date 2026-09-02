@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
 import { isClothingProduct } from '../utils/productUtils';
+import { useCart } from '../context/CartContext';
 import './ProductCard.css';
+
 
 
 /**
@@ -68,6 +70,8 @@ function useCountdown(endDateStr) {
 }
 
 export default function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
+  const navigate = useNavigate();
+  const { addToCart: contextAddToCart } = useCart();
   const [selectedSize, setSelectedSize] = useState(null);
   const isOutOfStock = product.stock === 0;
   const lowStock = product.stock > 0 && product.stock <= 5;
@@ -107,11 +111,22 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
         selectedSize: sizeToUse,
         finalPrice: displayPrice,
       });
-      setAddedAnimation(true);
-      setTimeout(() => setAddedAnimation(false), 1500);
+    } else {
+      contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default');
     }
+    setAddedAnimation(true);
+    setTimeout(() => setAddedAnimation(false), 1500);
   };
 
+  const handleBuyNow = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isOutOfStock) return;
+    
+    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
+    contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default');
+    navigate('/checkout');
+  };
 
   return (
     <div className={`product-card ${isOutOfStock ? 'product-card--oos' : ''}`}>
@@ -196,16 +211,41 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
           </span>
         )}
 
-        {/* Add to Cart */}
-        <button
-          className={`product-card__add-btn ${isOutOfStock ? 'product-card__add-btn--disabled' : ''} ${addedAnimation ? 'product-card__add-btn--added' : ''}`}
-          onClick={handleAddToCart}
-          disabled={isOutOfStock}
-          style={addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}}
-        >
-          {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED TO CART ✓' : 'ADD TO CART')}
-        </button>
+        {/* Buttons Row: Add to Cart & Buy Now */}
+        <div className="product-card__btn-group" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <button
+            className={`product-card__add-btn ${isOutOfStock ? 'product-card__add-btn--disabled' : ''} ${addedAnimation ? 'product-card__add-btn--added' : ''}`}
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+            style={{ flex: 1, margin: 0, ...(addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}) }}
+          >
+            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : 'ADD TO CART')}
+          </button>
+
+          {!isOutOfStock && (
+            <button
+              className="product-card__buy-btn"
+              onClick={handleBuyNow}
+              style={{
+                flex: 1,
+                background: '#111827',
+                color: '#ffffff',
+                border: '1px solid #111827',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '800',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                padding: '10px 8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              ⚡ BUY NOW
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
+

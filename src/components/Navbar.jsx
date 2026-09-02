@@ -9,9 +9,11 @@ const navLinks = [
   { label: 'Home', to: '/' },
   { label: 'Shop', to: '/shop' },
   { label: 'New Arrivals', to: '/new-arrivals' },
+  { label: 'Accessories', to: '/accessories' },
   { label: 'About Us', to: '/about' },
   { label: 'Sale', to: '/sale' },
 ];
+
 
 const mobileMenuLinks = [
   ...navLinks,
