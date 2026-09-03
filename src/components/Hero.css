@@ -466,17 +466,29 @@
 }
 
 .trust-icon {
-  font-size: 22px;
-  flex-shrink: 0;
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: #0f172a;
+  color: #fbbf24;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  transition: all 0.25s ease;
+}
+
+.trust-pill:hover .trust-icon {
+  background: #ca8a04;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.trust-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
 }
 
 .trust-pill strong {

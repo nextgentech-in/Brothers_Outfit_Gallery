@@ -9,6 +9,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { sanitizeInput } from '../utils/security';
 
 /**
  * Fetch reviews for a specific product
@@ -103,15 +104,18 @@ export async function submitReview(reviewData) {
     year: 'numeric'
   });
 
+  const cleanUserName = sanitizeInput(reviewData.userName) || 'Verified Customer';
+  const cleanComment = sanitizeInput(reviewData.comment);
+
   const payload = {
     productId: reviewData.productId,
-    productName: reviewData.productName || 'Product',
+    productName: sanitizeInput(reviewData.productName) || 'Product',
     productSlug: reviewData.productSlug || '',
     userId: reviewData.userId || 'guest',
-    userName: (reviewData.userName || '').trim() || 'Verified Customer',
+    userName: cleanUserName,
     userEmail: reviewData.userEmail || '',
-    rating: Number(reviewData.rating) || 5,
-    comment: reviewData.comment.trim(),
+    rating: Math.min(5, Math.max(1, Number(reviewData.rating) || 5)),
+    comment: cleanComment,
     recommend: reviewData.recommend !== false, // User suggestions: true = recommends product
     images: Array.isArray(reviewData.images) ? reviewData.images : [],
     verifiedPurchase: Boolean(reviewData.verifiedPurchase ?? true),
