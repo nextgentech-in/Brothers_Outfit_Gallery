@@ -141,8 +141,8 @@
 
 @media (max-width: 768px) {
   .new-arrivals-page {
-    padding-top: 80px;
-    padding-bottom: 60px;
+    padding-top: calc(var(--total-header-height, 88px) + 16px);
+    padding-bottom: 90px;
   }
 
   .na-header {

@@ -29,6 +29,19 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-full: 9999px;
+
+  /* Header & Navigation Dimensions */
+  --top-announcement-height: 32px;
+  --navbar-inner-height: 72px;
+  --total-header-height: 104px;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --top-announcement-height: 28px;
+    --navbar-inner-height: 60px;
+    --total-header-height: 88px;
+  }
 }
 
 /* ───────── Reset ───────── */

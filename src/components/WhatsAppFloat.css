@@ -130,10 +130,29 @@
 
 @media (max-width: 768px) {
   .whatsapp-float-container {
-    bottom: 20px;
-    right: 18px;
+    bottom: 16px;
+    right: 14px;
+    gap: 8px;
+  }
+  .whatsapp-float {
+    width: 46px;
+    height: 46px;
+    box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4);
+  }
+  .whatsapp-float svg {
+    width: 24px;
+    height: 24px;
   }
   .whatsapp-concierge-pill {
-    max-width: 250px;
+    max-width: 230px;
+    padding: 12px 14px;
+  }
+  .whatsapp-concierge-pill p {
+    font-size: 11px !important;
+    margin-bottom: 8px !important;
+  }
+  .concierge-chat-link {
+    font-size: 10.5px;
+    padding: 5px 12px;
   }
 }

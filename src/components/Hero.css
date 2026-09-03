@@ -362,11 +362,13 @@
 
 @media (max-width: 414px) {
   .hero {
-    height: 80vh;
+    height: auto;
+    min-height: 540px;
+    padding-top: var(--total-header-height, 88px);
   }
 
   .hero__content {
-    padding: 0 20px 50px;
+    padding: 24px 20px 40px;
   }
 
   .hero__actions {

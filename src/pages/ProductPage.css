@@ -91,3 +91,12 @@
     gap: 40px;
   }
 }
+
+@media (max-width: 768px) {
+  .product-page-container {
+    padding: calc(var(--total-header-height, 88px) + 16px) 16px 90px;
+  }
+  .product-main-grid {
+    gap: 24px;
+  }
+}

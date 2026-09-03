@@ -143,29 +143,55 @@
 
 @media (max-width: 768px) {
   .accessories-hero {
-    padding: 48px 16px;
+    padding: calc(var(--total-header-height, 88px) + 24px) 16px 36px;
   }
 
   .accessories-hero h1 {
-    font-size: 28px;
+    font-size: 26px;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+  }
+
+  .accessories-hero p {
+    font-size: 13px;
+    line-height: 1.5;
   }
 
   .accessories-tabs-container {
-    top: 60px;
+    top: var(--total-header-height, 88px);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   .accessories-tabs {
     justify-content: flex-start;
-    padding: 12px 16px;
+    padding: 10px 14px;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .accessories-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .accessories-tab-btn {
+    padding: 8px 16px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .accessories-content-container {
-    padding: 0 16px;
-    margin-top: 24px;
+    padding: 0 12px;
+    margin-top: 20px;
+    padding-bottom: 90px;
   }
 
   .accessories-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    gap: 10px;
   }
 }
