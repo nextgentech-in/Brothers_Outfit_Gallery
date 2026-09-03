@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
-import { createDelhiveryShipment, trackDelhiveryShipment } from '../../services/delhiveryService';
+import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import './AdminOrders.css';
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shippingOrderId, setShippingOrderId] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeTracking, setActiveTracking] = useState(null);
-  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -26,13 +27,19 @@ export default function AdminOrders() {
   const handleStatusChange = async (orderId, newStatus) => {
     await updateOrderStatus(orderId, newStatus);
     fetchOrders();
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+    }
   };
 
-  const handleCreateShipment = async (order) => {
+  const handleApproveAndShip = async (order) => {
     if (!order.shippingAddress) {
       alert('Cannot create shipment: Missing delivery address.');
       return;
     }
+
+    const confirmApprove = window.confirm(`Approve Order #${order.id} and generate Delhivery manifest for courier pickup?`);
+    if (!confirmApprove) return;
 
     setShippingOrderId(order.id);
     try {
@@ -46,21 +53,49 @@ export default function AdminOrders() {
 
       if (res && res.waybill) {
         await updateOrderShipment(order.id, res);
-        alert(`Success! Delhivery AWB Created: ${res.waybill}`);
+        alert(`Shipment Approved! Delhivery AWB Assigned: ${res.waybill}\nCourier pickup has been scheduled.`);
         fetchOrders();
+        if (selectedOrder && selectedOrder.id === order.id) {
+          setSelectedOrder(prev => ({ ...prev, status: 'Shipped', waybill: res.waybill }));
+        }
       }
     } catch (err) {
-      alert(`Failed to create Delhivery shipment: ${err.message}`);
+      alert(`Failed to approve & create Delhivery shipment: ${err.message}`);
     } finally {
       setShippingOrderId(null);
     }
   };
 
+  const handleCancelOrder = async (order) => {
+    const confirmCancel = window.confirm(`Are you sure you want to cancel Order #${order.id}? This will also cancel the delivery pickup if scheduled.`);
+    if (!confirmCancel) return;
+
+    setActionLoadingId(order.id);
+    try {
+      if (order.waybill) {
+        await cancelDelhiveryShipment(order.waybill, 'Cancelled by Admin');
+      }
+
+      await updateOrderStatus(order.id, 'Cancelled', {
+        cancellationReason: 'Cancelled by Store Admin',
+        cancelledAt: new Date()
+      });
+
+      alert(`Order #${order.id} has been cancelled successfully.`);
+      fetchOrders();
+      if (selectedOrder && selectedOrder.id === order.id) {
+        setSelectedOrder(prev => ({ ...prev, status: 'Cancelled' }));
+      }
+    } catch (err) {
+      alert(`Failed to cancel order: ${err.message}`);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const handleOpenTracking = async (waybill) => {
-    setTrackingLoading(true);
     const trackingData = await trackDelhiveryShipment(waybill);
     setActiveTracking(trackingData);
-    setTrackingLoading(false);
   };
 
   const filteredOrders = orders.filter(o => {
@@ -105,10 +140,10 @@ export default function AdminOrders() {
             <tr>
               <th>ORDER ID</th>
               <th>CUSTOMER</th>
-              <th>ITEMS</th>
+              <th>ITEMS & SIZES</th>
               <th>TOTAL</th>
               <th>PAYMENT</th>
-              <th>DELHIVERY LOGISTICS</th>
+              <th>DELHIVERY STATUS</th>
               <th>STATUS</th>
               <th>DATE</th>
               <th>ACTIONS</th>
@@ -118,21 +153,31 @@ export default function AdminOrders() {
             {loading ? (
               <tr><td colSpan="9" style={{textAlign: 'center', padding: '40px'}}>Loading orders...</td></tr>
             ) : filteredOrders.length === 0 ? (
-              <tr><td colSpan="9" style={{textAlign: 'center', padding: '40px'}}>No orders found.</td></tr>
+              <tr><td colSpan="9" style={{textAlign: 'center', padding: '40px'}}>No orders match the current criteria.</td></tr>
             ) : filteredOrders.map(o => (
               <tr key={o.id}>
                 <td>
-                  <strong>#{o.id.substring(0, 10)}</strong>
+                  <strong>#{o.id}</strong>
                 </td>
                 <td>
-                  <div>{o.shippingAddress?.fullName || 'N/A'}</div>
-                  <div style={{fontSize: '12px', color: '#666'}}>{o.userEmail || o.shippingAddress?.phone}</div>
+                  <div style={{ fontWeight: '600' }}>{o.shippingAddress?.fullName || 'Guest Customer'}</div>
+                  <div style={{ fontSize: '11.5px', color: '#64748b' }}>{o.userEmail || o.shippingAddress?.phone}</div>
                 </td>
-                <td>{o.items?.length || 0} items</td>
+                <td>
+                  <div className="admin-items-preview-cell">
+                    {o.items?.map((item, idx) => (
+                      <div key={idx} className="admin-items-preview-item">
+                        <span style={{ fontWeight: '600', color: '#0f172a' }}>{item.name}</span>
+                        {item.size && <span className="admin-item-size-badge">Size: {item.size}</span>}
+                        <span style={{ color: '#64748b', fontSize: '11px' }}> (×{item.quantity})</span>
+                      </div>
+                    ))}
+                  </div>
+                </td>
                 <td><strong>₹{o.totalAmount || o.finalTotal || 0}</strong></td>
                 <td>
                   <span className={`admin-badge admin-badge--${o.paymentStatus === 'Paid' ? 'active' : 'neutral'}`}>
-                    {o.paymentStatus || 'Paid (Razorpay)'}
+                    {o.paymentStatus || 'Paid'}
                   </span>
                 </td>
                 <td>
@@ -146,13 +191,15 @@ export default function AdminOrders() {
                         Track Status
                       </button>
                     </div>
+                  ) : o.status === 'Cancelled' ? (
+                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>Cancelled</span>
                   ) : (
                     <button
-                      onClick={() => handleCreateShipment(o)}
+                      onClick={() => handleApproveAndShip(o)}
                       disabled={shippingOrderId === o.id}
-                      className="btn-ship-delhivery"
+                      className="btn-approve-ship"
                     >
-                      {shippingOrderId === o.id ? 'MANIFESTING...' : '✈ Ship via Delhivery'}
+                      {shippingOrderId === o.id ? 'MANIFESTING...' : '✔ Approve & Ship'}
                     </button>
                   )}
                 </td>
@@ -161,6 +208,9 @@ export default function AdminOrders() {
                     value={o.status || 'Processing'} 
                     onChange={(e) => handleStatusChange(o.id, e.target.value)}
                     className="admin-status-dropdown"
+                    style={{
+                      borderColor: o.status === 'Cancelled' ? '#f87171' : (o.status === 'Delivered' ? '#4ade80' : '#cbd5e1')
+                    }}
                   >
                     <option value="Processing">Processing</option>
                     <option value="Shipped">Shipped</option>
@@ -168,22 +218,192 @@ export default function AdminOrders() {
                     <option value="Cancelled">Cancelled</option>
                   </select>
                 </td>
-                <td style={{fontSize: '12px'}}>
-                  {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString() : new Date(o.createdAt || Date.now()).toLocaleDateString()}
+                <td style={{fontSize: '12px', whiteSpace: 'nowrap'}}>
+                  {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : new Date(o.createdAt || Date.now()).toLocaleDateString('en-IN')}
                 </td>
                 <td>
-                  <button 
-                    onClick={() => alert(`Address: ${o.shippingAddress?.addressLine}, ${o.shippingAddress?.city}, ${o.shippingAddress?.pincode}\nPhone: ${o.shippingAddress?.phone}`)}
-                    className="admin-action-btn edit"
-                  >
-                    DETAILS
-                  </button>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button 
+                      onClick={() => setSelectedOrder(o)}
+                      className="admin-action-btn edit"
+                      style={{ padding: '5px 10px', fontSize: '11px', fontWeight: '700' }}
+                    >
+                      DETAILS
+                    </button>
+                    {o.status !== 'Cancelled' && (
+                      <button
+                        onClick={() => handleCancelOrder(o)}
+                        disabled={actionLoadingId === o.id}
+                        className="btn-cancel-admin"
+                      >
+                        {actionLoadingId === o.id ? '...' : 'Cancel'}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Detailed Order Modal with Line Items and Sizes */}
+      {selectedOrder && (
+        <div className="tracking-modal-overlay" onClick={() => setSelectedOrder(null)}>
+          <div className="order-details-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📋 Order Details #{selectedOrder.id}</h3>
+              <button className="close-btn" onClick={() => setSelectedOrder(null)}>✕</button>
+            </div>
+
+            <div className="order-details-modal-body">
+              {/* Status and Summary Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Order Status</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: selectedOrder.status === 'Cancelled' ? '#dc2626' : (selectedOrder.status === 'Delivered' ? '#16a34a' : '#0f172a') }}>
+                    {selectedOrder.status || 'Processing'}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Total Amount</div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>
+                    ₹{selectedOrder.totalAmount || selectedOrder.finalTotal || 0}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Payment Method</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600' }}>
+                    {selectedOrder.paymentMethod || 'Online'} ({selectedOrder.paymentStatus || 'Paid'})
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer & Delivery Address */}
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Customer & Shipping Address
+                </h4>
+                <div style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
+                  <strong>{selectedOrder.shippingAddress?.fullName}</strong> ({selectedOrder.userEmail})<br />
+                  📞 Phone: <strong>{selectedOrder.shippingAddress?.phone}</strong><br />
+                  📍 {selectedOrder.shippingAddress?.addressLine}, {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} - <strong>{selectedOrder.shippingAddress?.pincode}</strong>
+                </div>
+              </div>
+
+              {/* Items Breakdown with Image & SIZES */}
+              <div>
+                <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Ordered Items ({selectedOrder.items?.length || 0})
+                </h4>
+                <table className="order-items-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Size</th>
+                      <th>Color</th>
+                      <th>Qty</th>
+                      <th>Price</th>
+                      <th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedOrder.items?.map((item, idx) => (
+                      <tr key={idx}>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <img
+                              src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'}
+                              alt={item.name}
+                              style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px', background: '#f1f5f9' }}
+                            />
+                            <span style={{ fontWeight: '600', color: '#0f172a' }}>{item.name}</span>
+                          </div>
+                        </td>
+                        <td>
+                          {item.size ? (
+                            <span style={{ background: '#0f172a', color: '#ffffff', padding: '2px 8px', borderRadius: '4px', fontWeight: '800', fontSize: '11px' }}>
+                              {item.size}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>One Size</span>
+                          )}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '12px', color: '#475569' }}>
+                            {item.color || 'Standard'}
+                          </span>
+                        </td>
+                        <td><strong>{item.quantity}</strong></td>
+                        <td>₹{item.price}</td>
+                        <td><strong>₹{(item.price || 0) * (item.quantity || 1)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Delhivery AWB & Pickup Section */}
+              <div style={{ background: '#f0fdf4', padding: '14px', borderRadius: '8px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#166534', fontWeight: '700' }}>
+                    DELHIVERY EXPRESS SHIPMENT
+                  </div>
+                  {selectedOrder.waybill ? (
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#14532d', marginTop: '2px' }}>
+                      AWB / Waybill: {selectedOrder.waybill}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '12px', color: '#65a30d', marginTop: '2px' }}>
+                      No shipment generated yet. Click "Approve & Ship" to schedule courier pickup.
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {selectedOrder.waybill ? (
+                    <button
+                      onClick={() => handleOpenTracking(selectedOrder.waybill)}
+                      style={{ padding: '8px 14px', background: '#15803d', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      Track Shipment Live
+                    </button>
+                  ) : selectedOrder.status !== 'Cancelled' && (
+                    <button
+                      onClick={() => handleApproveAndShip(selectedOrder)}
+                      disabled={shippingOrderId === selectedOrder.id}
+                      style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      {shippingOrderId === selectedOrder.id ? 'MANIFESTING...' : '✔ Approve & Ship via Delhivery'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
+                {selectedOrder.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => handleCancelOrder(selectedOrder)}
+                    disabled={actionLoadingId === selectedOrder.id}
+                    style={{ padding: '8px 16px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Cancel Order
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  style={{ padding: '8px 16px', background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tracking Modal */}
       {activeTracking && (
@@ -245,4 +465,3 @@ export default function AdminOrders() {
     </div>
   );
 }
-

@@ -375,6 +375,10 @@ export default function AboutPage() {
               <h4>Can I try clothes in the store?</h4>
               <p>Yes, our Himatnagar store features spacious, comfortable trial rooms and dedicated styling assistants to ensure your ideal fit.</p>
             </div>
+            <div className="faq-item">
+              <h4>What is your Return & Exchange Policy?</h4>
+              <p>We provide <strong>exchanges exclusively in the case of damaged or defective items</strong> received. To request an exchange, please notify us within 48 hours of delivery on WhatsApp (+91 84602 33020) with unboxing video/photo proof of the defect. Non-defective returns or general refunds are not accepted.</p>
+            </div>
           </div>
         </div>
       </section>

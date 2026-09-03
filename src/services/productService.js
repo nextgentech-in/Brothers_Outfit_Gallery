@@ -102,14 +102,34 @@ export const getProductBySlug = async (slug) => {
   return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
 };
 
-export const getRelatedProducts = async (categoryId, excludeProductId, qty = 4) => {
-  if (!categoryId) return [];
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(100));
-  const snapshot = await getDocs(q);
-  let products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4) => {
+  try {
+    const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(100));
+    const snapshot = await getDocs(q);
+    let all = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(p => p.active !== false && p.id !== excludeProductId);
 
-  products = products.filter(p => p.active === true && p.categoryId === categoryId && p.id !== excludeProductId);
-  return products.slice(0, qty);
+    if (!categoryOrId) return all.slice(0, qty);
+
+    const target = String(categoryOrId).toLowerCase().trim();
+    let matches = all.filter(p => {
+      const pCat = String(p.category || '').toLowerCase().trim();
+      const pCatId = String(p.categoryId || '').toLowerCase().trim();
+      return pCat === target || pCatId === target;
+    });
+
+    if (matches.length < qty) {
+      const matchIds = new Set(matches.map(m => m.id));
+      const backfill = all.filter(p => !matchIds.has(p.id));
+      matches = [...matches, ...backfill];
+    }
+
+    return matches.slice(0, qty);
+  } catch (err) {
+    console.error('Error in getRelatedProducts:', err);
+    return [];
+  }
 };
 
 export const getCategories = async () => {

@@ -184,7 +184,7 @@ export default function OrderSummary({ subtotal, itemCount }) {
       <div className="summary-trust-badges">
         <span>🔒 Secure Checkout</span>
         <span>🛡️ Safe Payments</span>
-        <span>🔁 Easy Returns</span>
+        <span>🔁 Exchange on Damaged Items</span>
       </div>
     </div>
   );

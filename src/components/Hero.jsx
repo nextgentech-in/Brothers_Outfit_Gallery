@@ -97,8 +97,8 @@ export default function Hero() {
               </svg>
             </span>
             <div>
-              <strong>Easy 7-Day Exchange</strong>
-              <span>Doorstep size exchange available</span>
+              <strong>Exchange on Damage</strong>
+              <span>Replacement for defective/damaged items</span>
             </div>
           </div>
           <div className="trust-pill">

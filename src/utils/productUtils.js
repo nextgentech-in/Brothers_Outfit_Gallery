@@ -43,3 +43,22 @@ export function isClothingProduct(product) {
 
   return hasApparelSizes;
 }
+
+/**
+ * Extract all available sizes from a product in a normalized string array
+ * @param {Object} product
+ * @returns {string[]}
+ */
+export function getProductSizes(product) {
+  if (!product) return [];
+  const fromSizes = Array.isArray(product.sizes)
+    ? product.sizes.map(s => (typeof s === 'object' && s !== null) ? (s.size || s.name || '') : String(s))
+    : [];
+  const fromVariants = Array.isArray(product.variants)
+    ? product.variants.map(v => v.size || '')
+    : [];
+  return [...new Set([...fromSizes, ...fromVariants])]
+    .map(s => String(s).trim())
+    .filter(Boolean);
+}
+

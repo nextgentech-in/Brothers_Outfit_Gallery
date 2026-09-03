@@ -3,6 +3,7 @@ import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
 import { getShopProducts } from '../services/productService';
 import ProductCard from '../components/ProductCard';
+import { getProductSizes } from '../utils/productUtils';
 import './ShopPage.css';
 
 const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Accessories'];
@@ -151,7 +152,11 @@ export default function ShopPage() {
 
     // Size
     if (selectedSize) {
-      result = result.filter(p => p.sizes && p.sizes.includes(selectedSize));
+      const targetSize = String(selectedSize).toLowerCase().trim();
+      result = result.filter(p => {
+        const sizes = getProductSizes(p);
+        return sizes.some(s => s.toLowerCase() === targetSize);
+      });
     }
 
     // Color

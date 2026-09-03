@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getUserOrders, cancelUserOrder } from '../services/orderService';
 import './Profile.css';
 
 export default function Profile() {
@@ -36,6 +37,24 @@ export default function Profile() {
       console.error("Error loading user orders:", e);
     } finally {
       setOrdersLoading(false);
+    }
+  };
+
+  const [cancellingId, setCancellingId] = useState(null);
+
+  const handleCancelOrder = async (order) => {
+    const confirmCancel = window.confirm(`Are you sure you want to cancel Order #${order.id}?`);
+    if (!confirmCancel) return;
+
+    setCancellingId(order.id);
+    try {
+      await cancelUserOrder(order.id, 'Cancelled by customer', order.waybill);
+      alert('Your order has been cancelled successfully.');
+      loadUserOrders();
+    } catch (err) {
+      alert(`Failed to cancel order: ${err.message}`);
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -123,33 +142,150 @@ export default function Profile() {
                   </button>
                 </div>
               ) : (
-                <div className="orders-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
-                  {userOrders.map(order => (
-                    <div key={order.id} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>
-                        <div>
-                          <strong>Order #{order.id.substring(0, 10)}</strong>
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                            {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString() : new Date(order.createdAt || Date.now()).toLocaleDateString()}
+                <div className="orders-list" style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+                  {userOrders.map(order => {
+                    const isProcessing = (order.status || 'Processing') === 'Processing';
+                    const isCancelled = order.status === 'Cancelled';
+                    const isShipped = order.status === 'Shipped';
+                    const isDelivered = order.status === 'Delivered';
+
+                    return (
+                      <div key={order.id} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                        {/* Order Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div>
+                            <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
+                              Order #{order.id}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                              Placed on {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(order.createdAt || Date.now()).toLocaleDateString('en-IN')}
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{
+                              fontSize: '11px',
+                              fontWeight: '800',
+                              letterSpacing: '0.5px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              textTransform: 'uppercase',
+                              background: isCancelled ? '#fee2e2' : (isDelivered ? '#dcfce7' : (isShipped ? '#dbeafe' : '#fef3c7')),
+                              color: isCancelled ? '#b91c1c' : (isDelivered ? '#15803d' : (isShipped ? '#1d4ed8' : '#b45309')),
+                              border: `1px solid ${isCancelled ? '#fca5a5' : (isDelivered ? '#86efac' : (isShipped ? '#93c5fd' : '#fde68a'))}`
+                            }}>
+                              {order.status || 'Processing'}
+                            </span>
+                            <div style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>
+                              ₹{order.totalAmount || order.finalTotal || 0}
+                            </div>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <span className={`admin-badge admin-badge--${order.status === 'Delivered' ? 'active' : 'neutral'}`}>
-                            {order.status || 'Processing'}
-                          </span>
-                          <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '4px' }}>₹{order.totalAmount || order.finalTotal}</div>
+
+                        {/* Order Items Breakdown with SIZES */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                          {order.items?.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #edf2f7' }}>
+                              <img
+                                src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'}
+                                alt={item.name}
+                                style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '6px', background: '#e2e8f0', flexShrink: 0 }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {item.name}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                  {item.size && (
+                                    <span style={{ fontSize: '11px', fontWeight: '800', background: '#0f172a', color: '#ffffff', padding: '2px 8px', borderRadius: '4px' }}>
+                                      Size: {item.size}
+                                    </span>
+                                  )}
+                                  {item.color && (
+                                    <span style={{ fontSize: '11px', fontWeight: '600', background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '4px' }}>
+                                      Color: {item.color}
+                                    </span>
+                                  )}
+                                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                                    Qty: {item.quantity} × ₹{item.price}
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', flexShrink: 0 }}>
+                                ₹{(item.price || 0) * (item.quantity || 1)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Delivery Address & Tracking Info */}
+                        {order.shippingAddress && (
+                          <div style={{ fontSize: '12px', color: '#64748b', background: '#fafafa', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', border: '1px dashed #e2e8f0' }}>
+                            <strong style={{ color: '#334155' }}>Deliver to: </strong>
+                            {order.shippingAddress.fullName}, {order.shippingAddress.addressLine}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode} (📞 {order.shippingAddress.phone})
+                          </div>
+                        )}
+
+                        {/* Order Actions Footer */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>
+                            Payment: <strong>{order.paymentMethod || 'Online Payment'}</strong>
+                            {order.paymentStatus && <span style={{ marginLeft: '8px', color: '#16a34a', fontWeight: '700' }}>({order.paymentStatus})</span>}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {order.waybill && (
+                              <a
+                                href={order.trackingUrl || `https://www.delhivery.com/track/package/${order.waybill}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  padding: '7px 14px',
+                                  background: '#0f172a',
+                                  color: '#ffffff',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}
+                              >
+                                📦 Track Delhivery AWB: {order.waybill}
+                              </a>
+                            )}
+
+                            {isProcessing && (
+                              <button
+                                onClick={() => handleCancelOrder(order)}
+                                disabled={cancellingId === order.id}
+                                style={{
+                                  padding: '7px 14px',
+                                  background: '#fee2e2',
+                                  color: '#b91c1c',
+                                  border: '1px solid #fca5a5',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  fontWeight: '700',
+                                  cursor: cancellingId === order.id ? 'not-allowed' : 'pointer',
+                                  transition: 'background 0.2s'
+                                }}
+                              >
+                                {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}
+                              </button>
+                            )}
+
+                            {isCancelled && (
+                              <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: '600' }}>
+                                Order Cancelled {order.cancellationReason ? `(${order.cancellationReason})` : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-
-                      <div style={{ fontSize: '13px', color: '#4b5563', marginBottom: '12px' }}>
-                        <strong>Items:</strong> {order.items?.map(i => `${i.name} (x${i.quantity})`).join(', ')}
-                      </div>
-
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                        Payment: {order.paymentMethod || 'Online'} | Status: <span style={{ color: '#22c55e', fontWeight: '600' }}>{order.paymentStatus || 'Paid'}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

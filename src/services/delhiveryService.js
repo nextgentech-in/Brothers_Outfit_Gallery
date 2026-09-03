@@ -110,3 +110,30 @@ export const trackDelhiveryShipment = async (waybill) => {
     };
   }
 };
+
+/**
+ * Cancel a Delhivery shipment/pickup
+ * @param {string} waybill
+ * @param {string} cancellationReason
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+export const cancelDelhiveryShipment = async (waybill, cancellationReason = 'Customer Cancelled') => {
+  if (!waybill) return { success: true };
+  try {
+    const backendUrl = getBackendUrl();
+    const response = await fetch(`${backendUrl}/api/delhivery/cancel-shipment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ waybill, reason: cancellationReason }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.warn('Delhivery cancel shipment warning:', err);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Delhivery cancel shipment error:', error);
+    return { success: false, error: error.message };
+  }
+};
+

@@ -362,6 +362,7 @@ export default function AdminProductForm() {
         compareAtPrice: mrp,
         discountPercentage: autoDiscount,
         stock: formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0),
+        sizes: [...new Set(formData.variants.map(v => v.size))].filter(Boolean),
         images: combinedImages,
         thumbnailUrl: thumbnailUrl,
         image: thumbnailUrl, // Legacy fallback
