@@ -72,7 +72,7 @@ export default function AboutPage() {
         <div className="about-container">
           <div className="about-hero-badge">
             <span className="hero-badge-dot"></span>
-            <span>OFFICIAL STORE • MODASA, GUJARAT</span>
+            <span>OFFICIAL STORE • HIMATNAGAR, GUJARAT</span>
           </div>
           <h1 className="about-hero__title">MORE THAN CLOTHING.<br />IT'S YOUR STYLE.</h1>
           <p className="about-hero__desc">
@@ -140,7 +140,7 @@ export default function AboutPage() {
                 At <strong>{businessInfo.name}</strong>, we believe that modern menswear should be bold yet effortless, comfortable yet sharp. Founded with a vision to provide accessible, top-tier men's fashion, we have grown into one of the most trusted clothing destinations in the region.
               </p>
               <p>
-                Every piece in our catalog is handpicked for its fabric longevity, colorfastness, and tailored fit. Whether you walk into our Modasa gallery or shop conveniently online, we ensure you receive attentive customer service, honest sizing advice, and garments you'll be proud to wear.
+                Every piece in our catalog is handpicked for its fabric longevity, colorfastness, and tailored fit. Whether you walk into our Himatnagar gallery or shop conveniently online, we ensure you receive attentive customer service, honest sizing advice, and garments you'll be proud to wear.
               </p>
               
               <div className="story-highlights-list">
@@ -175,7 +175,7 @@ export default function AboutPage() {
                   <span className="badge-star">★</span>
                   <div>
                     <strong>Authentic In-Store Experience</strong>
-                    <span>Modasa's Top Fashion Gallery</span>
+                    <span>Himatnagar's Top Fashion Gallery</span>
                   </div>
                 </div>
               </div>
@@ -295,7 +295,7 @@ export default function AboutPage() {
                 <a href={businessInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
                   OPEN IN GOOGLE MAPS ↗
                 </a>
-                <a href="tel:+919876543210" className="btn-secondary">
+                <a href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} className="btn-secondary">
                   CALL STORE
                 </a>
               </div>
@@ -318,7 +318,7 @@ export default function AboutPage() {
                 <div className="map-pin-pulse-icon">📍</div>
                 <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
-                  <p>College Road, Modasa, Gujarat 383315</p>
+                  <p>FF 57, Pratham Square, Sahakari Jin Rd, Himatnagar, Gujarat 383001</p>
                   <span className="map-click-prompt">Click to open directions in Google Maps ↗</span>
                 </div>
               </div>
@@ -373,7 +373,7 @@ export default function AboutPage() {
             </div>
             <div className="faq-item">
               <h4>Can I try clothes in the store?</h4>
-              <p>Yes, our Modasa store features spacious, comfortable trial rooms and dedicated styling assistants to ensure your ideal fit.</p>
+              <p>Yes, our Himatnagar store features spacious, comfortable trial rooms and dedicated styling assistants to ensure your ideal fit.</p>
             </div>
           </div>
         </div>

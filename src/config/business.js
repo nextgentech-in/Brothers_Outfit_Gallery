@@ -8,8 +8,8 @@ export const businessInfo = {
   googleMapsUrl: "https://maps.app.goo.gl/LdPv9pHvtFU8cj4E8",
   
   // Real business location details
-  address: "BROTHERS OUTFIT GALLERY, College Road, Modasa, Gujarat 383315, India",
-  phone: "+91 98765 43210",
+  address: "FF 57, Pratham Square, Sahakari Jin Rd, Anant Vihar Society, Himatnagar, Gujarat 383001",
+  phone: "+91 84602 33020",
   email: "contact@brothersoutfit.com",
   coordinates: {
     lat: 23.5875977,
