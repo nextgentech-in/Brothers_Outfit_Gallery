@@ -301,26 +301,28 @@ export default function AboutPage() {
               </div>
             </div>
             
-            {/* Interactive Live Google Maps Iframe */}
-            <div className="location-map-container">
-              <iframe
-                title="Brothers Outfit Gallery Google Maps Location"
-                src="https://maps.google.com/maps?q=BROTHERS+OUTFIT+GALLERY,+23.5875977,72.9697925&t=&z=16&ie=UTF8&iwloc=&output=embed"
-                width="100%"
-                height="100%"
-                className="google-maps-iframe"
-                allowFullScreen=""
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              ></iframe>
-              <div className="map-info-badge">
-                <span className="map-badge-pin">📍</span>
-                <div>
+            {/* Clickable Map Photo linking to Google Maps */}
+            <a 
+              href={businessInfo.googleMapsUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="location-map-photo-wrap"
+              title="Click to open Brothers Outfit Gallery on Google Maps"
+            >
+              <img 
+                src="/images/store-map-photo.jpg" 
+                alt="Brothers Outfit Gallery Location Map" 
+                className="location-map-photo"
+              />
+              <div className="map-photo-overlay-card">
+                <div className="map-pin-pulse-icon">📍</div>
+                <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
-                  <p>Modasa, Gujarat • Click map to zoom or pan</p>
+                  <p>College Road, Modasa, Gujarat 383315</p>
+                  <span className="map-click-prompt">Click to open directions in Google Maps ↗</span>
                 </div>
               </div>
-            </div>
+            </a>
           </div>
         </div>
       </section>
