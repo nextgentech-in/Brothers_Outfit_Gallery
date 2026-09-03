@@ -135,6 +135,10 @@ export const updateOrderShipment = async (orderId, shipmentData) => {
     waybill: shipmentData.waybill,
     courier: shipmentData.courier || 'Delhivery Express',
     trackingUrl: shipmentData.trackingUrl,
+    pickupScheduled: true,
+    pickupAgentNotified: true,
+    pickupAgentStatus: shipmentData.pickupAgentStatus || 'Notified & Dispatched for Courier Pickup',
+    pickupDispatchedAt: shipmentData.pickupDispatchedAt || new Date().toISOString(),
     shippedAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });

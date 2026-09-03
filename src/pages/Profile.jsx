@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
 import './Profile.css';
@@ -7,8 +7,10 @@ import './Profile.css';
 export default function Profile() {
   const { currentUser, userProfile, logout, updateFirestoreProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' or 'orders'
+  const initialTab = searchParams.get('tab') === 'orders' ? 'orders' : 'profile';
+  const [activeTab, setActiveTab] = useState(initialTab); // 'profile' or 'orders'
   const [userOrders, setUserOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
 
@@ -31,7 +33,8 @@ export default function Profile() {
     if (!currentUser) return;
     setOrdersLoading(true);
     try {
-      const orders = await getUserOrders(currentUser.uid);
+      const emailToUse = currentUser.email || userProfile?.email || '';
+      const orders = await getUserOrders(currentUser.uid, emailToUse);
       setUserOrders(orders);
     } catch (e) {
       console.error("Error loading user orders:", e);
@@ -39,6 +42,10 @@ export default function Profile() {
       setOrdersLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadUserOrders();
+  }, [currentUser]);
 
   const [cancellingId, setCancellingId] = useState(null);
 

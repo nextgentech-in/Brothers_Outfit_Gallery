@@ -155,10 +155,15 @@ export default function CheckoutPage() {
       // Cash on Delivery
       try {
         const newOrderId = `ORD-${Date.now()}`;
+        const emailToSave = (shippingAddress.email || currentUser?.email || '').toLowerCase().trim();
         const orderPayload = {
           userId: currentUser?.uid || 'guest',
-          userEmail: shippingAddress.email,
-          shippingAddress,
+          userEmail: emailToSave,
+          userPhone: shippingAddress.phone || '',
+          shippingAddress: {
+            ...shippingAddress,
+            email: emailToSave
+          },
           items: cartItems,
           subtotal: cartSubtotal,
           discount,
@@ -173,6 +178,9 @@ export default function CheckoutPage() {
         };
 
         await createOrder(newOrderId, orderPayload);
+        try {
+          localStorage.setItem('last_placed_order', newOrderId);
+        } catch (e) { }
         // Trigger Admin Alert
         await createAdminOrderNotification(newOrderId, orderPayload);
 
@@ -225,10 +233,15 @@ export default function CheckoutPage() {
 
             if (verifyData.success) {
               const newOrderId = `ORD-${Date.now()}`;
+              const emailToSave = (shippingAddress.email || currentUser?.email || '').toLowerCase().trim();
               const orderPayload = {
                 userId: currentUser?.uid || 'guest',
-                userEmail: shippingAddress.email,
-                shippingAddress,
+                userEmail: emailToSave,
+                userPhone: shippingAddress.phone || '',
+                shippingAddress: {
+                  ...shippingAddress,
+                  email: emailToSave
+                },
                 items: cartItems,
                 subtotal: cartSubtotal,
                 discount,
@@ -245,6 +258,9 @@ export default function CheckoutPage() {
               };
 
               await createOrder(newOrderId, orderPayload);
+              try {
+                localStorage.setItem('last_placed_order', newOrderId);
+              } catch (e) { }
               // Trigger Admin Alert
               await createAdminOrderNotification(newOrderId, orderPayload);
 

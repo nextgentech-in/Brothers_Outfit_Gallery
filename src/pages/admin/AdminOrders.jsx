@@ -38,7 +38,9 @@ export default function AdminOrders() {
       return;
     }
 
-    const confirmApprove = window.confirm(`Approve Order #${order.id} and generate Delhivery manifest for courier pickup?`);
+    const confirmApprove = window.confirm(
+      `APPROVE FOR DELIVERY PICKUP:\n\nSchedule Delhivery courier pickup and dispatch notification to delivery agent for Order #${order.id}?`
+    );
     if (!confirmApprove) return;
 
     setShippingOrderId(order.id);
@@ -52,15 +54,34 @@ export default function AdminOrders() {
       });
 
       if (res && res.waybill) {
-        await updateOrderShipment(order.id, res);
-        alert(`Shipment Approved! Delhivery AWB Assigned: ${res.waybill}\nCourier pickup has been scheduled.`);
+        const shipmentData = {
+          ...res,
+          status: 'Shipped',
+          pickupAgentStatus: 'Notified - Assigned for Courier Pickup',
+          pickupAgentNotified: true,
+          pickupDispatchedAt: new Date().toISOString()
+        };
+        await updateOrderShipment(order.id, shipmentData);
+        alert(
+          `✓ ORDER APPROVED FOR PICKUP!\n\n` +
+          `• Delhivery AWB: ${res.waybill}\n` +
+          `• Courier: Delhivery Express\n` +
+          `• Notification: Delhivery delivery agent notified for store pickup.\n` +
+          `• Order Status: Shipped`
+        );
         fetchOrders();
         if (selectedOrder && selectedOrder.id === order.id) {
-          setSelectedOrder(prev => ({ ...prev, status: 'Shipped', waybill: res.waybill }));
+          setSelectedOrder(prev => ({
+            ...prev,
+            status: 'Shipped',
+            waybill: res.waybill,
+            pickupAgentStatus: 'Notified - Assigned for Courier Pickup',
+            pickupAgentNotified: true
+          }));
         }
       }
     } catch (err) {
-      alert(`Failed to approve & create Delhivery shipment: ${err.message}`);
+      alert(`Failed to approve pickup: ${err.message}`);
     } finally {
       setShippingOrderId(null);
     }
@@ -143,17 +164,16 @@ export default function AdminOrders() {
               <th>ITEMS & SIZES</th>
               <th>TOTAL</th>
               <th>PAYMENT</th>
-              <th>DELHIVERY STATUS</th>
               <th>STATUS</th>
               <th>DATE</th>
-              <th>ACTIONS</th>
+              <th style={{ minWidth: '190px' }}>ADMIN CONTROLS (2 OPTIONS)</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="9" style={{textAlign: 'center', padding: '40px'}}>Loading orders...</td></tr>
+              <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>Loading orders...</td></tr>
             ) : filteredOrders.length === 0 ? (
-              <tr><td colSpan="9" style={{textAlign: 'center', padding: '40px'}}>No orders match the current criteria.</td></tr>
+              <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>No orders match the current criteria.</td></tr>
             ) : filteredOrders.map(o => (
               <tr key={o.id}>
                 <td>
@@ -181,29 +201,6 @@ export default function AdminOrders() {
                   </span>
                 </td>
                 <td>
-                  {o.waybill ? (
-                    <div className="delhivery-admin-cell">
-                      <span className="waybill-tag">📦 AWB: {o.waybill}</span>
-                      <button 
-                        onClick={() => handleOpenTracking(o.waybill)}
-                        className="btn-track-mini"
-                      >
-                        Track Status
-                      </button>
-                    </div>
-                  ) : o.status === 'Cancelled' ? (
-                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>Cancelled</span>
-                  ) : (
-                    <button
-                      onClick={() => handleApproveAndShip(o)}
-                      disabled={shippingOrderId === o.id}
-                      className="btn-approve-ship"
-                    >
-                      {shippingOrderId === o.id ? 'MANIFESTING...' : '✔ Approve & Ship'}
-                    </button>
-                  )}
-                </td>
-                <td>
                   <select 
                     value={o.status || 'Processing'} 
                     onChange={(e) => handleStatusChange(o.id, e.target.value)}
@@ -222,23 +219,85 @@ export default function AdminOrders() {
                   {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : new Date(o.createdAt || Date.now()).toLocaleDateString('en-IN')}
                 </td>
                 <td>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <button 
-                      onClick={() => setSelectedOrder(o)}
-                      className="admin-action-btn edit"
-                      style={{ padding: '5px 10px', fontSize: '11px', fontWeight: '700' }}
-                    >
-                      DETAILS
-                    </button>
-                    {o.status !== 'Cancelled' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {/* Option 1: Cancel Order */}
+                    {o.status !== 'Cancelled' ? (
                       <button
                         onClick={() => handleCancelOrder(o)}
                         disabled={actionLoadingId === o.id}
                         className="btn-cancel-admin"
+                        style={{
+                          background: '#fef2f2',
+                          color: '#dc2626',
+                          border: '1px solid #fca5a5',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px'
+                        }}
                       >
-                        {actionLoadingId === o.id ? '...' : 'Cancel'}
+                        {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel Order'}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700' }}>❌ Cancelled</span>
+                    )}
+
+                    {/* Option 2: Approve for Pickup */}
+                    {o.status === 'Cancelled' ? null : o.waybill ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: '#f0fdf4', padding: '6px 8px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: '800' }}>
+                          ✓ Pickup Scheduled
+                        </span>
+                        <span style={{ fontSize: '10.5px', color: '#166534' }}>
+                          AWB: {o.waybill}
+                        </span>
+                        <span style={{ fontSize: '10px', color: '#16a34a' }}>
+                          📢 Delivery Agent Notified
+                        </span>
+                        <button 
+                          onClick={() => handleOpenTracking(o.waybill)}
+                          style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: '4px', fontSize: '10.5px', cursor: 'pointer', fontWeight: '700', marginTop: '2px' }}
+                        >
+                          Track Courier ↗
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleApproveAndShip(o)}
+                        disabled={shippingOrderId === o.id}
+                        className="btn-approve-ship"
+                        style={{
+                          background: '#16a34a',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11.5px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
+                        }}
+                      >
+                        {shippingOrderId === o.id ? 'Manifesting...' : '🚚 Option 2: Approve for Pickup'}
                       </button>
                     )}
+
+                    <button 
+                      onClick={() => setSelectedOrder(o)}
+                      className="admin-action-btn edit"
+                      style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', textAlign: 'center' }}
+                    >
+                      View Details
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -346,56 +405,68 @@ export default function AdminOrders() {
               </div>
 
               {/* Delhivery AWB & Pickup Section */}
-              <div style={{ background: '#f0fdf4', padding: '14px', borderRadius: '8px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#166534', fontWeight: '700' }}>
-                    DELHIVERY EXPRESS SHIPMENT
+                  <div style={{ fontSize: '11px', color: '#166534', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    DELHIVERY COURIER PICKUP & DISPATCH
                   </div>
                   {selectedOrder.waybill ? (
-                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#14532d', marginTop: '2px' }}>
-                      AWB / Waybill: {selectedOrder.waybill}
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#14532d', marginTop: '2px' }}>
+                        AWB / Waybill: {selectedOrder.waybill}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#15803d', marginTop: '3px' }}>
+                        📢 Delhivery agent has been scheduled and notified for store pickup.
+                      </div>
+                    </div>
+                  ) : selectedOrder.status === 'Cancelled' ? (
+                    <div style={{ fontSize: '13px', color: '#b91c1c', fontWeight: '700', marginTop: '2px' }}>
+                      Order is Cancelled. No pickup will be scheduled.
                     </div>
                   ) : (
-                    <div style={{ fontSize: '12px', color: '#65a30d', marginTop: '2px' }}>
-                      No shipment generated yet. Click "Approve & Ship" to schedule courier pickup.
+                    <div style={{ fontSize: '12.5px', color: '#4d7c0f', marginTop: '2px' }}>
+                      Ready for courier pickup. Click <strong>"Option 2: Approve for Pickup"</strong> to dispatch.
                     </div>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   {selectedOrder.waybill ? (
                     <button
                       onClick={() => handleOpenTracking(selectedOrder.waybill)}
                       style={{ padding: '8px 14px', background: '#15803d', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                     >
-                      Track Shipment Live
+                      Track Shipment Live ↗
                     </button>
                   ) : selectedOrder.status !== 'Cancelled' && (
                     <button
                       onClick={() => handleApproveAndShip(selectedOrder)}
                       disabled={shippingOrderId === selectedOrder.id}
-                      style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      style={{ padding: '9px 18px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '800', cursor: 'pointer', boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)' }}
                     >
-                      {shippingOrderId === selectedOrder.id ? 'MANIFESTING...' : '✔ Approve & Ship via Delhivery'}
+                      {shippingOrderId === selectedOrder.id ? 'MANIFESTING...' : '🚚 Option 2: Approve for Pickup'}
                     </button>
                   )}
                 </div>
               </div>
 
               {/* Action Buttons Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
-                {selectedOrder.status !== 'Cancelled' && (
-                  <button
-                    onClick={() => handleCancelOrder(selectedOrder)}
-                    disabled={actionLoadingId === selectedOrder.id}
-                    style={{ padding: '8px 16px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    Cancel Order
-                  </button>
-                )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+                <div>
+                  {selectedOrder.status !== 'Cancelled' && (
+                    <button
+                      onClick={() => handleCancelOrder(selectedOrder)}
+                      disabled={actionLoadingId === selectedOrder.id}
+                      style={{ padding: '8px 16px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      {actionLoadingId === selectedOrder.id ? 'Cancelling...' : '✕ Option 1: Cancel Order'}
+                    </button>
+                  )}
+                </div>
+
                 <button
                   onClick={() => setSelectedOrder(null)}
-                  style={{ padding: '8px 16px', background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  style={{ padding: '8px 20px', background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                 >
                   Close
                 </button>
