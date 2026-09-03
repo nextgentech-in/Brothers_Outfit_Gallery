@@ -21,15 +21,30 @@ const mobileMenuLinks = [
   { label: 'Wishlist', to: '/shop' },
 ];
 
+const announcements = [
+  { text: "⚡ FREE EXPRESS SHIPPING ON ALL ORDERS ABOVE ₹999", link: "/shop" },
+  { text: "🔥 USE CODE BROTHERS10 FOR 10% OFF YOUR ORDER", link: "/shop" },
+  { text: "📍 VISIT OUR STORE IN HIMATNAGAR • TRY BEFORE YOU BUY", link: "/about" }
+];
+
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [announcementIdx, setAnnouncementIdx] = useState(0);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
   const { currentUser, userProfile } = useAuth() || {};
   const { totalItems } = useCart() || { totalItems: 0 };
   const { resetShopState, setSearch } = useShop() || {};
+
+  // Rotate announcement ticker every 4 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAnnouncementIdx((prev) => (prev + 1) % announcements.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   const authAccountLink = currentUser ? '/profile' : '/login';
 
@@ -51,7 +66,7 @@ export default function Navbar() {
     const handleScroll = () => {
       if (!ticking) {
         window.requestAnimationFrame(() => {
-          setScrolled(window.scrollY > 50);
+          setScrolled(window.scrollY > 40);
           ticking = false;
         });
         ticking = true;
@@ -80,6 +95,15 @@ export default function Navbar() {
   return (
     <>
       <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}>
+        {/* Luxury Top Announcement Bar */}
+        <div className="top-announcement-bar">
+          <Link to={announcements[announcementIdx].link} className="top-announcement-bar__link">
+            <span className="announcement-pill">OFFER</span>
+            <span className="announcement-text">{announcements[announcementIdx].text}</span>
+            <span className="announcement-arrow">SHOP NOW →</span>
+          </Link>
+        </div>
+
         <div className="navbar__inner">
           {/* Mobile hamburger */}
           <button

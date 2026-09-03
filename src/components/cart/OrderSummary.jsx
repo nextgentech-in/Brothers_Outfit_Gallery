@@ -17,6 +17,11 @@ export default function OrderSummary({ subtotal, itemCount }) {
   
   const finalTotal = Math.max(0, subtotal - discount - couponDiscount + shipping);
 
+  // Free shipping progress calculation
+  const freeShippingThreshold = 1000;
+  const progressToFreeShipping = Math.min(100, Math.round((subtotal / freeShippingThreshold) * 100));
+  const amountNeeded = Math.max(0, freeShippingThreshold - subtotal);
+
   const handleApplyCoupon = async (e) => {
     e.preventDefault();
     if (!couponCode.trim()) return;
@@ -43,6 +48,26 @@ export default function OrderSummary({ subtotal, itemCount }) {
   return (
     <div className="order-summary-card">
       <h3 className="summary-title">ORDER SUMMARY</h3>
+      
+      {/* Free Shipping Progress Tracker */}
+      <div className="shipping-progress-box">
+        {subtotal >= freeShippingThreshold ? (
+          <div className="shipping-unlocked-banner">
+            <span>🎉</span>
+            <strong>Congratulations! You unlocked FREE Express Shipping!</strong>
+          </div>
+        ) : (
+          <div className="shipping-progress-text">
+            <span>Add <strong>₹{amountNeeded.toLocaleString('en-IN')}</strong> more for <strong>FREE Express Shipping</strong></span>
+          </div>
+        )}
+        <div className="shipping-progress-bar-bg">
+          <div 
+            className="shipping-progress-bar-fill" 
+            style={{ width: `${progressToFreeShipping}%` }}
+          />
+        </div>
+      </div>
       
       <div className="summary-row">
         <span>Subtotal ({itemCount} {itemCount === 1 ? 'item' : 'items'})</span>

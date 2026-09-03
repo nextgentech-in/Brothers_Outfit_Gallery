@@ -159,6 +159,11 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
 
       {/* Info */}
       <div className="product-card__info">
+        <div className="product-card__meta-row">
+          <span className="product-card__category">{product.category || "Men's Collection"}</span>
+          <span className="product-card__rating">★ 4.8</span>
+        </div>
+
         <Link to={`/product/${product.slug}`} className="product-card__name">
           {product.name}
         </Link>
