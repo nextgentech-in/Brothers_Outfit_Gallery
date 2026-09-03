@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
 import { isClothingProduct } from '../utils/productUtils';
@@ -128,17 +128,50 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
     navigate('/checkout');
   };
 
+  // Multiple photos support
+  const rawImages = (product.images && product.images.length > 0)
+    ? product.images
+    : [product.image || product.thumbnailUrl || '/images/hero.png'];
+
+  const imagesList = rawImages.map(img => (typeof img === 'object' && img !== null && img.url) ? img.url : img).filter(Boolean);
+  const [activeImgIdx, setActiveImgIdx] = useState(0);
+  const hasMultipleImages = imagesList.length > 1;
+  const touchStartX = useRef(null);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!touchStartX.current || !hasMultipleImages) return;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 30) {
+      if (diff > 0) {
+        setActiveImgIdx((prev) => (prev + 1) % imagesList.length);
+      } else {
+        setActiveImgIdx((prev) => (prev === 0 ? imagesList.length - 1 : prev - 1));
+      }
+    }
+    touchStartX.current = null;
+  };
 
   return (
     <div className={`product-card ${isOutOfStock ? 'product-card--oos' : ''}`}>
-      {/* Image */}
-      <Link to={`/product/${product.slug}`} className="product-card__image-wrap">
-        <img
-          src={optimizeImage(product.image || product.thumbnailUrl, 400)}
-          alt={product.name}
-          className="product-card__image"
-          loading="lazy"
-        />
+      {/* Image with multiple photos scroll option */}
+      <div 
+        className="product-card__image-wrap"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <Link to={`/product/${product.slug}`} className="product-card__image-link">
+          <img
+            src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 400)}
+            alt={`${product.name} - View ${activeImgIdx + 1}`}
+            className="product-card__image"
+            loading="lazy"
+          />
+        </Link>
+
         {isOutOfStock && (
           <div className="product-card__oos-badge">OUT OF STOCK</div>
         )}
@@ -154,7 +187,59 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
             </span>
           )}
         </div>
-      </Link>
+
+        {/* Multiple Photo Scroll Arrows & Dots */}
+        {hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              className="card-img-arrow card-img-arrow--prev"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setActiveImgIdx((prev) => (prev === 0 ? imagesList.length - 1 : prev - 1));
+              }}
+              aria-label="Previous image"
+            >
+              ‹
+            </button>
+
+            <button
+              type="button"
+              className="card-img-arrow card-img-arrow--next"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setActiveImgIdx((prev) => (prev + 1) % imagesList.length);
+              }}
+              aria-label="Next image"
+            >
+              ›
+            </button>
+
+            {/* Pagination Dots */}
+            <div className="card-img-dots">
+              {imagesList.map((_, i) => (
+                <span
+                  key={i}
+                  className={`card-img-dot ${i === activeImgIdx ? 'active' : ''}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveImgIdx(i);
+                  }}
+                  title={`Photo ${i + 1}`}
+                />
+              ))}
+            </div>
+
+            {/* Photo Counter */}
+            <span className="card-img-counter">
+              {activeImgIdx + 1}/{imagesList.length}
+            </span>
+          </>
+        )}
+      </div>
 
 
       {/* Info */}

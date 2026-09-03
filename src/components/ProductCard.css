@@ -40,6 +40,111 @@
   transform: scale(1.05);
 }
 
+/* Multiple Photo Scroll Controls */
+.card-img-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  z-index: 3;
+  opacity: 0;
+  transition: all 0.25s ease;
+}
+
+.product-card__image-wrap:hover .card-img-arrow {
+  opacity: 1;
+}
+
+.card-img-arrow--prev {
+  left: 8px;
+}
+
+.card-img-arrow--next {
+  right: 8px;
+}
+
+.card-img-arrow:hover {
+  background: #ffffff;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.card-img-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5px;
+  z-index: 3;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 12px;
+}
+
+.card-img-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.card-img-dot.active {
+  width: 12px;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.card-img-counter {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.product-card__image-wrap:hover .card-img-counter {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .card-img-arrow {
+    opacity: 0.85;
+    width: 26px;
+    height: 26px;
+  }
+  .card-img-counter {
+    opacity: 0.85;
+  }
+}
+
 /* Badges */
 .product-card__oos-badge {
   position: absolute;
