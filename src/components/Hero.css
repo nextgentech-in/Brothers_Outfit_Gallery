@@ -465,7 +465,7 @@
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
-.trust-icon {
+.hero-trust-bar .trust-icon {
   width: 44px;
   height: 44px;
   border-radius: 10px;
@@ -479,13 +479,13 @@
   transition: all 0.25s ease;
 }
 
-.trust-pill:hover .trust-icon {
+.hero-trust-bar .trust-pill:hover .trust-icon {
   background: #ca8a04;
   color: #ffffff;
   transform: scale(1.05);
 }
 
-.trust-icon svg {
+.hero-trust-bar .trust-icon svg {
   display: block;
   width: 22px;
   height: 22px;
