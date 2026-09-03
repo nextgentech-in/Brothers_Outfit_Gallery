@@ -16,28 +16,53 @@ export default function AdminHomepage() {
     showReviews: true
   });
 
+  const [saveStatus, setSaveStatus] = useState(null);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const data = await getHomepageConfig();
-      setConfig(prev => ({ ...prev, ...data }));
-      setLoading(false);
+      try {
+        const data = await getHomepageConfig();
+        if (data && Object.keys(data).length > 0) {
+          setConfig(prev => ({ ...prev, ...data }));
+        }
+      } catch (err) {
+        console.error('Failed to load homepage config:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
 
   const handleToggle = (key) => {
     setConfig(prev => ({ ...prev, [key]: !prev[key] }));
+    setSaveStatus(null);
   };
 
   const handleSave = async () => {
     setSaving(true);
-    await saveHomepageConfig(config);
-    setSaving(false);
-    alert('Homepage configuration saved!');
+    setSaveStatus(null);
+    try {
+      await saveHomepageConfig(config);
+      setSaveStatus({ type: 'success', text: 'Homepage section settings saved successfully! Live homepage updated.' });
+      setTimeout(() => setSaveStatus(null), 5000);
+    } catch (err) {
+      console.error('Error saving homepage config:', err);
+      setSaveStatus({ type: 'error', text: 'Failed to save homepage settings: ' + err.message });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (loading) return <div>Loading homepage manager...</div>;
+  const handleEnableAll = () => {
+    const allEnabled = {};
+    sections.forEach(s => { allEnabled[s.key] = true; });
+    setConfig(prev => ({ ...prev, ...allEnabled }));
+    setSaveStatus(null);
+  };
+
+  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading homepage manager...</div>;
 
   const sections = [
     { key: 'showHero', title: 'Hero Banner', desc: 'Main full-width video/carousel banner at top of home page' },
@@ -52,9 +77,46 @@ export default function AdminHomepage() {
 
   return (
     <div className="admin-homepage-mgr">
-      <div className="admin-header">
-        <h1 className="admin-title">Homepage Section Visibility</h1>
+      <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1 className="admin-title">Homepage Section Visibility</h1>
+          <p style={{ color: '#64748b', fontSize: '14px', margin: '4px 0 0' }}>Control which sections are displayed to visitors on the live storefront.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            type="button" 
+            onClick={handleEnableAll}
+            className="admin-action-btn"
+            style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            Enable All Sections
+          </button>
+          <a 
+            href="/" 
+            target="_blank" 
+            rel="noreferrer" 
+            className="admin-action-btn" 
+            style={{ padding: '8px 16px', background: '#1e293b', color: '#fff', textDecoration: 'none', borderRadius: '6px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            Preview Store ↗
+          </a>
+        </div>
       </div>
+
+      {saveStatus && (
+        <div style={{
+          padding: '14px 20px',
+          borderRadius: '8px',
+          marginBottom: '20px',
+          fontWeight: 600,
+          fontSize: '14px',
+          background: saveStatus.type === 'success' ? '#dcfce7' : '#fee2e2',
+          color: saveStatus.type === 'success' ? '#15803d' : '#b91c1c',
+          border: `1px solid ${saveStatus.type === 'success' ? '#86efac' : '#fca5a5'}`
+        }}>
+          {saveStatus.text}
+        </div>
+      )}
 
       <div className="homepage-sections-list">
         {sections.map(sec => (
@@ -66,7 +128,7 @@ export default function AdminHomepage() {
             <label className="switch">
               <input 
                 type="checkbox" 
-                checked={config[sec.key]} 
+                checked={config[sec.key] !== false} 
                 onChange={() => handleToggle(sec.key)} 
               />
               <span className="slider round"></span>
@@ -79,9 +141,9 @@ export default function AdminHomepage() {
         onClick={handleSave} 
         disabled={saving} 
         className="admin-btn-primary"
-        style={{marginTop: '24px', padding: '14px 28px'}}
+        style={{marginTop: '24px', padding: '14px 32px', fontSize: '14px', letterSpacing: '1px'}}
       >
-        {saving ? 'SAVING...' : 'SAVE HOMEPAGE CONFIG'}
+        {saving ? 'SAVING CHANGES...' : 'SAVE HOMEPAGE CONFIG'}
       </button>
     </div>
   );

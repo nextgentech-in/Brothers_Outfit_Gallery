@@ -88,6 +88,19 @@
   transform: scaleX(1);
 }
 
+.navbar__link--sale {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+}
+
+.navbar__link--sale::after {
+  background: #dc2626 !important;
+}
+
+.navbar__link--sale:hover {
+  color: #ef4444 !important;
+}
+
 /* Right Icons */
 .navbar__icons {
   display: flex;
@@ -293,6 +306,15 @@
 .mobile-menu__link:hover {
   padding-left: 8px;
   color: var(--color-text-muted);
+}
+
+.mobile-menu__link--sale {
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+}
+
+.mobile-menu__link--sale:hover {
+  color: #ef4444 !important;
 }
 
 /* ───────── Responsive ───────── */

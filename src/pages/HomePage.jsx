@@ -6,6 +6,7 @@ import TrendingCarousel from '../components/TrendingCarousel';
 import SaleProductCard from '../components/SaleProductCard';
 import ProductCard from '../components/ProductCard';
 import { getSaleProducts, getNewArrivals, getShopProducts } from '../services/productService';
+import { getHomepageConfig } from '../services/adminService';
 import './HomePage.css';
 
 export default function HomePage() {
@@ -13,6 +14,16 @@ export default function HomePage() {
   const [newArrivals, setNewArrivals] = useState([]);
   const [shopProducts, setShopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [homepageConfig, setHomepageConfig] = useState({
+    showHero: true,
+    showTrending: true,
+    showSaleSection: true,
+    showNewArrivals: true,
+    showShopCollection: true,
+    showAboutPreview: true,
+    showTrustBadges: true,
+    showReviews: true
+  });
   const { addToCart } = useCart();
 
   const handleAddToCart = (productData) => {
@@ -26,14 +37,18 @@ export default function HomePage() {
       try {
         setLoading(true);
         // Fetch concurrently
-        const [saleRes, newRes, shopRes] = await Promise.all([
+        const [saleRes, newRes, shopRes, configRes] = await Promise.all([
           getSaleProducts(4),
           getNewArrivals(4),
-          getShopProducts('All', 'featured', null, 8)
+          getShopProducts('All', 'featured', null, 8),
+          getHomepageConfig()
         ]);
 
         setSaleProducts(saleRes);
         setNewArrivals(newRes);
+        if (configRes && Object.keys(configRes).length > 0) {
+          setHomepageConfig(prev => ({ ...prev, ...configRes }));
+        }
 
         const excludeIds = new Set([...saleRes, ...newRes].map(p => p.id));
         const filteredShop = shopRes.products.filter(p => !excludeIds.has(p.id)).slice(0, 4);
@@ -61,13 +76,13 @@ export default function HomePage() {
   return (
     <div className="home-page">
       {/* 1. Hero */}
-      <Hero />
+      {homepageConfig.showHero !== false && <Hero />}
 
       {/* 2. Trending Now */}
-      <TrendingCarousel />
+      {homepageConfig.showTrending !== false && <TrendingCarousel />}
 
       {/* 3. Sale Products */}
-      {saleProducts.length > 0 && (
+      {homepageConfig.showSaleSection !== false && saleProducts.length > 0 && (
         <section className="home-section sale-section">
           <div className="home-container">
             <div className="section-header">
@@ -90,7 +105,7 @@ export default function HomePage() {
       )}
 
       {/* 4. New Arrivals */}
-      {newArrivals.length > 0 && (
+      {homepageConfig.showNewArrivals !== false && newArrivals.length > 0 && (
         <section className="home-section new-arrivals-section">
           <div className="home-container">
             <div className="section-header">
@@ -112,105 +127,113 @@ export default function HomePage() {
       )}
 
       {/* 5. Shop Our Collection */}
-      <section className="home-section shop-section">
-        <div className="home-container">
-          <div className="section-header">
-            <h2>SHOP OUR COLLECTION</h2>
-            <p className="subtitle">Find your everyday essentials, statement pieces and timeless men's styles.</p>
+      {homepageConfig.showShopCollection !== false && (
+        <section className="home-section shop-section">
+          <div className="home-container">
+            <div className="section-header">
+              <h2>SHOP OUR COLLECTION</h2>
+              <p className="subtitle">Find your everyday essentials, statement pieces and timeless men's styles.</p>
+            </div>
+            
+            <div className="product-grid">
+              {shopProducts.map(product => (
+                <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+              ))}
+            </div>
+            
+            <div className="section-footer">
+              <Link to="/shop" className="btn-view-all">VIEW ALL PRODUCTS →</Link>
+            </div>
           </div>
-          
-          <div className="product-grid">
-            {shopProducts.map(product => (
-              <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
-            ))}
-          </div>
-          
-          <div className="section-footer">
-            <Link to="/shop" className="btn-view-all">VIEW ALL PRODUCTS →</Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 6. About Us Preview */}
-      <section className="home-section about-preview-section">
-        <div className="home-container">
-          <div className="about-grid">
-            <div className="about-img-wrap">
-              <img src="/images/brothers-shop-real.png" alt="Brothers Outfit - Our Real Store" className="about-img" />
-            </div>
-            <div className="about-content">
-              <h2>ABOUT BROTHERS OUTFIT GALLERY</h2>
-              <p>At Brothers Outfit Gallery, we bring together modern men's fashion, quality clothing and a shopping experience built around confidence, comfort and personal style.</p>
-              <p>For years, we've focused on delivering the highest quality pieces—from everyday essentials to statement looks. Whether you visit our physical location or shop online, our commitment to excellent customer service remains our cornerstone.</p>
-              <Link to="/about" className="btn-secondary">DISCOVER OUR STORY →</Link>
+      {homepageConfig.showAboutPreview !== false && (
+        <section className="home-section about-preview-section">
+          <div className="home-container">
+            <div className="about-grid">
+              <div className="about-img-wrap">
+                <img src="/images/brothers-shop-real.png" alt="Brothers Outfit - Our Real Store" className="about-img" />
+              </div>
+              <div className="about-content">
+                <h2>ABOUT BROTHERS OUTFIT GALLERY</h2>
+                <p>At Brothers Outfit Gallery, we bring together modern men's fashion, quality clothing and a shopping experience built around confidence, comfort and personal style.</p>
+                <p>For years, we've focused on delivering the highest quality pieces—from everyday essentials to statement looks. Whether you visit our physical location or shop online, our commitment to excellent customer service remains our cornerstone.</p>
+                <Link to="/about" className="btn-secondary">DISCOVER OUR STORY →</Link>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 7. Why Shop With Us */}
-      <section className="home-section trust-section">
-        <div className="home-container">
-          <div className="section-header">
-            <h2>WHY SHOP WITH US</h2>
+      {homepageConfig.showTrustBadges !== false && (
+        <section className="home-section trust-section">
+          <div className="home-container">
+            <div className="section-header">
+              <h2>WHY SHOP WITH US</h2>
+            </div>
+            
+            <div className="trust-grid">
+              <div className="trust-item">
+                <div className="trust-icon">★</div>
+                <h3>PREMIUM QUALITY</h3>
+                <p>Quality-focused men's fashion for everyday wear.</p>
+              </div>
+              <div className="trust-item">
+                <div className="trust-icon">❖</div>
+                <h3>MODERN STYLES</h3>
+                <p>Contemporary styles for different occasions.</p>
+              </div>
+              <div className="trust-item">
+                <div className="trust-icon">🔒</div>
+                <h3>SECURE SHOPPING</h3>
+                <p>A secure and convenient online shopping experience.</p>
+              </div>
+              <div className="trust-item">
+                <div className="trust-icon">💬</div>
+                <h3>EASY SUPPORT</h3>
+                <p>Customer support when you need help.</p>
+              </div>
+            </div>
           </div>
-          
-          <div className="trust-grid">
-            <div className="trust-item">
-              <div className="trust-icon">★</div>
-              <h3>PREMIUM QUALITY</h3>
-              <p>Quality-focused men's fashion for everyday wear.</p>
-            </div>
-            <div className="trust-item">
-              <div className="trust-icon">❖</div>
-              <h3>MODERN STYLES</h3>
-              <p>Contemporary styles for different occasions.</p>
-            </div>
-            <div className="trust-item">
-              <div className="trust-icon">🔒</div>
-              <h3>SECURE SHOPPING</h3>
-              <p>A secure and convenient online shopping experience.</p>
-            </div>
-            <div className="trust-item">
-              <div className="trust-icon">💬</div>
-              <h3>EASY SUPPORT</h3>
-              <p>Customer support when you need help.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 8. Customer Reviews */}
-      <section className="home-section reviews-section">
-        <div className="home-container">
-          <div className="section-header">
-            <h2>WHAT OUR CUSTOMERS SAY</h2>
-            <p className="subtitle">Real experiences from our customers.</p>
-          </div>
-          
-          <div className="reviews-grid">
-            <div className="review-card">
-              <div className="review-stars">★★★★★</div>
-              <p className="review-text">"Great quality and the fit was exactly what I wanted. Prompt delivery as well!"</p>
-              <p className="review-author">Rahul Verma <span className="verified">✓ Verified</span></p>
+      {homepageConfig.showReviews !== false && (
+        <section className="home-section reviews-section">
+          <div className="home-container">
+            <div className="section-header">
+              <h2>WHAT OUR CUSTOMERS SAY</h2>
+              <p className="subtitle">Real experiences from our customers.</p>
             </div>
-            <div className="review-card">
-              <div className="review-stars">★★★★★</div>
-              <p className="review-text">"The oversized tees are absolute perfection. Fabric feels super premium and comfortable."</p>
-              <p className="review-author">Sumit Sharma <span className="verified">✓ Verified</span></p>
+            
+            <div className="reviews-grid">
+              <div className="review-card">
+                <div className="review-stars">★★★★★</div>
+                <p className="review-text">"Great quality and the fit was exactly what I wanted. Prompt delivery as well!"</p>
+                <p className="review-author">Rahul Verma <span className="verified">✓ Verified</span></p>
+              </div>
+              <div className="review-card">
+                <div className="review-stars">★★★★★</div>
+                <p className="review-text">"The oversized tees are absolute perfection. Fabric feels super premium and comfortable."</p>
+                <p className="review-author">Sumit Sharma <span className="verified">✓ Verified</span></p>
+              </div>
+              <div className="review-card">
+                <div className="review-stars">★★★★★</div>
+                <p className="review-text">"My go-to store for casual and ethnic wear. Support team is always responsive."</p>
+                <p className="review-author">Aryan Mehta <span className="verified">✓ Verified</span></p>
+              </div>
             </div>
-            <div className="review-card">
-              <div className="review-stars">★★★★★</div>
-              <p className="review-text">"My go-to store for casual and ethnic wear. Support team is always responsive."</p>
-              <p className="review-author">Aryan Mehta <span className="verified">✓ Verified</span></p>
+            
+            <div className="section-footer">
+              <Link to="/about" className="btn-view-all">READ CUSTOMER REVIEWS →</Link>
             </div>
           </div>
-          
-          <div className="section-footer">
-            <Link to="/about" className="btn-view-all">READ CUSTOMER REVIEWS →</Link>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
     </div>
   );

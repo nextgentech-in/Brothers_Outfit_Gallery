@@ -103,7 +103,33 @@ export const CartProvider = ({ children }) => {
     setCartItems(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
-  const clearCart = () => setCartItems([]);
+  const [appliedCoupon, setAppliedCoupon] = useState(() => {
+    try {
+      const persisted = sessionStorage.getItem('brothers_applied_coupon');
+      return persisted ? JSON.parse(persisted) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const applyCoupon = (couponResult) => {
+    setAppliedCoupon(couponResult);
+    try {
+      sessionStorage.setItem('brothers_applied_coupon', JSON.stringify(couponResult));
+    } catch (e) {}
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    try {
+      sessionStorage.removeItem('brothers_applied_coupon');
+    } catch (e) {}
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+    removeCoupon();
+  };
 
   const totalItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const cartSubtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -117,7 +143,10 @@ export const CartProvider = ({ children }) => {
       removeFromCart,
       clearCart,
       totalItems,
-      cartSubtotal
+      cartSubtotal,
+      appliedCoupon,
+      applyCoupon,
+      removeCoupon
     }}>
       {children}
     </CartContext.Provider>

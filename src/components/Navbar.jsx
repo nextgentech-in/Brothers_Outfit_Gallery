@@ -112,7 +112,7 @@ export default function Navbar() {
               <li key={link.label}>
                 <Link 
                   to={link.to} 
-                  className={`navbar__link ${link.label === 'ADMIN' ? 'navbar__link--admin' : ''}`}
+                  className={`navbar__link ${link.label === 'ADMIN' ? 'navbar__link--admin' : ''} ${link.label.toLowerCase() === 'sale' ? 'navbar__link--sale' : ''}`}
                   onClick={() => {
                     if (link.to === '/shop' && resetShopState) resetShopState();
                   }}
@@ -214,7 +214,7 @@ export default function Navbar() {
             <Link
               key={link.label}
               to={link.to}
-              className="mobile-menu__link"
+              className={`mobile-menu__link ${link.label.toLowerCase() === 'sale' ? 'mobile-menu__link--sale' : ''}`}
               onClick={() => {
                 setMobileOpen(false);
                 if ((link.to === '/shop' || link.label === 'Shop') && resetShopState) resetShopState();

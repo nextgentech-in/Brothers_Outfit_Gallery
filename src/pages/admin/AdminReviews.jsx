@@ -24,6 +24,8 @@ export default function AdminReviews() {
     }
   };
 
+  const [previewImg, setPreviewImg] = useState(null);
+
   return (
     <div className="admin-reviews-page">
       <div className="admin-header">
@@ -36,6 +38,8 @@ export default function AdminReviews() {
             <tr>
               <th>AUTHOR</th>
               <th>RATING</th>
+              <th>RECOMMENDS</th>
+              <th>PHOTOS</th>
               <th>COMMENT</th>
               <th>PRODUCT</th>
               <th>DATE</th>
@@ -44,20 +48,54 @@ export default function AdminReviews() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" style={{textAlign: 'center', padding: '40px'}}>Loading reviews...</td></tr>
+              <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>Loading reviews...</td></tr>
             ) : reviews.length === 0 ? (
-              <tr><td colSpan="6" style={{textAlign: 'center', padding: '40px'}}>No customer reviews found.</td></tr>
+              <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>No customer reviews found.</td></tr>
             ) : reviews.map(r => (
               <tr key={r.id}>
-                <td><strong>{r.userName || r.author || 'Anonymous'}</strong></td>
+                <td>
+                  <strong>{r.userName || r.author || 'Anonymous'}</strong>
+                  {r.userEmail && <div style={{ fontSize: '11px', color: '#64748b' }}>{r.userEmail}</div>}
+                </td>
                 <td>
                   <span style={{color: '#f59e0b', fontWeight: 'bold'}}>
-                    {'★'.repeat(r.rating || 5)}
+                    {'★'.repeat(Number(r.rating) || 5)}
                   </span>
                 </td>
-                <td>{r.comment || r.reviewText}</td>
-                <td>{r.productName || 'General Store Review'}</td>
-                <td style={{fontSize: '12px'}}>{r.createdAt || 'Recent'}</td>
+                <td>
+                  {r.recommend !== false ? (
+                    <span style={{ color: '#15803d', fontWeight: 600, background: '#f0fdf4', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                      👍 Yes
+                    </span>
+                  ) : (
+                    <span style={{ color: '#b91c1c', fontWeight: 600, background: '#fef2f2', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                      👎 No
+                    </span>
+                  )}
+                </td>
+                <td>
+                  {r.images && r.images.length > 0 ? (
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {r.images.map((img, i) => (
+                        <img 
+                          key={i} 
+                          src={img} 
+                          alt="Review attachment" 
+                          style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
+                          onClick={() => setPreviewImg(img)}
+                          title="Click to view full photo"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>None</span>
+                  )}
+                </td>
+                <td style={{ maxWidth: '280px', fontSize: '13px', lineHeight: '1.4' }}>{r.comment || r.reviewText}</td>
+                <td><strong>{r.productName || 'General Store Review'}</strong></td>
+                <td style={{fontSize: '12px', whiteSpace: 'nowrap'}}>
+                  {r.dateFormatted || (r.createdAt?.seconds ? new Date(r.createdAt.seconds * 1000).toLocaleDateString('en-IN') : 'Recent')}
+                </td>
                 <td>
                   <button onClick={() => handleDelete(r.id)} className="admin-action-btn delete">
                     DELETE
@@ -68,6 +106,15 @@ export default function AdminReviews() {
           </tbody>
         </table>
       </div>
+
+      {previewImg && (
+        <div 
+          onClick={() => setPreviewImg(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, cursor: 'pointer' }}
+        >
+          <img src={previewImg} alt="Preview" style={{ maxWidth: '85vw', maxHeight: '85vh', borderRadius: '8px', boxShadow: '0 8px 30px rgba(0,0,0,0.5)' }} />
+        </div>
+      )}
     </div>
   );
 }

@@ -5,12 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
 import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
 import { createAdminOrderNotification } from '../services/notificationService';
+import { validateCoupon } from '../services/couponService';
 import { getBackendUrl } from '../utils/apiConfig';
 import './CheckoutPage.css';
 
 
 export default function CheckoutPage() {
-  const { cartItems, cartSubtotal, clearCart } = useCart();
+  const { cartItems, cartSubtotal, clearCart, appliedCoupon, applyCoupon, removeCoupon } = useCart();
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
 
@@ -18,6 +19,10 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null);
   const [delhiveryStatus, setDelhiveryStatus] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
+
+  const [couponInput, setCouponInput] = useState('');
+  const [couponChecking, setCouponChecking] = useState(false);
+  const [couponFeedback, setCouponFeedback] = useState(null);
 
   const [shippingAddress, setShippingAddress] = useState({
     fullName: userProfile?.fullName || '',
@@ -34,8 +39,32 @@ export default function CheckoutPage() {
 
   // Pricing math: Free delivery for orders >= ₹1000, else ₹70
   const discount = cartSubtotal >= 2500 ? 250 : 0;
+  const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountAmount || 0) : 0;
   const shippingCost = cartSubtotal >= 1000 ? 0 : 70;
-  const finalTotal = cartSubtotal - discount + shippingCost;
+  const finalTotal = Math.max(0, cartSubtotal - discount - couponDiscount + shippingCost);
+
+  const handleCheckoutApplyCoupon = async (e) => {
+    e.preventDefault();
+    if (!couponInput.trim()) return;
+    setCouponChecking(true);
+    setCouponFeedback(null);
+
+    const res = await validateCoupon(couponInput, cartSubtotal);
+    setCouponChecking(false);
+
+    if (res.valid) {
+      applyCoupon(res);
+      setCouponFeedback({ type: 'success', text: res.message });
+      setCouponInput('');
+    } else {
+      setCouponFeedback({ type: 'error', text: res.error });
+    }
+  };
+
+  const handleCheckoutRemoveCoupon = () => {
+    removeCoupon();
+    setCouponFeedback(null);
+  };
 
 
   // Load Razorpay Script onto page
@@ -48,17 +77,6 @@ export default function CheckoutPage() {
       document.body.removeChild(script);
     };
   }, []);
-
-  if (cartItems.length === 0) {
-    return (
-      <div style={{ padding: '80px', textAlign: 'center' }}>
-        <h2>YOUR CART IS EMPTY</h2>
-        <button onClick={() => navigate('/shop')} className="btn-auth-primary" style={{ width: 'auto', margin: '20px auto' }}>
-          RETURN TO SHOP
-        </button>
-      </div>
-    );
-  }
 
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
   const [searchingPlace, setSearchingPlace] = useState(false);
@@ -144,6 +162,8 @@ export default function CheckoutPage() {
           items: cartItems,
           subtotal: cartSubtotal,
           discount,
+          couponCode: appliedCoupon?.coupon?.code || null,
+          couponDiscount,
           shippingCost,
           totalAmount: finalTotal,
           paymentMethod: 'Cash on Delivery',
@@ -212,6 +232,8 @@ export default function CheckoutPage() {
                 items: cartItems,
                 subtotal: cartSubtotal,
                 discount,
+                couponCode: appliedCoupon?.coupon?.code || null,
+                couponDiscount,
                 shippingCost,
                 totalAmount: finalTotal,
                 paymentMethod: 'Razorpay Online Payment',
@@ -260,6 +282,17 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+
+  if (cartItems.length === 0) {
+    return (
+      <div style={{ padding: '80px', textAlign: 'center' }}>
+        <h2>YOUR CART IS EMPTY</h2>
+        <button onClick={() => navigate('/shop')} className="btn-auth-primary" style={{ width: 'auto', margin: '20px auto' }}>
+          RETURN TO SHOP
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="checkout-page-container">
@@ -469,12 +502,95 @@ export default function CheckoutPage() {
             ))}
           </div>
 
+          {/* Coupon Code Section */}
+          <div className="checkout-coupon-card" style={{ margin: '18px 0', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#1e293b' }}>
+              Have a Discount Coupon?
+            </div>
+            {!appliedCoupon ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Enter code (e.g. BROTHERS10)"
+                  value={couponInput}
+                  onChange={(e) => {
+                    setCouponInput(e.target.value.toUpperCase());
+                    if (couponFeedback) setCouponFeedback(null);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    textTransform: 'uppercase',
+                    fontWeight: 600
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCheckoutApplyCoupon}
+                  disabled={couponChecking || !couponInput.trim()}
+                  style={{
+                    padding: '10px 18px',
+                    background: '#0f172a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '1px',
+                    cursor: couponChecking ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {couponChecking ? '...' : 'APPLY'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '10px 14px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                <div>
+                  <div style={{ fontSize: '13px', color: '#15803d', fontWeight: 700 }}>
+                    ✓ Coupon "{appliedCoupon.coupon?.code}" Active
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#166534' }}>
+                    Saving ₹{couponDiscount.toLocaleString('en-IN')} on this order
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={handleCheckoutRemoveCoupon} 
+                  style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+
+            {couponFeedback && (
+              <div style={{
+                marginTop: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: couponFeedback.type === 'success' ? '#15803d' : '#dc2626'
+              }}>
+                {couponFeedback.text}
+              </div>
+            )}
+          </div>
+
           <div className="checkout-totals">
-            <div className="summary-row"><span>Subtotal</span><span>₹{cartSubtotal}</span></div>
-            {discount > 0 && <div className="summary-row discount"><span>Discount</span><span>-₹{discount}</span></div>}
+            <div className="summary-row"><span>Subtotal</span><span>₹{cartSubtotal.toLocaleString('en-IN')}</span></div>
+            {discount > 0 && <div className="summary-row discount"><span>Auto Tier Discount</span><span>-₹{discount.toLocaleString('en-IN')}</span></div>}
+            {appliedCoupon && (
+              <div className="summary-row discount" style={{ color: '#16a34a' }}>
+                <span>Coupon ({appliedCoupon.coupon?.code})</span>
+                <span>-₹{couponDiscount.toLocaleString('en-IN')}</span>
+              </div>
+            )}
             <div className="summary-row"><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span></div>
             <div className="summary-divider"></div>
-            <div className="summary-row total"><span>TOTAL AMOUNT</span><span>₹{finalTotal}</span></div>
+            <div className="summary-row total"><span>TOTAL AMOUNT</span><span>₹{finalTotal.toLocaleString('en-IN')}</span></div>
           </div>
 
           <button
@@ -482,7 +598,7 @@ export default function CheckoutPage() {
             disabled={loading}
             className="btn-pay-now"
           >
-            {loading ? 'PROCESSING...' : (paymentMethod === 'razorpay' ? `PAY ₹${finalTotal} VIA RAZORPAY` : 'PLACE ORDER (COD)')}
+            {loading ? 'PROCESSING...' : (paymentMethod === 'razorpay' ? `PAY ₹${finalTotal.toLocaleString('en-IN')} VIA RAZORPAY` : 'PLACE ORDER (COD)')}
           </button>
         </div>
       </form>
