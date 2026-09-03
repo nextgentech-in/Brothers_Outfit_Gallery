@@ -17,14 +17,25 @@ export default function PhotoGallery({ images }) {
   };
 
   const showNext = (e) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     setCurrentIndex((prev) => (prev + 1) % images.length);
   };
 
   const showPrev = (e) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') showNext();
+      if (e.key === 'ArrowLeft') showPrev();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, images?.length]);
 
   if (!images || images.length === 0) return null;
 
@@ -52,6 +63,11 @@ export default function PhotoGallery({ images }) {
                 <line x1="8" y1="11" x2="14" y2="11"></line>
               </svg>
             </div>
+            {img.caption && (
+              <div className="photo-gallery-item-caption">
+                <span>{img.caption}</span>
+              </div>
+            )}
           </div>
         ))}
       </div>

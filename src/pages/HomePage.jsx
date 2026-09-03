@@ -154,7 +154,7 @@ export default function HomePage() {
           <div className="home-container">
             <div className="about-grid">
               <div className="about-img-wrap">
-                <img src="/images/brothers-shop-real.png" alt="Brothers Outfit - Our Real Store" className="about-img" />
+                <img src="/images/store-real-1.jpeg" alt="Brothers Outfit - Our Real Store" className="about-img" />
               </div>
               <div className="about-content">
                 <h2>ABOUT BROTHERS OUTFIT GALLERY</h2>
