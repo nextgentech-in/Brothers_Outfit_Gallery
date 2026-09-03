@@ -20,9 +20,22 @@ export function ShopProvider({ children }) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [priceRange, setPriceRange] = useState(0);
-  const [selectedSize, setSelectedSize] = useState(null);
-  const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [selectedColors, setSelectedColors] = useState([]);
   const [sortBy, setSortBy] = useState('newest');
+
+  // Toggle helper for multi-selection
+  const toggleSize = (size) => {
+    setSelectedSizes(prev => 
+      prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
+    );
+  };
+
+  const toggleColor = (color) => {
+    setSelectedColors(prev => 
+      prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]
+    );
+  };
 
   // Scroll Preservation
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -38,8 +51,8 @@ export function ShopProvider({ children }) {
     setSearch('');
     setCategory('All');
     setPriceRange(0);
-    setSelectedSize(null);
-    setSelectedColor(null);
+    setSelectedSizes([]);
+    setSelectedColors([]);
     setSortBy('newest');
     
     setScrollPosition(0);
@@ -54,8 +67,13 @@ export function ShopProvider({ children }) {
     search, setSearch,
     category, setCategory,
     priceRange, setPriceRange,
-    selectedSize, setSelectedSize,
-    selectedColor, setSelectedColor,
+    selectedSizes, setSelectedSizes, toggleSize,
+    selectedColors, setSelectedColors, toggleColor,
+    // Backwards-compatible aliases
+    selectedSize: selectedSizes[0] || null,
+    setSelectedSize: (s) => setSelectedSizes(s ? [s] : []),
+    selectedColor: selectedColors[0] || null,
+    setSelectedColor: (c) => setSelectedColors(c ? [c] : []),
     sortBy, setSortBy,
     scrollPosition, setScrollPosition,
     resetShopState

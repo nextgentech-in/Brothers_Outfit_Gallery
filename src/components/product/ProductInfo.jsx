@@ -321,9 +321,9 @@ export default function ProductInfo({ product }) {
         </details>
         
         <details className="accordion-block">
-          <summary>SHIPPING & RETURNS</summary>
+          <summary>SHIPPING & EXCHANGE POLICY</summary>
           <div className="accordion-content">
-            Standard delivery takes 3-5 business days. We accept returns within 14 days of delivery provided tags are fully intact.
+            Standard delivery takes 2-4 business days via Delhivery Express. We offer <strong>exchange or replacement only in the case of damaged or defective items</strong> received. To initiate an exchange, contact us on WhatsApp (+91 84602 33020) with package unboxing video/photo proof within 48 hours of delivery. General returns or refunds are not accepted.
           </div>
         </details>
       </div>

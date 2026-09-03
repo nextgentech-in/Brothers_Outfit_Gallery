@@ -62,3 +62,22 @@ export function getProductSizes(product) {
     .filter(Boolean);
 }
 
+/**
+ * Extract all available color names from a product in a normalized string array
+ * @param {Object} product
+ * @returns {string[]}
+ */
+export function getProductColors(product) {
+  if (!product) return [];
+  const fromColors = Array.isArray(product.colors)
+    ? product.colors.map(c => (typeof c === 'object' && c !== null ? (c.name || c.color || '') : String(c)))
+    : [];
+  const fromVariants = Array.isArray(product.variants)
+    ? product.variants.map(v => v.color || '')
+    : [];
+  return [...new Set([...fromColors, ...fromVariants])]
+    .map(c => String(c).trim())
+    .filter(Boolean);
+}
+
+

@@ -3,7 +3,7 @@ import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
 import { getShopProducts } from '../services/productService';
 import ProductCard from '../components/ProductCard';
-import { getProductSizes } from '../utils/productUtils';
+import { getProductSizes, getProductColors } from '../utils/productUtils';
 import './ShopPage.css';
 
 const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Accessories'];
@@ -34,8 +34,8 @@ export default function ShopPage() {
     search, setSearch,
     category, setCategory,
     priceRange, setPriceRange,
-    selectedSize, setSelectedSize,
-    selectedColor, setSelectedColor,
+    selectedSizes = [], setSelectedSizes, toggleSize,
+    selectedColors = [], setSelectedColors, toggleColor,
     sortBy, setSortBy,
     scrollPosition, setScrollPosition
   } = useShop();
@@ -150,33 +150,45 @@ export default function ShopPage() {
       result = result.filter(p => p.price >= range.min && p.price <= range.max);
     }
 
-    // Size
-    if (selectedSize) {
-      const targetSize = String(selectedSize).toLowerCase().trim();
+    // Multi-Size Filter
+    if (selectedSizes && selectedSizes.length > 0) {
       result = result.filter(p => {
-        const sizes = getProductSizes(p);
-        return sizes.some(s => s.toLowerCase() === targetSize);
+        const pSizes = getProductSizes(p).map(s => s.toLowerCase());
+        return selectedSizes.some(sz => pSizes.includes(sz.toLowerCase()));
       });
     }
 
-    // Color
-    if (selectedColor) {
-      result = result.filter(p => p.colors && p.colors.includes(selectedColor));
+    // Multi-Color Filter (Fixed! Checks objects, strings, variants)
+    if (selectedColors && selectedColors.length > 0) {
+      result = result.filter(p => {
+        const pColors = getProductColors(p).map(c => c.toLowerCase());
+        return selectedColors.some(clr => {
+          const target = clr.toLowerCase();
+          return pColors.some(pc => pc === target || pc.includes(target) || target.includes(pc));
+        });
+      });
     }
 
     return result;
-  }, [products, search, priceRange, selectedSize, selectedColor]);
+  }, [products, search, priceRange, selectedSizes, selectedColors]);
 
   const clearFilters = () => {
     setSearch('');
     setCategory('All');
     setPriceRange(0);
-    setSelectedSize(null);
-    setSelectedColor(null);
+    if (setSelectedSizes) setSelectedSizes([]);
+    if (setSelectedColors) setSelectedColors([]);
     setSortBy('featured');
   };
 
-  const hasActiveFilters = search || category !== 'All' || priceRange !== 0 || selectedSize || selectedColor || sortBy !== 'featured';
+  const hasActiveFilters = Boolean(
+    search ||
+    category !== 'All' ||
+    priceRange !== 0 ||
+    (selectedSizes && selectedSizes.length > 0) ||
+    (selectedColors && selectedColors.length > 0) ||
+    sortBy !== 'featured'
+  );
 
   const handleAddToCart = (productData) => {
     const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
@@ -293,42 +305,112 @@ export default function ShopPage() {
 
         {/* Size */}
         <div className="shop-filters__group">
-          <h4 className="shop-filters__heading">Size</h4>
-          <div className="shop-filters__options">
-            {SIZES.map(size => (
-              <button
-                key={size}
-                className={`shop-filters__chip shop-filters__chip--size ${selectedSize === size ? 'shop-filters__chip--active' : ''}`}
-                onClick={() => setSelectedSize(selectedSize === size ? null : size)}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 className="shop-filters__heading" style={{ margin: 0 }}>Size</h4>
+            {selectedSizes.length > 0 && (
+              <button 
+                type="button"
+                onClick={() => setSelectedSizes([])} 
+                style={{ background: 'none', border: 'none', color: '#d97706', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
               >
-                {size}
+                Clear ({selectedSizes.length})
               </button>
-            ))}
+            )}
+          </div>
+          <div className="shop-filters__options">
+            {SIZES.map(size => {
+              const isActive = selectedSizes.includes(size);
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  className={`shop-filters__chip shop-filters__chip--size ${isActive ? 'shop-filters__chip--active' : ''}`}
+                  onClick={() => toggleSize(size)}
+                >
+                  {size} {isActive ? '✓' : ''}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Color */}
         <div className="shop-filters__group">
-          <h4 className="shop-filters__heading">Color</h4>
-          <div className="shop-filters__options">
-            {COLORS.map(color => (
-              <button
-                key={color}
-                className={`shop-filters__chip ${selectedColor === color ? 'shop-filters__chip--active' : ''}`}
-                onClick={() => setSelectedColor(selectedColor === color ? null : color)}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h4 className="shop-filters__heading" style={{ margin: 0 }}>Color</h4>
+            {selectedColors.length > 0 && (
+              <button 
+                type="button"
+                onClick={() => setSelectedColors([])} 
+                style={{ background: 'none', border: 'none', color: '#d97706', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
               >
-                {color}
+                Clear ({selectedColors.length})
               </button>
-            ))}
+            )}
+          </div>
+          <div className="shop-filters__options">
+            {COLORS.map(color => {
+              const isActive = selectedColors.includes(color);
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  className={`shop-filters__chip ${isActive ? 'shop-filters__chip--active' : ''}`}
+                  onClick={() => toggleColor(color)}
+                >
+                  {color} {isActive ? '✓' : ''}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {hasActiveFilters && (
-          <button className="shop-filters__clear" onClick={clearFilters}>
+          <button type="button" className="shop-filters__clear" onClick={clearFilters}>
             Clear All Filters
           </button>
         )}
       </div>
+
+      {/* Active Filter Tags Bar */}
+      {hasActiveFilters && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '0 24px 16px', maxWidth: '1440px', margin: '0 auto' }}>
+          <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#64748b' }}>
+            Active Filters:
+          </span>
+          {category !== 'All' && (
+            <span style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              Category: {category}
+              <button type="button" onClick={() => setCategory('All')} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
+            </span>
+          )}
+          {priceRange !== 0 && PRICE_RANGES[priceRange] && (
+            <span style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              Price: {PRICE_RANGES[priceRange].label}
+              <button type="button" onClick={() => setPriceRange(0)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
+            </span>
+          )}
+          {selectedSizes.map(size => (
+            <span key={size} style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              Size: {size}
+              <button type="button" onClick={() => toggleSize(size)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
+            </span>
+          ))}
+          {selectedColors.map(color => (
+            <span key={color} style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              Color: {color}
+              <button type="button" onClick={() => toggleColor(color)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
+            </span>
+          ))}
+          <button 
+            type="button" 
+            onClick={clearFilters}
+            style={{ fontSize: '11.5px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '3px 10px', borderRadius: '14px', cursor: 'pointer', fontWeight: '700' }}
+          >
+            Reset All
+          </button>
+        </div>
+      )}
 
       {/* Loading Initial Data */}
       {loading && products.length === 0 ? (
