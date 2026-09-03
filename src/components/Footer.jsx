@@ -88,10 +88,10 @@ export default function Footer() {
           <div className="footer-col">
             <h4 className="footer-col-title">LEGAL</h4>
             <ul className="footer-links">
-              <li><Link to="/">Privacy Policy</Link></li>
-              <li><Link to="/">Terms & Conditions</Link></li>
-              <li><Link to="/">Shipping Policy</Link></li>
-              <li><Link to="/">Return & Refund Policy</Link></li>
+              <li><Link to="/about#privacy">Privacy Policy</Link></li>
+              <li><Link to="/about#terms">Terms & Conditions</Link></li>
+              <li><Link to="/about#shipping">Shipping Policy</Link></li>
+              <li><Link to="/about#exchange">Exchange Policy</Link></li>
             </ul>
           </div>
         </div>

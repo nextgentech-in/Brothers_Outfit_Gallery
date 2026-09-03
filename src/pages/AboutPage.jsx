@@ -383,7 +383,56 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 9. Final CTA */}
+      {/* 9. Store Policies & Legal */}
+      <section className="about-policies-section" style={{ background: '#f8fafc', padding: '60px 24px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+        <div className="about-container">
+          <div className="text-center" style={{ marginBottom: '36px' }}>
+            <span className="section-eyebrow">TRANSPARENT & RELIABLE</span>
+            <h2 className="section-title">STORE POLICIES & LEGAL TERMS</h2>
+            <p className="section-subtitle">Everything you need to know about shopping with Brothers Outfit Gallery.</p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            <div id="exchange" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                🔁 Exchange Policy (Damage Only)
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                We provide <strong>exchanges/replacements exclusively for damaged or defective items</strong> received. To initiate an exchange, please reach out via WhatsApp at <strong>+91 84602 33020</strong> within 48 hours of delivery with clear unboxing video or photo evidence of the defect. General returns, change-of-mind, or non-defective refunds are not accepted.
+              </p>
+            </div>
+
+            <div id="shipping" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                🚚 Shipping & Delivery Policy
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                Orders are processed within 24 hours and shipped via <strong>Delhivery Express</strong> across India. Standard transit time is <strong>2 to 4 business days</strong>. Orders of ₹1,000 or above receive <strong>FREE Express Shipping</strong>. Live tracking links and AWB waybills are provided for every parcel.
+              </p>
+            </div>
+
+            <div id="terms" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                📜 Terms & Order Cancellation
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                Customers can cancel any order directly from <strong>My Orders</strong> while the status is in <em>Processing</em> (prior to dispatch). Once manifest and shipped with Delhivery, orders cannot be recalled. We reserve the right to cancel unserviceable or fraudulent orders with immediate refund.
+              </p>
+            </div>
+
+            <div id="privacy" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                🔒 Privacy & Data Security
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                Your personal details (name, phone, delivery address, email) are strictly used for order fulfillment and courier delivery. All online payments are handled directly by RBI-authorized <strong>Razorpay</strong> with 256-bit encryption. We never store or access credit card or banking credentials.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 10. Final CTA */}
       <section className="about-final-cta">
         <div className="about-container text-center">
           <h2 className="section-title">READY TO UPGRADE YOUR WARDROBE?</h2>
