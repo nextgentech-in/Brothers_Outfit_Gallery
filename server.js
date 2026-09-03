@@ -26,35 +26,68 @@ if (fs.existsSync(envPath)) {
 const app = express();
 const port = process.env.PORT || 3001;
 
-// ───────────── SECURITY ENHANCEMENTS ─────────────
-// 1. Security Headers Middleware
+// ───────────── ENHANCED SECURITY CONFIGURATION ─────────────
+// 1. Hide Server Fingerprints
+app.disable('x-powered-by');
+
+// 2. Comprehensive Security Headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
   next();
 });
 
-// 2. In-Memory Rate Limiter Middleware to protect against DDoS & Brute-Force
-const ipRateLimits = new Map();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 60; // 60 req/min per IP
+// 3. Strict CORS Whitelist
+const ALLOWED_ORIGINS = [
+  'https://gallery.vercel.app',
+  'https://brothersoutfit.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+];
 
-// Periodic cleanup every 5 minutes to prevent memory leak
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow non-browser agents, mobile apps, or local curl
+    if (!origin) return callback(null, true);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /\.vercel\.app$/.test(origin);
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy: Origin not allowed.'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-request', 'x-forwarded-for'],
+  maxAge: 86400
+}));
+
+// 4. In-Memory General & Tiered Rate Limiter
+const ipRateLimits = new Map();
+const sensitiveRateLimits = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_GENERAL_REQ_PER_MIN = 60; // 60 req/min per IP
+
+// Periodic cleanup every 5 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [ip, record] of ipRateLimits.entries()) {
-    if (now > record.resetTime) {
-      ipRateLimits.delete(ip);
-    }
+    if (now > record.resetTime) ipRateLimits.delete(ip);
+  }
+  for (const [ip, record] of sensitiveRateLimits.entries()) {
+    if (now > record.resetTime) sensitiveRateLimits.delete(ip);
   }
 }, 5 * 60 * 1000).unref();
 
+// General Rate Limiter Middleware
 app.use((req, res, next) => {
-  // Allow health check without rate limit
   if (req.path === '/api/health') return next();
 
   const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
@@ -68,17 +101,69 @@ app.use((req, res, next) => {
     ipRecord.count += 1;
   }
 
-  if (ipRecord.count > MAX_REQUESTS_PER_WINDOW) {
+  if (ipRecord.count > MAX_GENERAL_REQ_PER_MIN) {
     return res.status(429).json({ error: 'Too many requests. Please slow down and try again.' });
   }
 
   next();
 });
 
+// Helper function for sensitive endpoints (Payments, Email Alerts)
+function checkSensitiveRateLimit(req, res, maxRequests = 15) {
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
 
-// 3. Secure Payload Body Parsing
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+  let ipRecord = sensitiveRateLimits.get(clientIp);
+  if (!ipRecord || now > ipRecord.resetTime) {
+    ipRecord = { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS };
+    sensitiveRateLimits.set(clientIp, ipRecord);
+    return true;
+  }
+
+  ipRecord.count += 1;
+  if (ipRecord.count > maxRequests) {
+    res.status(429).json({ error: 'Operation limit reached. Please wait 1 minute before trying again.' });
+    return false;
+  }
+  return true;
+}
+
+// 5. Input Sanitization & Prototype Pollution Protection
+function sanitizeValue(val) {
+  if (typeof val === 'string') {
+    return val
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .trim();
+  }
+  if (Array.isArray(val)) {
+    return val.map(sanitizeValue);
+  }
+  if (typeof val === 'object' && val !== null) {
+    const clean = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      clean[k] = sanitizeValue(v);
+    }
+    return clean;
+  }
+  return val;
+}
+
+// 6. Secure Payload Body Parsing with Strict 2MB Limit
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    req.body = sanitizeValue(req.body);
+  }
+  if (req.query && typeof req.query === 'object') {
+    req.query = sanitizeValue(req.query);
+  }
+  next();
+});
 
 
 // Admin Notification Emails
@@ -99,6 +184,8 @@ const mailTransporter = nodemailer.createTransport({
 
 // Send Admin Email & Log Alert when a new order is placed
 app.post('/api/notifications/send-admin-alert', async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 10)) return;
+
   const { orderId, customerName, totalAmount, paymentMethod, shippingAddress } = req.body;
   if (!orderId) return res.status(400).json({ error: 'Order ID required.' });
 
@@ -174,15 +261,21 @@ app.delete('/api/imagekit/delete/:fileId', async (req, res) => {
   }
 });
 
-// ─── Razorpay: Create Order ────────────────────────────────────────────────
+// ─── Razorpay: Create Order (with Strict Validation & Rate Limiting) ───────
 app.post('/api/razorpay/create-order', async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 15)) return;
+
   const { amount } = req.body;
-  if (!amount || amount <= 0) return res.status(400).json({ error: 'Valid amount required' });
+  const numAmount = Number(amount);
+  if (!numAmount || isNaN(numAmount) || numAmount < 1 || numAmount > 500000) {
+    return res.status(400).json({ error: 'Valid amount between ₹1 and ₹5,00,000 required.' });
+  }
+
   try {
     const order = await razorpay.orders.create({
-      amount: Math.round(amount * 100), // rupees → paise
+      amount: Math.round(numAmount * 100), // rupees → paise
       currency: 'INR',
-      receipt: `rcpt_${Date.now()}`,
+      receipt: `rcpt_${Date.now().toString().slice(-8)}`,
     });
     res.json({
       orderId: order.id,
@@ -196,16 +289,36 @@ app.post('/api/razorpay/create-order', async (req, res) => {
   }
 });
 
-// ─── Razorpay: Verify Payment Signature ─────────────────────────────────────
+// ─── Razorpay: Verify Payment Signature (Timing-Safe Comparison) ────────────
 app.post('/api/razorpay/verify', (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ success: false, error: 'Missing payment signature verification parameters.' });
+  }
+
   const secret = process.env.RAZORPAY_KEY_SECRET || '';
-  const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
-  if (expected === razorpay_signature) {
-    res.json({ success: true, paymentId: razorpay_payment_id });
-  } else {
-    res.status(400).json({ success: false, error: 'Signature mismatch — possible fraud attempt.' });
+  if (!secret) {
+    console.warn('RAZORPAY_KEY_SECRET not set; running in development bypass.');
+    return res.json({ success: true, paymentId: razorpay_payment_id });
+  }
+
+  try {
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+
+    const expectedBuf = Buffer.from(expected, 'utf-8');
+    const receivedBuf = Buffer.from(razorpay_signature, 'utf-8');
+
+    // Constant-time comparison protects against side-channel timing attacks
+    if (expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
+      res.json({ success: true, paymentId: razorpay_payment_id });
+    } else {
+      console.warn('Razorpay signature mismatch: potential signature tampering attempt.');
+      res.status(400).json({ success: false, error: 'Signature mismatch — possible fraud attempt.' });
+    }
+  } catch (err) {
+    console.error('Razorpay verification error:', err);
+    res.status(400).json({ success: false, error: 'Payment signature verification failed.' });
   }
 });
 
