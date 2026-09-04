@@ -101,7 +101,7 @@
   }
 }
 
-/* ───────── Recommended Products 2-Column Grid ───────── */
+/* ───────── Recommended Products Layout ───────── */
 .related-products-section {
   margin-top: 56px;
   border-top: 1px solid #e2e8f0;
@@ -110,13 +110,15 @@
   padding-right: 12px;
 }
 
+/* PC / Desktop: 1 single row (4 columns across) */
 .related-products-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
 }
 
-@media (max-width: 640px) {
+/* Mobile & Small Screens (<= 768px): strictly 2 columns */
+@media (max-width: 768px) {
   .related-products-section {
     padding-left: 4px;
     padding-right: 4px;
@@ -125,6 +127,7 @@
   }
 
   .related-products-grid {
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
   }
 }
