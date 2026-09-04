@@ -33,7 +33,7 @@ export default function RelatedProducts({ currentProductId, category }) {
   if (loading || !related || related.length === 0) return null;
 
   return (
-    <section className="related-products-section" style={{ marginTop: '70px', borderTop: '1px solid #e2e8f0', paddingTop: '40px' }}>
+    <section className="related-products-section">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '2px', color: '#d97706', textTransform: 'uppercase' }}>
@@ -69,11 +69,7 @@ export default function RelatedProducts({ currentProductId, category }) {
         )}
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-        gap: '16px'
-      }}>
+      <div className="related-products-grid">
         {related.map(product => (
           <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
         ))}
