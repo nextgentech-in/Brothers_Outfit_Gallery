@@ -296,12 +296,58 @@ export default function AdminProductForm() {
       // 2. Upload pending images via ImageKit API
       const newlyUploaded = [];
       if (pendingImages.length > 0) {
-        const backendUrl = getBackendUrl();
+        const getImageKitAuthParams = async () => {
+          const backendUrl = getBackendUrl();
+          const endpoints = [
+            backendUrl ? `${backendUrl}/api/imagekit/auth` : '/api/imagekit/auth',
+            'http://localhost:3001/api/imagekit/auth'
+          ];
+
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(ep);
+              if (res.ok) {
+                const data = await res.json();
+                if (data.token && data.signature && data.expire) {
+                  return data;
+                }
+              }
+            } catch (_) {}
+          }
+
+          // Client-side Web Crypto fallback if private key is present
+          const privateKey = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || import.meta.env.IMAGEKIT_PRIVATE_KEY;
+          if (privateKey && typeof window !== 'undefined' && window.crypto?.subtle) {
+            try {
+              const token = window.crypto.randomUUID ? window.crypto.randomUUID() : ('tok_' + Math.random().toString(36).slice(2) + Date.now());
+              const expire = Math.floor(Date.now() / 1000) + 1800;
+              const enc = new TextEncoder();
+              const cryptoKey = await window.crypto.subtle.importKey(
+                'raw',
+                enc.encode(privateKey),
+                { name: 'HMAC', hash: 'SHA-1' },
+                false,
+                ['sign']
+              );
+              const sigBuf = await window.crypto.subtle.sign(
+                'HMAC',
+                cryptoKey,
+                enc.encode(token + expire)
+              );
+              const signature = Array.from(new Uint8Array(sigBuf))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+              return { token, signature, expire };
+            } catch (fallbackErr) {
+              console.warn("Client fallback signature generation error:", fallbackErr);
+            }
+          }
+
+          throw new Error("Failed to get ImageKit auth params. Please ensure backend is running or check ImageKit credentials.");
+        };
 
         for (let i = 0; i < pendingImages.length; i++) {
-          const authRes = await fetch(`${backendUrl}/api/imagekit/auth`);
-          if (!authRes.ok) throw new Error("Failed to get ImageKit auth params. Ensure backend is running.");
-          const { token, signature, expire } = await authRes.json();
+          const { token, signature, expire } = await getImageKitAuthParams();
 
           const item = pendingImages[i];
           const uniqueFileName = `${Date.now()}-${item.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;

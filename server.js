@@ -56,11 +56,12 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow non-browser agents, mobile apps, or local curl
     if (!origin) return callback(null, true);
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /\.vercel\.app$/.test(origin);
+    const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /\.vercel\.app$/.test(origin) || isLocal;
     if (isAllowed) {
       callback(null, true);
     } else {
-      callback(new Error('Blocked by CORS policy: Origin not allowed.'));
+      callback(null, false);
     }
   },
   credentials: true,
@@ -106,6 +107,11 @@ app.use((req, res, next) => {
   }
 
   next();
+});
+
+// 4b. Health Check Endpoint
+app.get(['/api/health', '/health'], (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
 // Helper function for sensitive endpoints (Payments, Email Alerts)
@@ -157,10 +163,20 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 app.use((req, res, next) => {
   if (req.body && typeof req.body === 'object') {
-    req.body = sanitizeValue(req.body);
+    try {
+      req.body = sanitizeValue(req.body);
+    } catch (_) {}
   }
   if (req.query && typeof req.query === 'object') {
-    req.query = sanitizeValue(req.query);
+    try {
+      for (const key of Object.keys(req.query)) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          delete req.query[key];
+        } else {
+          req.query[key] = sanitizeValue(req.query[key]);
+        }
+      }
+    } catch (_) {}
   }
   next();
 });
@@ -183,7 +199,7 @@ const mailTransporter = nodemailer.createTransport({
 });
 
 // Send Admin Email & Log Alert when a new order is placed
-app.post('/api/notifications/send-admin-alert', async (req, res) => {
+app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-alert'], async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 10)) return;
 
   const { orderId, customerName, totalAmount, paymentMethod, shippingAddress } = req.body;
@@ -224,7 +240,7 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET || '',
 });
 
-app.get('/api/imagekit/auth', (req, res) => {
+app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
   try {
     const result = imagekit.getAuthenticationParameters();
     res.json(result);
@@ -238,7 +254,7 @@ app.get('/api/imagekit/auth', (req, res) => {
 // Since Firebase Auth token verification in backend requires Firebase Admin SDK,
 // and we want to keep it simple, we expect a header `x-admin-request: true` or similar.
 // In a full production app, you'd use Firebase Admin SDK to decode the Bearer token.
-app.delete('/api/imagekit/delete/:fileId', async (req, res) => {
+app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], async (req, res) => {
   // Simple check for now
   const adminHeader = req.headers['x-admin-request'];
   if (adminHeader !== 'true') {
@@ -262,7 +278,7 @@ app.delete('/api/imagekit/delete/:fileId', async (req, res) => {
 });
 
 // ─── Razorpay: Create Order (with Strict Validation & Rate Limiting) ───────
-app.post('/api/razorpay/create-order', async (req, res) => {
+app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 15)) return;
 
   const { amount } = req.body;
@@ -290,7 +306,7 @@ app.post('/api/razorpay/create-order', async (req, res) => {
 });
 
 // ─── Razorpay: Verify Payment Signature (Timing-Safe Comparison) ────────────
-app.post('/api/razorpay/verify', (req, res) => {
+app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({ success: false, error: 'Missing payment signature verification parameters.' });
@@ -380,7 +396,7 @@ function getEstimatedDeliveryDate(transitDays = 3) {
 }
 
 // ─── Delhivery One: Check Pincode Serviceability ─────────────────────────
-app.post('/api/delhivery/pincode/check', async (req, res) => {
+app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (req, res) => {
   const { pincode } = req.body;
   if (!pincode || !/^\d{6}$/.test(pincode)) {
     return res.status(400).json({ serviceable: false, error: 'Valid 6-digit Indian PIN code required.' });
@@ -413,31 +429,28 @@ app.post('/api/delhivery/pincode/check', async (req, res) => {
       const response = await fetch(url, { headers });
       if (response.ok) {
         const data = await response.json();
-        if (data && data.delivery_codes && data.delivery_codes.length > 0) {
-          const details = data.delivery_codes[0].postal_code;
-          const isServiceable = details.is_sda === 'Y' || details.pre_paid === 'Y' || details.cod === 'Y';
-          if (isServiceable) {
-            return res.json({
-              serviceable: true,
-              pincode,
-              city: details.city || 'Available City',
-              state: details.state_code || 'India',
-              codAvailable: details.cod === 'Y',
-              prepaidAvailable: details.pre_paid === 'Y',
-              estimatedDays: '2 - 4 Business Days',
-              estimatedDeliveryDate: getEstimatedDeliveryDate(3)
-            });
-          } else {
-            return res.json({
-              serviceable: false,
-              pincode,
-              error: `Delivery is currently not available for PIN code ${pincode}.`
-            });
-          }
+        const deliveryCodes = data?.delivery_codes || [];
+        const match = deliveryCodes.find(item => item.postal_code?.pin == pincode);
+
+        if (match) {
+          const pinData = match.postal_code;
+          const cod = pinData.cod === 'Y';
+          const prepaid = pinData.pre_paid === 'Y';
+          return res.json({
+            serviceable: true,
+            pincode,
+            city: pinData.district || pinData.city || 'Gujarat Hub',
+            state: pinData.state || 'Gujarat',
+            area: pinData.hub_name || pinData.city,
+            codAvailable: cod,
+            prepaidAvailable: prepaid,
+            estimatedDays: '2 - 4 Business Days',
+            estimatedDeliveryDate: getEstimatedDeliveryDate(3)
+          });
         }
       }
     } catch (dErr) {
-      console.warn('Delhivery direct API call warning:', dErr.message);
+      console.warn('Delhivery live serviceability API call warning:', dErr.message);
     }
 
     // 2. Dual-Layer Validation via India Post Official API
@@ -478,7 +491,7 @@ app.post('/api/delhivery/pincode/check', async (req, res) => {
 });
 
 // ─── Delhivery One: Lookup Pincode by City / Place Name ────────────────────
-app.post('/api/delhivery/pincode/lookup-by-place', async (req, res) => {
+app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-by-place'], async (req, res) => {
   const { place } = req.body;
   if (!place || place.trim().length < 3) {
     return res.status(400).json({ suggestions: [] });
@@ -507,7 +520,7 @@ app.post('/api/delhivery/pincode/lookup-by-place', async (req, res) => {
 
 
 // ─── Delhivery One: Create Order Shipment (Generate AWB) ──────────────────
-app.post('/api/delhivery/create-shipment', async (req, res) => {
+app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], async (req, res) => {
   const { orderId, shippingAddress, items, totalAmount, paymentMethod } = req.body;
   if (!orderId || !shippingAddress) {
     return res.status(400).json({ error: 'Order ID and shipping details are required.' });
@@ -593,7 +606,7 @@ app.post('/api/delhivery/create-shipment', async (req, res) => {
 });
 
 // ─── Delhivery One: Cancel Shipment / Pickup ─────────────────────────────
-app.post('/api/delhivery/cancel-shipment', async (req, res) => {
+app.post(['/api/delhivery/cancel-shipment', '/delhivery/cancel-shipment'], async (req, res) => {
   const { waybill, reason } = req.body;
   if (!waybill) return res.status(400).json({ error: 'Waybill number is required.' });
 
@@ -641,7 +654,7 @@ app.post('/api/delhivery/cancel-shipment', async (req, res) => {
 });
 
 // ─── Delhivery One: Track Shipment ────────────────────────────────────────
-app.get('/api/delhivery/track/:waybill', async (req, res) => {
+app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (req, res) => {
   const { waybill } = req.params;
   if (!waybill) return res.status(400).json({ error: 'Waybill number required.' });
 
