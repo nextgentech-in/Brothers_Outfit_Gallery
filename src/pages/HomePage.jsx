@@ -22,7 +22,19 @@ export default function HomePage() {
     showShopCollection: true,
     showAboutPreview: true,
     showTrustBadges: true,
-    showReviews: true
+    showReviews: true,
+    hero: {
+      bannerImage: '/images/hero.png',
+      mobileBannerImage: '',
+      eyebrow: 'NEW SEASON 2026',
+      heading: 'DEFINE YOUR\nEVERYDAY STYLE',
+      description: "Premium men's clothing designed for confidence, comfort and effortless style.",
+      saleButtonText: '🔥 SALE — UP TO 50% OFF',
+      saleButtonLink: '/sale',
+      primaryButtonText: 'EXPLORE CATALOG',
+      primaryButtonLink: '/shop',
+      overlayOpacity: 0.55
+    }
   });
   const { addToCart } = useCart();
 
@@ -72,7 +84,7 @@ export default function HomePage() {
   return (
     <div className="home-page">
       {/* 1. Hero */}
-      {homepageConfig.showHero !== false && <Hero />}
+      {homepageConfig.showHero !== false && <Hero heroConfig={homepageConfig?.hero} />}
 
       {/* 2. Trending Now */}
       {homepageConfig.showTrending !== false && <TrendingCarousel />}

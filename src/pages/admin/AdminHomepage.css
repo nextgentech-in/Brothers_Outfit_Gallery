@@ -1,12 +1,13 @@
 .admin-homepage-mgr {
   padding: 0;
+  max-width: 1200px;
 }
 
 .homepage-sections-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-width: 700px;
+  max-width: 800px;
 }
 
 .section-toggle-card {
@@ -14,28 +15,35 @@
   justify-content: space-between;
   align-items: center;
   background: white;
-  padding: 20px;
+  padding: 20px 24px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.section-toggle-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .section-toggle-card h3 {
   margin: 0 0 4px 0;
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
+  color: #0f172a;
 }
 
 .section-toggle-card p {
   margin: 0;
   font-size: 13px;
-  color: #6b7280;
+  color: #64748b;
 }
 
 /* Switch Toggle Styling */
 .switch {
   position: relative;
   display: inline-block;
-  width: 50px;
+  width: 48px;
   height: 26px;
   flex-shrink: 0;
 }
@@ -53,31 +61,32 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
-  transition: .3s;
+  background-color: #cbd5e1;
+  transition: .25s ease;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
-  left: 4px;
-  bottom: 4px;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
   background-color: white;
-  transition: .3s;
+  transition: .25s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 input:checked + .slider {
-  background-color: #22c55e;
+  background-color: #16a34a;
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px #22c55e;
+  box-shadow: 0 0 1px #16a34a;
 }
 
 input:checked + .slider:before {
-  transform: translateX(24px);
+  transform: translateX(22px);
 }
 
 .slider.round {
@@ -86,4 +95,41 @@ input:checked + .slider:before {
 
 .slider.round:before {
   border-radius: 50%;
+}
+
+/* Hero Editor Elements */
+.hero-editor-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-card {
+  transition: all 0.2s ease;
+}
+
+.editor-card:hover {
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
+}
+
+.editor-card input[type="text"],
+.editor-card textarea {
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.editor-card input[type="text"]:focus,
+.editor-card textarea:focus {
+  outline: none;
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.1);
+}
+
+@media (max-width: 768px) {
+  .hero-preview-box {
+    padding: 24px 18px !important;
+  }
+  
+  .hero-settings-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
