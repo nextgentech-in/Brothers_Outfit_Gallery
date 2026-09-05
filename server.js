@@ -74,7 +74,7 @@ app.use(cors({
 const ipRateLimits = new Map();
 const sensitiveRateLimits = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_GENERAL_REQ_PER_MIN = 60; // 60 req/min per IP
+const MAX_GENERAL_REQ_PER_MIN = 180; // 180 req/min per IP to avoid false 429 errors during fast browsing
 
 // Periodic cleanup every 5 minutes
 setInterval(() => {
@@ -722,6 +722,14 @@ app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (r
 });
 
 
+
+// Global Express Error Middleware to guarantee structured JSON errors
+app.use((err, req, res, _next) => {
+  console.error('Unhandled server error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'An unexpected server error occurred.'
+  });
+});
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   app.listen(port, () => {

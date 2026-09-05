@@ -64,6 +64,10 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
           alt={product.name}
           className="sale-card__image"
           loading="lazy"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = '/images/hero.png';
+          }}
         />
         
         {isOutOfStock && (

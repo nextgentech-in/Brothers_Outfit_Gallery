@@ -69,10 +69,6 @@ export default function HomePage() {
     fetchHomeData();
   }, []);
 
-  if (loading) {
-    return <div className="home-page"><Hero /><div style={{padding: '5rem', textAlign: 'center'}}>Loading Collection...</div></div>;
-  }
-
   return (
     <div className="home-page">
       {/* 1. Hero */}
@@ -82,7 +78,7 @@ export default function HomePage() {
       {homepageConfig.showTrending !== false && <TrendingCarousel />}
 
       {/* 3. Sale Products */}
-      {homepageConfig.showSaleSection !== false && saleProducts.length > 0 && (
+      {homepageConfig.showSaleSection !== false && (saleProducts.length > 0 || loading) && (
         <section className="home-section sale-section">
           <div className="home-container">
             <div className="section-header">
@@ -92,9 +88,12 @@ export default function HomePage() {
             </div>
             
             <div className="product-grid">
-              {saleProducts.map(product => (
-                <SaleProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
-              ))}
+              {loading && saleProducts.length === 0
+                ? [1, 2, 3, 4].map(n => <div key={n} className="product-skeleton" />)
+                : saleProducts.map(product => (
+                    <SaleProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+                  ))
+              }
             </div>
             
             <div className="section-footer">
@@ -105,7 +104,7 @@ export default function HomePage() {
       )}
 
       {/* 4. New Arrivals */}
-      {homepageConfig.showNewArrivals !== false && newArrivals.length > 0 && (
+      {homepageConfig.showNewArrivals !== false && (newArrivals.length > 0 || loading) && (
         <section className="home-section new-arrivals-section">
           <div className="home-container">
             <div className="section-header">
@@ -114,9 +113,12 @@ export default function HomePage() {
             </div>
             
             <div className="product-grid">
-              {newArrivals.map(product => (
-                <ProductCard key={product.id} product={product} showNewBadge={true} onAddToCart={handleAddToCart} />
-              ))}
+              {loading && newArrivals.length === 0
+                ? [1, 2, 3, 4].map(n => <div key={n} className="product-skeleton" />)
+                : newArrivals.map(product => (
+                    <ProductCard key={product.id} product={product} showNewBadge={true} onAddToCart={handleAddToCart} />
+                  ))
+              }
             </div>
             
             <div className="section-footer">
@@ -136,9 +138,12 @@ export default function HomePage() {
             </div>
             
             <div className="product-grid">
-              {shopProducts.map(product => (
-                <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
-              ))}
+              {loading && shopProducts.length === 0
+                ? [1, 2, 3, 4].map(n => <div key={n} className="product-skeleton" />)
+                : shopProducts.map(product => (
+                    <ProductCard key={product.id} product={product} onAddToCart={handleAddToCart} />
+                  ))
+              }
             </div>
             
             <div className="section-footer">

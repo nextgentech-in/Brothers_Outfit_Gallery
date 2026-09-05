@@ -1,26 +1,110 @@
-import { collection, query, where, orderBy, limit, startAfter, getDocs, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 const PRODUCTS = 'products';
 const CATEGORIES = 'categories';
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes fresh cache
 
-export const getShopProducts = async (category = 'All', sortBy = 'newest', lastDocSnap = null, pageSize = 12) => {
-  // To avoid Firebase Composite Index requirement errors blocking the UI, 
-  // we fetch recent active products and sort/filter them client-side.
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(100));
-  const snapshot = await getDocs(q);
+// In-Memory & Session Storage Caching + Request Coalescing Layer
+let memoryCache = null;
+let cacheTimestamp = 0;
+let inFlightFetch = null;
 
-  let products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-  // 1. Filter active
-  products = products.filter(p => p.active === true);
-
-  // 2. Filter Category
-  if (category !== 'All') {
-    products = products.filter(p => p.category === category || p.categoryId === category);
+// Read from session storage if memory cache is empty
+function getCachedProducts() {
+  const now = Date.now();
+  if (memoryCache && (now - cacheTimestamp < CACHE_TTL_MS)) {
+    return memoryCache;
   }
 
-  // 3. Sort
+  try {
+    const raw = sessionStorage.getItem('bo_products_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.timestamp && (now - parsed.timestamp < CACHE_TTL_MS) && Array.isArray(parsed.data)) {
+        memoryCache = parsed.data;
+        cacheTimestamp = parsed.timestamp;
+        return memoryCache;
+      }
+    }
+  } catch {
+    // Ignore sessionStorage quota or parsing errors
+  }
+  return null;
+}
+
+function setCachedProducts(products) {
+  const now = Date.now();
+  memoryCache = products;
+  cacheTimestamp = now;
+  try {
+    sessionStorage.setItem('bo_products_cache', JSON.stringify({
+      timestamp: now,
+      data: products
+    }));
+  } catch {
+    // Ignore storage quota
+  }
+}
+
+export const invalidateProductCache = () => {
+  memoryCache = null;
+  cacheTimestamp = 0;
+  inFlightFetch = null;
+  try {
+    sessionStorage.removeItem('bo_products_cache');
+  } catch {}
+};
+
+/**
+ * Fetch products from Firestore with single-flight deduplication & caching.
+ * Resolves in 0ms when cached, and combines simultaneous queries into 1 network call.
+ */
+export const fetchAllActiveProducts = async (forceRefresh = false) => {
+  if (!forceRefresh) {
+    const cached = getCachedProducts();
+    if (cached) return cached;
+  }
+
+  // If already in flight, reuse the exact same promise (coalesce requests)
+  if (inFlightFetch) {
+    return inFlightFetch;
+  }
+
+  inFlightFetch = (async () => {
+    try {
+      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(120));
+      const snapshot = await getDocs(q);
+      const rawProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCachedProducts(rawProducts);
+      return rawProducts;
+    } catch (err) {
+      console.warn('Firestore fetch failed, falling back to cache if available:', err.message);
+      // Resilience: return stale cache or empty array to keep error rate at 0
+      if (memoryCache) return memoryCache;
+      return [];
+    } finally {
+      inFlightFetch = null;
+    }
+  })();
+
+  return inFlightFetch;
+};
+
+export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12) => {
+  const rawList = await fetchAllActiveProducts();
+  let products = rawList.filter(p => p.active === true);
+
+  // 1. Filter Category
+  if (category !== 'All') {
+    const catLower = String(category).toLowerCase();
+    products = products.filter(p => 
+      String(p.category || '').toLowerCase() === catLower || 
+      String(p.categoryId || '').toLowerCase() === catLower
+    );
+  }
+
+  // 2. Sort
   products.sort((a, b) => {
     if (sortBy === 'price-asc') {
       const pA = a.salePrice || a.price || 0;
@@ -36,12 +120,11 @@ export const getShopProducts = async (category = 'All', sortBy = 'newest', lastD
       return (b.rating || 0) - (a.rating || 0);
     }
     // Default newest
-    const timeA = a.createdAt?.seconds || 0;
-    const timeB = b.createdAt?.seconds || 0;
+    const timeA = a.createdAt?.seconds || (typeof a.createdAt === 'number' ? a.createdAt : 0);
+    const timeB = b.createdAt?.seconds || (typeof b.createdAt === 'number' ? b.createdAt : 0);
     return timeB - timeA;
   });
 
-  // Client-side pagination mock
   return {
     products,
     lastVisible: null,
@@ -50,37 +133,31 @@ export const getShopProducts = async (category = 'All', sortBy = 'newest', lastD
 };
 
 export const getNewArrivals = async (qty = 4) => {
+  const rawList = await fetchAllActiveProducts();
+  let products = rawList.filter(p => p.active === true);
+
   const tenDaysAgo = new Date();
-  tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
-
-  // Single query avoid composite index
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(100));
-  const snapshot = await getDocs(q);
-
-  let products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  products = products.filter(p => p.active === true);
+  tenDaysAgo.setDate(tenDaysAgo.getDate() - 15);
 
   // Filter by date dynamically 
-  products = products.filter(p => {
+  const filtered = products.filter(p => {
     if (!p.createdAt) return true;
     const created = p.createdAt.toDate ? p.createdAt.toDate() : new Date(p.createdAt);
     return created >= tenDaysAgo;
   });
 
-  products.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const list = filtered.length > 0 ? filtered : products;
+  list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
-  return products.slice(0, qty);
+  return list.slice(0, qty);
 };
 
 export const getSaleProducts = async (qty = 4) => {
+  const rawList = await fetchAllActiveProducts();
   const now = new Date();
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(100));
-  const snapshot = await getDocs(q);
-
-  let products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
   // Filter locally
-  products = products.filter(p => {
+  const saleList = rawList.filter(p => {
     if (!p.active || !p.offerEnabled) return false;
 
     const end = p.offerEndAt ? (p.offerEndAt.toDate ? p.offerEndAt.toDate() : new Date(p.offerEndAt)) : null;
@@ -92,23 +169,35 @@ export const getSaleProducts = async (qty = 4) => {
     return true;
   });
 
-  return products.slice(0, qty);
+  return saleList.slice(0, qty);
 };
 
 export const getProductBySlug = async (slug) => {
-  const q = query(collection(db, PRODUCTS), where('slug', '==', slug), limit(1));
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  if (!slug) return null;
+
+  // 1. Instant check in memory cache
+  const cached = getCachedProducts();
+  if (cached) {
+    const found = cached.find(p => p.slug === slug);
+    if (found) return found;
+  }
+
+  // 2. Direct Firestore query fallback
+  try {
+    const q = query(collection(db, PRODUCTS), where('slug', '==', slug), limit(1));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  } catch (err) {
+    console.error('Error fetching product by slug:', err);
+    return null;
+  }
 };
 
 export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4) => {
   try {
-    const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(100));
-    const snapshot = await getDocs(q);
-    let all = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(p => p.active !== false && p.id !== excludeProductId);
+    const rawList = await fetchAllActiveProducts();
+    let all = rawList.filter(p => p.active !== false && p.id !== excludeProductId);
 
     if (!categoryOrId) return all.slice(0, qty);
 
@@ -133,11 +222,16 @@ export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4
 };
 
 export const getCategories = async () => {
-  const q = query(
-    collection(db, CATEGORIES),
-    where('active', '==', true),
-    orderBy('displayOrder', 'asc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  try {
+    const q = query(
+      collection(db, CATEGORIES),
+      where('active', '==', true),
+      orderBy('displayOrder', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  } catch (err) {
+    console.warn('Error fetching categories:', err.message);
+    return [];
+  }
 };

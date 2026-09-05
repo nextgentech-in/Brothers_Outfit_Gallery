@@ -169,6 +169,10 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
             alt={`${product.name} - View ${activeImgIdx + 1}`}
             className="product-card__image"
             loading="lazy"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/images/hero.png';
+            }}
           />
         </Link>
 

@@ -67,19 +67,32 @@ export default function CheckoutPage() {
   };
 
 
-  // Load Razorpay Script onto page
+  // Ensure Razorpay SDK is loaded safely with fallback and timeout
+  const ensureRazorpayLoaded = () => {
+    if (typeof window !== 'undefined' && window.Razorpay) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      let script = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+      if (window.Razorpay) return resolve(true);
+      script.addEventListener('load', () => resolve(true), { once: true });
+      script.addEventListener('error', () => resolve(false), { once: true });
+      setTimeout(() => resolve(Boolean(window.Razorpay)), 5000);
+    });
+  };
+
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
+    ensureRazorpayLoaded();
   }, []);
 
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
-  const [searchingPlace, setSearchingPlace] = useState(false);
+
 
   // Auto-verify Delhivery pincode serviceability & auto-fill city/state
   useEffect(() => {
@@ -195,8 +208,9 @@ export default function CheckoutPage() {
 
     // Razorpay Flow
     try {
-      if (typeof window === 'undefined' || !window.Razorpay) {
-        throw new Error('Payment gateway SDK is loading. Please check your internet connection and try again in a few seconds.');
+      const isGatewayLoaded = await ensureRazorpayLoaded();
+      if (!isGatewayLoaded || !window.Razorpay) {
+        throw new Error('Payment gateway is initializing. Please check your internet connection and try again.');
       }
 
       // 1. Create order on backend
@@ -221,6 +235,27 @@ export default function CheckoutPage() {
         name: 'Brothers Outfit Gallery',
         description: `Order Payment (${cartItems.length} items)`,
         order_id: orderData.orderId,
+        prefill: {
+          name: shippingAddress.fullName || '',
+          email: (shippingAddress.email || currentUser?.email || '').toLowerCase().trim(),
+          contact: shippingAddress.phone || ''
+        },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay with UPI (Google Pay, PhonePe, Paytm, QR)',
+                instruments: [{ method: 'upi' }]
+              },
+              other: {
+                name: 'Cards & Net Banking',
+                instruments: [{ method: 'card' }, { method: 'netbanking' }, { method: 'wallet' }]
+              }
+            },
+            sequence: ['block.upi', 'block.other'],
+            preferences: { show_default_blocks: true }
+          }
+        },
         modal: {
           ondismiss: function () {
             setLoading(false);

@@ -1,6 +1,7 @@
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
+import { invalidateProductCache } from './productService';
 
 const PRODUCTS = 'products';
 
@@ -23,10 +24,6 @@ export const deleteProductImage = async (fileId) => {
 export const generateProductId = () => {
   return doc(collection(db, PRODUCTS)).id;
 };
-
-
-
-
 
 // Admin fetching all products without active filters
 export const getAdminProducts = async () => {
@@ -52,6 +49,7 @@ export const createProduct = async (productData, preGeneratedId = null) => {
     updatedAt: serverTimestamp(),
   };
   await setDoc(newRef, payload);
+  invalidateProductCache();
   return newRef.id;
 };
 
@@ -63,18 +61,21 @@ export const updateProduct = async (id, productData) => {
     updatedAt: serverTimestamp(),
   };
   await updateDoc(docRef, payload);
+  invalidateProductCache();
 };
 
 // Deactivate product
 export const deactivateProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
   await updateDoc(docRef, { active: false, updatedAt: serverTimestamp() });
+  invalidateProductCache();
 };
 
 // Hard Delete
 export const deleteProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
   await deleteDoc(docRef);
+  invalidateProductCache();
 };
 
 // Simple Stats Method
@@ -231,10 +232,29 @@ export const deleteReview = async (id) => {
 };
 
 // ─── ADMIN: HOMEPAGE SECTIONS ──────────────────────────────────────────────────
+let homepageConfigCache = null;
+let homepageConfigTimestamp = 0;
+
 export const getHomepageConfig = async () => {
+  const now = Date.now();
+  if (homepageConfigCache && (now - homepageConfigTimestamp < 5 * 60 * 1000)) {
+    return homepageConfigCache;
+  }
+  try {
+    const raw = localStorage.getItem('bo_homepage_config');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.timestamp && (now - parsed.timestamp < 5 * 60 * 1000) && parsed.data) {
+        homepageConfigCache = parsed.data;
+        homepageConfigTimestamp = parsed.timestamp;
+        return homepageConfigCache;
+      }
+    }
+  } catch {}
+
   try {
     const snap = await getDoc(doc(db, 'settings', 'homepage'));
-    return snap.exists() ? snap.data() : {
+    const config = snap.exists() ? snap.data() : {
       showHero: true,
       showTrending: true,
       showSaleSection: true,
@@ -244,12 +264,23 @@ export const getHomepageConfig = async () => {
       showTrustBadges: true,
       showReviews: true
     };
-  } catch (err) {
-    return {};
+    homepageConfigCache = config;
+    homepageConfigTimestamp = now;
+    try {
+      localStorage.setItem('bo_homepage_config', JSON.stringify({ timestamp: now, data: config }));
+    } catch {}
+    return config;
+  } catch (_err) {
+    return homepageConfigCache || {};
   }
 };
 
 export const saveHomepageConfig = async (config) => {
+  homepageConfigCache = config;
+  homepageConfigTimestamp = Date.now();
+  try {
+    localStorage.setItem('bo_homepage_config', JSON.stringify({ timestamp: Date.now(), data: config }));
+  } catch {}
   await setDoc(doc(db, 'settings', 'homepage'), config, { merge: true });
 };
 

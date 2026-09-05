@@ -9,28 +9,58 @@ import './ProductPage.css';
 
 export default function ProductPage() {
   const { slug } = useParams();
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('bo_products_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed?.data)) {
+          return parsed.data.find(p => p.slug === slug) || null;
+        }
+      }
+    } catch {}
+    return null;
+  });
+  const [loading, setLoading] = useState(() => !product);
 
-  // Fetch product from Firebase
+  // Fetch product from Firebase (SWR background refresh)
   useEffect(() => {
     window.scrollTo(0, 0);
+    let isCurrent = true;
+
     const fetchProduct = async () => {
-      setLoading(true);
+      if (!product) setLoading(true);
       try {
         const prod = await getProductBySlug(slug);
-        setProduct(prod);
+        if (isCurrent && prod) {
+          setProduct(prod);
+        }
       } catch (error) {
         console.error("Error fetching product:", error);
       } finally {
-        setLoading(false);
+        if (isCurrent) setLoading(false);
       }
     };
     fetchProduct();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [slug]);
 
-  if (loading) {
-    return <div className="product-page-container"><div style={{padding: '4rem', textAlign: 'center'}}>Loading Product...</div></div>;
+  if (loading && !product) {
+    return (
+      <div className="product-page-container">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', padding: '40px 0' }}>
+          <div className="product-skeleton" style={{ minHeight: '500px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div className="product-skeleton" style={{ minHeight: '40px', width: '70%' }} />
+            <div className="product-skeleton" style={{ minHeight: '30px', width: '40%' }} />
+            <div className="product-skeleton" style={{ minHeight: '120px' }} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!product) {

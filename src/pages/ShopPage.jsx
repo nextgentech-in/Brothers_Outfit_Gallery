@@ -414,8 +414,10 @@ export default function ShopPage() {
 
       {/* Loading Initial Data */}
       {loading && products.length === 0 ? (
-        <div className="shop-empty">
-          <h3 className="shop-empty__title">Loading Products...</h3>
+        <div className="shop-grid">
+          {[1, 2, 3, 4, 5, 6].map(n => (
+            <div key={n} className="product-skeleton" />
+          ))}
         </div>
       ) : (
         <>
