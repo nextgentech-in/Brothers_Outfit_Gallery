@@ -50,7 +50,7 @@ const STANDARD_COLORS = [
   { name: 'Custom (Type specific name)', hex: '#cccccc' }
 ];
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export default function AdminProductForm() {
   const { id } = useParams();
@@ -289,7 +289,7 @@ export default function AdminProductForm() {
         return;
       }
       if (file.size > MAX_FILE_SIZE) {
-        alert(`${file.name}: Image must be 2 MB or smaller.`);
+        alert(`${file.name}: Image must be 10 MB or smaller.`);
         return;
       }
 
@@ -648,7 +648,7 @@ export default function AdminProductForm() {
 
           {/* Professional Image Upload Section */}
           <section className="admin-form-section">
-            <h3>Product Images <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#666' }}>(Max 2MB per image)</span></h3>
+            <h3>Product Images <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#666' }}>(Max 10MB per image)</span></h3>
 
             <div className="admin-image-upload-wrapper">
               <label className="admin-btn-secondary admin-upload-trigger">

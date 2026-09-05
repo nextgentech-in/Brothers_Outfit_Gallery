@@ -10,6 +10,7 @@ export default function Signup() {
     password: '',
     confirmPassword: '',
     phone: '',
+    birthdate: '',
     age: '',
     addressLine: '',
     city: '',
@@ -24,6 +25,21 @@ export default function Signup() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'birthdate' && value) {
+      const birthDate = new Date(value);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--;
+        }
+        if (calculatedAge >= 0 && calculatedAge < 120) {
+          setFormData(prev => ({ ...prev, birthdate: value, age: calculatedAge }));
+          return;
+        }
+      }
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -55,7 +71,8 @@ export default function Signup() {
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
-        age: Number(formData.age),
+        birthdate: formData.birthdate || '',
+        age: formData.age ? Number(formData.age) : null,
         address: addressData,
         provider: 'email/password'
       });
@@ -135,6 +152,17 @@ export default function Signup() {
               </div>
               
               <div className="form-row">
+                <div className="form-group">
+                  <label>Date of Birth (Birthdate)</label>
+                  <input 
+                    type="date" 
+                    name="birthdate" 
+                    className="form-input" 
+                    value={formData.birthdate} 
+                    max={new Date().toISOString().split('T')[0]} 
+                    onChange={handleChange} 
+                  />
+                </div>
                 <div className="form-group">
                   <label>Age *</label>
                   <input type="number" name="age" min="13" max="100" className="form-input" value={formData.age} onChange={handleChange} required />

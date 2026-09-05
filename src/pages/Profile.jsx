@@ -22,12 +22,29 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     fullName: userProfile?.fullName || '',
     phone: userProfile?.phone || '',
+    birthdate: userProfile?.birthdate || '',
     age: userProfile?.age || '',
     addressLine: userProfile?.address?.line1 || '',
     city: userProfile?.address?.city || '',
     state: userProfile?.address?.state || '',
     pincode: userProfile?.address?.pincode || ''
   });
+
+  useEffect(() => {
+    if (userProfile) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: userProfile.fullName || '',
+        phone: userProfile.phone || '',
+        birthdate: userProfile.birthdate || '',
+        age: userProfile.age || '',
+        addressLine: userProfile.address?.line1 || '',
+        city: userProfile.address?.city || '',
+        state: userProfile.address?.state || '',
+        pincode: userProfile.address?.pincode || ''
+      }));
+    }
+  }, [userProfile]);
 
   const loadUserOrders = useCallback(async () => {
     if (!currentUser) return;
@@ -81,6 +98,21 @@ export default function Profile() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'birthdate' && value) {
+      const birthDate = new Date(value);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--;
+        }
+        if (calculatedAge >= 0 && calculatedAge < 120) {
+          setFormData(prev => ({ ...prev, birthdate: value, age: calculatedAge }));
+          return;
+        }
+      }
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -99,7 +131,8 @@ export default function Profile() {
       await updateFirestoreProfile(currentUser.uid, {
         fullName: formData.fullName,
         phone: formData.phone,
-        age: Number(formData.age),
+        birthdate: formData.birthdate || '',
+        age: formData.age ? Number(formData.age) : null,
         address: addressData
       });
 
@@ -327,9 +360,31 @@ export default function Profile() {
                       <input type="tel" name="phone" className="form-input" value={formData.phone} onChange={handleChange} required />
                     </div>
                   </div>
-                  <div className="form-group">
-                    <label>Age</label>
-                    <input type="number" name="age" className="form-input" value={formData.age} onChange={handleChange} required />
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Date of Birth (Birthdate)</label>
+                      <input 
+                        type="date" 
+                        name="birthdate" 
+                        className="form-input" 
+                        value={formData.birthdate} 
+                        max={new Date().toISOString().split('T')[0]}
+                        onChange={handleChange} 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Age</label>
+                      <input 
+                        type="number" 
+                        name="age" 
+                        className="form-input" 
+                        value={formData.age} 
+                        onChange={handleChange} 
+                        min="1" 
+                        max="120"
+                        placeholder="Auto-calculated from DOB"
+                      />
+                    </div>
                   </div>
 
                   <h3 className="section-title" style={{ marginTop: '32px' }}>DELIVERY ADDRESS</h3>
@@ -365,19 +420,27 @@ export default function Profile() {
                   <div className="info-grid">
                     <div className="info-item">
                       <span className="info-label">Full Name</span>
-                      <span className="info-value">{userProfile.fullName}</span>
+                      <span className="info-value">{userProfile.fullName || '-'}</span>
                     </div>
                     <div className="info-item">
                       <span className="info-label">Email</span>
-                      <span className="info-value">{userProfile.email}</span>
+                      <span className="info-value">{userProfile.email || '-'}</span>
                     </div>
                     <div className="info-item">
                       <span className="info-label">Mobile Number</span>
-                      <span className="info-value">{userProfile.phone}</span>
+                      <span className="info-value">{userProfile.phone || '-'}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Date of Birth</span>
+                      <span className="info-value">
+                        {userProfile.birthdate 
+                          ? new Date(userProfile.birthdate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : 'Not provided'}
+                      </span>
                     </div>
                     <div className="info-item">
                       <span className="info-label">Age</span>
-                      <span className="info-value">{userProfile.age}</span>
+                      <span className="info-value">{userProfile.age ? `${userProfile.age} yrs` : 'Not provided'}</span>
                     </div>
                   </div>
 

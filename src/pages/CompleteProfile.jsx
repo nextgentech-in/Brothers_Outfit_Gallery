@@ -12,6 +12,7 @@ export default function CompleteProfile() {
   const [formData, setFormData] = useState({
     fullName: currentUser?.displayName || '',
     phone: '',
+    birthdate: '',
     age: '',
     addressLine: '',
     city: '',
@@ -21,6 +22,21 @@ export default function CompleteProfile() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'birthdate' && value) {
+      const birthDate = new Date(value);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--;
+        }
+        if (calculatedAge >= 0 && calculatedAge < 120) {
+          setFormData(prev => ({ ...prev, birthdate: value, age: calculatedAge }));
+          return;
+        }
+      }
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -45,7 +61,8 @@ export default function CompleteProfile() {
         fullName: formData.fullName,
         email: currentUser.email,
         phone: formData.phone,
-        age: Number(formData.age),
+        birthdate: formData.birthdate || '',
+        age: formData.age ? Number(formData.age) : null,
         address: addressData,
         provider: 'google'
       });
@@ -84,6 +101,17 @@ export default function CompleteProfile() {
                 <div className="form-group">
                   <label>Mobile Number *</label>
                   <input type="tel" name="phone" className="form-input" value={formData.phone} onChange={handleChange} required maxLength="15" />
+                </div>
+                <div className="form-group">
+                  <label>Date of Birth (Birthdate)</label>
+                  <input 
+                    type="date" 
+                    name="birthdate" 
+                    className="form-input" 
+                    value={formData.birthdate} 
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={handleChange} 
+                  />
                 </div>
                 <div className="form-group">
                   <label>Age *</label>

@@ -92,8 +92,8 @@ export default function AdminHomepage() {
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      alert('Image size exceeds 8MB. Please select a smaller image.');
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size exceeds 10MB. Please select a smaller image.');
       return;
     }
 

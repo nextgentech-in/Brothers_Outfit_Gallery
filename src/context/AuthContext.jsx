@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
           fullName: auth.currentUser?.displayName || effectiveEmail.split('@')[0] || 'User',
           email: effectiveEmail,
           phone: auth.currentUser?.phoneNumber || '',
+          birthdate: '',
           age: '',
           address: { line1: '', city: '', state: '', pincode: '' },
           provider: auth.currentUser?.providerData?.[0]?.providerId || 'google.com',

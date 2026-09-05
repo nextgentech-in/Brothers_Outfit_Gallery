@@ -20,7 +20,8 @@ export default function AdminCustomers() {
   const filtered = customers.filter(c => 
     c.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.phone?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.birthdate?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -46,7 +47,7 @@ export default function AdminCustomers() {
               <th>NAME</th>
               <th>EMAIL</th>
               <th>PHONE</th>
-              <th>AGE</th>
+              <th>DOB & AGE</th>
               <th>CITY / STATE</th>
               <th>ROLE</th>
             </tr>
@@ -61,7 +62,20 @@ export default function AdminCustomers() {
                 <td><strong>{c.fullName || 'N/A'}</strong></td>
                 <td>{c.email || 'N/A'}</td>
                 <td>{c.phone || 'N/A'}</td>
-                <td>{c.age || '-'}</td>
+                <td>
+                  {c.birthdate ? (
+                    <div>
+                      <strong style={{ color: '#0f172a', fontSize: '13px' }}>
+                        {new Date(c.birthdate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </strong>
+                      <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>
+                        {c.age ? `(${c.age} yrs)` : ''}
+                      </span>
+                    </div>
+                  ) : (
+                    c.age ? `${c.age} yrs` : '-'
+                  )}
+                </td>
                 <td>{c.address ? `${c.address.city || ''}, ${c.address.state || ''}` : '-'}</td>
                 <td>
                   <span className={`admin-badge admin-badge--${c.isAdmin ? 'active' : 'neutral'}`}>
