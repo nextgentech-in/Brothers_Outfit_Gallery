@@ -87,6 +87,7 @@ export default function AdminProductForm() {
   const [selectedVariantColor, setSelectedVariantColor] = useState('');
 
   // Customizable Sizes & Bulk Stock States
+  const [initialStockInput, setInitialStockInput] = useState(10);
   const [customSizeName, setCustomSizeName] = useState('');
   const [customSizeStock, setCustomSizeStock] = useState(10);
   const [bulkStockToApply, setBulkStockToApply] = useState(10);
