@@ -5,7 +5,34 @@ import './AdminProductForm.css';
 
 import { getBackendUrl } from '../../utils/apiConfig';
 
-const AVAILABLE_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+const CATEGORY_SIZES_MAP = {
+  'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
+  'T-Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
+  'Jeans': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'Trousers': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'Jackets': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'Hoodies': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'Ethnic Wear': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
+  'Perfumes': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
+  'Slippers': ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11', 'UK 12'],
+  'Accessories': ['One Size', 'Free Size', 'Regular', 'Adjustable', 'Standard'],
+  'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
+  'Watches': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
+  'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
+};
+
+const COMMON_BATCH_SIZES = {
+  'Perfumes': ['30ml', '50ml', '100ml'],
+  'Jeans': ['30', '32', '34', '36', '38'],
+  'Trousers': ['30', '32', '34', '36', '38'],
+  'Slippers': ['UK 7', 'UK 8', 'UK 9', 'UK 10'],
+  'Accessories': ['One Size', 'Free Size'],
+  'Wallets': ['Standard', 'Slim'],
+  'Watches': ['Standard', 'Dial 40mm'],
+  'Belts': ['32-36', '36-40'],
+  'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
+};
+
 const STANDARD_COLORS = [
   { name: 'Black', hex: '#000000' },
   { name: 'White', hex: '#ffffff' },
@@ -58,7 +85,12 @@ export default function AdminProductForm() {
   const [newColorName, setNewColorName] = useState('Black');
   const [newColorHex, setNewColorHex] = useState('#000000');
   const [selectedVariantColor, setSelectedVariantColor] = useState('');
-  const [selectedVariantSize, setSelectedVariantSize] = useState('');
+
+  // Customizable Sizes & Bulk Stock States
+  const [customSizeName, setCustomSizeName] = useState('');
+  const [customSizeStock, setCustomSizeStock] = useState(10);
+  const [bulkStockToApply, setBulkStockToApply] = useState(10);
+  const [applyToAllColors, setApplyToAllColors] = useState(false);
 
   // Image Upload States
   const [existingImages, setExistingImages] = useState([]);
@@ -137,26 +169,92 @@ export default function AdminProductForm() {
       colors: prev.colors.filter(c => c.name !== name),
       variants: prev.variants.filter(v => v.color !== name)
     }));
-  }
+  };
 
-  const handleAddVariant = () => {
-    if (!selectedVariantColor || !selectedVariantSize) return alert('Select color and size');
+  // Helper to determine active target colors (or 'Standard' if product has no color variations)
+  const getTargetColors = () => {
+    if (!formData.colors || formData.colors.length === 0) return ['Standard'];
+    if (applyToAllColors) return formData.colors.map(c => c.name);
+    return [selectedVariantColor || formData.colors[0]?.name || 'Standard'];
+  };
 
-    const exists = formData.variants.find(v => v.color === selectedVariantColor && v.size === selectedVariantSize);
-    if (exists) return alert('Variant combination already exists!');
+  // Add single size with custom initial stock
+  const handleAddSizeWithStock = (size, stock = 10) => {
+    if (!size || !String(size).trim()) return;
+    const cleanSize = String(size).trim();
+    const colorsToTarget = getTargetColors();
 
-    const newVariant = {
-      id: `${selectedVariantColor}-${selectedVariantSize}-${Date.now()}`,
-      color: selectedVariantColor,
-      size: selectedVariantSize,
-      sku: `${formData.sku || 'PRD'}-${selectedVariantColor[0].toUpperCase()}-${selectedVariantSize}`,
-      stock: 0
-    };
+    setFormData(prev => {
+      const updatedVariants = [...prev.variants];
+      colorsToTarget.forEach(colName => {
+        const existingIdx = updatedVariants.findIndex(v => v.color === colName && v.size === cleanSize);
+        if (existingIdx >= 0) {
+          // If already exists, update its stock
+          updatedVariants[existingIdx] = {
+            ...updatedVariants[existingIdx],
+            stock: parseInt(stock, 10) || 0
+          };
+        } else {
+          // Add new variant
+          updatedVariants.push({
+            id: `${colName}-${cleanSize}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            color: colName,
+            size: cleanSize,
+            sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${cleanSize.replace(/[^a-zA-Z0-9]/g, '')}`,
+            stock: parseInt(stock, 10) || 0
+          });
+        }
+      });
+      return { ...prev, variants: updatedVariants };
+    });
+  };
 
+  // 1-Click Batch Add multiple sizes with preset stock
+  const handleBatchAddSizes = (sizesList, batchStock = 10) => {
+    const colorsToTarget = getTargetColors();
+    setFormData(prev => {
+      const updatedVariants = [...prev.variants];
+      colorsToTarget.forEach(colName => {
+        sizesList.forEach(sz => {
+          const existingIdx = updatedVariants.findIndex(v => v.color === colName && v.size === sz);
+          if (existingIdx >= 0) {
+            updatedVariants[existingIdx] = {
+              ...updatedVariants[existingIdx],
+              stock: parseInt(batchStock, 10) || 0
+            };
+          } else {
+            updatedVariants.push({
+              id: `${colName}-${sz}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              color: colName,
+              size: sz,
+              sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${sz.replace(/[^a-zA-Z0-9]/g, '')}`,
+              stock: parseInt(batchStock, 10) || 0
+            });
+          }
+        });
+      });
+      return { ...prev, variants: updatedVariants };
+    });
+  };
+
+  // Bulk set stock for ALL existing variants simultaneously
+  const handleApplyBulkStock = () => {
+    const stockNum = parseInt(bulkStockToApply, 10) || 0;
     setFormData(prev => ({
       ...prev,
-      variants: [...prev.variants, newVariant]
+      variants: prev.variants.map(v => ({ ...v, stock: stockNum }))
     }));
+  };
+
+  // Handle adding user's custom-typed size (e.g. 250ml or 44 Slim)
+  const handleAddCustomSize = (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (!customSizeName.trim()) {
+      alert('Please enter a size or volume name (e.g. 250ml, 3XL, or Combo Pack)');
+      return;
+    }
+    handleAddSizeWithStock(customSizeName.trim(), customSizeStock);
+    setCustomSizeName('');
   };
 
   const updateVariantStock = (vId, stockVal) => {
@@ -608,65 +706,256 @@ export default function AdminProductForm() {
             </div>
           </section>
 
+          {/* Sizes & Inventory Section */}
           <section className="admin-form-section">
-            <h3>Sizes & Inventory</h3>
-            <p className="admin-helper-text">Manage stock per color/size combination to enable them on the store front.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, paddingBottom: 0, border: 'none' }}>📦 Sizes & Inventory Management</h3>
+                <p className="admin-helper-text" style={{ margin: '4px 0 0' }}>
+                  Smart category sizing (Clothes in sizes, Perfumes in ml, Accessories in Free Size). Fully customizable with bulk stock options.
+                </p>
+              </div>
+              <span style={{ padding: '4px 10px', background: '#f1f5f9', color: '#0f172a', borderRadius: '6px', fontSize: '12px', fontWeight: 700, border: '1px solid #cbd5e1' }}>
+                Mode: {formData.categoryId || 'Shirts'} ({((formData.categoryId || '').toLowerCase().includes('perfume')) ? 'Volumes in ml' : (formData.categoryId === 'Jeans' || formData.categoryId === 'Trousers') ? 'Waist Inches' : 'Apparel / Standard'})
+              </span>
+            </div>
 
-            {formData.colors.length === 0 ? (
-              <p style={{ color: '#dc2626', fontSize: '13px' }}>Please add at least one color first.</p>
-            ) : (
-              <>
-                <div className="admin-add-variant-row">
-                  <select value={selectedVariantColor} onChange={(e) => setSelectedVariantColor(e.target.value)}>
-                    <option value="">-- Select Color --</option>
+            {/* Target Color Selector (Only if colors are defined) */}
+            {formData.colors.length > 0 ? (
+              <div style={{ padding: '14px 18px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155' }}>Managing sizes for color:</label>
+                  <select 
+                    value={selectedVariantColor || formData.colors[0]?.name} 
+                    onChange={(e) => setSelectedVariantColor(e.target.value)}
+                    disabled={applyToAllColors}
+                    style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, background: '#fff' }}
+                  >
                     {formData.colors.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
                   </select>
-                  <select value={selectedVariantSize} onChange={(e) => setSelectedVariantSize(e.target.value)}>
-                    <option value="">-- Select Size --</option>
-                    {AVAILABLE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <button type="button" className="admin-btn-secondary" onClick={handleAddVariant}>+ ADD SIZE</button>
                 </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={applyToAllColors} 
+                    onChange={(e) => setApplyToAllColors(e.target.checked)} 
+                    style={{ width: '16px', height: '16px', accentColor: '#0f172a' }}
+                  />
+                  Apply added sizes & stock to ALL colors at once
+                </label>
+              </div>
+            ) : (
+              <div style={{ padding: '10px 16px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '20px' }}>
+                💡 Standard Mode (No color variation required for {formData.categoryId || 'this product'} — you can add sizes directly!)
+              </div>
+            )}
 
-                {formData.colors.map(color => {
-                  const colorVariants = formData.variants.filter(v => v.color === color.name);
-                  if (colorVariants.length === 0) return null;
-
-                  return (
-                    <div key={color.name} className="admin-variant-color-group">
-                      <h4>COLOR: {color.name.toUpperCase()}</h4>
-                      <table className="admin-variant-table">
-                        <thead>
-                          <tr>
-                            <th>SIZE</th>
-                            <th>SKU</th>
-                            <th>STOCK QUANTITY</th>
-                            <th>ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {colorVariants.map(v => (
-                            <tr key={v.id}>
-                              <td><strong>{v.size}</strong></td>
-                              <td>{v.sku}</td>
-                              <td>
-                                <input type="number" min="0" value={v.stock} onChange={(e) => updateVariantStock(v.id, e.target.value)} />
-                              </td>
-                              <td>
-                                <button type="button" className="admin-btn-text text-danger" onClick={() => removeVariant(v.id)}>Remove</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+            {/* Step 1: 1-Click Quick Add Common Sizes */}
+            {(() => {
+              const activeCat = formData.categoryId || 'Shirts';
+              const batchPresets = COMMON_BATCH_SIZES[activeCat] || COMMON_BATCH_SIZES['DEFAULT'];
+              return (
+                <div style={{ padding: '16px 20px', background: '#fafaf9', border: '1px solid #e7e5e4', borderRadius: '10px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <strong style={{ fontSize: '13.5px', color: '#1c1917', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        ⚡ 1-Click Batch Add Popular Sizes:
+                      </strong>
+                      <span style={{ fontSize: '12.5px', color: '#78716c' }}>
+                        Popular for {activeCat}: ({batchPresets.join(', ')})
+                      </span>
                     </div>
-                  )
-                })}
-
-                <div className="admin-total-stock-banner">
-                  TOTAL STOCK FOR THIS PRODUCT: <strong>{calculatedTotalStock}</strong>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#44403c' }}>Stock each:</span>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={initialStockInput} 
+                        onChange={(e) => setInitialStockInput(parseInt(e.target.value, 10) || 0)}
+                        style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => handleBatchAddSizes(batchPresets, initialStockInput)}
+                        className="admin-btn-secondary"
+                        style={{ padding: '7px 14px', fontSize: '12.5px', fontWeight: 700, background: '#0f172a', color: '#fff', cursor: 'pointer' }}
+                      >
+                        + Add All {batchPresets.length} Sizes Now
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </>
+              );
+            })()}
+
+            {/* Step 2: Category Preset Chips & Custom Size Input */}
+            {(() => {
+              const activeCat = formData.categoryId || 'Shirts';
+              const catSizes = CATEGORY_SIZES_MAP[activeCat] || CATEGORY_SIZES_MAP['Shirts'];
+              const isPerfume = (activeCat || '').toLowerCase().includes('perfume');
+              return (
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#1c1917', marginBottom: '8px' }}>
+                    Or Pick Individual {isPerfume ? 'Volumes (ml)' : 'Sizes'}:
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+                    {catSizes.map(sz => {
+                      const targetCol = getTargetColors()[0] || 'Standard';
+                      const alreadyAdded = formData.variants.some(v => v.color === targetCol && v.size === sz);
+                      return (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => handleAddSizeWithStock(sz, initialStockInput)}
+                          style={{
+                            padding: '6px 14px',
+                            borderRadius: '20px',
+                            border: alreadyAdded ? '1px solid #86efac' : '1px solid #cbd5e1',
+                            background: alreadyAdded ? '#f0fdf4' : '#ffffff',
+                            color: alreadyAdded ? '#15803d' : '#334155',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {alreadyAdded ? '✓ ' + sz : '+ ' + sz}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Size Form */}
+                  <form onSubmit={handleAddCustomSize} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', padding: '14px 18px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Custom Size:</span>
+                    <input
+                      type="text"
+                      placeholder={isPerfume ? "e.g. 250ml or 100ml Tester" : "e.g. 44 Slim or Custom Fit or XXL"}
+                      value={customSizeName}
+                      onChange={(e) => setCustomSizeName(e.target.value)}
+                      style={{ flex: '1', minWidth: '180px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#fff' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>Stock:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={customSizeStock}
+                      onChange={(e) => setCustomSizeStock(parseInt(e.target.value, 10) || 0)}
+                      style={{ width: '70px', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                    />
+                    <button
+                      type="submit"
+                      className="admin-btn-secondary"
+                      style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 700, background: '#1e293b', color: '#fff', cursor: 'pointer' }}
+                    >
+                      + Add Custom Size
+                    </button>
+                  </form>
+                </div>
+              );
+            })()}
+
+            {/* Step 3: Variants Table with Multiple Stocks and Bulk Updater */}
+            {formData.variants.length > 0 ? (
+              <div style={{ marginTop: '24px' }}>
+                {/* Bulk Set All Stocks Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                    ⚡ Multiple Stock Manager:
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '12.5px', color: '#475569' }}>Set stock for ALL sizes to:</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={bulkStockToApply}
+                      onChange={(e) => setBulkStockToApply(parseInt(e.target.value, 10) || 0)}
+                      style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyBulkStock}
+                      style={{ padding: '6px 14px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      ⚡ Apply to All ({formData.variants.length}) Sizes
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <table className="admin-variant-table" style={{ width: '100%', borderCollapse: 'collapse', borderRadius: '8px', overflow: 'hidden' }}>
+                  <thead>
+                    <tr>
+                      {formData.colors.length > 0 && <th>COLOR</th>}
+                      <th>SIZE / VOLUME</th>
+                      <th>SKU</th>
+                      <th>STOCK QUANTITY (LIVE)</th>
+                      <th>STATUS</th>
+                      <th>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.variants.map((v) => (
+                      <tr key={v.id}>
+                        {formData.colors.length > 0 && (
+                          <td><strong>{v.color}</strong></td>
+                        )}
+                        <td>
+                          <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
+                            {v.size}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '12px', color: '#64748b' }}>{v.sku}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              value={v.stock}
+                              onChange={(e) => updateVariantStock(v.id, e.target.value)}
+                              style={{ width: '85px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
+                            />
+                            <span style={{ fontSize: '12px', color: '#64748b' }}>units</span>
+                          </div>
+                        </td>
+                        <td>
+                          {(parseInt(v.stock, 10) || 0) > 0 ? (
+                            <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '12px' }}>
+                              ✓ In Stock
+                            </span>
+                          ) : (
+                            <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '12px' }}>
+                              ⚠ Out of Stock
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="admin-btn-text text-danger"
+                            onClick={() => removeVariant(v.id)}
+                            style={{ fontSize: '12px' }}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="admin-total-stock-banner" style={{ marginTop: '16px' }}>
+                  TOTAL PRODUCT STOCK (ALL SIZES COMBINED): <strong>{calculatedTotalStock} UNITS</strong>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '32px', textAlign: 'center', background: '#fafaf9', borderRadius: '8px', border: '1px dashed #d6d3d1', color: '#78716c' }}>
+                <p style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 600 }}>No sizes added yet for this product.</p>
+                <p style={{ margin: 0, fontSize: '12.5px' }}>Click any preset size chip above or click <strong>"1-Click Batch Add"</strong> to instantly initialize all sizes with stock.</p>
+              </div>
             )}
           </section>
 

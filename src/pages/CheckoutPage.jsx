@@ -321,11 +321,6 @@ export default function CheckoutPage() {
           }
         },
 
-        prefill: {
-          name: shippingAddress.fullName,
-          email: shippingAddress.email,
-          contact: shippingAddress.phone,
-        },
         theme: {
           color: '#111827',
         },

@@ -159,40 +159,45 @@ export default function ProductInfo({ product }) {
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
 
-      <div className="product-selector-group">
-        <h3 className="selector-title">COLOR <span className="selector-val">{selectedColor}</span></h3>
-        <div className="color-swatches">
-           {product.colors && product.colors[0]?.hex ? (
-              product.colors.map(col => (
-               <button 
-                 key={col.name} 
-                 className={`color-circle ${selectedColor === col.name ? 'selected' : ''}`}
-                 style={{ backgroundColor: col.hex }}
-                 onClick={() => setSelectedColor(col.name)}
-                 title={col.name}
-                 aria-label={`Select color ${col.name}`}
-               ></button>
-              ))
-           ) : (
-              productColors.map(col => (
-               <button 
-                 key={col} 
-                 className={`color-circle ${selectedColor === col ? 'selected' : ''}`}
-                 style={{ backgroundColor: col.toLowerCase() }}
-                 onClick={() => setSelectedColor(col)}
-                 title={col}
-                 aria-label={`Select color ${col}`}
-               ></button>
-              ))
-           )}
+      {/* Color Selection: Only show if product has multiple real colors defined */}
+      {productColors.length > 0 && !productColors.every(c => c === 'Standard' || c === 'Default') && (
+        <div className="product-selector-group">
+          <h3 className="selector-title">COLOR <span className="selector-val">{selectedColor}</span></h3>
+          <div className="color-swatches">
+             {product.colors && product.colors[0]?.hex ? (
+                product.colors.map(col => (
+                 <button 
+                   key={col.name} 
+                   className={`color-circle ${selectedColor === col.name ? 'selected' : ''}`}
+                   style={{ backgroundColor: col.hex }}
+                   onClick={() => setSelectedColor(col.name)}
+                   title={col.name}
+                   aria-label={`Select color ${col.name}`}
+                 ></button>
+                ))
+             ) : (
+                productColors.map(col => (
+                 <button 
+                   key={col} 
+                   className={`color-circle ${selectedColor === col ? 'selected' : ''}`}
+                   style={{ backgroundColor: col.toLowerCase() }}
+                   onClick={() => setSelectedColor(col)}
+                   title={col}
+                   aria-label={`Select color ${col}`}
+                 ></button>
+                ))
+             )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Size Selection Group */}
       <div className="product-selector-group">
         <div className="size-header">
           <h3 className="selector-title">
-            {isClothing ? 'SELECT SIZE *' : 'SIZE'}
+            {((product.categoryId || product.category || '').toLowerCase().includes('perfume') || (product.name || '').toLowerCase().includes('perfume'))
+              ? 'SELECT VOLUME (ML) *'
+              : (isClothing ? 'SELECT SIZE *' : 'SELECT SIZE')}
           </h3>
           {isClothing && <button className="btn-size-guide" onClick={() => alert("Size Guide Modal Trigger")}>SIZE GUIDE</button>}
         </div>
@@ -203,7 +208,9 @@ export default function ProductInfo({ product }) {
               // Read active stock distinct to color+size from variants matrix!
               let variantStock = null;
               if (product.variants?.length > 0) {
-                const matchedVariant = product.variants.find(v => v.color === selectedColor && v.size === size);
+                const matchedVariant = product.variants.find(v => 
+                  (v.color === selectedColor || !v.color || v.color === 'Standard' || v.color === 'Default') && v.size === size
+                ) || product.variants.find(v => v.size === size);
                 variantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : 0;
               }
               const isSizeOos = variantStock !== null ? variantStock === 0 : outOfStock;
