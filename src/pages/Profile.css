@@ -2,7 +2,7 @@
 .profile-page {
   min-height: 100vh;
   background: #f9f9f9;
-  padding: 60px 24px;
+  padding: calc(var(--total-header-height, 104px) + 24px) 24px 60px;
 }
 
 .profile-container {
@@ -541,7 +541,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .profile-page {
-    padding: 12px 10px 36px;
+    padding: max(116px, calc(var(--total-header-height, 88px) + 20px)) 12px 36px;
     overflow-x: hidden;
   }
 
@@ -553,40 +553,6 @@
   }
 
   .profile-sidebar {
-    width: 100%;
-    flex-direction: column;
-    padding: 10px 10px 0;
-    border-radius: 10px;
-  }
-
-  .profile-avatar-block {
-    flex-direction: row;
-    border-bottom: none;
-    padding: 0 4px 10px;
-    margin-bottom: 0;
-    text-align: left;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .profile-avatar {
-    width: 38px;
-    height: 38px;
-    margin-bottom: 0;
-  }
-
-  .profile-name {
-    font-size: 13.5px;
-    margin: 0;
-    line-height: 1.2;
-  }
-
-  .profile-email {
-    font-size: 11px;
-    line-height: 1.2;
-  }
-
-  .profile-sidebar .profile-nav {
     display: none;
   }
 
