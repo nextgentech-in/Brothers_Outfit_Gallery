@@ -96,29 +96,38 @@ export default function CheckoutPage() {
 
   // Auto-verify Delhivery pincode serviceability & auto-fill city/state
   useEffect(() => {
+    let isMounted = true;
     if (shippingAddress.pincode && shippingAddress.pincode.trim().length === 6) {
       const pin = shippingAddress.pincode.trim();
-      setCheckingPincode(true);
-      checkPincodeServiceability(pin)
-        .then(res => {
-          setDelhiveryStatus(res);
-          setCheckingPincode(false);
-          // Auto fill city and state if returned from pincode lookup
-          if (res && res.serviceable) {
-            setShippingAddress(prev => ({
-              ...prev,
-              city: prev.city || res.city || '',
-              state: prev.state || res.state || ''
-            }));
-          }
-        })
-        .catch(() => {
-          setDelhiveryStatus({ serviceable: false, error: 'Pincode check failed.' });
-          setCheckingPincode(false);
-        });
+      Promise.resolve().then(() => {
+        if (!isMounted) return;
+        setCheckingPincode(true);
+        checkPincodeServiceability(pin)
+          .then(res => {
+            if (!isMounted) return;
+            setDelhiveryStatus(res);
+            setCheckingPincode(false);
+            // Auto fill city and state if returned from pincode lookup
+            if (res && res.serviceable) {
+              setShippingAddress(prev => ({
+                ...prev,
+                city: prev.city || res.city || '',
+                state: prev.state || res.state || ''
+              }));
+            }
+          })
+          .catch(() => {
+            if (!isMounted) return;
+            setDelhiveryStatus({ serviceable: false, error: 'Pincode check failed.' });
+            setCheckingPincode(false);
+          });
+      });
     } else {
       setDelhiveryStatus(null);
     }
+    return () => {
+      isMounted = false;
+    };
   }, [shippingAddress.pincode]);
 
   const handleInputChange = (e) => {
@@ -193,7 +202,7 @@ export default function CheckoutPage() {
         await createOrder(newOrderId, orderPayload);
         try {
           localStorage.setItem('last_placed_order', newOrderId);
-        } catch (e) { }
+        } catch { }
         // Trigger Admin Alert
         await createAdminOrderNotification(newOrderId, orderPayload);
 
@@ -305,7 +314,7 @@ export default function CheckoutPage() {
               await createOrder(newOrderId, orderPayload);
               try {
                 localStorage.setItem('last_placed_order', newOrderId);
-              } catch (e) { }
+              } catch { }
               // Trigger Admin Alert
               await createAdminOrderNotification(newOrderId, orderPayload);
 

@@ -17,8 +17,14 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('@firebase/firestore') || id.includes('firebase/firestore')) {
+              return 'vendor-firestore';
+            }
+            if (id.includes('@firebase/auth') || id.includes('firebase/auth')) {
+              return 'vendor-auth';
+            }
             if (id.includes('firebase')) {
-              return 'vendor-firebase';
+              return 'vendor-firebase-core';
             }
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
               return 'vendor-react';

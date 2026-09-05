@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
-import { isClothingProduct } from '../utils/productUtils';
 import { useCart } from '../context/CartContext';
 import './ProductCard.css';
 
@@ -96,8 +95,6 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
     
   const hasDiscount = displayCompare && displayCompare > displayPrice;
   const [addedAnimation, setAddedAnimation] = useState(false);
-
-  const isClothing = isClothingProduct(product);
 
   const handleAddToCart = (e) => {
     e.preventDefault();

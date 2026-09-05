@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct } from '../../utils/productUtils';
 import './ProductInfo.css';
+
+const SizeGuideModal = lazy(() => import('../common/SizeGuideModal'));
 
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
 function MiniCountdown({ targetDate }) {
@@ -42,6 +44,7 @@ export default function ProductInfo({ product }) {
   const initialColor = product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black';
   const [selectedColor, setSelectedColor] = useState(initialColor);
   const [selectedSize, setSelectedSize] = useState(null);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [deliveryPincode, setDeliveryPincode] = useState('');
@@ -199,7 +202,16 @@ export default function ProductInfo({ product }) {
               ? 'SELECT VOLUME (ML) *'
               : (isClothing ? 'SELECT SIZE *' : 'SELECT SIZE')}
           </h3>
-          {isClothing && <button className="btn-size-guide" onClick={() => alert("Size Guide Modal Trigger")}>SIZE GUIDE</button>}
+          <button 
+            type="button" 
+            className="btn-size-guide" 
+            onClick={() => setSizeGuideOpen(true)}
+            title="Open comprehensive sizing chart & fit finder"
+          >
+            {((product.categoryId || product.category || '').toLowerCase().includes('perfume') || (product.name || '').toLowerCase().includes('perfume'))
+              ? '🧴 VOLUME GUIDE'
+              : '📏 SIZE GUIDE'}
+          </button>
         </div>
 
         {productSizes.length > 0 ? (
@@ -334,6 +346,18 @@ export default function ProductInfo({ product }) {
           </div>
         </details>
       </div>
+
+      {/* Interactive Online Size & Volume Guide Modal (Lazy Loaded for Instant Page Paint) */}
+      {sizeGuideOpen && (
+        <Suspense fallback={null}>
+          <SizeGuideModal 
+            isOpen={sizeGuideOpen}
+            onClose={() => setSizeGuideOpen(false)}
+            category={product.categoryId || product.category || 'Shirts'}
+            onSelectSize={(size) => setSelectedSize(size)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -280,19 +280,16 @@ export default function AdminProductForm() {
     const files = Array.from(e.target.files);
     if (!files.length) return;
 
-    let hasErrors = false;
     const newPending = [];
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/jpg'];
 
     files.forEach((file) => {
       if (!validTypes.includes(file.type) && !file.name.match(/\.(jpe?g|png|webp|avif)$/i)) {
         alert(`${file.name}: Please upload a JPG, PNG, WEBP or AVIF image.`);
-        hasErrors = true;
         return;
       }
       if (file.size > MAX_FILE_SIZE) {
         alert(`${file.name}: Image must be 2 MB or smaller.`);
-        hasErrors = true;
         return;
       }
 
@@ -346,10 +343,6 @@ export default function AdminProductForm() {
       }
       return copy;
     });
-  };
-
-  const checkEnsurePrimaryFlags = (allCount) => {
-    // Safety check before publish
   };
 
   const setPrimaryImage = (type, index) => {
@@ -411,7 +404,7 @@ export default function AdminProductForm() {
                   return data;
                 }
               }
-            } catch (_) {}
+            } catch {}
           }
 
           // Client-side Web Crypto fallback if private key is present
@@ -469,7 +462,7 @@ export default function AdminProductForm() {
             const errText = await uploadRes.text();
             console.error("ImageKit upload error:", errText);
             let parsedErr;
-            try { parsedErr = JSON.parse(errText); } catch (e) { }
+            try { parsedErr = JSON.parse(errText); } catch { }
             const detail = parsedErr?.message || errText;
             throw new Error(`Upload failed for ${item.name}: ${detail}`);
           }

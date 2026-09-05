@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import './AdminOrders.css';
@@ -13,16 +13,16 @@ export default function AdminOrders() {
   const [activeTracking, setActiveTracking] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     const data = await getAdminOrders();
     setOrders(data);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [fetchOrders]);
 
   const handleStatusChange = async (orderId, newStatus) => {
     await updateOrderStatus(orderId, newStatus);
@@ -216,7 +216,7 @@ export default function AdminOrders() {
                   </select>
                 </td>
                 <td style={{fontSize: '12px', whiteSpace: 'nowrap'}}>
-                  {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : new Date(o.createdAt || Date.now()).toLocaleDateString('en-IN')}
+                  {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
                 </td>
                 <td>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

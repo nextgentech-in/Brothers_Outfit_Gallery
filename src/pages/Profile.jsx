@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
@@ -29,7 +29,7 @@ export default function Profile() {
     pincode: userProfile?.address?.pincode || ''
   });
 
-  const loadUserOrders = async () => {
+  const loadUserOrders = useCallback(async () => {
     if (!currentUser) return;
     setOrdersLoading(true);
     try {
@@ -41,11 +41,11 @@ export default function Profile() {
     } finally {
       setOrdersLoading(false);
     }
-  };
+  }, [currentUser, userProfile?.email]);
 
   useEffect(() => {
     loadUserOrders();
-  }, [currentUser]);
+  }, [loadUserOrders]);
 
   const [cancellingId, setCancellingId] = useState(null);
 
@@ -105,7 +105,7 @@ export default function Profile() {
 
       setMessage('PROFILE UPDATED SUCCESSFULLY');
       setIsEditing(false);
-    } catch (err) {
+    } catch {
       setMessage('Failed to update profile.');
     } finally {
       setLoading(false);
@@ -181,7 +181,7 @@ export default function Profile() {
 
                     const formattedDate = order.createdAt?.toDate 
                       ? order.createdAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                      : new Date(order.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                      : (order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent');
 
                     return (
                       <div key={order.id} className="order-card">

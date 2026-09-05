@@ -3,6 +3,30 @@ import { useAuth } from '../../context/AuthContext';
 import { getProductReviews, submitReview, compressReviewImage } from '../../services/reviewService';
 import './ReviewsModule.css';
 
+// Baseline demo reviews if a product is brand new and has no Firestore reviews yet
+const DEFAULT_INITIAL_REVIEWS = [
+  {
+    id: 'demo-1',
+    userName: 'Rahul K.',
+    rating: 5,
+    dateFormatted: '2 days ago',
+    recommend: true,
+    verifiedPurchase: true,
+    comment: 'Exceptional quality! The fitting was absolutely perfect matching the measurements in the Size Guide. Premium finish and soft texture.',
+    images: []
+  },
+  {
+    id: 'demo-2',
+    userName: 'Sameer Patel',
+    rating: 4,
+    dateFormatted: '1 week ago',
+    recommend: true,
+    verifiedPurchase: true,
+    comment: 'Very decent build specifically the premium fabric textures used. Very comfortable for everyday wear. Delivery was fast.',
+    images: []
+  }
+];
+
 export default function ReviewsModule({ product }) {
   const { currentUser, userProfile } = useAuth() || {};
   const [reviews, setReviews] = useState([]);
@@ -11,7 +35,7 @@ export default function ReviewsModule({ product }) {
 
   // Form State
   const [rating, setRating] = useState(5);
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState(() => userProfile?.fullName || currentUser?.displayName || '');
   const [comment, setComment] = useState('');
   const [recommend, setRecommend] = useState(true); // Reviewer suggests the product
   const [photos, setPhotos] = useState([]); // Base64 data URLs
@@ -23,38 +47,14 @@ export default function ReviewsModule({ product }) {
   const [lightboxImg, setLightboxImg] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Initialize author name if user profile loads
+  // Sync author name if user profile loads later
   useEffect(() => {
     if (userProfile?.fullName) {
       setUserName(userProfile.fullName);
     } else if (currentUser?.displayName) {
       setUserName(currentUser.displayName);
     }
-  }, [userProfile, currentUser]);
-
-  // Baseline demo reviews if a product is brand new and has no Firestore reviews yet
-  const defaultInitialReviews = [
-    {
-      id: 'demo-1',
-      userName: 'Rahul K.',
-      rating: 5,
-      dateFormatted: '2 days ago',
-      recommend: true,
-      verifiedPurchase: true,
-      comment: 'Exceptional quality! The fitting was absolutely perfect matching the measurements in the Size Guide. Premium finish and soft texture.',
-      images: []
-    },
-    {
-      id: 'demo-2',
-      userName: 'Sameer Patel',
-      rating: 4,
-      dateFormatted: '1 week ago',
-      recommend: true,
-      verifiedPurchase: true,
-      comment: 'Very decent build specifically the premium fabric textures used. Very comfortable for everyday wear. Delivery was fast.',
-      images: []
-    }
-  ];
+  }, [userProfile?.fullName, currentUser?.displayName]);
 
   // Fetch reviews for current product
   useEffect(() => {
@@ -69,12 +69,12 @@ export default function ReviewsModule({ product }) {
           if (data && data.length > 0) {
             setReviews(data);
           } else {
-            setReviews(defaultInitialReviews);
+            setReviews(DEFAULT_INITIAL_REVIEWS);
           }
         }
       } catch (err) {
         console.error('Error loading reviews:', err);
-        if (isMounted) setReviews(defaultInitialReviews);
+        if (isMounted) setReviews(DEFAULT_INITIAL_REVIEWS);
       } finally {
         if (isMounted) setLoading(false);
       }
