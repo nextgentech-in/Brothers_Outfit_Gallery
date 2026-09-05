@@ -149,117 +149,106 @@ export default function Profile() {
                   </button>
                 </div>
               ) : (
-                <div className="orders-list" style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+                <div className="orders-list">
                   {userOrders.map(order => {
                     const isProcessing = (order.status || 'Processing') === 'Processing';
-                    const isCancelled = order.status === 'Cancelled';
-                    const isShipped = order.status === 'Shipped';
-                    const isDelivered = order.status === 'Delivered';
+                    const isCancelled = (order.status || '').toLowerCase() === 'cancelled';
+                    const isShipped = (order.status || '').toLowerCase() === 'shipped';
+                    const isDelivered = (order.status || '').toLowerCase() === 'delivered';
+                    const statusClass = isCancelled ? 'status-cancelled' : isDelivered ? 'status-delivered' : isShipped ? 'status-shipped' : 'status-processing';
+
+                    const formattedDate = order.createdAt?.toDate 
+                      ? order.createdAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : new Date(order.createdAt || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
                     return (
-                      <div key={order.id} style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                      <div key={order.id} className="order-card">
                         {/* Order Header */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                          <div>
-                            <div style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a' }}>
-                              Order #{order.id}
+                        <div className="order-card-header">
+                          <div className="order-header-left">
+                            <div className="order-id-line">
+                              <span className="order-id-label">Order</span>
+                              <span className="order-id-badge" title={order.id}>#{order.id}</span>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                              Placed on {order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(order.createdAt || Date.now()).toLocaleDateString('en-IN')}
-                            </div>
+                            <span className="order-date-text">Placed on {formattedDate}</span>
                           </div>
 
-                          <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: '800',
-                              letterSpacing: '0.5px',
-                              padding: '4px 10px',
-                              borderRadius: '20px',
-                              textTransform: 'uppercase',
-                              background: isCancelled ? '#fee2e2' : (isDelivered ? '#dcfce7' : (isShipped ? '#dbeafe' : '#fef3c7')),
-                              color: isCancelled ? '#b91c1c' : (isDelivered ? '#15803d' : (isShipped ? '#1d4ed8' : '#b45309')),
-                              border: `1px solid ${isCancelled ? '#fca5a5' : (isDelivered ? '#86efac' : (isShipped ? '#93c5fd' : '#fde68a'))}`
-                            }}>
+                          <div className="order-header-right">
+                            <span className={`order-status-pill ${statusClass}`}>
                               {order.status || 'Processing'}
                             </span>
-                            <div style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>
+                            <div className="order-total-price">
                               ₹{order.totalAmount || order.finalTotal || 0}
                             </div>
                           </div>
                         </div>
 
-                        {/* Order Items Breakdown with SIZES */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                        {/* Order Items Breakdown */}
+                        <div className="order-items-list">
                           {order.items?.map((item, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #edf2f7' }}>
+                            <div key={idx} className="order-item-row">
                               <img
                                 src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'}
                                 alt={item.name}
-                                style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '6px', background: '#e2e8f0', flexShrink: 0 }}
+                                className="order-item-img"
                               />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              <div className="order-item-content">
+                                <div className="order-item-title" title={item.name}>
                                   {item.name}
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                <div className="order-item-meta-row">
                                   {item.size && (
-                                    <span style={{ fontSize: '11px', fontWeight: '800', background: '#0f172a', color: '#ffffff', padding: '2px 8px', borderRadius: '4px' }}>
+                                    <span className="order-pill pill-size">
                                       Size: {item.size}
                                     </span>
                                   )}
                                   {item.color && (
-                                    <span style={{ fontSize: '11px', fontWeight: '600', background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '4px' }}>
-                                      Color: {item.color}
+                                    <span className="order-pill pill-color">
+                                      {item.color}
                                     </span>
                                   )}
-                                  <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                                  <span className="order-item-qty">
                                     Qty: {item.quantity} × ₹{item.price}
                                   </span>
                                 </div>
                               </div>
-                              <div style={{ fontSize: '13.5px', fontWeight: '800', color: '#0f172a', flexShrink: 0 }}>
+                              <div className="order-item-amount">
                                 ₹{(item.price || 0) * (item.quantity || 1)}
                               </div>
                             </div>
                           ))}
                         </div>
 
-                        {/* Delivery Address & Tracking Info */}
+                        {/* Delivery Address Compact Summary */}
                         {order.shippingAddress && (
-                          <div style={{ fontSize: '12px', color: '#64748b', background: '#fafafa', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', border: '1px dashed #e2e8f0' }}>
-                            <strong style={{ color: '#334155' }}>Deliver to: </strong>
-                            {order.shippingAddress.fullName}, {order.shippingAddress.addressLine}, {order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode} (📞 {order.shippingAddress.phone})
+                          <div className="order-shipping-summary">
+                            <span className="shipping-icon">📍</span>
+                            <span className="shipping-text">
+                              <strong>Deliver to: </strong>
+                              {order.shippingAddress.fullName ? `${order.shippingAddress.fullName}, ` : ''}
+                              {order.shippingAddress.city ? `${order.shippingAddress.city} ` : ''}
+                              {order.shippingAddress.pincode ? `(${order.shippingAddress.pincode})` : ''}
+                              {order.shippingAddress.phone ? ` • 📞 ${order.shippingAddress.phone}` : ''}
+                            </span>
                           </div>
                         )}
 
                         {/* Order Actions Footer */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>
-                            Payment: <strong>{order.paymentMethod || 'Online Payment'}</strong>
-                            {order.paymentStatus && <span style={{ marginLeft: '8px', color: '#16a34a', fontWeight: '700' }}>({order.paymentStatus})</span>}
+                        <div className="order-card-footer">
+                          <div className="order-payment-desc">
+                            Payment: <strong>{order.paymentMethod === 'cod' || order.paymentMethod?.toLowerCase().includes('cash') ? 'Cash on Delivery' : (order.paymentMethod || 'Online')}</strong>
+                            {order.paymentStatus && <span className="status-tag">({order.paymentStatus})</span>}
                           </div>
 
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div className="order-actions-wrap">
                             {order.waybill && (
                               <a
                                 href={order.trackingUrl || `https://www.delhivery.com/track/package/${order.waybill}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                style={{
-                                  padding: '7px 14px',
-                                  background: '#0f172a',
-                                  color: '#ffffff',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  fontWeight: '700',
-                                  textDecoration: 'none',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px'
-                                }}
+                                className="btn-order-track"
                               >
-                                📦 Track Delhivery AWB: {order.waybill}
+                                📦 Track Delhivery
                               </a>
                             )}
 
@@ -267,24 +256,14 @@ export default function Profile() {
                               <button
                                 onClick={() => handleCancelOrder(order)}
                                 disabled={cancellingId === order.id}
-                                style={{
-                                  padding: '7px 14px',
-                                  background: '#fee2e2',
-                                  color: '#b91c1c',
-                                  border: '1px solid #fca5a5',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  fontWeight: '700',
-                                  cursor: cancellingId === order.id ? 'not-allowed' : 'pointer',
-                                  transition: 'background 0.2s'
-                                }}
+                                className="btn-order-cancel"
                               >
                                 {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}
                               </button>
                             )}
 
                             {isCancelled && (
-                              <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: '600' }}>
+                              <span className="order-cancelled-tag">
                                 Order Cancelled {order.cancellationReason ? `(${order.cancellationReason})` : ''}
                               </span>
                             )}
