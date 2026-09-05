@@ -235,10 +235,14 @@ const imagekit = new ImageKit({
   urlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/dummy",
 });
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
-});
+const getRazorpayClient = () => {
+  return new Razorpay({
+    key_id: (process.env.RAZORPAY_KEY_ID || '').trim(),
+    key_secret: (process.env.RAZORPAY_KEY_SECRET || '').trim(),
+  });
+};
+
+const razorpay = getRazorpayClient();
 
 app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
   try {
@@ -288,7 +292,8 @@ app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, r
   }
 
   try {
-    const order = await razorpay.orders.create({
+    const rzp = getRazorpayClient();
+    const order = await rzp.orders.create({
       amount: Math.round(numAmount * 100), // rupees → paise
       currency: 'INR',
       receipt: `rcpt_${Date.now().toString().slice(-8)}`,
@@ -297,11 +302,11 @@ app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, r
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      key: process.env.RAZORPAY_KEY_ID,
+      key: (process.env.RAZORPAY_KEY_ID || '').trim(),
     });
   } catch (error) {
     console.error('Razorpay create-order error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || 'Payment initiation failed on gateway.' });
   }
 });
 
@@ -312,7 +317,7 @@ app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing payment signature verification parameters.' });
   }
 
-  const secret = process.env.RAZORPAY_KEY_SECRET || '';
+  const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
   if (!secret) {
     console.warn('RAZORPAY_KEY_SECRET not set; running in development bypass.');
     return res.json({ success: true, paymentId: razorpay_payment_id });

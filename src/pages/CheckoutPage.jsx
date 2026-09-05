@@ -195,6 +195,10 @@ export default function CheckoutPage() {
 
     // Razorpay Flow
     try {
+      if (typeof window === 'undefined' || !window.Razorpay) {
+        throw new Error('Payment gateway SDK is loading. Please check your internet connection and try again in a few seconds.');
+      }
+
       // 1. Create order on backend
       const res = await fetch(`${backendUrl}/api/razorpay/create-order`, {
         method: 'POST',
@@ -203,19 +207,25 @@ export default function CheckoutPage() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to initiate Razorpay payment. Ensure backend server is running.');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to initiate Razorpay payment. Ensure backend server is running.');
       }
 
       const orderData = await res.json();
 
       // 2. Configure Razorpay modal options
       const options = {
-        key: orderData.key || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_dummy',
+        key: orderData.key || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TYFhwSwlmko7Oj',
         amount: orderData.amount,
-        currency: orderData.currency,
+        currency: orderData.currency || 'INR',
         name: 'Brothers Outfit Gallery',
         description: `Order Payment (${cartItems.length} items)`,
         order_id: orderData.orderId,
+        modal: {
+          ondismiss: function () {
+            setLoading(false);
+          },
+        },
         handler: async function (response) {
           try {
             // Verify signature
