@@ -533,8 +533,46 @@ export default function AdminProductForm() {
 
   return (
     <div className="admin-product-form-container">
-      <div className="admin-header">
-        <h1 className="admin-title">{isEdit ? 'EDIT PRODUCT' : 'ADD NEW PRODUCT'}</h1>
+      <div className="admin-form-header-bar">
+        <div className="admin-header-title-wrap">
+          <h1 className="admin-title">{isEdit ? 'EDIT PRODUCT' : 'ADD NEW PRODUCT'}</h1>
+          <span className="admin-header-subtitle">
+            {isEdit ? `ID: ${id} • Edit pricing, inventory and photos` : 'Single-window product publishing with live inventory'}
+          </span>
+        </div>
+
+        {/* Top Quick Actions Bar (Immediate Access on Mobile & Desktop) */}
+        <div className="admin-header-actions-bar">
+          <label className="admin-top-active-toggle" title="Store visibility status">
+            <input 
+              type="checkbox" 
+              name="active" 
+              checked={formData.active} 
+              onChange={handleChange} 
+            />
+            <span className={`admin-status-pill ${formData.active ? 'is-active' : 'is-hidden'}`}>
+              {formData.active ? '🟢 Visible in Store' : '⚪ Hidden Draft'}
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={() => navigate('/admin/products')}
+            className="admin-btn-secondary admin-top-cancel-btn"
+            disabled={submitting}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={submitting}
+            className="admin-btn-primary admin-top-publish-btn"
+          >
+            {submitting ? 'Publishing...' : (isEdit ? '✓ Save Changes' : '🚀 Publish Product')}
+          </button>
+        </div>
       </div>
 
       {error && <div className="admin-alert-error">{error}</div>}
@@ -879,67 +917,69 @@ export default function AdminProductForm() {
                   </div>
                 </div>
 
-                {/* Table */}
-                <table className="admin-variant-table" style={{ width: '100%', borderCollapse: 'collapse', borderRadius: '8px', overflow: 'hidden' }}>
-                  <thead>
-                    <tr>
-                      {formData.colors.length > 0 && <th>COLOR</th>}
-                      <th>SIZE / VOLUME</th>
-                      <th>SKU</th>
-                      <th>STOCK QUANTITY (LIVE)</th>
-                      <th>STATUS</th>
-                      <th>ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.variants.map((v) => (
-                      <tr key={v.id}>
-                        {formData.colors.length > 0 && (
-                          <td><strong>{v.color}</strong></td>
-                        )}
-                        <td>
-                          <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
-                            {v.size}
-                          </span>
-                        </td>
-                        <td style={{ fontSize: '12px', color: '#64748b' }}>{v.sku}</td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="number"
-                              min="0"
-                              value={v.stock}
-                              onChange={(e) => updateVariantStock(v.id, e.target.value)}
-                              style={{ width: '85px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
-                            />
-                            <span style={{ fontSize: '12px', color: '#64748b' }}>units</span>
-                          </div>
-                        </td>
-                        <td>
-                          {(parseInt(v.stock, 10) || 0) > 0 ? (
-                            <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '12px' }}>
-                              ✓ In Stock
-                            </span>
-                          ) : (
-                            <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '12px' }}>
-                              ⚠ Out of Stock
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-btn-text text-danger"
-                            onClick={() => removeVariant(v.id)}
-                            style={{ fontSize: '12px' }}
-                          >
-                            Remove
-                          </button>
-                        </td>
+                {/* Responsive Table Wrapper */}
+                <div className="admin-table-scroll-wrapper">
+                  <table className="admin-variant-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {formData.colors.length > 0 && <th>COLOR</th>}
+                        <th>SIZE / VOLUME</th>
+                        <th>SKU</th>
+                        <th>STOCK QUANTITY (LIVE)</th>
+                        <th>STATUS</th>
+                        <th>ACTIONS</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {formData.variants.map((v) => (
+                        <tr key={v.id}>
+                          {formData.colors.length > 0 && (
+                            <td><strong>{v.color}</strong></td>
+                          )}
+                          <td>
+                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
+                              {v.size}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '12px', color: '#64748b' }}>{v.sku}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                value={v.stock}
+                                onChange={(e) => updateVariantStock(v.id, e.target.value)}
+                                style={{ width: '85px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
+                              />
+                              <span style={{ fontSize: '12px', color: '#64748b' }}>units</span>
+                            </div>
+                          </td>
+                          <td>
+                            {(parseInt(v.stock, 10) || 0) > 0 ? (
+                              <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '12px' }}>
+                                ✓ In Stock
+                              </span>
+                            ) : (
+                              <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '12px' }}>
+                                ⚠ Out of Stock
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="admin-btn-text text-danger"
+                              onClick={() => removeVariant(v.id)}
+                              style={{ fontSize: '12px' }}
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 <div className="admin-total-stock-banner" style={{ marginTop: '16px' }}>
                   TOTAL PRODUCT STOCK (ALL SIZES COMBINED): <strong>{calculatedTotalStock} UNITS</strong>
@@ -991,7 +1031,7 @@ export default function AdminProductForm() {
               className="admin-btn-primary"
               style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: '15px' }}
             >
-              {submitting ? 'PUBLISHING - DO NOT CLOSE...' : 'PUBLISH PRODUCT'}
+              {submitting ? 'SAVING - DO NOT CLOSE...' : (isEdit ? '✓ SAVE CHANGES' : '🚀 PUBLISH PRODUCT')}
             </button>
             {submitting && (
               <p style={{ fontSize: '12px', color: '#78716c', textAlign: 'center', marginTop: '-8px' }}>

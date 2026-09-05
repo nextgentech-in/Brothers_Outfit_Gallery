@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import './SizeGuideModal.css';
 
 // Master sizing data for all categories
@@ -192,8 +193,9 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
   }, [measurementInput, activeTab, unit, fitPreference]);
 
   if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div className="size-guide-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Size Guide">
       <div className="size-guide-modal" onClick={(e) => e.stopPropagation()}>
         
@@ -559,6 +561,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

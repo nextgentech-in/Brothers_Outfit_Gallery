@@ -1,11 +1,10 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct } from '../../utils/productUtils';
+import SizeGuideModal from '../common/SizeGuideModal';
 import './ProductInfo.css';
-
-const SizeGuideModal = lazy(() => import('../common/SizeGuideModal'));
 
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
 function MiniCountdown({ targetDate }) {
@@ -205,7 +204,11 @@ export default function ProductInfo({ product }) {
           <button 
             type="button" 
             className="btn-size-guide" 
-            onClick={() => setSizeGuideOpen(true)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setSizeGuideOpen(true);
+            }}
             title="Open comprehensive sizing chart & fit finder"
           >
             {((product.categoryId || product.category || '').toLowerCase().includes('perfume') || (product.name || '').toLowerCase().includes('perfume'))
@@ -347,17 +350,13 @@ export default function ProductInfo({ product }) {
         </details>
       </div>
 
-      {/* Interactive Online Size & Volume Guide Modal (Lazy Loaded for Instant Page Paint) */}
-      {sizeGuideOpen && (
-        <Suspense fallback={null}>
-          <SizeGuideModal 
-            isOpen={sizeGuideOpen}
-            onClose={() => setSizeGuideOpen(false)}
-            category={product.categoryId || product.category || 'Shirts'}
-            onSelectSize={(size) => setSelectedSize(size)}
-          />
-        </Suspense>
-      )}
+      {/* Interactive Online Size & Volume Guide Modal */}
+      <SizeGuideModal 
+        isOpen={sizeGuideOpen}
+        onClose={() => setSizeGuideOpen(false)}
+        category={product.categoryId || product.category || 'Shirts'}
+        onSelectSize={(size) => setSelectedSize(size)}
+      />
     </div>
   );
 }
