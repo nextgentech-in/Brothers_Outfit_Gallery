@@ -34,9 +34,19 @@ export default function Navbar() {
   const [announcementIdx, setAnnouncementIdx] = useState(0);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
-  const { currentUser, userProfile } = useAuth() || {};
+  const { currentUser, userProfile, logout } = useAuth() || {};
   const { totalItems } = useCart() || { totalItems: 0 };
   const { resetShopState, setSearch } = useShop() || {};
+
+  const handleLogout = async () => {
+    try {
+      if (logout) await logout();
+      setMobileOpen(false);
+      navigate('/');
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   // Rotate announcement ticker every 4 seconds
   useEffect(() => {
@@ -51,14 +61,6 @@ export default function Navbar() {
   const desktopLinks = [...navLinks];
   if (userProfile?.isAdmin) {
     desktopLinks.push({ label: 'ADMIN', to: '/admin' });
-  }
-
-  const mobileMenuLinksD = [
-    ...navLinks,
-    { label: 'Account', to: authAccountLink }
-  ];
-  if (userProfile?.isAdmin) {
-    mobileMenuLinksD.push({ label: 'ADMIN', to: '/admin' });
   }
 
   useEffect(() => {
@@ -172,10 +174,10 @@ export default function Navbar() {
               {totalItems > 0 && <span className="navbar__badge" style={{ background: '#16a34a' }}>{totalItems}</span>}
             </Link>
 
-            {/* Account - desktop only */}
-            <Link to={authAccountLink} className="navbar__icon-btn navbar__icon-btn--desktop" aria-label="Account">
+            {/* Account - desktop & mobile */}
+            <Link to={authAccountLink} className="navbar__icon-btn navbar__icon-btn--account" aria-label="Account">
               {currentUser ? (
-                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--color-heading)', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-heading)', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                   {userProfile?.fullName ? userProfile.fullName.charAt(0).toUpperCase() : currentUser.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
               ) : (
@@ -234,19 +236,83 @@ export default function Navbar() {
       />
       <div className={`mobile-menu ${mobileOpen ? 'mobile-menu--open' : ''}`}>
         <div className="mobile-menu__inner">
-          {mobileMenuLinksD.map((link) => (
-            <Link
-              key={link.label}
-              to={link.to}
-              className={`mobile-menu__link ${link.label.toLowerCase() === 'sale' ? 'mobile-menu__link--sale' : ''}`}
-              onClick={() => {
-                setMobileOpen(false);
-                if ((link.to === '/shop' || link.label === 'Shop') && resetShopState) resetShopState();
-              }}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {/* User Profile Info Card in Mobile Menu */}
+          {currentUser ? (
+            <div className="mobile-menu__user-card">
+              <div className="mobile-menu__user-avatar">
+                {userProfile?.fullName ? userProfile.fullName.charAt(0).toUpperCase() : currentUser.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="mobile-menu__user-details">
+                <span className="mobile-menu__user-greeting">Logged in as</span>
+                <span className="mobile-menu__user-name">{userProfile?.fullName || currentUser.email}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="mobile-menu__guest-card">
+              <Link 
+                to="/login" 
+                className="mobile-menu__login-btn"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span>👤</span> Login / Sign Up
+              </Link>
+            </div>
+          )}
+
+          {/* Nav Links */}
+          <div className="mobile-menu__section">
+            <span className="mobile-menu__section-title">EXPLORE</span>
+            {navLinks.map((link) => (
+              <Link
+                key={link.label}
+                to={link.to}
+                className={`mobile-menu__link ${link.label.toLowerCase() === 'sale' ? 'mobile-menu__link--sale' : ''}`}
+                onClick={() => {
+                  setMobileOpen(false);
+                  if ((link.to === '/shop' || link.label === 'Shop') && resetShopState) resetShopState();
+                }}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Account & Orders Section */}
+          {currentUser && (
+            <div className="mobile-menu__section mobile-menu__section--account">
+              <span className="mobile-menu__section-title">MY ACCOUNT</span>
+              <Link
+                to="/profile?tab=profile"
+                className="mobile-menu__link mobile-menu__link--sub"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span className="mobile-menu__icon">👤</span> My Profile
+              </Link>
+              <Link
+                to="/profile?tab=orders"
+                className="mobile-menu__link mobile-menu__link--sub"
+                onClick={() => setMobileOpen(false)}
+              >
+                <span className="mobile-menu__icon">📦</span> My Orders
+              </Link>
+              {userProfile?.isAdmin && (
+                <Link
+                  to="/admin"
+                  className="mobile-menu__link mobile-menu__link--admin"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <span className="mobile-menu__icon">⚡</span> Admin Dashboard
+                </Link>
+              )}
+              <button
+                type="button"
+                className="mobile-menu__link mobile-menu__link--logout"
+                onClick={handleLogout}
+              >
+                <span className="mobile-menu__icon">🚪</span> Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

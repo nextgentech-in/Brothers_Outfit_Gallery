@@ -133,6 +133,28 @@ export default function Profile() {
         </div>
 
         <div className="profile-content">
+          {/* Mobile Profile Navigation Tabs (Always Visible at Top on Mobile) */}
+          <div className="profile-mobile-tabs">
+            <button 
+              className={`profile-mobile-tab ${activeTab === 'profile' ? 'active' : ''}`}
+              onClick={() => handleTabChange('profile')}
+            >
+              👤 My Profile
+            </button>
+            <button 
+              className={`profile-mobile-tab ${activeTab === 'orders' ? 'active' : ''}`}
+              onClick={() => handleTabChange('orders')}
+            >
+              📦 My Orders ({userOrders.length})
+            </button>
+            <button 
+              className="profile-mobile-tab profile-mobile-tab--logout"
+              onClick={handleLogout}
+            >
+              🚪 Logout
+            </button>
+          </div>
+
           {activeTab === 'orders' ? (
             <div className="profile-orders-view">
               <div className="profile-header">
