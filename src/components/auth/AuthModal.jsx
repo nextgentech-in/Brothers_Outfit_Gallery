@@ -111,10 +111,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
     try {
       setError('');
       setLoadingGoogle(true);
-      const res = await loginWithGoogle();
-      setLoadingGoogle(false);
-      if (onSuccess) onSuccess(res?.user);
-      onClose();
+      await loginWithGoogle();
     } catch (err) {
       console.error('Google auth error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
