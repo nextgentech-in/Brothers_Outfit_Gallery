@@ -80,7 +80,7 @@ export default function AboutPage() {
           </p>
           <div className="about-hero__actions">
             <Link to="/shop" className="btn-primary">EXPLORE COLLECTION →</Link>
-            <a href={businessInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary">VISIT PHYSICAL STORE →</a>
+            <a href="#store-location" className="btn-secondary">VIEW STORE LOCATION ↓</a>
           </div>
 
           {/* Hero Photos Strip Preview */}
@@ -193,9 +193,6 @@ export default function AboutPage() {
               <h2 className="section-title">INSIDE OUR GALLERY</h2>
               <p className="section-subtitle">Take a visual tour through our aisles, racks, and premium collections.</p>
             </div>
-            <a href={businessInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary gallery-directions-btn">
-              GET STORE DIRECTIONS ↗
-            </a>
           </div>
           
           <PhotoGallery images={storeImages} />
@@ -292,22 +289,19 @@ export default function AboutPage() {
               </div>
 
               <div className="location-buttons-wrap">
-                <a href={businessInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                  OPEN IN GOOGLE MAPS ↗
-                </a>
-                <a href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} className="btn-secondary">
-                  CALL STORE
+                <a 
+                  href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} 
+                  className="btn-primary"
+                  style={{ width: '100%', textAlign: 'center' }}
+                >
+                  CALL STORE: {businessInfo.phone}
                 </a>
               </div>
             </div>
             
-            {/* Clickable Map Photo linking to Google Maps */}
-            <a 
-              href={businessInfo.googleMapsUrl} 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            {/* Store Map Visual Showcase */}
+            <div 
               className="location-map-photo-wrap"
-              title="Click to open Brothers Outfit Gallery on Google Maps"
             >
               <img 
                 src="/images/store-map-photo.jpg" 
@@ -319,10 +313,9 @@ export default function AboutPage() {
                 <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
                   <p>Pratham Square, Sahakari Jin Road, Himatnagar, Gujarat 383001</p>
-                  <span className="map-click-prompt">Click to open directions in Google Maps ↗</span>
                 </div>
               </div>
-            </a>
+            </div>
           </div>
         </div>
       </section>
@@ -439,7 +432,7 @@ export default function AboutPage() {
           <p>Browse our latest men's collections online or visit {businessInfo.name} in person today.</p>
           <div className="about-hero__actions">
             <Link to="/shop" className="btn-primary">SHOP CATALOG ONLINE →</Link>
-            <a href={businessInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary">GET DIRECTIONS TO STORE →</a>
+            <a href="#store-location" className="btn-secondary">VIEW STORE DETAILS ↓</a>
           </div>
         </div>
       </section>

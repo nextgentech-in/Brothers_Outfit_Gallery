@@ -16,7 +16,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
 
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingForm, setLoadingForm] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -47,15 +48,25 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
     e.preventDefault();
     try {
       setError('');
-      setLoading(true);
-      const cred = await login(loginEmail, loginPassword);
-      setLoading(false);
+      setLoadingForm(true);
+      const cred = await login(loginEmail.trim(), loginPassword);
+      setLoadingForm(false);
       if (onSuccess) onSuccess(cred.user);
       onClose();
     } catch (err) {
       console.error('Login error:', err);
-      setError('Incorrect email or password. Please try again.');
-      setLoading(false);
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/invalid-credential'
+      ) {
+        setError('Incorrect email or password. Please try again or create an account.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please wait a few minutes.');
+      } else {
+        setError(err.message || 'Incorrect email or password. Please try again.');
+      }
+      setLoadingForm(false);
     }
   };
 
@@ -70,8 +81,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
 
     try {
       setError('');
-      setLoading(true);
-      const userCredential = await signup(signupEmail, signupPassword);
+      setLoadingForm(true);
+      const userCredential = await signup(signupEmail.trim(), signupPassword);
       
       // Save basic profile name without prompting long address form
       await updateFirestoreProfile(userCredential.user.uid, {
@@ -80,7 +91,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
         provider: 'email/password'
       });
 
-      setLoading(false);
+      setLoadingForm(false);
       if (onSuccess) onSuccess(userCredential.user);
       onClose();
     } catch (err) {
@@ -92,24 +103,32 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
       } else {
         setError('Failed to create account. Please check your details.');
       }
-      setLoading(false);
+      setLoadingForm(false);
     }
   };
 
   const handleGoogleAuth = async () => {
     try {
       setError('');
-      setLoading(true);
+      setLoadingGoogle(true);
       const res = await loginWithGoogle();
-      setLoading(false);
+      setLoadingGoogle(false);
       if (onSuccess) onSuccess(res?.user);
       onClose();
     } catch (err) {
       console.error('Google auth error:', err);
-      if (err.code !== 'auth/popup-closed-by-user') {
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Google sign-in window was closed.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError('Domain not authorized in Firebase Console. Please add this domain under Firebase Console > Authentication > Settings > Authorized domains.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Google Sign-In is not enabled in Firebase Console > Authentication > Sign-in method.');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error during Google sign-in. Please try again.');
+      } else {
         setError(`Google sign-in failed: ${err.message || 'Please try again.'}`);
       }
-      setLoading(false);
+      setLoadingGoogle(false);
     }
   };
 
@@ -153,7 +172,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
         {/* Quick Google Sign In */}
         <button
           type="button"
-          disabled={loading}
+          disabled={loadingForm || loadingGoogle}
           onClick={handleGoogleAuth}
           className="auth-modal-google-btn"
         >
@@ -163,7 +182,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
             <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
             <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
           </svg>
-          <span>Continue with Google</span>
+          <span>{loadingGoogle ? 'Connecting with Google...' : 'Continue with Google'}</span>
         </button>
 
         <div className="auth-modal-divider">
@@ -196,10 +215,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loadingForm || loadingGoogle}
               className="auth-modal-submit-btn"
             >
-              {loading ? 'SIGNING IN...' : 'SIGN IN & PROCEED'}
+              {loadingForm ? 'SIGNING IN...' : 'SIGN IN & PROCEED'}
             </button>
             <div className="auth-modal-footer-note">
               <span>Don't have an account? </span>
@@ -262,10 +281,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
             </div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loadingForm || loadingGoogle}
               className="auth-modal-submit-btn"
             >
-              {loading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT & PROCEED'}
+              {loadingForm ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT & PROCEED'}
             </button>
             <div className="auth-modal-footer-note">
               <span>Already have an account? </span>

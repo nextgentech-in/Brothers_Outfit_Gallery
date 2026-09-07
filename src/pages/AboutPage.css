@@ -547,7 +547,7 @@
   margin-top: auto;
 }
 
-/* Clickable Map Photo Card */
+/* Map Visual Showcase Card */
 .location-map-photo-wrap {
   position: relative;
   display: block;
@@ -557,14 +557,7 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
   border: 1px solid #cbd5e1;
   text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.location-map-photo-wrap:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
-  border-color: #94a3b8;
+  cursor: default;
 }
 
 .location-map-photo {
