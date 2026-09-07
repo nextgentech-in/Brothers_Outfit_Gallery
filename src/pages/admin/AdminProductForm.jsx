@@ -78,6 +78,7 @@ export default function AdminProductForm() {
     offerStartAt: '',
     offerEndAt: '',
     active: true,
+    isTrending: false,
   });
 
   // Ephemeral States
@@ -125,6 +126,7 @@ export default function AdminProductForm() {
             salePrice: data.salePrice || data.price || '',
             variants: loadedVariants,
             colors: data.colors || [],
+            isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
           });
 
           // Map legacy string images to object schema or use existing objects
@@ -1231,11 +1233,25 @@ export default function AdminProductForm() {
         {/* Right Sidebar: Publishing */}
         <div className="admin-form-sidebar">
           <section className="admin-form-section">
-            <h3>Publishing</h3>
+            <h3>Publishing & Placement</h3>
             <label className="admin-checkbox-param highlight-checkbox">
               <input type="checkbox" name="active" checked={formData.active} onChange={handleChange} />
               ACTIVE (Visible on Store)
             </label>
+
+            <label className="admin-checkbox-param highlight-checkbox" style={{
+              marginTop: '12px',
+              background: formData.isTrending ? '#fef3c7' : '#f8fafc',
+              borderColor: formData.isTrending ? '#f59e0b' : '#e2e8f0'
+            }}>
+              <input type="checkbox" name="isTrending" checked={!!formData.isTrending} onChange={handleChange} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 700, color: formData.isTrending ? '#b45309' : '#334155' }}>
+                🔥 Feature in Trending Section
+              </span>
+            </label>
+            <p style={{ margin: '6px 0 0 28px', fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
+              When enabled, this product appears in the "TRENDING NOW" carousel on the homepage.
+            </p>
           </section>
 
           <div className="admin-form-actions-bottom" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '32px' }}>

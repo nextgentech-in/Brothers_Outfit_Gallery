@@ -71,6 +71,13 @@ export const deactivateProduct = async (id) => {
   invalidateProductCache();
 };
 
+// Toggle Trending Status
+export const toggleProductTrending = async (id, isTrending) => {
+  const docRef = doc(db, PRODUCTS, id);
+  await updateDoc(docRef, { isTrending, updatedAt: serverTimestamp() });
+  invalidateProductCache();
+};
+
 // Hard Delete
 export const deleteProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);

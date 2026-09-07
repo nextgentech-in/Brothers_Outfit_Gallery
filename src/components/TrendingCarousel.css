@@ -124,27 +124,55 @@
   opacity: 0.85;
 }
 
+/* Card Badge */
+.trending__card-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: #dc2626;
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  z-index: 3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
 /* Card Info */
 .trending__card-info {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 24px;
+  padding: 22px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   z-index: 2;
+  gap: 12px;
+}
+
+.trending__card-details {
+  flex: 1;
+  min-width: 0;
 }
 
 .trending__card-title {
   font-family: var(--font-heading);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: #fff;
   margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .trending__card-subtitle {
@@ -152,8 +180,34 @@
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.75);
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trending__card-pricing {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.trending__card-price {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+}
+
+.trending__card-mrp {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: line-through;
 }
 
 .trending__card-arrow {

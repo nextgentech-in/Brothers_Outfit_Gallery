@@ -172,6 +172,12 @@ export const getSaleProducts = async (qty = 4) => {
   return saleList.slice(0, qty);
 };
 
+export const getTrendingProducts = async (qty = 12) => {
+  const rawList = await fetchAllActiveProducts();
+  const trending = rawList.filter(p => p.active !== false && (p.isTrending === true || p.trending === true));
+  return trending.slice(0, qty);
+};
+
 export const getProductBySlug = async (slug) => {
   if (!slug) return null;
 

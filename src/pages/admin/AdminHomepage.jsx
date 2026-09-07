@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getHomepageConfig, saveHomepageConfig } from '../../services/adminService';
+import { getHomepageConfig, saveHomepageConfig, getAdminProducts, toggleProductTrending } from '../../services/adminService';
 import { uploadImageToImageKit } from '../../utils/imageUtils';
 import './AdminHomepage.css';
 
@@ -11,12 +11,17 @@ const PRESET_BANNERS = [
 ];
 
 export default function AdminHomepage() {
-  const [activeTab, setActiveTab] = useState('hero'); // 'hero' | 'sections'
+  const [activeTab, setActiveTab] = useState('hero'); // 'hero' | 'trending' | 'sections'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Catalog products for Trending placement manager
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [trendingSearch, setTrendingSearch] = useState('');
+  const [togglingTrendingId, setTogglingTrendingId] = useState(null);
 
   const [config, setConfig] = useState({
     showHero: true,
@@ -27,6 +32,11 @@ export default function AdminHomepage() {
     showAboutPreview: true,
     showTrustBadges: true,
     showReviews: true,
+    trending: {
+      label: 'CURATED FOR YOU',
+      title: 'TRENDING NOW',
+      subtitle: "Discover the styles defining men's fashion right now."
+    },
     hero: {
       bannerImage: '/images/hero.png',
       mobileBannerImage: '',
@@ -47,7 +57,10 @@ export default function AdminHomepage() {
     async function load() {
       setLoading(true);
       try {
-        const data = await getHomepageConfig();
+        const [data, productsData] = await Promise.all([
+          getHomepageConfig(),
+          getAdminProducts().catch(() => [])
+        ]);
         if (data && Object.keys(data).length > 0) {
           setConfig(prev => ({
             ...prev,
@@ -55,9 +68,16 @@ export default function AdminHomepage() {
             hero: {
               ...prev.hero,
               ...(data.hero || {})
+            },
+            trending: {
+              label: 'CURATED FOR YOU',
+              title: 'TRENDING NOW',
+              subtitle: "Discover the styles defining men's fashion right now.",
+              ...(data.trending || {})
             }
           }));
         }
+        setCatalogProducts(productsData || []);
       } catch (err) {
         console.error('Failed to load homepage config:', err);
       } finally {
@@ -76,6 +96,38 @@ export default function AdminHomepage() {
       }
     }));
     setSaveStatus(null);
+  };
+
+  const handleTrendingConfigChange = (field, value) => {
+    setConfig(prev => ({
+      ...prev,
+      trending: {
+        ...prev.trending,
+        [field]: value
+      }
+    }));
+    setSaveStatus(null);
+  };
+
+  const handleToggleTrendingProduct = async (productId, currentStatus) => {
+    const newStatus = !currentStatus;
+    setTogglingTrendingId(productId);
+    // Optimistic local state update
+    setCatalogProducts(prev => prev.map(p => p.id === productId ? { ...p, isTrending: newStatus } : p));
+    try {
+      await toggleProductTrending(productId, newStatus);
+      setSaveStatus({
+        type: 'success',
+        text: newStatus ? '🔥 Product added to Trending section!' : '✓ Product removed from Trending section.'
+      });
+      setTimeout(() => setSaveStatus(null), 4000);
+    } catch (err) {
+      console.error('Failed to toggle trending:', err);
+      setCatalogProducts(prev => prev.map(p => p.id === productId ? { ...p, isTrending: currentStatus } : p));
+      setSaveStatus({ type: 'error', text: 'Failed to update trending status. Please try again.' });
+    } finally {
+      setTogglingTrendingId(null);
+    }
   };
 
   const handleToggle = (key) => {
@@ -212,6 +264,25 @@ export default function AdminHomepage() {
           }}
         >
           🎨 Hero Banner & Content
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('trending')}
+          style={{
+            padding: '12px 20px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'trending' ? '2px solid #0f172a' : '2px solid transparent',
+            color: activeTab === 'trending' ? '#0f172a' : '#64748b',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          🔥 Trending Section ({catalogProducts.filter(p => p.isTrending === true).length})
         </button>
         <button
           type="button"
@@ -556,6 +627,274 @@ export default function AdminHomepage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: TRENDING SECTION MANAGER */}
+      {activeTab === 'trending' && (
+        <div className="trending-editor-container">
+          {/* Section 1: Heading & Copy Config */}
+          <div className="editor-card" style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '28px' }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+              ✍️ Trending Section Header & Copy
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#64748b' }}>
+              Customize the title, eyebrow badge, and subtitle text displayed above the trending carousel on the homepage.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '6px' }}>
+                  Eyebrow Label (Small Tag):
+                </label>
+                <input
+                  type="text"
+                  value={config.trending?.label || ''}
+                  onChange={(e) => handleTrendingConfigChange('label', e.target.value)}
+                  placeholder="CURATED FOR YOU"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '6px' }}>
+                  Section Title:
+                </label>
+                <input
+                  type="text"
+                  value={config.trending?.title || ''}
+                  onChange={(e) => handleTrendingConfigChange('title', e.target.value)}
+                  placeholder="TRENDING NOW"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '6px' }}>
+                  Subtitle Description:
+                </label>
+                <input
+                  type="text"
+                  value={config.trending?.subtitle || ''}
+                  onChange={(e) => handleTrendingConfigChange('subtitle', e.target.value)}
+                  placeholder="Discover the styles defining men's fashion right now."
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Currently Featured in Trending */}
+          {(() => {
+            const trendingProducts = catalogProducts.filter(p => p.isTrending === true);
+            return (
+              <div className="editor-card" style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '28px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      🔥 Featured Products in Trending ({trendingProducts.length})
+                    </h3>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+                      These products are shown in the animated infinite carousel on the storefront homepage.
+                    </p>
+                  </div>
+                  <a
+                    href="/admin/products"
+                    className="admin-action-btn"
+                    style={{ padding: '6px 12px', background: '#f1f5f9', color: '#334155', borderRadius: '6px', fontSize: '12.5px', fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    View in Products Table →
+                  </a>
+                </div>
+
+                {trendingProducts.length === 0 ? (
+                  <div style={{ padding: '36px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>🛍️</div>
+                    <p style={{ margin: '0 0 6px', fontSize: '14px', fontWeight: 700, color: '#334155' }}>
+                      No products are currently marked as Trending.
+                    </p>
+                    <p style={{ margin: 0, fontSize: '13px' }}>
+                      Search below to add items from your catalog, or toggle the "🔥 Trending" button in the Products list.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+                    {trendingProducts.map(p => {
+                      const img = p.images?.[0]?.url || (typeof p.images?.[0] === 'string' ? p.images[0] : null) || p.thumbnailUrl || p.image || '/images/hero.png';
+                      const price = p.salePrice || p.price || 0;
+                      const mrp = p.mrp || p.compareAtPrice || 0;
+                      return (
+                        <div
+                          key={p.id}
+                          style={{
+                            display: 'flex',
+                            gap: '12px',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            border: '1px solid #fef3c7',
+                            background: '#fffbeb',
+                            alignItems: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <img
+                            src={img}
+                            alt={p.name}
+                            style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #fed7aa', flexShrink: 0 }}
+                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/images/hero.png'; }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h4 style={{ margin: '0 0 2px', fontSize: '13.5px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.name || 'Unnamed Product'}
+                            </h4>
+                            <div style={{ fontSize: '11.5px', color: '#78716c', marginBottom: '4px' }}>
+                              {p.category || p.categoryId || 'General'}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 800, color: '#b45309' }}>
+                                ₹{price.toLocaleString('en-IN')}
+                              </span>
+                              {mrp > price && (
+                                <span style={{ fontSize: '11px', color: '#a8a29e', textDecoration: 'line-through' }}>
+                                  ₹{mrp.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={togglingTrendingId === p.id}
+                            onClick={() => handleToggleTrendingProduct(p.id, true)}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              background: '#fee2e2',
+                              border: '1px solid #fca5a5',
+                              color: '#b91c1c',
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              cursor: togglingTrendingId === p.id ? 'not-allowed' : 'pointer',
+                              flexShrink: 0
+                            }}
+                            title="Remove from Trending section"
+                          >
+                            {togglingTrendingId === p.id ? '...' : '✕ Remove'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Section 3: Add from Catalog */}
+          <div className="editor-card" style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <h3 style={{ margin: '0 0 4px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+              ➕ Add Products from Catalog to Trending
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: '#64748b' }}>
+              Search your catalog below and click "+ Add to Trending" to instantly feature products on the homepage.
+            </p>
+
+            {/* Search Input */}
+            <div style={{ marginBottom: '18px' }}>
+              <input
+                type="text"
+                value={trendingSearch}
+                onChange={(e) => setTrendingSearch(e.target.value)}
+                placeholder="Search products by title, SKU, or category to add..."
+                style={{
+                  width: '100%',
+                  padding: '11px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13.5px'
+                }}
+              />
+            </div>
+
+            {(() => {
+              const nonTrending = catalogProducts.filter(p => {
+                if (p.isTrending === true) return false;
+                if (!trendingSearch) return true;
+                const q = trendingSearch.toLowerCase();
+                return (
+                  p.name?.toLowerCase().includes(q) ||
+                  p.category?.toLowerCase().includes(q) ||
+                  p.categoryId?.toLowerCase().includes(q) ||
+                  p.sku?.toLowerCase().includes(q)
+                );
+              });
+
+              if (nonTrending.length === 0) {
+                return (
+                  <p style={{ color: '#64748b', fontSize: '13.5px', textAlign: 'center', padding: '24px 0' }}>
+                    {trendingSearch ? 'No matching products found.' : 'All catalog products are already added to Trending!'}
+                  </p>
+                );
+              }
+
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '12px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {nonTrending.slice(0, 30).map(p => {
+                    const img = p.images?.[0]?.url || (typeof p.images?.[0] === 'string' ? p.images[0] : null) || p.thumbnailUrl || p.image || '/images/hero.png';
+                    const price = p.salePrice || p.price || 0;
+                    const mrp = p.mrp || p.compareAtPrice || 0;
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: '1px solid #e2e8f0',
+                          background: '#fafafa'
+                        }}
+                      >
+                        <img
+                          src={img}
+                          alt={p.name}
+                          style={{ width: '46px', height: '46px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/images/hero.png'; }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {p.name || 'Unnamed Product'}
+                          </h4>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            {p.category || p.categoryId || 'General'} · ₹{price.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={togglingTrendingId === p.id}
+                          onClick={() => handleToggleTrendingProduct(p.id, false)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            background: '#0f172a',
+                            border: 'none',
+                            color: '#fff',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: togglingTrendingId === p.id ? 'not-allowed' : 'pointer',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {togglingTrendingId === p.id ? '...' : '+ Add'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

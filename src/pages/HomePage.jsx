@@ -23,6 +23,11 @@ export default function HomePage() {
     showAboutPreview: true,
     showTrustBadges: true,
     showReviews: true,
+    trending: {
+      label: 'CURATED FOR YOU',
+      title: 'TRENDING NOW',
+      subtitle: "Discover the styles defining men's fashion right now."
+    },
     hero: {
       bannerImage: '/images/hero.png',
       mobileBannerImage: '',
@@ -87,7 +92,7 @@ export default function HomePage() {
       {homepageConfig.showHero !== false && <Hero heroConfig={homepageConfig?.hero} />}
 
       {/* 2. Trending Now */}
-      {homepageConfig.showTrending !== false && <TrendingCarousel />}
+      {homepageConfig.showTrending !== false && <TrendingCarousel trendingConfig={homepageConfig?.trending} />}
 
       {/* 3. Sale Products */}
       {homepageConfig.showSaleSection !== false && (saleProducts.length > 0 || loading) && (
