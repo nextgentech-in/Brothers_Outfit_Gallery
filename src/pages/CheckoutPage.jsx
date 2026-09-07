@@ -8,6 +8,7 @@ import { createAdminOrderNotification } from '../services/notificationService';
 import { validateCoupon } from '../services/couponService';
 import { getBackendUrl } from '../utils/apiConfig';
 import AuthModal from '../components/auth/AuthModal';
+import PhoneOtpModal from '../components/checkout/PhoneOtpModal';
 import './CheckoutPage.css';
 
 
@@ -21,6 +22,8 @@ export default function CheckoutPage() {
   const [delhiveryStatus, setDelhiveryStatus] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [phoneOtpModalOpen, setPhoneOtpModalOpen] = useState(false);
+  const [verifiedPhone, setVerifiedPhone] = useState(null);
 
   const [couponInput, setCouponInput] = useState('');
   const [couponChecking, setCouponChecking] = useState(false);
@@ -51,6 +54,17 @@ export default function CheckoutPage() {
     }
   }, [userProfile, currentUser]);
 
+  useEffect(() => {
+    if (userProfile?.phoneVerified && userProfile?.phone) {
+      const clean = String(userProfile.phone).replace(/\D/g, '').slice(-10);
+      if (clean.length === 10) setVerifiedPhone(clean);
+    }
+  }, [userProfile]);
+
+  const currentPhoneDigits = String(shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+  const isPhoneVerified = Boolean(
+    verifiedPhone && currentPhoneDigits && verifiedPhone === currentPhoneDigits
+  );
 
   const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
 
@@ -151,6 +165,13 @@ export default function CheckoutPage() {
     const { name, value } = e.target;
     setShippingAddress(prev => ({ ...prev, [name]: value }));
 
+    if (name === 'phone') {
+      const digits = String(value).replace(/\D/g, '').slice(-10);
+      if (verifiedPhone && digits !== verifiedPhone) {
+        setVerifiedPhone(null);
+      }
+    }
+
     // Auto-search pincode if user types city or place (>= 3 chars)
     if (name === 'city' && value.trim().length >= 3) {
       setSearchingPlace(true);
@@ -181,6 +202,11 @@ export default function CheckoutPage() {
       return setError('Please fill in all required shipping address fields.');
     }
 
+    const cleanInputPhone = String(shippingAddress.phone).replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(cleanInputPhone)) {
+      return setError('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
+    }
+
     if (delhiveryStatus && !delhiveryStatus.serviceable) {
       return setError('Cannot place order: Please enter a valid and serviceable PIN code.');
     }
@@ -190,6 +216,35 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Check if phone number needs verification with OTP
+    if (!isPhoneVerified) {
+      setError(null);
+      setPhoneOtpModalOpen(true);
+      return;
+    }
+
+    await executeOrderPlacement(shippingAddress.phone);
+  };
+
+  const handlePhoneVerified = async (confirmedPhone) => {
+    setVerifiedPhone(confirmedPhone);
+    setPhoneOtpModalOpen(false);
+
+    // Save verified phone to Firestore user profile in background
+    if (currentUser && updateFirestoreProfile) {
+      updateFirestoreProfile(currentUser.uid, {
+        phone: confirmedPhone,
+        phoneVerified: true,
+        phoneVerifiedAt: new Date().toISOString()
+      }).catch(() => {});
+    }
+
+    // Immediately execute order placement with verified phone
+    await executeOrderPlacement(confirmedPhone);
+  };
+
+  const executeOrderPlacement = async (activePhone = null) => {
+    const finalPhone = activePhone || shippingAddress.phone;
     setLoading(true);
     setError(null);
 
@@ -203,9 +258,11 @@ export default function CheckoutPage() {
         const orderPayload = {
           userId: currentUser?.uid || 'guest',
           userEmail: emailToSave,
-          userPhone: shippingAddress.phone || '',
+          userPhone: finalPhone,
+          phoneVerified: true,
           shippingAddress: {
             ...shippingAddress,
+            phone: finalPhone,
             email: emailToSave
           },
           items: cartItems,
@@ -227,7 +284,8 @@ export default function CheckoutPage() {
         if (currentUser && updateFirestoreProfile) {
           updateFirestoreProfile(currentUser.uid, {
             fullName: shippingAddress.fullName,
-            phone: shippingAddress.phone,
+            phone: finalPhone,
+            phoneVerified: true,
             address: {
               line1: shippingAddress.addressLine,
               city: shippingAddress.city,
@@ -284,7 +342,7 @@ export default function CheckoutPage() {
         prefill: {
           name: shippingAddress.fullName || '',
           email: (shippingAddress.email || currentUser?.email || '').toLowerCase().trim(),
-          contact: shippingAddress.phone || ''
+          contact: finalPhone
         },
         config: {
           display: {
@@ -328,9 +386,11 @@ export default function CheckoutPage() {
               const orderPayload = {
                 userId: currentUser?.uid || 'guest',
                 userEmail: emailToSave,
-                userPhone: shippingAddress.phone || '',
+                userPhone: finalPhone,
+                phoneVerified: true,
                 shippingAddress: {
                   ...shippingAddress,
+                  phone: finalPhone,
                   email: emailToSave
                 },
                 items: cartItems,
@@ -354,7 +414,8 @@ export default function CheckoutPage() {
               if (currentUser && updateFirestoreProfile) {
                 updateFirestoreProfile(currentUser.uid, {
                   fullName: shippingAddress.fullName,
-                  phone: shippingAddress.phone,
+                  phone: finalPhone,
+                  phoneVerified: true,
                   address: {
                     line1: shippingAddress.addressLine,
                     city: shippingAddress.city,
@@ -438,14 +499,44 @@ export default function CheckoutPage() {
 
           <div className="checkout-form-row">
             <div className="checkout-form-group">
-              <label>Phone Number *</label>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Phone Number *</span>
+                {isPhoneVerified ? (
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    color: '#15803d',
+                    background: '#dcfce7',
+                    border: '1px solid #86efac',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    ✓ Verified
+                  </span>
+                ) : (
+                  <span style={{
+                    fontSize: '0.72rem',
+                    color: '#b45309',
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: '600'
+                  }}>
+                    OTP Verification Required
+                  </span>
+                )}
+              </label>
               <input
                 type="tel"
                 name="phone"
                 value={shippingAddress.phone}
                 onChange={handleInputChange}
                 required
-                placeholder="+91 98765 43210"
+                placeholder="10-digit mobile number (e.g. 9876543210)"
               />
             </div>
             <div className="checkout-form-group">
@@ -725,6 +816,21 @@ export default function CheckoutPage() {
         onClose={() => setAuthModalOpen(false)}
         onSuccess={() => handlePlaceOrder()}
         message="Sign in or create an account to place your order."
+      />
+
+      <PhoneOtpModal
+        isOpen={phoneOtpModalOpen}
+        phone={shippingAddress.phone}
+        onClose={() => setPhoneOtpModalOpen(false)}
+        onSuccess={handlePhoneVerified}
+        onChangePhone={() => {
+          setPhoneOtpModalOpen(false);
+          const phoneInput = document.querySelector('input[name="phone"]');
+          if (phoneInput) {
+            phoneInput.focus();
+            phoneInput.select();
+          }
+        }}
       />
     </div>
   );

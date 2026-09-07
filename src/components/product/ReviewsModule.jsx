@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getProductReviews, submitReview, compressReviewImage } from '../../services/reviewService';
 import './ReviewsModule.css';
@@ -46,6 +47,22 @@ export default function ReviewsModule({ product }) {
   // Lightbox for reviewing photo enlarged
   const [lightboxImg, setLightboxImg] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Lock body scroll and enable escape key to close lightbox
+  useEffect(() => {
+    if (lightboxImg) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') setLightboxImg(null);
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [lightboxImg]);
 
   // Sync author name if user profile loads later
   useEffect(() => {
@@ -456,11 +473,22 @@ export default function ReviewsModule({ product }) {
         </div>
       </div>
 
-      {/* Lightbox for customer review photo */}
-      {lightboxImg && (
-        <div className="review-lightbox-backdrop" onClick={() => setLightboxImg(null)}>
-          <img src={lightboxImg} alt="Review attachment full preview" className="review-lightbox-img" />
-        </div>
+      {/* Lightbox for customer review photo rendered at body root */}
+      {lightboxImg && createPortal(
+        <div className="review-lightbox-backdrop" onClick={() => setLightboxImg(null)} role="dialog" aria-modal="true" aria-label="Customer review photo enlarged">
+          <button
+            type="button"
+            className="review-lightbox-close"
+            onClick={() => setLightboxImg(null)}
+            aria-label="Close photo preview"
+          >
+            ✕
+          </button>
+          <div className="review-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <img src={lightboxImg} alt="Review attachment full preview" className="review-lightbox-img" />
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

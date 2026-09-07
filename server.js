@@ -230,6 +230,137 @@ app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-aler
 });
 
 
+// ───────────── PHONE NUMBER OTP VERIFICATION ENDPOINTS ─────────────
+const otpStore = new Map(); // phone -> { otp, expiresAt, attempts, createdAt }
+const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_VERIFY_ATTEMPTS = 5;
+
+// Clean expired OTPs every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [phone, record] of otpStore.entries()) {
+    if (now > record.expiresAt) {
+      otpStore.delete(phone);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
+// 1. Send OTP to Indian Phone Number
+app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 15)) return;
+
+  const { phone } = req.body;
+  if (!phone) {
+    return res.status(400).json({ error: 'Phone number is required.' });
+  }
+
+  // Clean phone number: remove non-digits and extract 10 digits
+  const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+  if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+    return res.status(400).json({ error: 'Please enter a valid 10-digit Indian mobile number.' });
+  }
+
+  const now = Date.now();
+  const existing = otpStore.get(cleanPhone);
+
+  // Prevent spamming (minimum 20 seconds between resends)
+  if (existing && (now - existing.createdAt < 20 * 1000)) {
+    const waitSec = Math.ceil((20 * 1000 - (now - existing.createdAt)) / 1000);
+    return res.status(429).json({ error: `Please wait ${waitSec}s before requesting a new OTP.` });
+  }
+
+  // Generate secure 6-digit numeric OTP
+  const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  otpStore.set(cleanPhone, {
+    otp: generatedOtp,
+    expiresAt: now + OTP_EXPIRY_MS,
+    attempts: 0,
+    createdAt: now
+  });
+
+  console.log(`\n======================================================`);
+  console.log(`[PHONE OTP DISPATCH] Number: +91 ${cleanPhone} | OTP Code: ${generatedOtp} (Valid 5 mins)`);
+  console.log(`======================================================\n`);
+
+  // Hook for Fast2SMS or other SMS Gateway if configured
+  if (process.env.FAST2SMS_API_KEY) {
+    try {
+      await fetch('https://www.fast2sms.com/dev/bulkV2', {
+        method: 'POST',
+        headers: {
+          'authorization': process.env.FAST2SMS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          route: 'otp',
+          variables_values: generatedOtp,
+          numbers: cleanPhone
+        })
+      });
+      console.log(`[SMS GATEWAY] Fast2SMS sent successfully to +91 ${cleanPhone}`);
+    } catch (smsErr) {
+      console.warn(`[SMS GATEWAY] Fast2SMS send warning:`, smsErr.message);
+    }
+  }
+
+  // Return success response with devOtp in sandbox/dev mode for seamless verification
+  const isSandbox = !process.env.FAST2SMS_API_KEY;
+  return res.json({
+    success: true,
+    message: `OTP sent successfully to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}`,
+    phone: cleanPhone,
+    expiresIn: 300,
+    devOtp: isSandbox ? generatedOtp : undefined
+  });
+});
+
+// 2. Verify Entered OTP
+app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
+  const { phone, otp } = req.body;
+  if (!phone || !otp) {
+    return res.status(400).json({ error: 'Phone number and 6-digit OTP are required.' });
+  }
+
+  const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+  const cleanOtp = String(otp).trim();
+
+  const record = otpStore.get(cleanPhone);
+  if (!record) {
+    return res.status(400).json({ error: 'No active OTP found or code has expired. Please tap Resend OTP.' });
+  }
+
+  const now = Date.now();
+  if (now > record.expiresAt) {
+    otpStore.delete(cleanPhone);
+    return res.status(400).json({ error: 'OTP has expired. Please request a new code.' });
+  }
+
+  record.attempts += 1;
+  if (record.attempts > MAX_VERIFY_ATTEMPTS) {
+    otpStore.delete(cleanPhone);
+    return res.status(429).json({ error: 'Too many incorrect attempts. Please request a new OTP.' });
+  }
+
+  if (record.otp !== cleanOtp) {
+    const remaining = MAX_VERIFY_ATTEMPTS - record.attempts;
+    return res.status(400).json({
+      error: `Incorrect OTP. ${remaining > 0 ? `${remaining} attempt(s) remaining.` : 'Please request a new code.'}`
+    });
+  }
+
+  // OTP verified successfully - consume so it cannot be re-used
+  otpStore.delete(cleanPhone);
+
+  console.log(`[PHONE OTP SUCCESS] +91 ${cleanPhone} verified successfully.`);
+  return res.json({
+    success: true,
+    verified: true,
+    phone: cleanPhone,
+    verifiedAt: new Date().toISOString()
+  });
+});
+
 const imagekit = new ImageKit({
   publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "dummy_private_key",
