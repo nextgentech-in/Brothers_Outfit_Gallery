@@ -23,7 +23,8 @@
   to { opacity: 1; }
 }
 
-.phone-otp-card {
+.phone-otp-card,
+.phone-otp-modal {
   position: relative;
   background: #ffffff;
   width: 100%;
@@ -47,7 +48,8 @@
   }
 }
 
-.phone-otp-close {
+.phone-otp-close,
+.phone-otp-close-btn {
   position: absolute;
   top: 18px;
   right: 18px;
@@ -65,7 +67,8 @@
   transition: all 0.15s ease;
 }
 
-.phone-otp-close:hover {
+.phone-otp-close:hover,
+.phone-otp-close-btn:hover {
   background: #e2e8f0;
   color: #0f172a;
 }

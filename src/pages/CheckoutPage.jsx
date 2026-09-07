@@ -24,6 +24,8 @@ export default function CheckoutPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [phoneOtpModalOpen, setPhoneOtpModalOpen] = useState(false);
   const [verifiedPhone, setVerifiedPhone] = useState(null);
+  const [otpTriggerSource, setOtpTriggerSource] = useState('place_order'); // 'inline' | 'place_order'
+  const [phoneFeedback, setPhoneFeedback] = useState(null);
 
   const [couponInput, setCouponInput] = useState('');
   const [couponChecking, setCouponChecking] = useState(false);
@@ -166,6 +168,7 @@ export default function CheckoutPage() {
     setShippingAddress(prev => ({ ...prev, [name]: value }));
 
     if (name === 'phone') {
+      setPhoneFeedback(null);
       const digits = String(value).replace(/\D/g, '').slice(-10);
       if (verifiedPhone && digits !== verifiedPhone) {
         setVerifiedPhone(null);
@@ -184,6 +187,21 @@ export default function CheckoutPage() {
     } else if (name === 'city' && value.trim().length < 3) {
       setPlaceSuggestions([]);
     }
+  };
+
+  const handleVerifyPhoneInline = () => {
+    const cleanInputPhone = String(shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(cleanInputPhone)) {
+      setPhoneFeedback({
+        type: 'error',
+        message: 'Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).'
+      });
+      return;
+    }
+    setPhoneFeedback(null);
+    setError(null);
+    setOtpTriggerSource('inline');
+    setPhoneOtpModalOpen(true);
   };
 
   const handleSelectPlaceSuggestion = (suggestion) => {
@@ -219,6 +237,7 @@ export default function CheckoutPage() {
     // Check if phone number needs verification with OTP
     if (!isPhoneVerified) {
       setError(null);
+      setOtpTriggerSource('place_order');
       setPhoneOtpModalOpen(true);
       return;
     }
@@ -229,6 +248,10 @@ export default function CheckoutPage() {
   const handlePhoneVerified = async (confirmedPhone) => {
     setVerifiedPhone(confirmedPhone);
     setPhoneOtpModalOpen(false);
+    setPhoneFeedback({
+      type: 'success',
+      message: '✓ Mobile number verified successfully.'
+    });
 
     // Save verified phone to Firestore user profile in background
     if (currentUser && updateFirestoreProfile) {
@@ -239,8 +262,10 @@ export default function CheckoutPage() {
       }).catch(() => {});
     }
 
-    // Immediately execute order placement with verified phone
-    await executeOrderPlacement(confirmedPhone);
+    // If verification was triggered by "Place Order" button, continue immediately to checkout
+    if (otpTriggerSource === 'place_order') {
+      await executeOrderPlacement(confirmedPhone);
+    }
   };
 
   const executeOrderPlacement = async (activePhone = null) => {
@@ -499,7 +524,7 @@ export default function CheckoutPage() {
 
           <div className="checkout-form-row">
             <div className="checkout-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                 <span>Phone Number *</span>
                 {isPhoneVerified ? (
                   <span style={{
@@ -526,18 +551,81 @@ export default function CheckoutPage() {
                     borderRadius: '12px',
                     fontWeight: '600'
                   }}>
-                    OTP Verification Required
+                    Verification Required
                   </span>
                 )}
               </label>
-              <input
-                type="tel"
-                name="phone"
-                value={shippingAddress.phone}
-                onChange={handleInputChange}
-                required
-                placeholder="10-digit mobile number (e.g. 9876543210)"
-              />
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={shippingAddress.phone}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isPhoneVerified}
+                  placeholder="10-digit mobile number"
+                  style={{
+                    flex: 1,
+                    backgroundColor: isPhoneVerified ? '#f8fafc' : '#ffffff',
+                    borderColor: isPhoneVerified ? '#86efac' : undefined
+                  }}
+                />
+                {!isPhoneVerified ? (
+                  <button
+                    type="button"
+                    onClick={handleVerifyPhoneInline}
+                    style={{
+                      background: '#111827',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0 14px',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    Verify via OTP
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVerifiedPhone(null);
+                      setPhoneFeedback(null);
+                    }}
+                    style={{
+                      background: '#f1f5f9',
+                      color: '#334155',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '0 12px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+
+              {phoneFeedback && (
+                <div style={{
+                  fontSize: '0.78rem',
+                  marginTop: '4px',
+                  color: phoneFeedback.type === 'error' ? '#dc2626' : '#15803d',
+                  fontWeight: '600'
+                }}>
+                  {phoneFeedback.message}
+                </div>
+              )}
             </div>
             <div className="checkout-form-group">
               <label>Email *</label>
@@ -823,6 +911,8 @@ export default function CheckoutPage() {
         phone={shippingAddress.phone}
         onClose={() => setPhoneOtpModalOpen(false)}
         onSuccess={handlePhoneVerified}
+        title={otpTriggerSource === 'inline' ? "Verify Phone Number" : "Verify Phone to Complete Order"}
+        submitText={otpTriggerSource === 'inline' ? "VERIFY NUMBER" : (paymentMethod === 'razorpay' ? `VERIFY & PAY ₹${finalTotal.toLocaleString('en-IN')}` : 'VERIFY & PLACE ORDER')}
         onChangePhone={() => {
           setPhoneOtpModalOpen(false);
           const phoneInput = document.querySelector('input[name="phone"]');

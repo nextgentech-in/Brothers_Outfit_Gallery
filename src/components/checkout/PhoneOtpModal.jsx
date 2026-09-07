@@ -3,7 +3,16 @@ import { createPortal } from 'react-dom';
 import { sendPhoneOtp, verifyPhoneOtp } from '../../services/otpService';
 import './PhoneOtpModal.css';
 
-export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onChangePhone }) {
+export default function PhoneOtpModal({
+  isOpen,
+  phone,
+  onClose,
+  onSuccess,
+  onChangePhone,
+  title = "Verify Phone Number",
+  subtitle = null,
+  submitText = "VERIFY & PLACE ORDER"
+}) {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -81,7 +90,6 @@ export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onCha
   };
 
   const handleDigitChange = (index, value) => {
-    // Handle typing single digit
     const cleaned = value.replace(/\D/g, '');
     if (!cleaned) {
       const copy = [...digits];
@@ -90,20 +98,27 @@ export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onCha
       return;
     }
 
-    // If user pasted or typed multiple digits
+    // If multiple characters (e.g. autofill), distribute across inputs
     if (cleaned.length > 1) {
       handlePasteDigits(cleaned);
       return;
     }
 
     const copy = [...digits];
-    copy[index] = cleaned[0];
+    copy[index] = cleaned;
     setDigits(copy);
-    setError('');
 
-    // Auto-advance to next input box
-    if (index < 5 && cleaned[0]) {
+    // Focus next input if available
+    if (index < 5 && cleaned) {
       inputRefs.current[index + 1]?.focus();
+    }
+
+    // If last digit filled, auto submit
+    if (index === 5 && cleaned) {
+      const fullOtp = [...copy.slice(0, 5), cleaned].join('');
+      if (fullOtp.length === 6) {
+        handleVerifyOtp(fullOtp);
+      }
     }
   };
 
@@ -116,55 +131,49 @@ export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onCha
       inputRefs.current[index - 1]?.focus();
     } else if (e.key === 'ArrowRight' && index < 5) {
       inputRefs.current[index + 1]?.focus();
-    } else if (e.key === 'Enter') {
-      const fullOtp = digits.join('');
-      if (fullOtp.length === 6) {
-        handleVerifyOtp(fullOtp);
-      }
+    }
+  };
+
+  const handlePasteDigits = (pasteValue) => {
+    const raw = String(pasteValue).replace(/\D/g, '').slice(0, 6);
+    if (!raw) return;
+    const newDigits = ['', '', '', '', '', ''];
+    for (let i = 0; i < raw.length; i++) {
+      newDigits[i] = raw[i];
+    }
+    setDigits(newDigits);
+    const targetFocus = Math.min(raw.length, 5);
+    inputRefs.current[targetFocus]?.focus();
+
+    if (raw.length === 6) {
+      handleVerifyOtp(raw);
     }
   };
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (pasted) {
-      handlePasteDigits(pasted);
-    }
+    const pasted = e.clipboardData.getData('text');
+    handlePasteDigits(pasted);
   };
 
-  const handlePasteDigits = (numStr) => {
-    const arr = numStr.slice(0, 6).split('');
-    const newDigits = ['', '', '', '', '', ''];
-    arr.forEach((d, idx) => {
-      newDigits[idx] = d;
-    });
-    setDigits(newDigits);
-    setError('');
-
-    // Focus last filled or next empty
-    const nextIdx = Math.min(arr.length, 5);
-    inputRefs.current[nextIdx]?.focus();
-
-    if (arr.length === 6) {
-      handleVerifyOtp(arr.join(''));
-    }
-  };
-
-  const handleVerifyOtp = async (otpToVerify = null) => {
-    const code = otpToVerify || digits.join('');
-    if (code.length !== 6) {
-      return setError('Please enter the complete 6-digit verification code.');
+  const handleVerifyOtp = async (otpOverride = null) => {
+    const otpToSubmit = otpOverride || digits.join('');
+    if (otpToSubmit.length !== 6) {
+      setError('Please enter all 6 digits of the OTP.');
+      return;
     }
 
     try {
       setLoading(true);
       setError('');
-      const res = await verifyPhoneOtp(cleanPhone, code);
-      if (res?.verified) {
+      const res = await verifyPhoneOtp(cleanPhone, otpToSubmit);
+      if (res?.success || res?.verified) {
         onSuccess(cleanPhone);
+      } else {
+        setError(res.error || 'Verification failed. Please try again.');
       }
     } catch (err) {
-      setError(err.message || 'Incorrect OTP code. Please check and try again.');
+      setError(err.message || 'Incorrect or expired OTP.');
     } finally {
       setLoading(false);
     }
@@ -172,33 +181,36 @@ export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onCha
 
   if (!isOpen) return null;
 
-  const fullCode = digits.join('');
-  const isComplete = fullCode.length === 6;
+  const isComplete = digits.every(d => d !== '');
 
   return createPortal(
     <div className="phone-otp-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="phone-otp-card" onClick={(e) => e.stopPropagation()}>
+      <div className="phone-otp-modal" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          className="phone-otp-close"
+          className="phone-otp-close-btn"
           onClick={onClose}
-          aria-label="Close OTP verification"
+          aria-label="Close verification modal"
         >
           ✕
         </button>
 
         <div className="phone-otp-header">
           <div className="phone-otp-icon-wrap">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-              <line x1="12" y1="18" x2="12.01" y2="18" />
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="m9 12 2 2 4-4" />
             </svg>
           </div>
           <span className="phone-otp-badge">ORDER SECURITY VERIFICATION</span>
-          <h2 className="phone-otp-title">Verify Phone Number</h2>
+          <h2 className="phone-otp-title">{title}</h2>
           <p className="phone-otp-subtitle">
-            Enter the 6-digit code sent via SMS to{' '}
-            <strong className="phone-otp-number">{formattedPhone}</strong>
+            {subtitle || (
+              <>
+                Enter the 6-digit code sent via SMS to{' '}
+                <strong className="phone-otp-number">{formattedPhone}</strong>
+              </>
+            )}
           </p>
           {onChangePhone && (
             <button
@@ -214,13 +226,21 @@ export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onCha
         {/* Development / Sandbox Quick Auto-fill Hint */}
         {devOtpHint && (
           <div className="phone-otp-dev-hint">
-            <span>⚡ Test Sandbox OTP: <strong>{devOtpHint}</strong></span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#854d0e' }}>
+                ⚡ Test Mode (Add SMS key to .env for real SMS)
+              </span>
+              <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1e293b', letterSpacing: '1px' }}>
+                OTP: {devOtpHint}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => handlePasteDigits(devOtpHint)}
               className="phone-otp-autofill-btn"
+              style={{ marginTop: '6px', width: '100%' }}
             >
-              Auto Fill
+              Click to Auto-fill ({devOtpHint})
             </button>
           </div>
         )}
@@ -271,7 +291,7 @@ export default function PhoneOtpModal({ isOpen, phone, onClose, onSuccess, onCha
           onClick={() => handleVerifyOtp()}
           className="phone-otp-submit-btn"
         >
-          {loading ? 'VERIFYING...' : 'VERIFY & PLACE ORDER'}
+          {loading ? 'VERIFYING...' : submitText}
         </button>
 
         <p className="phone-otp-footer-note">

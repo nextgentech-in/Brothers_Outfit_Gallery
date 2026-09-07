@@ -283,10 +283,14 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   console.log(`[PHONE OTP DISPATCH] Number: +91 ${cleanPhone} | OTP Code: ${generatedOtp} (Valid 5 mins)`);
   console.log(`======================================================\n`);
 
-  // Hook for Fast2SMS or other SMS Gateway if configured
+  // Dispatch Real SMS via available provider
+  let realSmsSent = false;
+  let smsProviderUsed = null;
+
+  // 1. Fast2SMS (India Quick SMS / OTP)
   if (process.env.FAST2SMS_API_KEY) {
     try {
-      await fetch('https://www.fast2sms.com/dev/bulkV2', {
+      const fastRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
         method: 'POST',
         headers: {
           'authorization': process.env.FAST2SMS_API_KEY,
@@ -298,20 +302,84 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
           numbers: cleanPhone
         })
       });
-      console.log(`[SMS GATEWAY] Fast2SMS sent successfully to +91 ${cleanPhone}`);
+      const fastData = await fastRes.json().catch(() => ({}));
+      console.log(`[SMS GATEWAY] Fast2SMS status:`, fastData);
+      if (fastData?.return || fastData?.status_code === 200) {
+        realSmsSent = true;
+        smsProviderUsed = 'Fast2SMS';
+      }
     } catch (smsErr) {
-      console.warn(`[SMS GATEWAY] Fast2SMS send warning:`, smsErr.message);
+      console.warn(`[SMS GATEWAY] Fast2SMS error:`, smsErr.message);
     }
   }
 
-  // Return success response with devOtp in sandbox/dev mode for seamless verification
-  const isSandbox = !process.env.FAST2SMS_API_KEY;
+  // 2. 2Factor.in (India Transactional SMS / OTP)
+  if (!realSmsSent && process.env.TWOFACTOR_API_KEY) {
+    try {
+      const twoFactRes = await fetch(
+        `https://2factor.in/API/V1/${process.env.TWOFACTOR_API_KEY}/SMS/${cleanPhone}/${generatedOtp}/OTP1`
+      );
+      const twoFactData = await twoFactRes.json().catch(() => ({}));
+      console.log(`[SMS GATEWAY] 2Factor status:`, twoFactData);
+      if (twoFactData?.Status === 'Success') {
+        realSmsSent = true;
+        smsProviderUsed = '2Factor';
+      }
+    } catch (smsErr) {
+      console.warn(`[SMS GATEWAY] 2Factor error:`, smsErr.message);
+    }
+  }
+
+  // 3. Twilio SMS
+  if (!realSmsSent && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER) {
+    try {
+      const authHeader = 'Basic ' + Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
+      const params = new URLSearchParams();
+      params.append('To', `+91${cleanPhone}`);
+      params.append('From', process.env.TWILIO_PHONE_NUMBER);
+      params.append('Body', `Your Brothers Outfit verification OTP is ${generatedOtp}. Valid for 5 minutes.`);
+
+      const twilioRes = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        }
+      );
+      const twilioData = await twilioRes.json().catch(() => ({}));
+      console.log(`[SMS GATEWAY] Twilio status:`, twilioData);
+      if (twilioData?.sid) {
+        realSmsSent = true;
+        smsProviderUsed = 'Twilio';
+      }
+    } catch (smsErr) {
+      console.warn(`[SMS GATEWAY] Twilio error:`, smsErr.message);
+    }
+  }
+
+  const hasConfiguredGateway = Boolean(
+    process.env.FAST2SMS_API_KEY ||
+    process.env.TWOFACTOR_API_KEY ||
+    (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN)
+  );
+
   return res.json({
     success: true,
-    message: `OTP sent successfully to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}`,
+    message: realSmsSent
+      ? `OTP sent to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} via SMS.`
+      : hasConfiguredGateway
+        ? `OTP generated, but SMS gateway failed to dispatch. Check server logs.`
+        : `OTP generated (Test Mode: Add FAST2SMS_API_KEY or TWOFACTOR_API_KEY to .env to deliver real SMS).`,
     phone: cleanPhone,
     expiresIn: 300,
-    devOtp: isSandbox ? generatedOtp : undefined
+    realSmsSent,
+    smsProvider: smsProviderUsed,
+    hasGateway: hasConfiguredGateway,
+    devOtp: !hasConfiguredGateway ? generatedOtp : undefined
   });
 });
 
