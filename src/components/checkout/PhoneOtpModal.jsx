@@ -19,7 +19,6 @@ export default function PhoneOtpModal({
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
-  const [devOtpHint, setDevOtpHint] = useState(null);
 
   const inputRefs = useRef([]);
 
@@ -34,7 +33,6 @@ export default function PhoneOtpModal({
     if (isOpen && cleanPhone) {
       setDigits(['', '', '', '', '', '']);
       setError('');
-      setDevOtpHint(null);
       handleSendOtp();
     }
   }, [isOpen, cleanPhone]);
@@ -78,9 +76,6 @@ export default function PhoneOtpModal({
       setCanResend(false);
       setCountdown(30);
       const res = await sendPhoneOtp(cleanPhone);
-      if (res?.devOtp) {
-        setDevOtpHint(res.devOtp);
-      }
     } catch (err) {
       setError(err.message || 'Failed to send OTP to this number. Please check connection.');
       setCanResend(true);
@@ -222,28 +217,6 @@ export default function PhoneOtpModal({
             </button>
           )}
         </div>
-
-        {/* Development / Sandbox Quick Auto-fill Hint */}
-        {devOtpHint && (
-          <div className="phone-otp-dev-hint">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: '700', color: '#854d0e' }}>
-                ⚡ Test Mode (Add SMS key to .env for real SMS)
-              </span>
-              <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1e293b', letterSpacing: '1px' }}>
-                OTP: {devOtpHint}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handlePasteDigits(devOtpHint)}
-              className="phone-otp-autofill-btn"
-              style={{ marginTop: '6px', width: '100%' }}
-            >
-              Click to Auto-fill ({devOtpHint})
-            </button>
-          </div>
-        )}
 
         {error && <div className="phone-otp-error">{error}</div>}
 

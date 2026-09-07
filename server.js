@@ -367,19 +367,24 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
     (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN)
   );
 
+  if (!realSmsSent) {
+    if (!hasConfiguredGateway) {
+      return res.status(503).json({
+        error: 'SMS service is not configured yet. Please add FAST2SMS_API_KEY in .env to deliver real SMS to mobile numbers.'
+      });
+    }
+    return res.status(502).json({
+      error: 'Failed to deliver SMS via the configured gateway. Please verify your SMS provider balance/credentials.'
+    });
+  }
+
   return res.json({
     success: true,
-    message: realSmsSent
-      ? `OTP sent to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} via SMS.`
-      : hasConfiguredGateway
-        ? `OTP generated, but SMS gateway failed to dispatch. Check server logs.`
-        : `OTP generated (Test Mode: Add FAST2SMS_API_KEY or TWOFACTOR_API_KEY to .env to deliver real SMS).`,
+    message: `OTP sent successfully to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)} via SMS.`,
     phone: cleanPhone,
     expiresIn: 300,
-    realSmsSent,
-    smsProvider: smsProviderUsed,
-    hasGateway: hasConfiguredGateway,
-    devOtp: !hasConfiguredGateway ? generatedOtp : undefined
+    realSmsSent: true,
+    smsProvider: smsProviderUsed
   });
 });
 

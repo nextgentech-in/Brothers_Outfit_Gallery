@@ -81,11 +81,10 @@ export async function sendPhoneOtp(phone) {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to send OTP. Please check the phone number.');
-    }
-
-    if (firebaseErr.code === 'auth/operation-not-allowed') {
-      data.firebaseNotEnabled = true;
+      const msg = data.error || (firebaseErr?.code === 'auth/operation-not-allowed'
+        ? 'SMS could not be delivered: Add FAST2SMS_API_KEY to .env or enable India (+91) SMS Region Policy in Firebase.'
+        : 'Failed to deliver SMS. Please check your SMS provider configuration.');
+      throw new Error(msg);
     }
 
     confirmationResultStore = null;
