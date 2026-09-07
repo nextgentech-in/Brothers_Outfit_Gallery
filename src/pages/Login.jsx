@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './AuthPage.css';
@@ -9,8 +9,15 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+  const { currentUser, login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in (e.g. after Google redirect authentication)
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/');
+    }
+  }, [currentUser, navigate]);
 
   async function handleSubmit(e) {
     e.preventDefault();

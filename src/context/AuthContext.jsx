@@ -95,23 +95,7 @@ export function AuthProvider({ children }) {
   }
 
   async function loginWithGoogle() {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) {
-      return await signInWithRedirect(auth, googleProvider);
-    }
-    try {
-      return await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      if (
-        error.code === 'auth/popup-blocked' ||
-        error.code === 'auth/popup-closed-by-user' ||
-        error.code === 'auth/cancelled-popup-request'
-      ) {
-        console.warn("Popup blocked or closed, falling back to redirect:", error.code);
-        return await signInWithRedirect(auth, googleProvider);
-      }
-      throw error;
-    }
+    return await signInWithRedirect(auth, googleProvider);
   }
 
   // Create or update a profile document in Firestore natively
