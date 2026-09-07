@@ -95,12 +95,20 @@ export function AuthProvider({ children }) {
   }
 
   async function loginWithGoogle() {
-    const result = await signInWithPopup(auth, googleProvider);
-    if (result && result.user) {
-      setCurrentUser(result.user);
-      fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result && result.user) {
+        setCurrentUser(result.user);
+        fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
+      }
+      return result;
+    } catch (error) {
+      if (error.code === 'auth/popup-blocked') {
+        console.warn("Popup blocked by browser, falling back to redirect...");
+        return await signInWithRedirect(auth, googleProvider);
+      }
+      throw error;
     }
-    return result;
   }
 
   // Create or update a profile document in Firestore natively
