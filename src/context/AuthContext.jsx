@@ -95,7 +95,12 @@ export function AuthProvider({ children }) {
   }
 
   async function loginWithGoogle() {
-    return await signInWithRedirect(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    if (result && result.user) {
+      setCurrentUser(result.user);
+      fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
+    }
+    return result;
   }
 
   // Create or update a profile document in Firestore natively

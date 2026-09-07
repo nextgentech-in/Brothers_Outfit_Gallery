@@ -87,8 +87,15 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
   const countdown = useCountdown(offerActive ? product.offer_end_at : null);
 
   // Price display logic routing to new schema (mrp/salePrice) fallback legacy (compareAt/price)
+  const defaultFrontVariant = product.variants?.find(v => v.isDefaultPrice);
+  const defaultFrontPrice = (defaultFrontVariant?.price !== undefined && defaultFrontVariant?.price !== '' && !isNaN(Number(defaultFrontVariant?.price)))
+    ? Number(defaultFrontVariant.price)
+    : (defaultFrontVariant?.salePrice !== undefined && defaultFrontVariant?.salePrice !== '' && !isNaN(Number(defaultFrontVariant?.salePrice))
+        ? Number(defaultFrontVariant.salePrice)
+        : null);
+
   const baseMrp = product.mrp || product.compareAtPrice || 0;
-  const baseSale = product.salePrice || product.price || 0;
+  const baseSale = defaultFrontPrice !== null ? defaultFrontPrice : (product.salePrice || product.price || 0);
 
   // Selected size-wise price if applicable
   const matchedVariant = selectedSize && product.variants
@@ -112,7 +119,7 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
     e.stopPropagation();
     if (isOutOfStock) return;
     
-    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
+    const sizeToUse = selectedSize || defaultFrontVariant?.size || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     if (onAddToCart) {
       onAddToCart({
         ...product,
@@ -127,7 +134,7 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
   };
 
   const executeBuyNow = () => {
-    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
+    const sizeToUse = selectedSize || defaultFrontVariant?.size || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     buyNowDirect(product, sizeToUse, product.colors?.[0] || 'Default', 1, displayPrice);
     navigate('/checkout');
   };

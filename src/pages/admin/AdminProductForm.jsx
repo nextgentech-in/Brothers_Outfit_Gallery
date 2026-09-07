@@ -105,11 +105,25 @@ export default function AdminProductForm() {
     if (isEdit) {
       getAdminProductById(id).then(data => {
         if (data) {
+          let loadedVariants = (data.variants || []).map((v) => ({
+            ...v,
+            isDefaultPrice: v.isDefaultPrice !== undefined ? !!v.isDefaultPrice : false
+          }));
+
+          if (loadedVariants.length > 0 && !loadedVariants.some(v => v.isDefaultPrice)) {
+            const matchedIdx = loadedVariants.findIndex(v => Number(v.price) === Number(data.salePrice || data.price));
+            if (matchedIdx !== -1) {
+              loadedVariants[matchedIdx].isDefaultPrice = true;
+            } else {
+              loadedVariants[0].isDefaultPrice = true;
+            }
+          }
+
           setFormData({
             ...data,
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
-            variants: data.variants || [],
+            variants: loadedVariants,
             colors: data.colors || [],
           });
 
@@ -216,6 +230,9 @@ export default function AdminProductForm() {
           });
         }
       });
+      if (updatedVariants.length > 0 && !updatedVariants.some(v => v.isDefaultPrice)) {
+        updatedVariants[0].isDefaultPrice = true;
+      }
       return { ...prev, variants: updatedVariants };
     });
   };
@@ -251,6 +268,9 @@ export default function AdminProductForm() {
           }
         });
       });
+      if (updatedVariants.length > 0 && !updatedVariants.some(v => v.isDefaultPrice)) {
+        updatedVariants[0].isDefaultPrice = true;
+      }
       return { ...prev, variants: updatedVariants };
     });
   };
@@ -290,6 +310,26 @@ export default function AdminProductForm() {
     setCustomSizePrice('');
   };
 
+  const handleSetDefaultFrontPrice = (vId) => {
+    setFormData(prev => {
+      const selected = prev.variants.find(v => v.id === vId);
+      const updatedVariants = prev.variants.map(v => ({
+        ...v,
+        isDefaultPrice: v.id === vId
+      }));
+      const priceToSync = (selected?.price !== undefined && selected?.price !== '' && !isNaN(Number(selected?.price)))
+        ? Number(selected.price)
+        : prev.salePrice;
+
+      return {
+        ...prev,
+        variants: updatedVariants,
+        salePrice: priceToSync || prev.salePrice,
+        price: priceToSync || prev.price
+      };
+    });
+  };
+
   const updateVariantStock = (vId, stockVal) => {
     setFormData(prev => ({
       ...prev,
@@ -299,17 +339,36 @@ export default function AdminProductForm() {
 
   const updateVariantPrice = (vId, priceVal) => {
     const parsed = priceVal === '' ? '' : parseFloat(priceVal);
-    setFormData(prev => ({
-      ...prev,
-      variants: prev.variants.map(v => v.id === vId ? { ...v, price: parsed, salePrice: parsed } : v)
-    }));
+    setFormData(prev => {
+      const updatedVariants = prev.variants.map(v => v.id === vId ? { ...v, price: parsed, salePrice: parsed } : v);
+      const isDefault = prev.variants.find(v => v.id === vId)?.isDefaultPrice;
+      const updatedSalePrice = isDefault && parsed !== '' ? parsed : prev.salePrice;
+      return {
+        ...prev,
+        variants: updatedVariants,
+        salePrice: updatedSalePrice,
+        price: updatedSalePrice
+      };
+    });
   };
 
   const removeVariant = (vId) => {
-    setFormData(prev => ({
-      ...prev,
-      variants: prev.variants.filter(v => v.id !== vId)
-    }));
+    setFormData(prev => {
+      const remaining = prev.variants.filter(v => v.id !== vId);
+      if (remaining.length > 0 && !remaining.some(v => v.isDefaultPrice)) {
+        remaining[0].isDefaultPrice = true;
+      }
+      const activeDef = remaining.find(v => v.isDefaultPrice);
+      const newPrice = activeDef && activeDef.price !== '' && !isNaN(Number(activeDef.price))
+        ? Number(activeDef.price)
+        : prev.salePrice;
+      return {
+        ...prev,
+        variants: remaining,
+        salePrice: newPrice || prev.salePrice,
+        price: newPrice || prev.price
+      };
+    });
   };
 
   // -------------------------------------------------------------
@@ -530,27 +589,42 @@ export default function AdminProductForm() {
       const primaryImg = combinedImages.find(img => img.isPrimary) || combinedImages[0];
       const thumbnailUrl = primaryImg ? primaryImg.url : '';
 
-      const autoDiscount = Math.round(((mrp - sale) / mrp) * 100);
+      // Find default variant price selected by admin
+      const defaultVariant = formData.variants.find(v => v.isDefaultPrice);
+      const chosenDefaultSale = (defaultVariant && defaultVariant.price !== undefined && defaultVariant.price !== '' && !isNaN(Number(defaultVariant.price)))
+        ? parseFloat(defaultVariant.price)
+        : sale;
 
-      const normalizedVariants = formData.variants.map(v => {
+      const normalizedVariants = formData.variants.map((v, idx) => {
         const vPrice = (v.price !== undefined && v.price !== '' && !isNaN(Number(v.price)))
           ? parseFloat(v.price)
           : sale;
+        const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
           price: vPrice,
           salePrice: vPrice,
-          stock: parseInt(v.stock, 10) || 0
+          stock: parseInt(v.stock, 10) || 0,
+          isDefaultPrice: isDefault
         };
       });
+
+      if (normalizedVariants.length > 0 && !normalizedVariants.some(v => v.isDefaultPrice)) {
+        normalizedVariants[0].isDefaultPrice = true;
+      }
+
+      const finalFrontPrice = chosenDefaultSale || sale;
+      const autoDiscount = (mrp && finalFrontPrice && mrp > finalFrontPrice)
+        ? Math.round(((mrp - finalFrontPrice) / mrp) * 100)
+        : 0;
 
       const payload = {
         ...formData,
         mrp: mrp,
-        salePrice: sale,
-        price: sale,
+        salePrice: finalFrontPrice,
+        price: finalFrontPrice,
         compareAtPrice: mrp,
-        discountPercentage: autoDiscount,
+        discountPercentage: Math.max(0, autoDiscount),
         variants: normalizedVariants,
         stock: normalizedVariants.reduce((acc, v) => acc + (v.stock || 0), 0),
         sizes: [...new Set(normalizedVariants.map(v => v.size))].filter(Boolean),
@@ -1009,11 +1083,17 @@ export default function AdminProductForm() {
                   </div>
                 </div>
 
+                <div style={{ marginBottom: '8px', padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', fontSize: '12.5px', color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🔘</span>
+                  <span><strong>Display Price on Front:</strong> Select the radio button (✓ Front Price) below for the size/volume you want to display on the storefront product card.</span>
+                </div>
+
                 {/* Responsive Table Wrapper */}
                 <div className="admin-table-scroll-wrapper">
                   <table className="admin-variant-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
+                        <th style={{ width: '140px', textAlign: 'center' }}>FRONT PRICE (TICK)</th>
                         {formData.colors.length > 0 && <th>COLOR</th>}
                         <th>SIZE / VOLUME</th>
                         <th>SKU</th>
@@ -1025,7 +1105,35 @@ export default function AdminProductForm() {
                     </thead>
                     <tbody>
                       {formData.variants.map((v) => (
-                        <tr key={v.id}>
+                        <tr key={v.id} style={{ background: v.isDefaultPrice ? '#f0fdf4' : 'transparent', transition: 'background 0.2s ease' }}>
+                          <td style={{ textAlign: 'center' }}>
+                            <label
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                cursor: 'pointer',
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                border: v.isDefaultPrice ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+                                background: v.isDefaultPrice ? '#dcfce7' : '#ffffff',
+                                transition: 'all 0.15s ease',
+                                userSelect: 'none'
+                              }}
+                              title="Tick this size's price to display on front catalog cards"
+                            >
+                              <input
+                                type="radio"
+                                name="frontDefaultPrice"
+                                checked={!!v.isDefaultPrice}
+                                onChange={() => handleSetDefaultFrontPrice(v.id)}
+                                style={{ width: '15px', height: '15px', accentColor: '#16a34a', cursor: 'pointer' }}
+                              />
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: v.isDefaultPrice ? '#166534' : '#64748b' }}>
+                                {v.isDefaultPrice ? '✓ Front Price' : 'Display Front'}
+                              </span>
+                            </label>
+                          </td>
                           {formData.colors.length > 0 && (
                             <td><strong>{v.color}</strong></td>
                           )}

@@ -45,13 +45,23 @@ export default function ProductInfo({ product }) {
   const { currentUser } = useAuth() || {};
   const initialColor = product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black';
   const [selectedColor, setSelectedColor] = useState(initialColor);
-  const [selectedSize, setSelectedSize] = useState(null);
+  const defaultFrontVariant = useMemo(() => {
+    return product.variants?.find(v => v.isDefaultPrice) || null;
+  }, [product.variants]);
+
+  const [selectedSize, setSelectedSize] = useState(defaultFrontVariant?.size || null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
+
+  useEffect(() => {
+    if (defaultFrontVariant?.size && !selectedSize) {
+      setSelectedSize(defaultFrontVariant.size);
+    }
+  }, [defaultFrontVariant]);
 
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
@@ -64,15 +74,21 @@ export default function ProductInfo({ product }) {
   // Dynamic size-wise pricing matching selected size
   const matchedVariant = useMemo(() => {
     if (!product.variants || product.variants.length === 0) return null;
-    const targetSize = selectedSize || (productSizes.length > 0 ? productSizes[0] : null);
+    const targetSize = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : null);
     if (!targetSize) return null;
     return product.variants.find(v =>
       v.size === targetSize && (!v.color || v.color === selectedColor || v.color === 'Standard' || v.color === 'Default')
     ) || product.variants.find(v => v.size === targetSize);
-  }, [product.variants, selectedSize, selectedColor, productSizes]);
+  }, [product.variants, selectedSize, selectedColor, productSizes, defaultFrontVariant]);
+
+  const defaultFrontPrice = (defaultFrontVariant?.price !== undefined && defaultFrontVariant?.price !== '' && !isNaN(Number(defaultFrontVariant?.price)))
+    ? Number(defaultFrontVariant.price)
+    : (defaultFrontVariant?.salePrice !== undefined && defaultFrontVariant?.salePrice !== '' && !isNaN(Number(defaultFrontVariant?.salePrice))
+        ? Number(defaultFrontVariant.salePrice)
+        : null);
 
   const baseMrp = product.mrp || product.compareAtPrice || 0;
-  const baseSale = product.salePrice || product.price || 0;
+  const baseSale = defaultFrontPrice !== null ? defaultFrontPrice : (product.salePrice || product.price || 0);
 
   const activeSale = (matchedVariant?.price !== undefined && matchedVariant?.price !== '' && !isNaN(Number(matchedVariant?.price)))
     ? Number(matchedVariant.price)
@@ -114,14 +130,14 @@ export default function ProductInfo({ product }) {
       return alert('PLEASE SELECT A SIZE FOR THIS CLOTHING ITEM');
     }
 
-    const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
     addToCart(product, sizeToUse, selectedColor, quantity, activeSale);
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
   };
 
   const executeBuyNow = () => {
-    const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
     buyNowDirect(product, sizeToUse, selectedColor, quantity, activeSale);
     navigate('/checkout');
   };

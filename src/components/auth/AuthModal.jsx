@@ -111,7 +111,11 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
     try {
       setError('');
       setLoadingGoogle(true);
-      await loginWithGoogle();
+      const res = await loginWithGoogle();
+      if (res?.user) {
+        if (onSuccess) onSuccess(res.user);
+        onClose();
+      }
     } catch (err) {
       console.error('Google auth error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
@@ -125,6 +129,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
       } else {
         setError(`Google sign-in failed: ${err.message || 'Please try again.'}`);
       }
+    } finally {
       setLoadingGoogle(false);
     }
   };

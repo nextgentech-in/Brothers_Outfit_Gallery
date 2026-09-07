@@ -23,7 +23,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     e.stopPropagation();
     if (isOutOfStock) return;
     
-    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
+    const sizeToUse = selectedSize || defaultFrontVariant?.size || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     if (onAddToCart) {
       onAddToCart({
         ...product,
@@ -38,7 +38,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
   };
 
   const executeBuyNow = () => {
-    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
+    const sizeToUse = selectedSize || defaultFrontVariant?.size || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     buyNowDirect(product, sizeToUse, product.colors?.[0] || 'Default', 1, salePrice);
     navigate('/checkout');
   };
@@ -64,9 +64,16 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     }
   };
 
+  const defaultFrontVariant = product.variants?.find(v => v.isDefaultPrice);
+  const defaultFrontPrice = (defaultFrontVariant?.price !== undefined && defaultFrontVariant?.price !== '' && !isNaN(Number(defaultFrontVariant?.price)))
+    ? Number(defaultFrontVariant.price)
+    : (defaultFrontVariant?.salePrice !== undefined && defaultFrontVariant?.salePrice !== '' && !isNaN(Number(defaultFrontVariant?.salePrice))
+        ? Number(defaultFrontVariant.salePrice)
+        : null);
+
   // Pricing calculations
   const originalPrice = product.mrp || product.compareAtPrice || product.price || 0;
-  const baseForDiscount = product.mrp || product.compareAtPrice || product.salePrice || product.price || 0;
+  const baseForDiscount = defaultFrontPrice !== null ? defaultFrontPrice : (product.salePrice || product.price || product.mrp || 0);
   const salePrice = Math.round(baseForDiscount * (1 - (product.offer_discount_percentage || 0) / 100));
 
   return (
