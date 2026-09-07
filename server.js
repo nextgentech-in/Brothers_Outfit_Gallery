@@ -286,6 +286,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   // Dispatch Real SMS via available provider
   let realSmsSent = false;
   let smsProviderUsed = null;
+  let lastGatewayError = null;
 
   // 1. Fast2SMS (India Quick SMS / OTP)
   if (process.env.FAST2SMS_API_KEY) {
@@ -307,8 +308,12 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
       if (fastData?.return || fastData?.status_code === 200) {
         realSmsSent = true;
         smsProviderUsed = 'Fast2SMS';
+      } else {
+        lastGatewayError = fastData?.message || (Array.isArray(fastData?.message) ? fastData.message.join(', ') : 'Fast2SMS verification required');
+        console.warn(`[SMS GATEWAY] Fast2SMS failed:`, lastGatewayError);
       }
     } catch (smsErr) {
+      lastGatewayError = smsErr.message;
       console.warn(`[SMS GATEWAY] Fast2SMS error:`, smsErr.message);
     }
   }
@@ -324,8 +329,11 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
       if (twoFactData?.Status === 'Success') {
         realSmsSent = true;
         smsProviderUsed = '2Factor';
+      } else {
+        lastGatewayError = twoFactData?.Details || '2Factor dispatch failed';
       }
     } catch (smsErr) {
+      lastGatewayError = smsErr.message;
       console.warn(`[SMS GATEWAY] 2Factor error:`, smsErr.message);
     }
   }
@@ -355,8 +363,11 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
       if (twilioData?.sid) {
         realSmsSent = true;
         smsProviderUsed = 'Twilio';
+      } else {
+        lastGatewayError = twilioData?.message || 'Twilio dispatch failed';
       }
     } catch (smsErr) {
+      lastGatewayError = smsErr.message;
       console.warn(`[SMS GATEWAY] Twilio error:`, smsErr.message);
     }
   }
@@ -374,7 +385,9 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
       });
     }
     return res.status(502).json({
-      error: 'Failed to deliver SMS via the configured gateway. Please verify your SMS provider balance/credentials.'
+      error: lastGatewayError
+        ? `SMS Delivery Notice: ${lastGatewayError}`
+        : 'Failed to deliver SMS via the configured gateway. Please verify your SMS provider balance/credentials.'
     });
   }
 
