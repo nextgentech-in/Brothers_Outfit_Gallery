@@ -96,7 +96,8 @@ export function AuthProvider({ children }) {
 
   async function loginWithGoogle() {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
       if (result && result.user) {
         setCurrentUser(result.user);
         fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
@@ -105,7 +106,8 @@ export function AuthProvider({ children }) {
     } catch (error) {
       if (error.code === 'auth/popup-blocked') {
         console.warn("Popup blocked by browser, falling back to redirect...");
-        return await signInWithRedirect(auth, googleProvider);
+        const provider = new GoogleAuthProvider();
+        return await signInWithRedirect(auth, provider);
       }
       throw error;
     }
