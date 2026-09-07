@@ -7,18 +7,20 @@ import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/de
 import { createAdminOrderNotification } from '../services/notificationService';
 import { validateCoupon } from '../services/couponService';
 import { getBackendUrl } from '../utils/apiConfig';
+import AuthModal from '../components/auth/AuthModal';
 import './CheckoutPage.css';
 
 
 export default function CheckoutPage() {
   const { cartItems, cartSubtotal, clearCart, appliedCoupon, applyCoupon, removeCoupon } = useCart();
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, updateFirestoreProfile } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [delhiveryStatus, setDelhiveryStatus] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const [couponInput, setCouponInput] = useState('');
   const [couponChecking, setCouponChecking] = useState(false);
@@ -33,6 +35,21 @@ export default function CheckoutPage() {
     state: userProfile?.address?.state || '',
     pincode: userProfile?.address?.pincode || '',
   });
+
+  useEffect(() => {
+    if (userProfile) {
+      setShippingAddress(prev => ({
+        ...prev,
+        fullName: prev.fullName || userProfile.fullName || '',
+        phone: prev.phone || userProfile.phone || '',
+        email: prev.email || currentUser?.email || userProfile.email || '',
+        addressLine: prev.addressLine || userProfile.address?.line1 || '',
+        city: prev.city || userProfile.address?.city || '',
+        state: prev.state || userProfile.address?.state || '',
+        pincode: prev.pincode || userProfile.address?.pincode || '',
+      }));
+    }
+  }, [userProfile, currentUser]);
 
 
   const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
@@ -159,13 +176,18 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
       return setError('Please fill in all required shipping address fields.');
     }
 
     if (delhiveryStatus && !delhiveryStatus.serviceable) {
       return setError('Cannot place order: Please enter a valid and serviceable PIN code.');
+    }
+
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return;
     }
 
     setLoading(true);
@@ -200,6 +222,21 @@ export default function CheckoutPage() {
         };
 
         await createOrder(newOrderId, orderPayload);
+
+        // Save delivery info to user profile
+        if (currentUser && updateFirestoreProfile) {
+          updateFirestoreProfile(currentUser.uid, {
+            fullName: shippingAddress.fullName,
+            phone: shippingAddress.phone,
+            address: {
+              line1: shippingAddress.addressLine,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              pincode: shippingAddress.pincode
+            }
+          }).catch(() => {});
+        }
+
         try {
           localStorage.setItem('last_placed_order', newOrderId);
         } catch { }
@@ -312,6 +349,21 @@ export default function CheckoutPage() {
               };
 
               await createOrder(newOrderId, orderPayload);
+
+              // Save delivery info to user profile
+              if (currentUser && updateFirestoreProfile) {
+                updateFirestoreProfile(currentUser.uid, {
+                  fullName: shippingAddress.fullName,
+                  phone: shippingAddress.phone,
+                  address: {
+                    line1: shippingAddress.addressLine,
+                    city: shippingAddress.city,
+                    state: shippingAddress.state,
+                    pincode: shippingAddress.pincode
+                  }
+                }).catch(() => {});
+              }
+
               try {
                 localStorage.setItem('last_placed_order', newOrderId);
               } catch { }
@@ -667,6 +719,13 @@ export default function CheckoutPage() {
           </button>
         </div>
       </form>
+
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => handlePlaceOrder()}
+        message="Sign in or create an account to place your order."
+      />
     </div>
   );
 }

@@ -27,9 +27,42 @@ export const CartProvider = ({ children }) => {
     localStorage.setItem('brothers_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
-  const addToCart = (product, size, color, quantity = 1) => {
+  const resolveItemPrice = (product, safeSize, safeColor, explicitPrice = null) => {
+    if (explicitPrice !== null && explicitPrice !== undefined && !isNaN(Number(explicitPrice))) {
+      return Number(explicitPrice);
+    }
+    const matched = product.variants?.find(v =>
+      v.size === safeSize && (!v.color || v.color === safeColor || v.color === 'Standard' || v.color === 'Default')
+    ) || product.variants?.find(v => v.size === safeSize);
+
+    if (matched && matched.price !== undefined && matched.price !== '' && !isNaN(Number(matched.price))) {
+      return Number(matched.price);
+    }
+    if (matched && matched.salePrice !== undefined && matched.salePrice !== '' && !isNaN(Number(matched.salePrice))) {
+      return Number(matched.salePrice);
+    }
+
+    return product.offer_enabled && product.discountPercentage > 0 
+      ? (product.price || 0)
+      : (product.salePrice || product.price || 0);
+  };
+
+  const resolveItemStock = (product, safeSize, safeColor) => {
+    const matched = product.variants?.find(v =>
+      v.size === safeSize && (!v.color || v.color === safeColor || v.color === 'Standard' || v.color === 'Default')
+    ) || product.variants?.find(v => v.size === safeSize);
+
+    if (matched && matched.stock !== undefined && !isNaN(Number(matched.stock))) {
+      return Number(matched.stock);
+    }
+    return product.stock || 50;
+  };
+
+  const addToCart = (product, size, color, quantity = 1, explicitPrice = null) => {
     const safeColor = formatVariantValue(color, 'Standard');
     const safeSize = formatVariantValue(size, 'One Size');
+    const activePrice = resolveItemPrice(product, safeSize, safeColor, explicitPrice);
+    const itemStock = resolveItemStock(product, safeSize, safeColor);
 
     setCartItems(prev => {
       // Use composite key preventing duplicate variants tracking completely
@@ -40,14 +73,10 @@ export const CartProvider = ({ children }) => {
         // Increment quantity within stock limits natively
         return prev.map(item =>
           item.cartItemId === cartItemId
-            ? { ...item, quantity: Math.min(item.quantity + quantity, item.stock || 99) }
+            ? { ...item, quantity: Math.min(item.quantity + quantity, item.stock || 99), price: activePrice }
             : item
         );
       }
-
-      const activePrice = product.offer_enabled && product.discountPercentage > 0 
-        ? product.price 
-        : (product.salePrice || product.price || 0);
 
       return [...prev, {
         cartItemId,
@@ -58,20 +87,18 @@ export const CartProvider = ({ children }) => {
         size: safeSize,
         color: safeColor,
         price: activePrice,
-        stock: product.stock || 50,
+        stock: itemStock,
         quantity: Math.max(1, quantity)
       }];
     });
   };
 
   // Direct Buy Now: Replaces cart with ONLY this single product
-  const buyNowDirect = (product, size, color, quantity = 1) => {
+  const buyNowDirect = (product, size, color, quantity = 1, explicitPrice = null) => {
     const safeColor = formatVariantValue(color, 'Standard');
     const safeSize = formatVariantValue(size, 'One Size');
-
-    const activePrice = product.offer_enabled && product.discountPercentage > 0 
-      ? product.price 
-      : (product.salePrice || product.price || 0);
+    const activePrice = resolveItemPrice(product, safeSize, safeColor, explicitPrice);
+    const itemStock = resolveItemStock(product, safeSize, safeColor);
 
     const singleItem = {
       cartItemId: `${product.id}-${safeSize}-${safeColor}`,
@@ -82,7 +109,7 @@ export const CartProvider = ({ children }) => {
       size: safeSize,
       color: safeColor,
       price: activePrice,
-      stock: product.stock || 50,
+      stock: itemStock,
       quantity: Math.max(1, quantity)
     };
 

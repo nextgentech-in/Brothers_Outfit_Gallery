@@ -105,7 +105,7 @@ const SIZE_CHARTS = {
 };
 
 export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', onSelectSize }) {
-  // Determine initial tab based on product category
+  // Determine tab strictly based on product category
   const detectCategoryTab = (cat) => {
     const c = (cat || '').toLowerCase();
     if (c.includes('perfume') || c.includes('fragrance')) return 'perfumes';
@@ -116,9 +116,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
     return 'shirts';
   };
 
-  const [userSelectedTab, setUserSelectedTab] = useState(null);
-  const activeTab = userSelectedTab || detectCategoryTab(category);
-  const setActiveTab = (tab) => setUserSelectedTab(tab);
+  const activeTab = detectCategoryTab(category);
 
   const [unit, setUnit] = useState('in'); // 'in' or 'cm'
   const [measurementInput, setMeasurementInput] = useState('');
@@ -210,52 +208,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
           </div>
           <button className="size-guide-close-btn" onClick={onClose} aria-label="Close size guide">
             ✕
-          </button>
-        </div>
-
-        {/* Category Tabs */}
-        <div className="size-guide-tabs">
-          <button 
-            type="button"
-            className={`size-tab ${activeTab === 'shirts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('shirts')}
-          >
-            👕 Shirts / T-Shirts
-          </button>
-          <button 
-            type="button"
-            className={`size-tab ${activeTab === 'jeans' ? 'active' : ''}`}
-            onClick={() => setActiveTab('jeans')}
-          >
-            👖 Jeans / Pants
-          </button>
-          <button 
-            type="button"
-            className={`size-tab ${activeTab === 'jackets' ? 'active' : ''}`}
-            onClick={() => setActiveTab('jackets')}
-          >
-            🧥 Jackets / Hoodies
-          </button>
-          <button 
-            type="button"
-            className={`size-tab ${activeTab === 'footwear' ? 'active' : ''}`}
-            onClick={() => setActiveTab('footwear')}
-          >
-            🩴 Footwear
-          </button>
-          <button 
-            type="button"
-            className={`size-tab ${activeTab === 'perfumes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('perfumes')}
-          >
-            🧴 Perfume Volumes
-          </button>
-          <button 
-            type="button"
-            className={`size-tab ${activeTab === 'accessories' ? 'active' : ''}`}
-            onClick={() => setActiveTab('accessories')}
-          >
-            🧣 Belts & More
           </button>
         </div>
 

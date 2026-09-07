@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import AuthModal from './auth/AuthModal';
 import './ProductCard.css';
 
 
@@ -70,8 +72,10 @@ function useCountdown(endDateStr) {
 
 export default function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
   const navigate = useNavigate();
+  const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
   const [selectedSize, setSelectedSize] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const isOutOfStock = product.stock === 0;
   const lowStock = product.stock > 0 && product.stock <= 5;
   
@@ -86,8 +90,15 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
   const baseMrp = product.mrp || product.compareAtPrice || 0;
   const baseSale = product.salePrice || product.price || 0;
 
-  const displayPrice = offerActive ? offerPrice : baseSale;
-  const displayCompare = offerActive ? baseMrp : (baseMrp > baseSale ? baseMrp : null);
+  // Selected size-wise price if applicable
+  const matchedVariant = selectedSize && product.variants
+    ? product.variants.find(v => v.size === selectedSize)
+    : null;
+  const variantSale = matchedVariant?.price || matchedVariant?.salePrice;
+  const activeProductSale = variantSale ? Number(variantSale) : baseSale;
+
+  const displayPrice = offerActive ? offerPrice : activeProductSale;
+  const displayCompare = offerActive ? baseMrp : (baseMrp > displayPrice ? baseMrp : null);
   
   const displayDiscount = offerActive
     ? product.offer_discount_percentage
@@ -109,10 +120,16 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
         finalPrice: displayPrice,
       });
     } else {
-      contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default');
+      contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default', 1, displayPrice);
     }
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 1500);
+  };
+
+  const executeBuyNow = () => {
+    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
+    buyNowDirect(product, sizeToUse, product.colors?.[0] || 'Default', 1, displayPrice);
+    navigate('/checkout');
   };
 
   const handleBuyNow = (e) => {
@@ -120,9 +137,13 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
     e.stopPropagation();
     if (isOutOfStock) return;
     
-    const sizeToUse = selectedSize || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
-    buyNowDirect(product, sizeToUse, product.colors?.[0] || 'Default');
-    navigate('/checkout');
+    // If not logged in, trigger account creation / login modal first
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return;
+    }
+
+    executeBuyNow();
   };
 
   // Multiple photos support
@@ -337,6 +358,13 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
           )}
         </div>
       </div>
+
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={executeBuyNow}
+        message="Sign in or create an account to complete your purchase."
+      />
     </div>
   );
 }

@@ -86,11 +86,14 @@ export default function AdminProductForm() {
   const [newColorHex, setNewColorHex] = useState('#000000');
   const [selectedVariantColor, setSelectedVariantColor] = useState('');
 
-  // Customizable Sizes & Bulk Stock States
+  // Customizable Sizes, Bulk Stock & Size-Wise Price States
   const [initialStockInput, setInitialStockInput] = useState(10);
+  const [initialPriceInput, setInitialPriceInput] = useState('');
   const [customSizeName, setCustomSizeName] = useState('');
   const [customSizeStock, setCustomSizeStock] = useState(10);
+  const [customSizePrice, setCustomSizePrice] = useState('');
   const [bulkStockToApply, setBulkStockToApply] = useState(10);
+  const [bulkPriceToApply, setBulkPriceToApply] = useState('');
   const [applyToAllColors, setApplyToAllColors] = useState(false);
 
   // Image Upload States
@@ -179,30 +182,37 @@ export default function AdminProductForm() {
     return [selectedVariantColor || formData.colors[0]?.name || 'Standard'];
   };
 
-  // Add single size with custom initial stock
-  const handleAddSizeWithStock = (size, stock = 10) => {
+  // Add single size with custom initial stock and optional price
+  const handleAddSizeWithStock = (size, stock = 10, price = null) => {
     if (!size || !String(size).trim()) return;
     const cleanSize = String(size).trim();
     const colorsToTarget = getTargetColors();
 
     setFormData(prev => {
+      const defaultPrice = (price !== null && price !== '' && !isNaN(Number(price)))
+        ? parseFloat(price)
+        : (prev.salePrice ? parseFloat(prev.salePrice) : '');
+
       const updatedVariants = [...prev.variants];
       colorsToTarget.forEach(colName => {
         const existingIdx = updatedVariants.findIndex(v => v.color === colName && v.size === cleanSize);
         if (existingIdx >= 0) {
-          // If already exists, update its stock
+          // If already exists, update its stock (and price if provided)
           updatedVariants[existingIdx] = {
             ...updatedVariants[existingIdx],
-            stock: parseInt(stock, 10) || 0
+            stock: parseInt(stock, 10) || 0,
+            ...(defaultPrice !== '' ? { price: defaultPrice, salePrice: defaultPrice } : {})
           };
         } else {
-          // Add new variant
+          // Add new variant with size-wise price
           updatedVariants.push({
             id: `${colName}-${cleanSize}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             color: colName,
             size: cleanSize,
             sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${cleanSize.replace(/[^a-zA-Z0-9]/g, '')}`,
-            stock: parseInt(stock, 10) || 0
+            stock: parseInt(stock, 10) || 0,
+            price: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || ''),
+            salePrice: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || '')
           });
         }
       });
@@ -210,10 +220,14 @@ export default function AdminProductForm() {
     });
   };
 
-  // 1-Click Batch Add multiple sizes with preset stock
-  const handleBatchAddSizes = (sizesList, batchStock = 10) => {
+  // 1-Click Batch Add multiple sizes with preset stock and optional price
+  const handleBatchAddSizes = (sizesList, batchStock = 10, batchPrice = null) => {
     const colorsToTarget = getTargetColors();
     setFormData(prev => {
+      const defaultPrice = (batchPrice !== null && batchPrice !== '' && !isNaN(Number(batchPrice)))
+        ? parseFloat(batchPrice)
+        : (prev.salePrice ? parseFloat(prev.salePrice) : '');
+
       const updatedVariants = [...prev.variants];
       colorsToTarget.forEach(colName => {
         sizesList.forEach(sz => {
@@ -221,7 +235,8 @@ export default function AdminProductForm() {
           if (existingIdx >= 0) {
             updatedVariants[existingIdx] = {
               ...updatedVariants[existingIdx],
-              stock: parseInt(batchStock, 10) || 0
+              stock: parseInt(batchStock, 10) || 0,
+              ...(defaultPrice !== '' ? { price: defaultPrice, salePrice: defaultPrice } : {})
             };
           } else {
             updatedVariants.push({
@@ -229,7 +244,9 @@ export default function AdminProductForm() {
               color: colName,
               size: sz,
               sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${sz.replace(/[^a-zA-Z0-9]/g, '')}`,
-              stock: parseInt(batchStock, 10) || 0
+              stock: parseInt(batchStock, 10) || 0,
+              price: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || ''),
+              salePrice: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || '')
             });
           }
         });
@@ -247,6 +264,20 @@ export default function AdminProductForm() {
     }));
   };
 
+  // Bulk set price for ALL existing variants simultaneously
+  const handleApplyBulkPrice = () => {
+    if (bulkPriceToApply === '' || isNaN(Number(bulkPriceToApply))) {
+      alert('Please enter a valid price amount');
+      return;
+    }
+    const priceNum = parseFloat(bulkPriceToApply);
+    if (priceNum < 0) return;
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.map(v => ({ ...v, price: priceNum, salePrice: priceNum }))
+    }));
+  };
+
   // Handle adding user's custom-typed size (e.g. 250ml or 44 Slim)
   const handleAddCustomSize = (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
@@ -254,14 +285,23 @@ export default function AdminProductForm() {
       alert('Please enter a size or volume name (e.g. 250ml, 3XL, or Combo Pack)');
       return;
     }
-    handleAddSizeWithStock(customSizeName.trim(), customSizeStock);
+    handleAddSizeWithStock(customSizeName.trim(), customSizeStock, customSizePrice);
     setCustomSizeName('');
+    setCustomSizePrice('');
   };
 
   const updateVariantStock = (vId, stockVal) => {
     setFormData(prev => ({
       ...prev,
       variants: prev.variants.map(v => v.id === vId ? { ...v, stock: parseInt(stockVal, 10) || 0 } : v)
+    }));
+  };
+
+  const updateVariantPrice = (vId, priceVal) => {
+    const parsed = priceVal === '' ? '' : parseFloat(priceVal);
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.map(v => v.id === vId ? { ...v, price: parsed, salePrice: parsed } : v)
     }));
   };
 
@@ -492,6 +532,18 @@ export default function AdminProductForm() {
 
       const autoDiscount = Math.round(((mrp - sale) / mrp) * 100);
 
+      const normalizedVariants = formData.variants.map(v => {
+        const vPrice = (v.price !== undefined && v.price !== '' && !isNaN(Number(v.price)))
+          ? parseFloat(v.price)
+          : sale;
+        return {
+          ...v,
+          price: vPrice,
+          salePrice: vPrice,
+          stock: parseInt(v.stock, 10) || 0
+        };
+      });
+
       const payload = {
         ...formData,
         mrp: mrp,
@@ -499,8 +551,9 @@ export default function AdminProductForm() {
         price: sale,
         compareAtPrice: mrp,
         discountPercentage: autoDiscount,
-        stock: formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0),
-        sizes: [...new Set(formData.variants.map(v => v.size))].filter(Boolean),
+        variants: normalizedVariants,
+        stock: normalizedVariants.reduce((acc, v) => acc + (v.stock || 0), 0),
+        sizes: [...new Set(normalizedVariants.map(v => v.size))].filter(Boolean),
         images: combinedImages,
         thumbnailUrl: thumbnailUrl,
         image: thumbnailUrl, // Legacy fallback
@@ -797,18 +850,27 @@ export default function AdminProductForm() {
                         Popular for {activeCat}: ({batchPresets.join(', ')})
                       </span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#44403c' }}>Stock each:</span>
                       <input 
                         type="number" 
                         min="0" 
                         value={initialStockInput} 
                         onChange={(e) => setInitialStockInput(parseInt(e.target.value, 10) || 0)}
-                        style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                        style={{ width: '65px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                      />
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#44403c' }}>Price (₹):</span>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        placeholder={formData.salePrice || 'Sale Price'}
+                        value={initialPriceInput} 
+                        onChange={(e) => setInitialPriceInput(e.target.value)}
+                        style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
                       />
                       <button 
                         type="button" 
-                        onClick={() => handleBatchAddSizes(batchPresets, initialStockInput)}
+                        onClick={() => handleBatchAddSizes(batchPresets, initialStockInput, initialPriceInput)}
                         className="admin-btn-secondary"
                         style={{ padding: '7px 14px', fontSize: '12.5px', fontWeight: 700, background: '#0f172a', color: '#fff', cursor: 'pointer' }}
                       >
@@ -838,7 +900,7 @@ export default function AdminProductForm() {
                         <button
                           key={sz}
                           type="button"
-                          onClick={() => handleAddSizeWithStock(sz, initialStockInput)}
+                          onClick={() => handleAddSizeWithStock(sz, initialStockInput, initialPriceInput)}
                           style={{
                             padding: '6px 14px',
                             borderRadius: '20px',
@@ -868,7 +930,7 @@ export default function AdminProductForm() {
                       placeholder={isPerfume ? "e.g. 250ml or 100ml Tester" : "e.g. 44 Slim or Custom Fit or XXL"}
                       value={customSizeName}
                       onChange={(e) => setCustomSizeName(e.target.value)}
-                      style={{ flex: '1', minWidth: '180px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#fff' }}
+                      style={{ flex: '1', minWidth: '160px', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#fff' }}
                     />
                     <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>Stock:</span>
                     <input
@@ -876,7 +938,16 @@ export default function AdminProductForm() {
                       min="0"
                       value={customSizeStock}
                       onChange={(e) => setCustomSizeStock(parseInt(e.target.value, 10) || 0)}
-                      style={{ width: '70px', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                      style={{ width: '65px', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>Price (₹):</span>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder={formData.salePrice || "Price"}
+                      value={customSizePrice}
+                      onChange={(e) => setCustomSizePrice(e.target.value)}
+                      style={{ width: '80px', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
                     />
                     <button
                       type="submit"
@@ -890,29 +961,50 @@ export default function AdminProductForm() {
               );
             })()}
 
-            {/* Step 3: Variants Table with Multiple Stocks and Bulk Updater */}
+            {/* Step 3: Variants Table with Size-Wise Price & Stock Managers */}
             {formData.variants.length > 0 ? (
               <div style={{ marginTop: '24px' }}>
-                {/* Bulk Set All Stocks Bar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                    ⚡ Multiple Stock Manager:
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '12.5px', color: '#475569' }}>Set stock for ALL sizes to:</span>
+                {/* Bulk Stock & Price Manager Bar */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', padding: '14px 18px', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '16px' }}>
+                  {/* Bulk Stock */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a' }}>📦 Set ALL Stocks to:</span>
                     <input
                       type="number"
                       min="0"
                       value={bulkStockToApply}
                       onChange={(e) => setBulkStockToApply(parseInt(e.target.value, 10) || 0)}
-                      style={{ width: '70px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                      style={{ width: '65px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
                     />
                     <button
                       type="button"
                       onClick={handleApplyBulkStock}
-                      style={{ padding: '6px 14px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ padding: '6px 12px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                     >
-                      ⚡ Apply to All ({formData.variants.length}) Sizes
+                      Apply Stock
+                    </button>
+                  </div>
+
+                  {/* Bulk Price */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#0f172a' }}>💰 Set ALL Prices to:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#64748b' }}>₹</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder={formData.salePrice || 'Price'}
+                        value={bulkPriceToApply}
+                        onChange={(e) => setBulkPriceToApply(e.target.value)}
+                        style={{ width: '80px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'center', background: '#fff' }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleApplyBulkPrice}
+                      style={{ padding: '6px 12px', background: '#166534', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Apply Price
                     </button>
                   </div>
                 </div>
@@ -925,6 +1017,7 @@ export default function AdminProductForm() {
                         {formData.colors.length > 0 && <th>COLOR</th>}
                         <th>SIZE / VOLUME</th>
                         <th>SKU</th>
+                        <th>PRICE (₹)</th>
                         <th>STOCK QUANTITY (LIVE)</th>
                         <th>STATUS</th>
                         <th>ACTIONS</th>
@@ -943,13 +1036,26 @@ export default function AdminProductForm() {
                           </td>
                           <td style={{ fontSize: '12px', color: '#64748b' }}>{v.sku}</td>
                           <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder={formData.salePrice || "Price"}
+                                value={v.price !== undefined ? v.price : (formData.salePrice || '')}
+                                onChange={(e) => updateVariantPrice(v.id, e.target.value)}
+                                style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
+                              />
+                            </div>
+                          </td>
+                          <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <input
                                 type="number"
                                 min="0"
                                 value={v.stock}
                                 onChange={(e) => updateVariantStock(v.id, e.target.value)}
-                                style={{ width: '85px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
+                                style={{ width: '75px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
                               />
                               <span style={{ fontSize: '12px', color: '#64748b' }}>units</span>
                             </div>

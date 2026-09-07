@@ -70,8 +70,6 @@ export default function Footer() {
               <li><Link to="/about">Contact Us</Link></li>
               <li><Link to="/about">FAQ</Link></li>
               <li><Link to="/profile?tab=orders">Track Order</Link></li>
-              <li><Link to="/about">Returns & Exchanges</Link></li>
-
             </ul>
           </div>
 

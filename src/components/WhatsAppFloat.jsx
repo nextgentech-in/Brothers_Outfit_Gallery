@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './WhatsAppFloat.css';
 
 const WA_NUMBER = '918460233020';
@@ -7,6 +7,13 @@ const WA_MESSAGE = "Hi Brothers Outfit Gallery! I'd like styling and sizing assi
 export default function WhatsAppFloat() {
   const [showPrompt, setShowPrompt] = useState(true);
   const waUrl = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_MESSAGE)}`;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowPrompt(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="whatsapp-float-container">

@@ -17,7 +17,7 @@ export default function Login() {
       setError('');
       setLoading(true);
       await login(email, password);
-      navigate('/profile');
+      navigate('/');
     } catch (err) {
       setError('Incorrect email or password.');
       setLoading(false);
@@ -29,7 +29,7 @@ export default function Login() {
       setError('');
       setLoading(true);
       await loginWithGoogle();
-      navigate('/profile');
+      navigate('/');
     } catch (err) {
       console.error("Google signin error:", err);
       if (err.code === 'auth/popup-closed-by-user') {

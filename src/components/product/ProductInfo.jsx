@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct } from '../../utils/productUtils';
 import SizeGuideModal from '../common/SizeGuideModal';
+import AuthModal from '../auth/AuthModal';
 import './ProductInfo.css';
 
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
@@ -40,10 +42,12 @@ function MiniCountdown({ targetDate }) {
 
 export default function ProductInfo({ product }) {
   const navigate = useNavigate();
+  const { currentUser } = useAuth() || {};
   const initialColor = product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black';
   const [selectedColor, setSelectedColor] = useState(initialColor);
   const [selectedSize, setSelectedSize] = useState(null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [deliveryPincode, setDeliveryPincode] = useState('');
@@ -52,26 +56,46 @@ export default function ProductInfo({ product }) {
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
 
-  // Guard against missing properties gracefully reading legacy vs new admin schema
-  const activeMrp = product.mrp || product.compareAtPrice || 0;
-  const activeSale = product.salePrice || product.price || 0;
-  
-  // Calculate distinct UI variables
-  const currentDiscount = activeMrp > activeSale ? Math.round(((activeMrp - activeSale) / activeMrp) * 100) : 0;
-  const hasDiscount = currentDiscount > 0;
-  
   // Read variants if present, else fallback
   const productColors = product.colors?.length > 0 ? product.colors.map(c => c.name || c) : [];
   const productSizes = product.variants?.length > 0 ? [...new Set(product.variants.map(v => v.size))] : (product.sizes || []);
   const productTotalStock = product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10)||0), 0) : (product.stock || 0);
 
+  // Dynamic size-wise pricing matching selected size
+  const matchedVariant = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return null;
+    const targetSize = selectedSize || (productSizes.length > 0 ? productSizes[0] : null);
+    if (!targetSize) return null;
+    return product.variants.find(v =>
+      v.size === targetSize && (!v.color || v.color === selectedColor || v.color === 'Standard' || v.color === 'Default')
+    ) || product.variants.find(v => v.size === targetSize);
+  }, [product.variants, selectedSize, selectedColor, productSizes]);
+
+  const baseMrp = product.mrp || product.compareAtPrice || 0;
+  const baseSale = product.salePrice || product.price || 0;
+
+  const activeSale = (matchedVariant?.price !== undefined && matchedVariant?.price !== '' && !isNaN(Number(matchedVariant?.price)))
+    ? Number(matchedVariant.price)
+    : ((matchedVariant?.salePrice !== undefined && matchedVariant?.salePrice !== '' && !isNaN(Number(matchedVariant?.salePrice)))
+      ? Number(matchedVariant.salePrice)
+      : baseSale);
+
+  const activeMrp = (matchedVariant?.mrp !== undefined && matchedVariant?.mrp !== '' && !isNaN(Number(matchedVariant?.mrp)))
+    ? Number(matchedVariant.mrp)
+    : (activeSale > baseMrp ? Math.round(activeSale * 1.25) : baseMrp);
+
+  // Calculate distinct UI variables
+  const currentDiscount = (activeMrp > activeSale && activeMrp > 0) ? Math.round(((activeMrp - activeSale) / activeMrp) * 100) : 0;
+  const hasDiscount = currentDiscount > 0;
+
   const {
     name, rating = 4.8, offer_enabled, offer_end_at, description, shortDescription
   } = product;
 
-  // Validation
-  const outOfStock = productTotalStock === 0;
-  const stock = productTotalStock;
+  // Stock status for selected size or whole product
+  const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : productTotalStock;
+  const outOfStock = productSizes.length > 0 && selectedSize ? activeVariantStock === 0 : productTotalStock === 0;
+  const stock = selectedSize && matchedVariant ? activeVariantStock : productTotalStock;
   
   const { addToCart, buyNowDirect } = useCart();
 
@@ -91,9 +115,15 @@ export default function ProductInfo({ product }) {
     }
 
     const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
-    addToCart(product, sizeToUse, selectedColor, quantity);
+    addToCart(product, sizeToUse, selectedColor, quantity, activeSale);
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
+  };
+
+  const executeBuyNow = () => {
+    const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    buyNowDirect(product, sizeToUse, selectedColor, quantity, activeSale);
+    navigate('/checkout');
   };
 
   const handleBuyNow = () => {
@@ -101,9 +131,17 @@ export default function ProductInfo({ product }) {
       return alert('PLEASE SELECT A SIZE FOR THIS CLOTHING ITEM');
     }
 
-    const sizeToUse = selectedSize || (productSizes.length > 0 ? productSizes[0] : 'One Size');
-    buyNowDirect(product, sizeToUse, selectedColor, quantity);
-    navigate('/checkout');
+    // If user does not have an account / is not logged in, pop up AuthModal first!
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return;
+    }
+
+    executeBuyNow();
+  };
+
+  const onAuthSuccess = () => {
+    executeBuyNow();
   };
 
 
@@ -356,6 +394,14 @@ export default function ProductInfo({ product }) {
         onClose={() => setSizeGuideOpen(false)}
         category={product.categoryId || product.category || 'Shirts'}
         onSelectSize={(size) => setSelectedSize(size)}
+      />
+
+      {/* Account Login / Signup Modal on Buy Now */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={onAuthSuccess}
+        message="Sign in or create an account to proceed with your order."
       />
     </div>
   );

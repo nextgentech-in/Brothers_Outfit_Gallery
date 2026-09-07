@@ -239,7 +239,7 @@ export default function AboutPage() {
         <div className="about-container">
           <div className="text-center" style={{ marginBottom: '32px' }}>
             <span className="section-eyebrow">MAP & LOCATION</span>
-            <h2 className="section-title">FIND BROTHERS OUTFIT GALLERY</h2>
+            <h2 className="section-title">OUR STORE LOCATION</h2>
             <p className="section-subtitle">Conveniently located with easy parking and direct highway access.</p>
           </div>
           
@@ -250,9 +250,9 @@ export default function AboutPage() {
                 <span>STORE OPEN FOR SHOPPING</span>
               </div>
 
-              <h3>MEN'S CLOTHING STORE NEAR YOU</h3>
+              <h3>BROTHERS OUTFIT GALLERY</h3>
               <p>
-                Experience the latest collections in person. Our staff is ready to help you find the perfect size, match coordinates, and elevate your wardrobe.
+                Experience our full collections in person at our flagship destination. Our team is ready to help you find the perfect size, match coordinates, and elevate your wardrobe.
               </p>
               
               <div className="location-contact-list">
@@ -318,7 +318,7 @@ export default function AboutPage() {
                 <div className="map-pin-pulse-icon">📍</div>
                 <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
-                  <p>FF 57, Pratham Square, Sahakari Jin Rd, Himatnagar, Gujarat 383001</p>
+                  <p>Pratham Square, Sahakari Jin Road, Himatnagar, Gujarat 383001</p>
                   <span className="map-click-prompt">Click to open directions in Google Maps ↗</span>
                 </div>
               </div>
