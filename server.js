@@ -43,6 +43,7 @@ app.use((req, res, next) => {
 
 // 3. Strict CORS Whitelist
 const ALLOWED_ORIGINS = [
+  'https://brothers-outfit-gallery.vercel.app',
   'https://gallery.vercel.app',
   'https://brothersoutfit.com',
   'http://localhost:5173',
