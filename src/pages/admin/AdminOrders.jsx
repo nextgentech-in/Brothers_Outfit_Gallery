@@ -3,6 +3,18 @@ import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../se
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import './AdminOrders.css';
 
+const ADMIN_CANCEL_REASONS = [
+  'Out of stock',
+  'Customer request',
+  'Payment issue / Failed verification',
+  'Incorrect order details',
+  'Delivery not serviceable to this area',
+  'Duplicate order',
+  'Pricing error',
+  'Fraudulent / Suspicious order',
+  'Other'
+];
+
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,6 +24,11 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeTracking, setActiveTracking] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Cancellation reason modal state
+  const [cancelModal, setCancelModal] = useState({ open: false, order: null });
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelCustomReason, setCancelCustomReason] = useState('');
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -87,25 +104,49 @@ export default function AdminOrders() {
     }
   };
 
-  const handleCancelOrder = async (order) => {
-    const confirmCancel = window.confirm(`Are you sure you want to cancel Order #${order.id}? This will also cancel the delivery pickup if scheduled.`);
-    if (!confirmCancel) return;
+  const openCancelModal = (order) => {
+    setCancelModal({ open: true, order });
+    setCancelReason('');
+    setCancelCustomReason('');
+  };
+
+  const closeCancelModal = () => {
+    setCancelModal({ open: false, order: null });
+    setCancelReason('');
+    setCancelCustomReason('');
+  };
+
+  const handleConfirmCancel = async () => {
+    const order = cancelModal.order;
+    if (!order) return;
+
+    const finalReason = cancelReason === 'Other'
+      ? (cancelCustomReason.trim() || 'Other (no details provided)')
+      : cancelReason;
+
+    if (!finalReason) {
+      alert('Please select a cancellation reason.');
+      return;
+    }
 
     setActionLoadingId(order.id);
+    closeCancelModal();
+
     try {
       if (order.waybill) {
-        await cancelDelhiveryShipment(order.waybill, 'Cancelled by Admin');
+        await cancelDelhiveryShipment(order.waybill, finalReason);
       }
 
       await updateOrderStatus(order.id, 'Cancelled', {
-        cancellationReason: 'Cancelled by Store Admin',
+        cancellationReason: finalReason,
+        cancelledBy: 'Admin',
         cancelledAt: new Date()
       });
 
-      alert(`Order #${order.id} has been cancelled successfully.`);
+      alert(`Order #${order.id} has been cancelled.\nReason: ${finalReason}`);
       fetchOrders();
       if (selectedOrder && selectedOrder.id === order.id) {
-        setSelectedOrder(prev => ({ ...prev, status: 'Cancelled' }));
+        setSelectedOrder(prev => ({ ...prev, status: 'Cancelled', cancellationReason: finalReason }));
       }
     } catch (err) {
       alert(`Failed to cancel order: ${err.message}`);
@@ -223,7 +264,7 @@ export default function AdminOrders() {
                     {/* Option 1: Cancel Order */}
                     {o.status !== 'Cancelled' ? (
                       <button
-                        onClick={() => handleCancelOrder(o)}
+                        onClick={() => openCancelModal(o)}
                         disabled={actionLoadingId === o.id}
                         className="btn-cancel-admin"
                         style={{
@@ -244,7 +285,14 @@ export default function AdminOrders() {
                         {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel Order'}
                       </button>
                     ) : (
-                      <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700' }}>❌ Cancelled</span>
+                      <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700' }}>
+                        <div>❌ Cancelled</div>
+                        {o.cancellationReason && (
+                          <div style={{ fontSize: '10px', color: '#b91c1c', fontWeight: '600', marginTop: '2px', fontStyle: 'italic' }}>
+                            Reason: {o.cancellationReason}
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Option 2: Approve for Pickup */}
@@ -453,9 +501,16 @@ export default function AdminOrders() {
               {/* Action Buttons Footer */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
                 <div>
+                  {selectedOrder.status === 'Cancelled' && selectedOrder.cancellationReason && (
+                    <div style={{ padding: '8px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cancellation Reason</div>
+                      <div style={{ fontSize: '13px', color: '#dc2626', fontWeight: '600', marginTop: '2px' }}>{selectedOrder.cancellationReason}</div>
+                      {selectedOrder.cancelledBy && <div style={{ fontSize: '10px', color: '#9b1c1c', marginTop: '2px' }}>Cancelled by: {selectedOrder.cancelledBy}</div>}
+                    </div>
+                  )}
                   {selectedOrder.status !== 'Cancelled' && (
                     <button
-                      onClick={() => handleCancelOrder(selectedOrder)}
+                      onClick={() => openCancelModal(selectedOrder)}
                       disabled={actionLoadingId === selectedOrder.id}
                       style={{ padding: '8px 16px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
                     >
@@ -528,6 +583,54 @@ export default function AdminOrders() {
                 >
                   Open Official Delhivery Portal ↗
                 </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Cancel Reason Modal */}
+      {cancelModal.open && (
+        <div className="tracking-modal-overlay" onClick={closeCancelModal}>
+          <div className="cancel-reason-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ background: '#b91c1c' }}>
+              <h3>✕ Cancel Order #{cancelModal.order?.id}</h3>
+              <button className="close-btn" onClick={closeCancelModal}>✕</button>
+            </div>
+            <div className="cancel-reason-body">
+              <p className="cancel-reason-desc">Select a reason for cancelling this order. This reason will be visible to the customer.</p>
+              <div className="cancel-reason-options">
+                {ADMIN_CANCEL_REASONS.map(reason => (
+                  <label key={reason} className={`cancel-reason-option ${cancelReason === reason ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="cancelReason"
+                      value={reason}
+                      checked={cancelReason === reason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
+                    <span>{reason}</span>
+                  </label>
+                ))}
+              </div>
+              {cancelReason === 'Other' && (
+                <textarea
+                  className="cancel-reason-textarea"
+                  placeholder="Type your specific reason here..."
+                  value={cancelCustomReason}
+                  onChange={(e) => setCancelCustomReason(e.target.value)}
+                  rows={3}
+                />
+              )}
+              <div className="cancel-reason-actions">
+                <button className="cancel-reason-btn-secondary" onClick={closeCancelModal}>Go Back</button>
+                <button
+                  className="cancel-reason-btn-danger"
+                  onClick={handleConfirmCancel}
+                  disabled={!cancelReason || (cancelReason === 'Other' && !cancelCustomReason.trim())}
+                >
+                  Confirm Cancellation
+                </button>
               </div>
             </div>
           </div>

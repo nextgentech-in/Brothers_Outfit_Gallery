@@ -6,7 +6,23 @@ import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Accessories'];
+const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+
+const SUB_CATEGORIES = {
+  'T-Shirts': ['All', 'Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley'],
+  'Shirts': ['All', 'Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
+  'Jeans': ['All', 'Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
+  'Trousers': ['All', 'Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
+  'Jackets': ['All', 'Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
+  'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
+  'Ethnic Wear': ['All', 'Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
+  'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
+  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar'],
+  'Accessories': ['All', 'Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
+  'Watches': ['All', 'Analog', 'Digital', 'Smart Watch', 'Chronograph'],
+  'Wallets': ['All', 'Bifold', 'Trifold', 'Card Holder', 'Money Clip'],
+  'Belts': ['All', 'Leather', 'Canvas', 'Reversible', 'Auto-Lock'],
+};
 const PRICE_RANGES = [
   { label: 'All Prices', min: 0, max: Infinity },
   { label: 'Under ₹500', min: 0, max: 499 },
@@ -43,7 +59,15 @@ export default function ShopPage() {
   const { addToCart } = useCart();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [subCategory, setSubCategory] = useState('All');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const mounted = useRef(false);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Fetch from Firestore
   const fetchProducts = async (isLoadMore = false) => {
@@ -130,13 +154,18 @@ export default function ShopPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, sortBy]); 
 
+  // Reset sub-category when category changes
+  useEffect(() => {
+    setSubCategory('All');
+  }, [category]);
+
   // Client-side filtering for search, price ranges, sizes, colors
   const filtered = useMemo(() => {
     let result = [...products];
 
-    // Search
-    if (search.trim()) {
-      const q = search.toLowerCase().trim();
+    // Search (debounced)
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
       result = result.filter(p =>
         (p.name && p.name.toLowerCase().includes(q)) ||
         (p.category && p.category.toLowerCase().includes(q)) ||
@@ -169,8 +198,16 @@ export default function ShopPage() {
       });
     }
 
+    // Sub-Category Filter
+    if (subCategory && subCategory !== 'All') {
+      result = result.filter(p => {
+        const pSub = (p.subCategory || '').toLowerCase();
+        return pSub === subCategory.toLowerCase();
+      });
+    }
+
     return result;
-  }, [products, search, priceRange, selectedSizes, selectedColors]);
+  }, [products, debouncedSearch, priceRange, selectedSizes, selectedColors, subCategory]);
 
   const clearFilters = () => {
     setSearch('');
@@ -179,6 +216,7 @@ export default function ShopPage() {
     if (setSelectedSizes) setSelectedSizes([]);
     if (setSelectedColors) setSelectedColors([]);
     setSortBy('featured');
+    setSubCategory('All');
   };
 
   const hasActiveFilters = Boolean(
@@ -187,7 +225,8 @@ export default function ShopPage() {
     priceRange !== 0 ||
     (selectedSizes && selectedSizes.length > 0) ||
     (selectedColors && selectedColors.length > 0) ||
-    sortBy !== 'featured'
+    sortBy !== 'featured' ||
+    (subCategory && subCategory !== 'All')
   );
 
   const handleAddToCart = (productData) => {
@@ -286,6 +325,24 @@ export default function ShopPage() {
             ))}
           </div>
         </div>
+
+        {/* Sub-Category (shown when a category with sub-types is selected) */}
+        {category !== 'All' && SUB_CATEGORIES[category] && (
+          <div className="shop-filters__group">
+            <h4 className="shop-filters__heading">Type / Fit</h4>
+            <div className="shop-filters__options">
+              {SUB_CATEGORIES[category].map(sub => (
+                <button
+                  key={sub}
+                  className={`shop-filters__chip ${subCategory === sub ? 'shop-filters__chip--active' : ''}`}
+                  onClick={() => setSubCategory(sub)}
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Price */}
         <div className="shop-filters__group">

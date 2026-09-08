@@ -226,7 +226,7 @@
   }
   
   .admin-main {
-    padding: 16px 12px;
+    padding: 16px 10px;
     width: 100%;
     max-width: 100vw;
     box-sizing: border-box;
@@ -237,11 +237,100 @@
   .admin-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 12px;
+    margin-bottom: 20px;
   }
 
   .admin-title {
-    font-size: 24px;
+    font-size: 20px;
+  }
+
+  /* Force all admin tables to be scrollable */
+  .admin-table-container,
+  .admin-table-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: 100%;
+    display: block;
+  }
+
+  .admin-table-container .admin-table,
+  .admin-table-scroll-wrapper .admin-table {
+    min-width: 750px;
+  }
+
+  /* Admin form grid stack on mobile */
+  .admin-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-form-sidebar {
+    order: -1;
+  }
+
+  .admin-form-header-bar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .admin-header-actions-bar {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .admin-header-actions-bar button,
+  .admin-header-actions-bar label {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .admin-form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Admin variant table responsive */
+  .admin-variant-table {
+    min-width: 700px;
+  }
+
+  /* Buttons and controls */
+  .admin-btn-primary,
+  .admin-btn-secondary {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  /* Inline header notification */
+  .admin-inline-header {
+    margin-bottom: 12px;
+  }
+
+  .admin-notif-dropdown {
+    right: -10px;
+    width: 290px;
+  }
+
+  /* Admin form section padding */
+  .admin-form-section {
+    padding: 16px !important;
+  }
+
+  /* Admin products grid */
+  .admin-products-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Admin stats / dashboard cards */
+  .admin-stats-grid,
+  .admin-dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
   }
 }
 
@@ -441,3 +530,221 @@
   margin-left: 10px;
 }
 
+/* ═══════ Shared Admin Form Styling ═══════ */
+.admin-form-group {
+  margin-bottom: 18px;
+}
+
+.admin-form-group label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
+.admin-form-group input,
+.admin-form-group select,
+.admin-form-group textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #0f172a;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.admin-form-group input:focus,
+.admin-form-group select:focus,
+.admin-form-group textarea:focus {
+  outline: none;
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.06);
+}
+
+.admin-form-group input:hover:not(:focus),
+.admin-form-group select:hover:not(:focus),
+.admin-form-group textarea:hover:not(:focus) {
+  border-color: #cbd5e1;
+}
+
+.admin-form-group input[disabled],
+.admin-form-group select[disabled] {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.admin-helper-text {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* Admin Form Section Cards */
+.admin-form-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.admin-form-section h3,
+.admin-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid #f1f5f9;
+  letter-spacing: 0.3px;
+}
+
+/* Admin Buttons */
+.admin-btn-primary {
+  padding: 10px 24px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-btn-primary:hover {
+  background: #1e293b;
+}
+
+.admin-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-btn-secondary {
+  padding: 10px 24px;
+  background: #f8fafc;
+  color: #334155;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.admin-btn-danger {
+  padding: 10px 24px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-btn-danger:hover {
+  background: #fecaca;
+}
+
+/* Admin Card */
+.admin-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s;
+}
+
+.admin-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Admin Grid */
+.admin-form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.admin-form-row > .admin-form-group {
+  flex: 1;
+}
+
+/* Admin Status Pills */
+.admin-status-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.admin-status-pill.active {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.admin-status-pill.inactive {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+
+.admin-status-pill.pending {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+/* Admin Empty State */
+.admin-empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  color: #94a3b8;
+}
+
+.admin-empty-state h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.admin-empty-state p {
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+/* Admin Table Scroll Wrapper */
+.admin-table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}

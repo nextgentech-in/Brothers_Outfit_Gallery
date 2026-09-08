@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
@@ -70,7 +70,7 @@ function useCountdown(endDateStr) {
   return remaining;
 }
 
-export default function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
+function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -376,3 +376,4 @@ export default function ProductCard({ product, onAddToCart, showNewBadge = false
   );
 }
 
+export default memo(ProductCard);

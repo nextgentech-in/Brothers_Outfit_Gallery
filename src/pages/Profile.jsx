@@ -4,6 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
 import './Profile.css';
 
+const CUSTOMER_CANCEL_REASONS = [
+  'Changed my mind',
+  'Found better price elsewhere',
+  'Ordered by mistake',
+  'Delivery too slow',
+  'Want to change size/color',
+  'Financial reasons',
+  'Other'
+];
+
 export default function Profile() {
   const { currentUser, userProfile, logout, updateFirestoreProfile } = useAuth();
   const navigate = useNavigate();
@@ -65,14 +75,37 @@ export default function Profile() {
   }, [loadUserOrders]);
 
   const [cancellingId, setCancellingId] = useState(null);
+  const [cancelModal, setCancelModal] = useState({ open: false, order: null });
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelCustomReason, setCancelCustomReason] = useState('');
 
-  const handleCancelOrder = async (order) => {
-    const confirmCancel = window.confirm(`Are you sure you want to cancel Order #${order.id}?`);
-    if (!confirmCancel) return;
+  const openCancelModal = (order) => {
+    setCancelModal({ open: true, order });
+    setCancelReason('');
+    setCancelCustomReason('');
+  };
+
+  const closeCancelModal = () => {
+    setCancelModal({ open: false, order: null });
+    setCancelReason('');
+    setCancelCustomReason('');
+  };
+
+  const handleConfirmCancel = async () => {
+    const order = cancelModal.order;
+    if (!order) return;
+
+    const finalReason = cancelReason === 'Other'
+      ? (cancelCustomReason.trim() || 'Other')
+      : cancelReason;
+
+    if (!finalReason) return;
 
     setCancellingId(order.id);
+    closeCancelModal();
+
     try {
-      await cancelUserOrder(order.id, 'Cancelled by customer', order.waybill);
+      await cancelUserOrder(order.id, finalReason, order.waybill);
       alert('Your order has been cancelled successfully.');
       loadUserOrders();
     } catch (err) {
@@ -309,7 +342,7 @@ export default function Profile() {
 
                             {isProcessing && (
                               <button
-                                onClick={() => handleCancelOrder(order)}
+                                onClick={() => openCancelModal(order)}
                                 disabled={cancellingId === order.id}
                                 className="btn-order-cancel"
                               >
@@ -318,9 +351,19 @@ export default function Profile() {
                             )}
 
                             {isCancelled && (
-                              <span className="order-cancelled-tag">
-                                Order Cancelled {order.cancellationReason ? `(${order.cancellationReason})` : ''}
-                              </span>
+                              <div className="order-cancelled-tag">
+                                <div>Order Cancelled</div>
+                                {order.cancellationReason && (
+                                  <div className="order-cancel-reason-text">
+                                    Reason: {order.cancellationReason}
+                                  </div>
+                                )}
+                                {order.cancelledBy && (
+                                  <div className="order-cancel-by-text">
+                                    By: {order.cancelledBy === 'Admin' ? 'Store' : 'You'}
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -345,65 +388,84 @@ export default function Profile() {
 
               {isEditing ? (
                 <form onSubmit={handleSave} className="profile-form">
-                  <h3 className="section-title">PERSONAL INFORMATION</h3>
-                  <div className="form-group">
-                    <label>Email (Cannot be changed)</label>
-                    <input type="email" className="form-input" value={userProfile.email} readOnly style={{ background: '#f5f5f5' }} />
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Full Name</label>
-                      <input type="text" name="fullName" className="form-input" value={formData.fullName} onChange={handleChange} required />
+                  <div className="profile-form-card">
+                    <div className="profile-form-card-header">
+                      <span className="profile-form-icon">👤</span>
+                      <div>
+                        <h3 className="profile-form-title">PERSONAL INFORMATION</h3>
+                        <p className="profile-form-subtitle">Update your identity and contact details</p>
+                      </div>
                     </div>
+
                     <div className="form-group">
-                      <label>Mobile Number</label>
-                      <input type="tel" name="phone" className="form-input" value={formData.phone} onChange={handleChange} required />
+                      <label>Email Address</label>
+                      <input type="email" className="form-input" value={userProfile.email} readOnly style={{ background: '#f8fafc' }} />
+                      <span className="form-field-hint">Account email cannot be modified</span>
                     </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Date of Birth (Birthdate)</label>
-                      <input 
-                        type="date" 
-                        name="birthdate" 
-                        className="form-input" 
-                        value={formData.birthdate} 
-                        max={new Date().toISOString().split('T')[0]}
-                        onChange={handleChange} 
-                      />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Full Name</label>
+                        <input type="text" name="fullName" className="form-input" value={formData.fullName} onChange={handleChange} required placeholder="Enter your full name" />
+                      </div>
+                      <div className="form-group">
+                        <label>Mobile Number</label>
+                        <input type="tel" name="phone" className="form-input" value={formData.phone} onChange={handleChange} required placeholder="10-digit mobile number" />
+                      </div>
                     </div>
-                    <div className="form-group">
-                      <label>Age</label>
-                      <input 
-                        type="number" 
-                        name="age" 
-                        className="form-input" 
-                        value={formData.age} 
-                        onChange={handleChange} 
-                        min="1" 
-                        max="120"
-                        placeholder="Auto-calculated from DOB"
-                      />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Date of Birth (Birthdate)</label>
+                        <input 
+                          type="date" 
+                          name="birthdate" 
+                          className="form-input" 
+                          value={formData.birthdate} 
+                          max={new Date().toISOString().split('T')[0]}
+                          onChange={handleChange} 
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Age</label>
+                        <input 
+                          type="number" 
+                          name="age" 
+                          className="form-input" 
+                          value={formData.age} 
+                          onChange={handleChange} 
+                          min="1" 
+                          max="120"
+                          placeholder="Auto-calculated from DOB"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <h3 className="section-title" style={{ marginTop: '32px' }}>DELIVERY ADDRESS</h3>
-                  <div className="form-group">
-                    <label>Address Line 1</label>
-                    <input type="text" name="addressLine" className="form-input" value={formData.addressLine} onChange={handleChange} required />
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>City</label>
-                      <input type="text" name="city" className="form-input" value={formData.city} onChange={handleChange} required />
+                  <div className="profile-form-card" style={{ marginTop: '24px' }}>
+                    <div className="profile-form-card-header">
+                      <span className="profile-form-icon">📍</span>
+                      <div>
+                        <h3 className="profile-form-title">DELIVERY ADDRESS</h3>
+                        <p className="profile-form-subtitle">Default address used for shipping your orders</p>
+                      </div>
                     </div>
+
                     <div className="form-group">
-                      <label>State</label>
-                      <input type="text" name="state" className="form-input" value={formData.state} onChange={handleChange} required />
+                      <label>Address Line 1 (House/Flat, Street)</label>
+                      <input type="text" name="addressLine" className="form-input" value={formData.addressLine} onChange={handleChange} required placeholder="Street address, apartment, suite" />
                     </div>
-                    <div className="form-group">
-                      <label>Pincode</label>
-                      <input type="text" name="pincode" className="form-input" value={formData.pincode} onChange={handleChange} required />
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>City</label>
+                        <input type="text" name="city" className="form-input" value={formData.city} onChange={handleChange} required placeholder="e.g. Himatnagar" />
+                      </div>
+                      <div className="form-group">
+                        <label>State</label>
+                        <input type="text" name="state" className="form-input" value={formData.state} onChange={handleChange} required placeholder="e.g. Gujarat" />
+                      </div>
+                      <div className="form-group">
+                        <label>Pincode</label>
+                        <input type="text" name="pincode" className="form-input" value={formData.pincode} onChange={handleChange} required placeholder="6-digit pincode" />
+                      </div>
                     </div>
                   </div>
 
@@ -456,6 +518,54 @@ export default function Profile() {
           )}
         </div>
       </div>
+
+      {/* Customer Cancel Reason Modal */}
+      {cancelModal.open && (
+        <div className="cancel-overlay" onClick={closeCancelModal}>
+          <div className="cancel-modal" onClick={e => e.stopPropagation()}>
+            <div className="cancel-modal-header">
+              <h3>Cancel Order #{cancelModal.order?.id}</h3>
+              <button className="cancel-modal-close" onClick={closeCancelModal}>✕</button>
+            </div>
+            <div className="cancel-modal-body">
+              <p className="cancel-modal-desc">Please tell us why you'd like to cancel this order:</p>
+              <div className="cancel-modal-options">
+                {CUSTOMER_CANCEL_REASONS.map(reason => (
+                  <label key={reason} className={`cancel-modal-option ${cancelReason === reason ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="customerCancelReason"
+                      value={reason}
+                      checked={cancelReason === reason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
+                    <span>{reason}</span>
+                  </label>
+                ))}
+              </div>
+              {cancelReason === 'Other' && (
+                <textarea
+                  className="cancel-modal-textarea"
+                  placeholder="Please describe your reason..."
+                  value={cancelCustomReason}
+                  onChange={(e) => setCancelCustomReason(e.target.value)}
+                  rows={3}
+                />
+              )}
+              <div className="cancel-modal-actions">
+                <button className="cancel-modal-btn-ghost" onClick={closeCancelModal}>Keep Order</button>
+                <button
+                  className="cancel-modal-btn-danger"
+                  onClick={handleConfirmCancel}
+                  disabled={!cancelReason || (cancelReason === 'Other' && !cancelCustomReason.trim())}
+                >
+                  Confirm Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

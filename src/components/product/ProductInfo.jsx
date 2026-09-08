@@ -183,6 +183,20 @@ export default function ProductInfo({ product }) {
     <div className="product-info-wrapper">
       <h1 className="product-title">{name}</h1>
       
+      {/* Sub-Category & GSL Badges */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+        {product.subCategory && (
+          <span style={{ fontSize: '11px', fontWeight: '700', background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '20px', border: '1px solid #e2e8f0', letterSpacing: '0.3px' }}>
+            {product.subCategory}
+          </span>
+        )}
+        {product.gsl && (
+          <span style={{ fontSize: '11px', fontWeight: '700', background: '#fef3c7', color: '#92400e', padding: '3px 10px', borderRadius: '20px', border: '1px solid #fde68a', letterSpacing: '0.3px' }}>
+            GSL: {product.gsl}
+          </span>
+        )}
+      </div>
+
       <div className="product-rating" onClick={() => window.location.hash = 'reviews'}>
         <span className="stars">
           ★★★★★
@@ -388,6 +402,8 @@ export default function ProductInfo({ product }) {
           <summary>PRODUCT DETAILS</summary>
           <div className="accordion-content">
             <ul style={{ margin: 0, paddingLeft: '20px' }}>
+              {product.gsl && <li><strong>GSL:</strong> {product.gsl}</li>}
+              {product.subCategory && <li><strong>Type:</strong> {product.subCategory}</li>}
               <li>Fabric: 100% Premium Material</li>
               <li>Fit: Modern Classic</li>
               <li>Pattern: Solid</li>

@@ -14,18 +14,34 @@ const CATEGORY_SIZES_MAP = {
   'Hoodies': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
   'Ethnic Wear': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
   'Perfumes': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
-  'Slippers': ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11', 'UK 12'],
+  'Slippers': ['6', '7', '8', '9', '10', '11', 'Custom'],
   'Accessories': ['One Size', 'Free Size', 'Regular', 'Adjustable', 'Standard'],
   'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
   'Watches': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
   'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
 };
 
+const SUB_CATEGORY_MAP = {
+  'T-Shirts': ['Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley'],
+  'Shirts': ['Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
+  'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
+  'Trousers': ['Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
+  'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
+  'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
+  'Ethnic Wear': ['Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
+  'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
+  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Deodorant', 'Gift Set'],
+  'Accessories': ['Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
+  'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
+  'Watches': ['Analog', 'Digital', 'Smart Watch', 'Chronograph', 'Dress Watch'],
+  'Belts': ['Leather', 'Canvas', 'Reversible', 'Auto-Lock', 'Braided'],
+};
+
 const COMMON_BATCH_SIZES = {
   'Perfumes': ['30ml', '50ml', '100ml'],
   'Jeans': ['30', '32', '34', '36', '38'],
   'Trousers': ['30', '32', '34', '36', '38'],
-  'Slippers': ['UK 7', 'UK 8', 'UK 9', 'UK 10'],
+  'Slippers': ['7', '8', '9', '10', '11'],
   'Accessories': ['One Size', 'Free Size'],
   'Wallets': ['Standard', 'Slim'],
   'Watches': ['Standard', 'Dial 40mm'],
@@ -79,6 +95,8 @@ export default function AdminProductForm() {
     offerEndAt: '',
     active: true,
     isTrending: false,
+    subCategory: '',
+    gsl: '',
   });
 
   // Ephemeral States
@@ -122,6 +140,8 @@ export default function AdminProductForm() {
 
           setFormData({
             ...data,
+            subCategory: data.subCategory || '',
+            gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
             variants: loadedVariants,
@@ -742,7 +762,32 @@ export default function AdminProductForm() {
                   <option value="Belts">Belts</option>
                 </select>
               </div>
+              {/* Sub-Category */}
+              {SUB_CATEGORY_MAP[formData.categoryId] && (
+                <div className="admin-form-group">
+                  <label>Sub-Category / Fit Type</label>
+                  <select name="subCategory" value={formData.subCategory || ''} onChange={handleChange}>
+                    <option value="">— Select Sub-Category —</option>
+                    {SUB_CATEGORY_MAP[formData.categoryId].map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+            {/* GSL Field for Shirts and T-Shirts */}
+            {(formData.categoryId === 'T-Shirts' || formData.categoryId === 'Shirts') && (
+              <div className="admin-form-group">
+                <label>GSL (Garment Spec Label — GSM / Fabric Weight / Quality)</label>
+                <input
+                  type="text"
+                  name="gsl"
+                  value={formData.gsl || ''}
+                  onChange={handleChange}
+                  placeholder="e.g. 180 GSM Cotton, Premium 220 GSM, Bio-Washed 240 GSM"
+                />
+              </div>
+            )}
             <div className="admin-form-group">
               <label>Short Description</label>
               <textarea name="shortDescription" value={formData.shortDescription} onChange={handleChange} rows="2"></textarea>
