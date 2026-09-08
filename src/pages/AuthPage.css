@@ -141,7 +141,7 @@
 }
 
 .btn-auth-primary:hover:not(:disabled) {
-  background: #c0392b;
+  background: var(--color-primary-hover, #262626);
 }
 
 .btn-auth-primary:disabled {
