@@ -269,6 +269,13 @@ export default function CheckoutPage() {
   };
 
   const executeOrderPlacement = async (activePhone = null) => {
+    if (!currentUser) {
+      setError('Please sign in to your Brothers Outfit account to complete checkout.');
+      setAuthModalOpen(true);
+      setLoading(false);
+      return;
+    }
+
     const finalPhone = activePhone || shippingAddress.phone;
     setLoading(true);
     setError(null);
@@ -279,9 +286,9 @@ export default function CheckoutPage() {
       // Cash on Delivery
       try {
         const newOrderId = `ORD-${Date.now()}`;
-        const emailToSave = (shippingAddress.email || currentUser?.email || '').toLowerCase().trim();
+        const emailToSave = (currentUser.email || shippingAddress.email || '').toLowerCase().trim();
         const orderPayload = {
-          userId: currentUser?.uid || 'guest',
+          userId: currentUser.uid,
           userEmail: emailToSave,
           userPhone: finalPhone,
           phoneVerified: true,
@@ -342,11 +349,16 @@ export default function CheckoutPage() {
         throw new Error('Payment gateway is initializing. Please check your internet connection and try again.');
       }
 
-      // 1. Create order on backend
+      // 1. Create order on backend with authoritative server calculation
       const res = await fetch(`${backendUrl}/api/razorpay/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: finalTotal }),
+        body: JSON.stringify({
+          items: cartItems,
+          couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
+          clientTotal: finalTotal,
+          amount: finalTotal
+        }),
       });
 
       if (!res.ok) {
@@ -407,9 +419,9 @@ export default function CheckoutPage() {
 
             if (verifyData.success) {
               const newOrderId = `ORD-${Date.now()}`;
-              const emailToSave = (shippingAddress.email || currentUser?.email || '').toLowerCase().trim();
+              const emailToSave = (currentUser.email || shippingAddress.email || '').toLowerCase().trim();
               const orderPayload = {
-                userId: currentUser?.uid || 'guest',
+                userId: currentUser.uid,
                 userEmail: emailToSave,
                 userPhone: finalPhone,
                 phoneVerified: true,

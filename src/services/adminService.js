@@ -1,22 +1,24 @@
 import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { db, auth } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
 import { invalidateProductCache } from './productService';
 
 const PRODUCTS = 'products';
 
-// Delete a single image from ImageKit
+// Delete a single image from ImageKit (authenticated admin only)
 export const deleteProductImage = async (fileId) => {
   if (!fileId) return;
   try {
     const backendUrl = getBackendUrl();
+    const token = await auth.currentUser?.getIdToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
        method: 'DELETE',
-       headers: { 'x-admin-request': 'true' }
+       headers
     });
   } catch (err) {
     console.error("ImageKit delete error:", err);
-    // Ignore not-found errors
   }
 };
 

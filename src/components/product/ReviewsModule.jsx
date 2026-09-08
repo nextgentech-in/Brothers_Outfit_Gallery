@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getProductReviews, submitReview, compressReviewImage } from '../../services/reviewService';
 import './ReviewsModule.css';
@@ -139,6 +140,10 @@ export default function ReviewsModule({ product }) {
   // Submit Review to Firestore
   const handleSubmitReview = async (e) => {
     e.preventDefault();
+    if (!currentUser) {
+      setFeedback({ type: 'error', text: 'You must be signed in to submit a review for this product.' });
+      return;
+    }
     if (!comment.trim()) {
       setFeedback({ type: 'error', text: 'Please write your review thoughts.' });
       return;
@@ -152,9 +157,9 @@ export default function ReviewsModule({ product }) {
         productId: product?.id || 'general-product',
         productName: product?.name || 'Store Product',
         productSlug: product?.slug || '',
-        userId: currentUser?.uid || 'guest',
-        userName: userName.trim() || 'Verified Customer',
-        userEmail: currentUser?.email || '',
+        userId: currentUser.uid,
+        userName: userName.trim() || currentUser.displayName || 'Verified Customer',
+        userEmail: currentUser.email || '',
         rating: Number(rating),
         comment: comment.trim(),
         recommend: Boolean(recommend),
@@ -261,6 +266,21 @@ export default function ReviewsModule({ product }) {
               <p className="review-form-desc">
                 Reviewing <strong>{product?.name || 'this item'}</strong>. Share your authentic photos & experience to help other shoppers!
               </p>
+
+              {!currentUser && (
+                <div style={{
+                  padding: '12px 16px',
+                  borderRadius: '6px',
+                  marginBottom: '16px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  background: 'rgba(234, 179, 8, 0.08)',
+                  color: '#ca8a04',
+                  border: '1px solid rgba(234, 179, 8, 0.25)'
+                }}>
+                  Please <Link to="/login" style={{ textDecoration: 'underline', fontWeight: 700, color: '#ca8a04' }}>sign in to your account</Link> to submit a review.
+                </div>
+              )}
 
               {feedback && (
                 <div style={{

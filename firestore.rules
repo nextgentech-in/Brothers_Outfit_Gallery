@@ -11,12 +11,19 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Secure Admin Check: strictly based on verified admin email whitelist or protected admins collection
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email in ['setupatel01@gmail.com', 'setupatel441@gmail.com'] ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin')
       );
+    }
+
+    // Admin Collection: stores verified admin roles; only existing admins can manage
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     // Products: public read; admin write only
@@ -25,18 +32,28 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Orders: anyone can place; customers read their own; admin manages all
+    // Orders: authenticated customers place orders; customers read their own; only admins manage or customers cancel
     match /orders/{orderId} {
-      allow create: if true;
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
       allow read: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email));
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancellationReason', 'cancelledAt', 'updatedAt']) &&
+        request.resource.data.status == 'Cancelled'
+      );
       allow delete: if isAdmin();
     }
 
-    // User Profiles: owner can read/write; admin can view
+    // User Profiles: owner can read/write; users cannot set or escalate isAdmin privileges
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']))
+      );
+      allow delete: if isAdmin();
     }
 
     // Coupons: public read for checkout validation; admin write only
@@ -45,11 +62,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Reviews: public read; customers can post; admin can moderate
+    // Reviews: public read; authenticated customers can post; admin can moderate
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if true;
-      allow update, delete: if isAdmin();
+      allow create: if isAuthenticated() &&
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.rating is number &&
+                    request.resource.data.rating >= 1 &&
+                    request.resource.data.rating <= 5;
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     // Store Settings: public read; admin write only
@@ -58,9 +79,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Notifications: system alerts
+    // Notifications: admin alerts - strictly protected from public access
     match /notifications/{notificationId} {
-      allow read, write: if true;
+      allow read, update, delete: if isAdmin();
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.type == 'NEW_ORDER');
     }
   }
 }

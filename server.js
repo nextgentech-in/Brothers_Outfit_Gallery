@@ -462,6 +462,228 @@ const getRazorpayClient = () => {
 
 const razorpay = getRazorpayClient();
 
+// ─── Token Verification & Admin Authentication Middleware ──────────────────
+const adminTokenCache = new Map();
+const FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY || "AIzaSyB7HF5zw63Rt2sxj2BiIGx3AgPZTqoxgvw";
+const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || "brothersoutfitgallary";
+
+async function verifyUserToken(idToken) {
+  if (!idToken || typeof idToken !== 'string') return null;
+  const tokenHash = crypto.createHash('sha256').update(idToken).digest('hex');
+  const cached = adminTokenCache.get(tokenHash);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached;
+  }
+
+  try {
+    const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.users && data.users.length > 0) {
+      const user = data.users[0];
+      const record = {
+        uid: user.localId,
+        email: (user.email || '').toLowerCase().trim(),
+        expiresAt: Date.now() + 10 * 60 * 1000 // 10 min cache
+      };
+      adminTokenCache.set(tokenHash, record);
+      return record;
+    }
+  } catch (err) {
+    console.warn('Token verification error:', err.message);
+  }
+  return null;
+}
+
+// Clean up expired tokens periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of adminTokenCache.entries()) {
+    if (now > v.expiresAt) adminTokenCache.delete(k);
+  }
+}, 10 * 60 * 1000).unref();
+
+async function requireAdminAuth(req, res, next) {
+  const adminSecret = (process.env.ADMIN_SECRET || process.env.VITE_ADMIN_SECRET || '').trim();
+  const reqSecret = req.headers['x-admin-secret'];
+  if (adminSecret && reqSecret && reqSecret === adminSecret) {
+    req.isAdmin = true;
+    return next();
+  }
+
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    const user = await verifyUserToken(token);
+    if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
+      req.user = user;
+      req.isAdmin = true;
+      return next();
+    }
+  }
+
+  return res.status(401).json({
+    error: 'Unauthorized: Admin authentication is required.'
+  });
+}
+
+async function requireAuth(req, res, next) {
+  const adminSecret = (process.env.ADMIN_SECRET || process.env.VITE_ADMIN_SECRET || '').trim();
+  const reqSecret = req.headers['x-admin-secret'];
+  if (adminSecret && reqSecret && reqSecret === adminSecret) {
+    req.isAdmin = true;
+    return next();
+  }
+
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7).trim();
+    const user = await verifyUserToken(token);
+    if (user) {
+      req.user = user;
+      req.isAdmin = ADMIN_EMAILS.includes(user.email);
+      return next();
+    }
+  }
+
+  return res.status(401).json({
+    error: 'Unauthorized: Authentication required.'
+  });
+}
+
+// ─── Server-Side Catalog Cache & Price Verification ─────────────────────────
+let productCatalogCache = { products: null, expiresAt: 0 };
+let couponCatalogCache = { coupons: null, expiresAt: 0 };
+
+function parseFirestoreValue(val) {
+  if (!val) return null;
+  if ('stringValue' in val) return val.stringValue;
+  if ('integerValue' in val) return parseInt(val.integerValue, 10);
+  if ('doubleValue' in val) return parseFloat(val.doubleValue);
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('arrayValue' in val) return (val.arrayValue.values || []).map(parseFirestoreValue);
+  if ('mapValue' in val) {
+    const obj = {};
+    for (const [k, v] of Object.entries(val.mapValue.fields || {})) obj[k] = parseFirestoreValue(v);
+    return obj;
+  }
+  return null;
+}
+
+function parseFirestoreDoc(doc) {
+  if (!doc || !doc.name) return null;
+  const id = doc.name.split('/').pop();
+  const obj = { id };
+  for (const [k, v] of Object.entries(doc.fields || {})) {
+    obj[k] = parseFirestoreValue(v);
+  }
+  return obj;
+}
+
+async function fetchProductsFromFirestore() {
+  if (productCatalogCache.products && Date.now() < productCatalogCache.expiresAt) {
+    return productCatalogCache.products;
+  }
+  try {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products?pageSize=300`);
+    if (res.ok) {
+      const data = await res.json();
+      const products = (data.documents || []).map(parseFirestoreDoc).filter(Boolean);
+      productCatalogCache = { products, expiresAt: Date.now() + 60 * 1000 };
+      return products;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch products from Firestore REST API:', err.message);
+  }
+  return productCatalogCache.products || [];
+}
+
+async function fetchCouponsFromFirestore() {
+  if (couponCatalogCache.coupons && Date.now() < couponCatalogCache.expiresAt) {
+    return couponCatalogCache.coupons;
+  }
+  try {
+    const res = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/coupons?pageSize=100`);
+    if (res.ok) {
+      const data = await res.json();
+      const coupons = (data.documents || []).map(parseFirestoreDoc).filter(Boolean);
+      couponCatalogCache = { coupons, expiresAt: Date.now() + 60 * 1000 };
+      return coupons;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch coupons from Firestore REST API:', err.message);
+  }
+  return couponCatalogCache.coupons || [];
+}
+
+async function calculateServerOrderTotal(items, couponCode) {
+  const products = await fetchProductsFromFirestore();
+  const productsMap = new Map(products.map(p => [p.id, p]));
+
+  let subtotal = 0;
+  for (const item of items) {
+    const product = productsMap.get(item.id);
+    if (!product) {
+      throw new Error(`Product not found or unavailable in store: ${item.id}`);
+    }
+
+    let unitPrice = Number(product.salePrice ?? product.price ?? 0);
+    if (product.variants && product.variants.length > 0 && (item.size || item.selectedSize)) {
+      const targetSize = item.size || item.selectedSize;
+      const targetColor = item.color || item.selectedColor;
+      const matchedVariant = product.variants.find(v =>
+        v.size === targetSize && (!targetColor || v.color === targetColor || v.color === 'Standard' || v.color === 'Default')
+      ) || product.variants.find(v => v.size === targetSize);
+      if (matchedVariant) {
+        unitPrice = Number(matchedVariant.salePrice ?? matchedVariant.price ?? unitPrice);
+      }
+    }
+
+    const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    subtotal += unitPrice * qty;
+  }
+
+  // Tiered store discount: ₹250 off if cart subtotal >= ₹2500
+  const discount = subtotal >= 2500 ? 250 : 0;
+
+  // Coupon discount calculation
+  let couponDiscount = 0;
+  if (couponCode && typeof couponCode === 'string' && couponCode.trim()) {
+    const cleanCode = couponCode.trim().toUpperCase();
+    const coupons = await fetchCouponsFromFirestore();
+    const coupon = coupons.find(c => (c.code || '').toUpperCase() === cleanCode && c.active !== false);
+    if (coupon) {
+      const nowStr = new Date().toISOString().slice(0, 10);
+      const isExpired = coupon.expiryDate && coupon.expiryDate < nowStr;
+      const minAmount = Number(coupon.minOrderAmount) || 0;
+      if (!isExpired && subtotal >= minAmount) {
+        if (coupon.discountType === 'percentage') {
+          couponDiscount = Math.round((subtotal * (Number(coupon.discountValue) || 0)) / 100);
+        } else {
+          couponDiscount = Number(coupon.discountValue) || 0;
+        }
+      }
+    }
+  }
+
+  // Free shipping for orders >= ₹1000, else ₹70
+  const shippingCost = subtotal >= 1000 ? 0 : 70;
+  const finalTotal = Math.max(1, subtotal - discount - couponDiscount + shippingCost);
+
+  return {
+    subtotal,
+    discount,
+    couponDiscount,
+    shippingCost,
+    finalTotal
+  };
+}
+
 app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
   try {
     const result = imagekit.getAuthenticationParameters();
@@ -472,17 +694,8 @@ app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
   }
 });
 
-// Mock authentication check middleware to ensure only admins can delete
-// Since Firebase Auth token verification in backend requires Firebase Admin SDK,
-// and we want to keep it simple, we expect a header `x-admin-request: true` or similar.
-// In a full production app, you'd use Firebase Admin SDK to decode the Bearer token.
-app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], async (req, res) => {
-  // Simple check for now
-  const adminHeader = req.headers['x-admin-request'];
-  if (adminHeader !== 'true') {
-     return res.status(403).json({ error: "Unauthorized" });
-  }
-
+// Admin-Protected Media Management API
+app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], requireAdminAuth, async (req, res) => {
   const { fileId } = req.params;
   if (!fileId) return res.status(400).json({ error: "Missing fileId" });
 
@@ -491,28 +704,49 @@ app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], async (
     res.json(result);
   } catch (error) {
     console.error("ImageKit Delete Error:", error);
-    // Ignore NOT_FOUND errors as the intent is to delete anyway
     if (error.message && error.message.includes('No file found')) {
-        return res.json({ success: true, message: "File already deleted." });
+      return res.json({ success: true, message: "File already deleted." });
     }
     res.status(500).json({ error: error.message });
   }
 });
 
-// ─── Razorpay: Create Order (with Strict Validation & Rate Limiting) ───────
+// ─── Razorpay: Create Order (Server-Recalculated & Rate-Limited) ─────────────
 app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 15)) return;
 
-  const { amount } = req.body;
-  const numAmount = Number(amount);
-  if (!numAmount || isNaN(numAmount) || numAmount < 1 || numAmount > 500000) {
-    return res.status(400).json({ error: 'Valid amount between ₹1 and ₹5,00,000 required.' });
+  const { items, couponCode, amount, clientTotal } = req.body;
+  let orderTotalInRupees = 0;
+
+  // Recalculate and verify authoritative totals on server if cart items provided
+  if (Array.isArray(items) && items.length > 0) {
+    try {
+      const serverCalc = await calculateServerOrderTotal(items, couponCode);
+      orderTotalInRupees = serverCalc.finalTotal;
+
+      const requestedTotal = Number(clientTotal || amount);
+      if (requestedTotal && Math.abs(serverCalc.finalTotal - requestedTotal) > 2) {
+        console.warn(`Price mismatch: client sent ₹${requestedTotal}, server calculated ₹${serverCalc.finalTotal}`);
+        return res.status(400).json({
+          error: 'Order price mismatch detected. Cart totals have been updated to match store prices. Please refresh.'
+        });
+      }
+    } catch (calcErr) {
+      console.error('Server order total calculation error:', calcErr);
+      return res.status(400).json({ error: calcErr.message || 'Error computing order total.' });
+    }
+  } else {
+    const numAmount = Number(amount);
+    if (!numAmount || isNaN(numAmount) || numAmount < 1 || numAmount > 500000) {
+      return res.status(400).json({ error: 'Valid items array or amount between ₹1 and ₹5,00,000 required.' });
+    }
+    orderTotalInRupees = numAmount;
   }
 
   try {
     const rzp = getRazorpayClient();
     const order = await rzp.orders.create({
-      amount: Math.round(numAmount * 100), // rupees → paise
+      amount: Math.round(orderTotalInRupees * 100), // rupees → paise
       currency: 'INR',
       receipt: `rcpt_${Date.now().toString().slice(-8)}`,
     });
@@ -520,6 +754,7 @@ app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, r
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
+      verifiedTotal: orderTotalInRupees,
       key: (process.env.RAZORPAY_KEY_ID || '').trim(),
     });
   } catch (error) {
@@ -537,8 +772,11 @@ app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
 
   const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
   if (!secret) {
-    console.warn('RAZORPAY_KEY_SECRET not set; running in development bypass.');
-    return res.json({ success: true, paymentId: razorpay_payment_id });
+    console.error('FATAL: RAZORPAY_KEY_SECRET is not configured on the server.');
+    return res.status(500).json({
+      success: false,
+      error: 'Server payment configuration error: Payment gateway credentials missing.'
+    });
   }
 
   try {
@@ -553,7 +791,7 @@ app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
       res.json({ success: true, paymentId: razorpay_payment_id });
     } else {
       console.warn('Razorpay signature mismatch: potential signature tampering attempt.');
-      res.status(400).json({ success: false, error: 'Signature mismatch — possible fraud attempt.' });
+      res.status(400).json({ success: false, error: 'Signature mismatch — payment verification failed.' });
     }
   } catch (err) {
     console.error('Razorpay verification error:', err);
@@ -743,7 +981,7 @@ app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-b
 
 
 // ─── Delhivery One: Create Order Shipment (Generate AWB) ──────────────────
-app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], async (req, res) => {
+app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requireAdminAuth, async (req, res) => {
   const { orderId, shippingAddress, items, totalAmount, paymentMethod } = req.body;
   if (!orderId || !shippingAddress) {
     return res.status(400).json({ error: 'Order ID and shipping details are required.' });
@@ -829,7 +1067,7 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], async
 });
 
 // ─── Delhivery One: Cancel Shipment / Pickup ─────────────────────────────
-app.post(['/api/delhivery/cancel-shipment', '/delhivery/cancel-shipment'], async (req, res) => {
+app.post(['/api/delhivery/cancel-shipment', '/delhivery/cancel-shipment'], requireAuth, async (req, res) => {
   const { waybill, reason } = req.body;
   if (!waybill) return res.status(400).json({ error: 'Waybill number is required.' });
 

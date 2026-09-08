@@ -49,30 +49,6 @@ export const uploadImageToImageKit = async (file, folder = 'hero/') => {
     console.warn("Backend ImageKit auth fetch failed, testing client fallback:", err);
   }
 
-  // 2. Client-side fallback if backend is momentarily unreachable
-  if (!authParams?.signature) {
-    const privateKey = import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || import.meta.env.IMAGEKIT_PRIVATE_KEY;
-    if (privateKey && typeof window !== 'undefined' && window.crypto?.subtle) {
-      try {
-        const token = window.crypto.randomUUID ? window.crypto.randomUUID() : ('tok_' + Math.random().toString(36).slice(2) + Date.now());
-        const expire = Math.floor(Date.now() / 1000) + 1800;
-        const enc = new TextEncoder();
-        const cryptoKey = await window.crypto.subtle.importKey(
-          'raw',
-          enc.encode(privateKey),
-          { name: 'HMAC', hash: 'SHA-1' },
-          false,
-          ['sign']
-        );
-        const sigBuf = await window.crypto.subtle.sign('HMAC', cryptoKey, enc.encode(token + expire));
-        const signature = Array.from(new Uint8Array(sigBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-        authParams = { token, signature, expire };
-      } catch (clientErr) {
-        console.warn("Client signature fallback failed:", clientErr);
-      }
-    }
-  }
-
   if (!authParams?.signature) {
     throw new Error("Unable to obtain ImageKit authentication. Please ensure the backend server is running.");
   }

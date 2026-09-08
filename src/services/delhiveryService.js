@@ -1,4 +1,5 @@
 import { getBackendUrl } from '../utils/apiConfig';
+import { auth } from '../firebase/firebaseConfig';
 
 /**
  * Check Delhivery PIN code serviceability
@@ -70,9 +71,13 @@ export const lookupPincodeByPlace = async (place) => {
 export const createDelhiveryShipment = async (orderDetails) => {
   try {
     const backendUrl = getBackendUrl();
+    const token = await auth.currentUser?.getIdToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const response = await fetch(`${backendUrl}/api/delhivery/create-shipment`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(orderDetails),
     });
 
@@ -121,9 +126,13 @@ export const cancelDelhiveryShipment = async (waybill, cancellationReason = 'Cus
   if (!waybill) return { success: true };
   try {
     const backendUrl = getBackendUrl();
+    const token = await auth.currentUser?.getIdToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const response = await fetch(`${backendUrl}/api/delhivery/cancel-shipment`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ waybill, reason: cancellationReason }),
     });
     if (!response.ok) {
