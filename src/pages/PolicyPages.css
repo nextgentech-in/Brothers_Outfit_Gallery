@@ -1,0 +1,144 @@
+/* ───────── Shared Policy Pages Styles ───────── */
+.policy-page {
+  min-height: 80vh;
+  padding: 40px 20px 80px;
+  background: var(--color-bg-alt, #f8fafc);
+}
+
+.policy-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.policy-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.policy-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--color-accent-gold, #d97706);
+  text-transform: uppercase;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.policy-title {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--color-heading, #09090b);
+  letter-spacing: -0.5px;
+  margin-bottom: 12px;
+}
+
+.policy-updated {
+  font-size: 13px;
+  color: var(--color-text-muted, #64748b);
+}
+
+.policy-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle, #e2e8f0);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+  padding: 40px 48px;
+  margin-bottom: 30px;
+}
+
+@media (max-width: 768px) {
+  .policy-card {
+    padding: 24px 20px;
+  }
+  .policy-title {
+    font-size: 26px;
+  }
+}
+
+.policy-section {
+  margin-bottom: 32px;
+}
+
+.policy-section:last-child {
+  margin-bottom: 0;
+}
+
+.policy-section h2 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.policy-section p {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+.policy-section ul {
+  padding-left: 20px;
+  margin-bottom: 14px;
+}
+
+.policy-section li {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #475569;
+  margin-bottom: 8px;
+  list-style-type: disc;
+}
+
+.policy-highlight-box {
+  background: #fef3c7;
+  border-left: 4px solid #d97706;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 18px 0;
+}
+
+.policy-highlight-box p {
+  color: #92400e;
+  font-size: 13.5px;
+  margin: 0;
+  font-weight: 500;
+}
+
+.policy-contact-box {
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.policy-contact-box strong {
+  color: #0f172a;
+}
+
+.policy-whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #25d366;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+  width: fit-content;
+  margin-top: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.policy-whatsapp-btn:hover {
+  opacity: 0.9;
+}

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { getStoreSettings, saveStoreSettings } from '../../services/adminService';
+import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminSettings.css';
 
 export default function AdminSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { showToast } = useAdminUI();
   const [settings, setSettings] = useState({
     storeName: '',
     phone: '',
@@ -33,10 +35,15 @@ export default function AdminSettings() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    await saveStoreSettings(settings);
-    setSaving(false);
-    alert('Store settings saved successfully!');
+    try {
+      setSaving(true);
+      await saveStoreSettings(settings);
+      showToast('Store settings saved successfully!', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to save store settings', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) return <div>Loading settings...</div>;

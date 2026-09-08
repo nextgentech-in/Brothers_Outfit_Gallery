@@ -2,7 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 import { useShop } from '../context/ShopContext';
+import { searchProducts } from '../services/productService';
+import { optimizeImage } from '../utils/imageUtils';
 import './Navbar.css';
 
 const navLinks = [
@@ -35,8 +38,75 @@ export default function Navbar() {
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
   const { currentUser, userProfile, logout } = useAuth() || {};
-  const { totalItems } = useCart() || { totalItems: 0 };
+  const { totalItems, openCartDrawer } = useCart() || { totalItems: 0 };
+  const { wishlistCount } = useWishlist() || { wishlistCount: 0 };
   const { resetShopState, setSearch } = useShop() || {};
+
+  // Live search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+
+  // Debounced search querying active catalog
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchProducts(searchQuery, 6);
+        setSearchResults(results);
+      } catch (err) {
+        console.warn('Live search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 180);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setSearchOpen(false);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (searchResults.length > 0) {
+        setSelectedIndex(prev => (prev < searchResults.length - 1 ? prev + 1 : 0));
+      }
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (searchResults.length > 0) {
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : searchResults.length - 1));
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedIndex >= 0 && searchResults[selectedIndex]) {
+        const target = searchResults[selectedIndex];
+        setSearchOpen(false);
+        navigate(`/product/${target.slug}`);
+      } else {
+        const val = searchQuery.trim();
+        if (val) {
+          setSearchOpen(false);
+          if (setSearch) setSearch(val);
+          navigate('/shop');
+        }
+      }
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -93,6 +163,20 @@ export default function Navbar() {
     }
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
+
+  // Global Escape key dismiss for search overlay and mobile menu
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (searchOpen) setSearchOpen(false);
+        if (mobileOpen) setMobileOpen(false);
+      }
+    };
+    if (searchOpen || mobileOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [searchOpen, mobileOpen]);
 
   return (
     <>
@@ -154,7 +238,10 @@ export default function Navbar() {
             {/* Search */}
             <button
               className="navbar__icon-btn"
-              onClick={() => setSearchOpen(true)}
+              onClick={() => {
+                setSearchOpen(true);
+                setTimeout(() => searchInputRef.current?.focus(), 50);
+              }}
               aria-label="Search"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -163,16 +250,28 @@ export default function Navbar() {
               </svg>
             </button>
 
+            {/* Wishlist */}
+            <Link to="/wishlist" className="navbar__icon-btn" aria-label="Wishlist">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+              {wishlistCount > 0 && <span className="navbar__badge" style={{ background: '#d97706' }}>{wishlistCount}</span>}
+            </Link>
 
-            {/* Cart */}
-            <Link to="/cart" className="navbar__icon-btn" aria-label="Cart">
+            {/* Cart - opens MiniCartDrawer */}
+            <button
+              type="button"
+              className="navbar__icon-btn"
+              onClick={openCartDrawer}
+              aria-label="Shopping Cart"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
                 <line x1="3" y1="6" x2="21" y2="6" />
                 <path d="M16 10a4 4 0 0 1-8 0" />
               </svg>
               {totalItems > 0 && <span className="navbar__badge" style={{ background: '#16a34a' }}>{totalItems}</span>}
-            </Link>
+            </button>
 
             {/* Account - desktop & mobile */}
             <Link to={authAccountLink} className="navbar__icon-btn navbar__icon-btn--account" aria-label="Account">
@@ -202,19 +301,26 @@ export default function Navbar() {
             <input
               ref={searchInputRef}
               type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="search-overlay__input"
-              placeholder="Search products..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = e.target.value.trim();
-                  if (val) {
-                    setSearchOpen(false);
-                    if (setSearch) setSearch(val);
-                    navigate('/shop');
-                  }
-                }
-              }}
+              placeholder="Search products by title, category, tag..."
+              onKeyDown={handleSearchKeyDown}
             />
+            {searchQuery && (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  searchInputRef.current?.focus();
+                }}
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
             <button
               className="search-overlay__close"
               onClick={() => setSearchOpen(false)}
@@ -226,6 +332,87 @@ export default function Navbar() {
               </svg>
             </button>
           </div>
+
+          {/* Live Search Suggestions Dropdown */}
+          {searchOpen && (searchQuery.trim().length > 0 || searchResults.length > 0) && (
+            <div className="search-results-dropdown" role="listbox">
+              {isSearching && (
+                <div className="search-dropdown-loading">
+                  <span className="search-spinner"></span> Searching catalog...
+                </div>
+              )}
+
+              {!isSearching && searchResults.length === 0 && searchQuery.trim().length > 1 && (
+                <div className="search-dropdown-empty">
+                  No products found for "{searchQuery}".
+                  <button
+                    type="button"
+                    className="search-see-all-btn"
+                    onClick={() => {
+                      setSearchOpen(false);
+                      if (setSearch) setSearch(searchQuery.trim());
+                      navigate('/shop');
+                    }}
+                  >
+                    Search in Shop →
+                  </button>
+                </div>
+              )}
+
+              {searchResults.length > 0 && (
+                <>
+                  <div className="search-results-list">
+                    {searchResults.map((product, idx) => (
+                      <div
+                        key={product.id || product.slug || idx}
+                        className={`search-result-item ${selectedIndex === idx ? 'search-result-item--selected' : ''}`}
+                        role="option"
+                        aria-selected={selectedIndex === idx}
+                        onClick={() => {
+                          setSearchOpen(false);
+                          navigate(`/product/${product.slug}`);
+                        }}
+                      >
+                        <div className="search-result-thumb">
+                          {product.images && product.images[0] ? (
+                            <img
+                              src={optimizeImage(product.images[0], { width: 90, quality: 75 })}
+                              alt={product.name}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="search-result-placeholder">👕</div>
+                          )}
+                        </div>
+                        <div className="search-result-info">
+                          <span className="search-result-name">{product.name}</span>
+                          <span className="search-result-category">{product.category || 'Apparel'}</span>
+                        </div>
+                        <div className="search-result-pricing">
+                          <span className="search-result-price">₹{product.price}</span>
+                          {product.originalPrice && product.originalPrice > product.price && (
+                            <span className="search-result-mrp">₹{product.originalPrice}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="search-view-all-results"
+                    onClick={() => {
+                      setSearchOpen(false);
+                      if (setSearch) setSearch(searchQuery.trim());
+                      navigate('/shop');
+                    }}
+                  >
+                    View all matching products in Shop →
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -275,6 +462,26 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            {/* Wishlist Link in Mobile Menu */}
+            <Link
+              to="/wishlist"
+              className="mobile-menu__link"
+              onClick={() => setMobileOpen(false)}
+            >
+              <span className="mobile-menu__icon">♡</span> Wishlist {wishlistCount > 0 && `(${wishlistCount})`}
+            </Link>
+            {/* Bag link */}
+            <button
+              type="button"
+              className="mobile-menu__link"
+              style={{ background: 'none', border: 'none', textAlign: 'left', width: '100%', cursor: 'pointer', font: 'inherit' }}
+              onClick={() => {
+                setMobileOpen(false);
+                openCartDrawer();
+              }}
+            >
+              <span className="mobile-menu__icon">🛍️</span> Shopping Bag {totalItems > 0 && `(${totalItems})`}
+            </button>
           </div>
 
           {/* Account & Orders Section */}

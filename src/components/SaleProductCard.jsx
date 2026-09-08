@@ -4,6 +4,7 @@ import OfferCountdown from './OfferCountdown';
 import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../context/WishlistContext';
 import AuthModal from './auth/AuthModal';
 import './SaleProductCard.css';
 
@@ -11,18 +12,29 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist() || {};
   const [selectedSize, setSelectedSize] = useState(null);
   const [addedAnimation, setAddedAnimation] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [sizePrompt, setSizePrompt] = useState(false);
   const isOutOfStock = product.stock === 0;
   const lowStock = product.stock > 0 && product.stock <= 5;
   const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
+  const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
+  const hasMultipleSizes = availableSizes.length > 1;
+  const needsSizeSelection = hasMultipleSizes && !selectedSize;
 
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (isOutOfStock) return;
     
+    if (needsSizeSelection) {
+      setSizePrompt(true);
+      setTimeout(() => setSizePrompt(false), 3000);
+      return;
+    }
+
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     if (onAddToCart) {
       onAddToCart({
@@ -48,6 +60,12 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     e.stopPropagation();
     if (isOutOfStock) return;
     
+    if (needsSizeSelection) {
+      setSizePrompt(true);
+      setTimeout(() => setSizePrompt(false), 3000);
+      return;
+    }
+
     // If not logged in, trigger account creation / login modal first
     if (!currentUser) {
       setAuthModalOpen(true);
@@ -79,17 +97,19 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
   return (
     <div className={`sale-card ${isOutOfStock ? 'sale-card--oos' : ''}`}>
       {/* Image Container */}
-      <Link to={`/product/${product.slug}`} className="sale-card__image-wrap">
-        <img
-          src={optimizeImage(product.image || product.thumbnailUrl, 400)}
-          alt={product.name}
-          className="sale-card__image"
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = '/images/hero.png';
-          }}
-        />
+      <div className="sale-card__image-wrap">
+        <Link to={`/product/${product.slug}`} style={{ display: 'block', width: '100%', height: '100%' }}>
+          <img
+            src={optimizeImage(product.image || product.thumbnailUrl, 400)}
+            alt={product.name}
+            className="sale-card__image"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = '/images/hero.png';
+            }}
+          />
+        </Link>
         
         {isOutOfStock && (
           <div className="sale-card__overlay">OUT OF STOCK</div>
@@ -99,9 +119,24 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
           <span className="sale-card__badge-sale">SALE</span>
           <span className="sale-card__badge-discount">{product.offer_discount_percentage}% OFF</span>
         </div>
-      </Link>
 
-
+        {/* Wishlist Button */}
+        <button
+          type="button"
+          className={`sale-card__wishlist ${inWishlist ? 'sale-card__wishlist--active' : ''}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (toggleWishlist) toggleWishlist(product);
+          }}
+          aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#c0392b" : "none"} stroke={inWishlist ? "#c0392b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+          </svg>
+        </button>
+      </div>
 
       {/* Card Info */}
       <div className="sale-card__info">
@@ -121,12 +156,25 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
         </div>
 
         {/* Sizes */}
-        <div className="sale-card__sizes">
+        {sizePrompt && (
+          <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: '800', background: '#fee2e2', padding: '3px 8px', borderRadius: '4px', textAlign: 'center', marginBottom: '4px' }}>
+            ⚠️ Please select a size first
+          </div>
+        )}
+        <div 
+          className="sale-card__sizes"
+          style={sizePrompt ? { outline: '2px solid #ef4444', borderRadius: '6px', padding: '4px' } : {}}
+        >
           {availableSizes.map((size) => (
             <button
               key={size}
               className={`sale-card__size ${selectedSize === size ? 'sale-card__size--selected' : ''} ${isOutOfStock ? 'sale-card__size--disabled' : ''}`}
-              onClick={() => !isOutOfStock && setSelectedSize(size)}
+              onClick={() => {
+                if (!isOutOfStock) {
+                  setSelectedSize(size);
+                  setSizePrompt(false);
+                }
+              }}
               disabled={isOutOfStock}
             >
               {size}
@@ -145,7 +193,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
             disabled={isOutOfStock}
             style={{ flex: 1, margin: 0, ...(addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}) }}
           >
-            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : 'ADD TO CART')}
+            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : (needsSizeSelection ? 'CHOOSE SIZE' : 'ADD TO CART'))}
           </button>
 
           {!isOutOfStock && (

@@ -1,0 +1,126 @@
+/* ───────── Cart Toast Styles ───────── */
+.cart-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2500;
+  max-width: 400px;
+  width: calc(100vw - 32px);
+  animation: toastSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toastSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cart-toast-inner {
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-toast-thumb {
+  width: 44px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #1e293b;
+  flex-shrink: 0;
+}
+
+.cart-toast-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cart-toast-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #22c55e;
+}
+
+.cart-toast-check {
+  font-size: 12px;
+}
+
+.cart-toast-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cart-toast-variant {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.cart-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cart-toast-view-btn {
+  background: #d97706;
+  color: #ffffff;
+  border: none;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+}
+
+.cart-toast-view-btn:hover {
+  background: #b45309;
+}
+
+.cart-toast-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.cart-toast-close-btn:hover {
+  color: #ffffff;
+}
+
+@media (max-width: 600px) {
+  .cart-toast {
+    bottom: 84px; /* Above mobile sticky navbar / buttons */
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}

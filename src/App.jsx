@@ -5,9 +5,12 @@ import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import { AuthProvider } from './context/AuthContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { CartProvider } from './context/CartContext';
 import { ShopProvider } from './context/ShopContext';
 import WhatsAppFloat from './components/WhatsAppFloat';
+import MiniCartDrawer from './components/cart/MiniCartDrawer';
+import CartToast from './components/cart/CartToast';
 
 // Critical First-Paint Pages
 import HomePage from './pages/HomePage';
@@ -47,6 +50,11 @@ const ProductPage = lazyWithRetry(() => import('./pages/ProductPage'));
 const CartPage = lazyWithRetry(() => import('./pages/CartPage'));
 const CheckoutPage = lazyWithRetry(() => import('./pages/CheckoutPage'));
 const OrderConfirmationPage = lazyWithRetry(() => import('./pages/OrderConfirmationPage'));
+const WishlistPage = lazyWithRetry(() => import('./pages/WishlistPage'));
+const ShippingPolicyPage = lazyWithRetry(() => import('./pages/ShippingPolicyPage'));
+const ReturnsPolicyPage = lazyWithRetry(() => import('./pages/ReturnsPolicyPage'));
+const PrivacyPolicyPage = lazyWithRetry(() => import('./pages/PrivacyPolicyPage'));
+const TermsPage = lazyWithRetry(() => import('./pages/TermsPage'));
 
 // Auth Pages (Lazy)
 const Login = lazyWithRetry(() => import('./pages/Login'));
@@ -250,8 +258,15 @@ function AppContent() {
 
             <Route path="/about" element={<AboutPage />} />
             <Route path="/cart" element={<CartPage />} />
+            <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmationPage />} />
+
+            {/* Policy & Legal Routes */}
+            <Route path="/shipping" element={<ShippingPolicyPage />} />
+            <Route path="/returns" element={<ReturnsPolicyPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
             
             {/* Standard Auth Routes */}
             <Route path="/login" element={<Login />} />
@@ -294,6 +309,8 @@ function AppContent() {
         </Routes>
       </main>
       {!isAdmin && <Footer />}
+      {!isAdmin && <MiniCartDrawer />}
+      {!isAdmin && <CartToast />}
       {!isAdmin && <WhatsAppFloat />}
     </>
   );
@@ -303,13 +320,15 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <CartProvider>
-          <ShopProvider>
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
-          </ShopProvider>
-        </CartProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <ShopProvider>
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </ShopProvider>
+          </CartProvider>
+        </WishlistProvider>
       </AuthProvider>
       <Analytics />
     </ErrorBoundary>

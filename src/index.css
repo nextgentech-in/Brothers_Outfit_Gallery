@@ -173,3 +173,26 @@ h1, h2, h3, h4, h5, h6 {
   color: #92400e;
   border: 1px solid #fde68a;
 }
+
+/* ───────── Accessibility: Keyboard Focus Indicators ───────── */
+:focus-visible {
+  outline: 2px solid #d97706 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.18) !important;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ───────── Accessibility: Respect Reduced Motion Preferences ───────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

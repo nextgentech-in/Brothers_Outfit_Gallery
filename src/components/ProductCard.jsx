@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../context/WishlistContext';
 import AuthModal from './auth/AuthModal';
 import './ProductCard.css';
 
@@ -74,12 +75,17 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist() || {};
   const [selectedSize, setSelectedSize] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [sizePrompt, setSizePrompt] = useState(false);
   const isOutOfStock = product.stock === 0;
   const lowStock = product.stock > 0 && product.stock <= 5;
   
   const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
+  const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
+  const hasMultipleSizes = availableSizes.length > 1;
+  const needsSizeSelection = hasMultipleSizes && !selectedSize;
 
   // Offer logic
   const offerActive = showOffer && isOfferActive(product);
@@ -119,6 +125,12 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
     e.stopPropagation();
     if (isOutOfStock) return;
     
+    if (needsSizeSelection) {
+      setSizePrompt(true);
+      setTimeout(() => setSizePrompt(false), 3000);
+      return;
+    }
+
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (availableSizes.length > 0 ? availableSizes[0] : 'One Size');
     if (onAddToCart) {
       onAddToCart({
@@ -144,6 +156,12 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
     e.stopPropagation();
     if (isOutOfStock) return;
     
+    if (needsSizeSelection) {
+      setSizePrompt(true);
+      setTimeout(() => setSizePrompt(false), 3000);
+      return;
+    }
+
     // If not logged in, trigger account creation / login modal first
     if (!currentUser) {
       setAuthModalOpen(true);
@@ -217,6 +235,23 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
           )}
         </div>
 
+        {/* Wishlist Button */}
+        <button
+          type="button"
+          className={`product-card__wishlist ${inWishlist ? 'product-card__wishlist--active' : ''}`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (toggleWishlist) toggleWishlist(product);
+          }}
+          aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#c0392b" : "none"} stroke={inWishlist ? "#c0392b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+          </svg>
+        </button>
+
         {/* Multiple Photo Scroll Arrows & Dots */}
         {hasMultipleImages && (
           <>
@@ -283,12 +318,25 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         </Link>
 
         {/* Sizes */}
-        <div className="product-card__sizes">
+        {sizePrompt && (
+          <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: '800', background: '#fee2e2', padding: '3px 8px', borderRadius: '4px', textAlign: 'center' }}>
+            ⚠️ Please select a size first
+          </div>
+        )}
+        <div 
+          className="product-card__sizes"
+          style={sizePrompt ? { outline: '2px solid #ef4444', borderRadius: '6px', padding: '4px' } : {}}
+        >
           {availableSizes.map((size) => (
             <button
               key={size}
               className={`product-card__size ${selectedSize === size ? 'product-card__size--selected' : ''} ${isOutOfStock ? 'product-card__size--disabled' : ''}`}
-              onClick={() => !isOutOfStock && setSelectedSize(size)}
+              onClick={() => {
+                if (!isOutOfStock) {
+                  setSelectedSize(size);
+                  setSizePrompt(false);
+                }
+              }}
               disabled={isOutOfStock}
             >
               {size}
@@ -339,7 +387,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
             disabled={isOutOfStock}
             style={{ flex: 1, margin: 0, ...(addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}) }}
           >
-            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : 'ADD TO CART')}
+            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : (needsSizeSelection ? 'CHOOSE SIZE' : 'ADD TO CART'))}
           </button>
 
           {!isOutOfStock && (

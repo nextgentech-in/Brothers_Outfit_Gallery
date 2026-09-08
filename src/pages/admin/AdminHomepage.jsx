@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getHomepageConfig, saveHomepageConfig, getAdminProducts, toggleProductTrending } from '../../services/adminService';
 import { uploadImageToImageKit } from '../../utils/imageUtils';
+import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminHomepage.css';
 
 const PRESET_BANNERS = [
@@ -17,6 +18,7 @@ export default function AdminHomepage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
+  const { showToast } = useAdminUI();
 
   // Catalog products for Trending placement manager
   const [catalogProducts, setCatalogProducts] = useState([]);
@@ -140,12 +142,12 @@ export default function AdminHomepage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file (JPG, PNG, WEBP).');
+      showToast('Please select a valid image file (JPG, PNG, WEBP).', 'warning');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Image size exceeds 10MB. Please select a smaller image.');
+      showToast('Image size exceeds 10MB. Please select a smaller image.', 'error');
       return;
     }
 

@@ -111,7 +111,7 @@ export default function ReviewsModule({ product }) {
     if (!files.length) return;
 
     if (photos.length + files.length > 5) {
-      alert('You can attach a maximum of 5 photos per review.');
+      setFeedback({ type: 'error', message: 'You can attach a maximum of 5 photos per review.' });
       return;
     }
 
@@ -126,7 +126,7 @@ export default function ReviewsModule({ product }) {
       setPhotos(prev => [...prev, ...compressedList]);
     } catch (err) {
       console.error('Photo processing error:', err);
-      alert('Failed to process one or more images. Please try different photos.');
+      setFeedback({ type: 'error', message: 'Failed to process one or more images. Please try different photos.' });
     } finally {
       setCompressing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

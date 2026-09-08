@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { getAdminReviews, deleteReview } from '../../services/adminService';
+import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminReviews.css';
 
 export default function AdminReviews() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { showToast, showConfirm } = useAdminUI();
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -18,8 +20,17 @@ export default function AdminReviews() {
   }, []);
 
   const handleDelete = async (id) => {
-    if (window.confirm("Delete this customer review?")) {
+    const confirmed = await showConfirm({
+      title: 'Delete Review',
+      message: 'Are you sure you want to delete this customer review? It will be removed from the store.',
+      confirmText: 'Delete Review',
+      cancelText: 'Cancel',
+      isDestructive: true
+    });
+
+    if (confirmed) {
       await deleteReview(id);
+      showToast('Review deleted successfully.', 'success');
       fetchReviews();
     }
   };

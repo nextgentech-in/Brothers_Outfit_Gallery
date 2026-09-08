@@ -78,6 +78,7 @@ export default function Profile() {
   const [cancelModal, setCancelModal] = useState({ open: false, order: null });
   const [cancelReason, setCancelReason] = useState('');
   const [cancelCustomReason, setCancelCustomReason] = useState('');
+  const [orderFeedback, setOrderFeedback] = useState(null);
 
   const openCancelModal = (order) => {
     setCancelModal({ open: true, order });
@@ -106,10 +107,12 @@ export default function Profile() {
 
     try {
       await cancelUserOrder(order.id, finalReason, order.waybill);
-      alert('Your order has been cancelled successfully.');
+      setOrderFeedback({ type: 'success', text: `Order #${order.id} has been cancelled successfully.` });
       loadUserOrders();
+      setTimeout(() => setOrderFeedback(null), 6000);
     } catch (err) {
-      alert(`Failed to cancel order: ${err.message}`);
+      setOrderFeedback({ type: 'error', text: `Failed to cancel order: ${err.message}` });
+      setTimeout(() => setOrderFeedback(null), 6000);
     } finally {
       setCancellingId(null);
     }
@@ -226,6 +229,24 @@ export default function Profile() {
               <div className="profile-header">
                 <h1>MY ORDERS ({userOrders.length})</h1>
               </div>
+
+              {orderFeedback && (
+                <div 
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    background: orderFeedback.type === 'success' ? '#dcfce7' : '#fee2e2',
+                    color: orderFeedback.type === 'success' ? '#166534' : '#991b1b',
+                    border: `1px solid ${orderFeedback.type === 'success' ? '#bbf7d0' : '#fecaca'}`
+                  }}
+                >
+                  {orderFeedback.type === 'success' ? '✓ ' : '✕ '}
+                  {orderFeedback.text}
+                </div>
+              )}
 
               {ordersLoading ? (
                 <p>Loading your orders...</p>

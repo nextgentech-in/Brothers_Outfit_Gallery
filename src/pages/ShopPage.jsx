@@ -61,6 +61,7 @@ export default function ShopPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [subCategory, setSubCategory] = useState('All');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const [displayLimit, setDisplayLimit] = useState(12);
   const mounted = useRef(false);
 
   // Debounce search input
@@ -69,41 +70,24 @@ export default function ShopPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Fetch from Firestore
-  const fetchProducts = async (isLoadMore = false) => {
-    if (isLoadMore) {
-      if (loadingMore || !hasMore) return;
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
+  // Reset displayLimit on filter change
+  useEffect(() => {
+    setDisplayLimit(12);
+  }, [category, subCategory, debouncedSearch, priceRange, selectedSizes, selectedColors, sortBy]);
 
+  // Fetch full category or catalog from Firestore/cache
+  const fetchProducts = async () => {
+    setLoading(true);
     try {
       const result = await getShopProducts(
         category,
         sortBy,
-        isLoadMore ? lastVisible : null,
-        12
+        null,
+        500
       );
 
-      if (result.products.length === 0 && !isLoadMore) {
-        setHasMore(false);
-        setProducts([]);
-      } else if (result.products.length === 0 && isLoadMore) {
-        setHasMore(false);
-      } else {
-        if (isLoadMore) {
-          setProducts(prev => {
-            const existingIds = new Set(prev.map(p => p.id));
-            const newUnique = result.products.filter(p => !existingIds.has(p.id));
-            return [...prev, ...newUnique];
-          });
-        } else {
-          setProducts(result.products);
-        }
-        setLastVisible(result.lastVisible);
-        setHasMore(result.hasMore);
-      }
+      setProducts(result.products || []);
+      setHasMore(false);
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -273,8 +257,15 @@ export default function ShopPage() {
 
         {/* Filter Toggle (mobile) + Sort */}
         <div className="shop-controls__row">
-          <button className="shop-filter-toggle" onClick={() => setFiltersOpen(!filtersOpen)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button 
+            type="button"
+            className="shop-filter-toggle" 
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            aria-expanded={filtersOpen}
+            aria-controls="shop-filters-panel"
+            aria-label={filtersOpen ? "Hide product filters" : "Show product filters"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="4" y1="21" x2="4" y2="14"/>
               <line x1="4" y1="10" x2="4" y2="3"/>
               <line x1="12" y1="21" x2="12" y2="12"/>
@@ -295,6 +286,7 @@ export default function ShopPage() {
               className="shop-sort__select"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort products by"
             >
               {SORT_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -302,23 +294,31 @@ export default function ShopPage() {
             </select>
           </div>
 
-          <span className="shop-count">
+          <span className="shop-count" aria-live="polite">
             {filtered.length} {filtered.length === 1 ? 'Product' : 'Products'}{hasActiveFilters ? ' Found' : ''}
           </span>
         </div>
       </div>
 
       {/* Filters */}
-      <div className={`shop-filters ${filtersOpen ? 'shop-filters--open' : ''}`}>
+      <div 
+        id="shop-filters-panel"
+        className={`shop-filters ${filtersOpen ? 'shop-filters--open' : ''}`}
+        role="region"
+        aria-label="Product catalog filters"
+      >
         {/* Category */}
         <div className="shop-filters__group">
           <h4 className="shop-filters__heading">Category</h4>
-          <div className="shop-filters__options">
+          <div className="shop-filters__options" role="group" aria-label="Filter by category">
             {CATEGORIES.map(cat => (
               <button
                 key={cat}
+                type="button"
                 className={`shop-filters__chip ${category === cat ? 'shop-filters__chip--active' : ''}`}
                 onClick={() => setCategory(cat)}
+                aria-pressed={category === cat}
+                aria-label={`Category ${cat}`}
               >
                 {cat}
               </button>
@@ -330,12 +330,15 @@ export default function ShopPage() {
         {category !== 'All' && SUB_CATEGORIES[category] && (
           <div className="shop-filters__group">
             <h4 className="shop-filters__heading">Type / Fit</h4>
-            <div className="shop-filters__options">
+            <div className="shop-filters__options" role="group" aria-label="Filter by type or fit">
               {SUB_CATEGORIES[category].map(sub => (
                 <button
                   key={sub}
+                  type="button"
                   className={`shop-filters__chip ${subCategory === sub ? 'shop-filters__chip--active' : ''}`}
                   onClick={() => setSubCategory(sub)}
+                  aria-pressed={subCategory === sub}
+                  aria-label={`Type ${sub}`}
                 >
                   {sub}
                 </button>
@@ -347,12 +350,15 @@ export default function ShopPage() {
         {/* Price */}
         <div className="shop-filters__group">
           <h4 className="shop-filters__heading">Price</h4>
-          <div className="shop-filters__options">
+          <div className="shop-filters__options" role="group" aria-label="Filter by price range">
             {PRICE_RANGES.map((range, i) => (
               <button
                 key={range.label}
+                type="button"
                 className={`shop-filters__chip ${priceRange === i ? 'shop-filters__chip--active' : ''}`}
                 onClick={() => setPriceRange(i)}
+                aria-pressed={priceRange === i}
+                aria-label={`Price range ${range.label}`}
               >
                 {range.label}
               </button>
@@ -369,12 +375,13 @@ export default function ShopPage() {
                 type="button"
                 onClick={() => setSelectedSizes([])} 
                 style={{ background: 'none', border: 'none', color: '#d97706', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                aria-label="Clear selected sizes"
               >
                 Clear ({selectedSizes.length})
               </button>
             )}
           </div>
-          <div className="shop-filters__options">
+          <div className="shop-filters__options" role="group" aria-label="Filter by size">
             {SIZES.map(size => {
               const isActive = selectedSizes.includes(size);
               return (
@@ -383,6 +390,8 @@ export default function ShopPage() {
                   type="button"
                   className={`shop-filters__chip shop-filters__chip--size ${isActive ? 'shop-filters__chip--active' : ''}`}
                   onClick={() => toggleSize(size)}
+                  aria-pressed={isActive}
+                  aria-label={`Size ${size}`}
                 >
                   {size} {isActive ? '✓' : ''}
                 </button>
@@ -400,12 +409,13 @@ export default function ShopPage() {
                 type="button"
                 onClick={() => setSelectedColors([])} 
                 style={{ background: 'none', border: 'none', color: '#d97706', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                aria-label="Clear selected colors"
               >
                 Clear ({selectedColors.length})
               </button>
             )}
           </div>
-          <div className="shop-filters__options">
+          <div className="shop-filters__options" role="group" aria-label="Filter by color">
             {COLORS.map(color => {
               const isActive = selectedColors.includes(color);
               return (
@@ -414,6 +424,8 @@ export default function ShopPage() {
                   type="button"
                   className={`shop-filters__chip ${isActive ? 'shop-filters__chip--active' : ''}`}
                   onClick={() => toggleColor(color)}
+                  aria-pressed={isActive}
+                  aria-label={`Color ${color}`}
                 >
                   {color} {isActive ? '✓' : ''}
                 </button>
@@ -423,7 +435,12 @@ export default function ShopPage() {
         </div>
 
         {hasActiveFilters && (
-          <button type="button" className="shop-filters__clear" onClick={clearFilters}>
+          <button 
+            type="button" 
+            className="shop-filters__clear" 
+            onClick={clearFilters}
+            aria-label="Clear all applied filters"
+          >
             Clear All Filters
           </button>
         )}
@@ -481,7 +498,7 @@ export default function ShopPage() {
           {/* Product Grid or Empty */}
           {filtered.length > 0 ? (
             <div className="shop-grid">
-              {filtered.map(product => (
+              {filtered.slice(0, displayLimit).map(product => (
                 <ProductCard
                   key={product.id}
                   product={product}
@@ -503,30 +520,29 @@ export default function ShopPage() {
           )}
 
           {/* Load More Button */}
-          {filtered.length > 0 && hasMore && (
+          {filtered.length > displayLimit && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
               <button 
                 className="shop-load-more" 
-                onClick={() => fetchProducts(true)}
-                disabled={loadingMore}
+                onClick={() => setDisplayLimit(prev => prev + 12)}
                 style={{ 
                   padding: '12px 30px', 
                   background: 'var(--color-heading)', 
                   color: 'white', 
                   border: 'none', 
                   borderRadius: '4px',
-                  cursor: loadingMore ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                   fontWeight: '600'
                 }}
               >
-                {loadingMore ? 'LOADING MORE...' : 'LOAD MORE'}
+                LOAD MORE ({filtered.length - displayLimit} REMAINING)
               </button>
             </div>
           )}
           
-          {filtered.length > 0 && !hasMore && (
+          {filtered.length > 0 && filtered.length <= displayLimit && (
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem', color: '#666', fontSize: '0.9rem' }}>
-              No more products
+              Showing all {filtered.length} products
             </div>
           )}
         </>

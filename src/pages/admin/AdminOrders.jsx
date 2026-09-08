@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
+import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminOrders.css';
 
 const ADMIN_CANCEL_REASONS = [
@@ -24,6 +25,7 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeTracking, setActiveTracking] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const { showToast, showConfirm } = useAdminUI();
 
   // Cancellation reason modal state
   const [cancelModal, setCancelModal] = useState({ open: false, order: null });
@@ -51,13 +53,16 @@ export default function AdminOrders() {
 
   const handleApproveAndShip = async (order) => {
     if (!order.shippingAddress) {
-      alert('Cannot create shipment: Missing delivery address.');
+      showToast('Cannot create shipment: Missing delivery address.', 'error');
       return;
     }
 
-    const confirmApprove = window.confirm(
-      `APPROVE FOR DELIVERY PICKUP:\n\nSchedule Delhivery courier pickup and dispatch notification to delivery agent for Order #${order.id}?`
-    );
+    const confirmApprove = await showConfirm({
+      title: 'Approve For Delhivery Pickup',
+      message: `Schedule courier pickup and notify delivery agent for Order #${order.id}?`,
+      confirmText: 'Approve & Schedule',
+      cancelText: 'Cancel'
+    });
     if (!confirmApprove) return;
 
     setShippingOrderId(order.id);
@@ -79,13 +84,7 @@ export default function AdminOrders() {
           pickupDispatchedAt: new Date().toISOString()
         };
         await updateOrderShipment(order.id, shipmentData);
-        alert(
-          `✓ ORDER APPROVED FOR PICKUP!\n\n` +
-          `• Delhivery AWB: ${res.waybill}\n` +
-          `• Courier: Delhivery Express\n` +
-          `• Notification: Delhivery delivery agent notified for store pickup.\n` +
-          `• Order Status: Shipped`
-        );
+        showToast(`Order approved! Delhivery AWB: ${res.waybill}`, 'success', 5000);
         fetchOrders();
         if (selectedOrder && selectedOrder.id === order.id) {
           setSelectedOrder(prev => ({
@@ -98,7 +97,7 @@ export default function AdminOrders() {
         }
       }
     } catch (err) {
-      alert(`Failed to approve pickup: ${err.message}`);
+      showToast(`Failed to approve pickup: ${err.message}`, 'error');
     } finally {
       setShippingOrderId(null);
     }
@@ -125,7 +124,7 @@ export default function AdminOrders() {
       : cancelReason;
 
     if (!finalReason) {
-      alert('Please select a cancellation reason.');
+      showToast('Please select a cancellation reason.', 'warning');
       return;
     }
 
@@ -143,13 +142,13 @@ export default function AdminOrders() {
         cancelledAt: new Date()
       });
 
-      alert(`Order #${order.id} has been cancelled.\nReason: ${finalReason}`);
+      showToast(`Order #${order.id} cancelled. Reason: ${finalReason}`, 'info');
       fetchOrders();
       if (selectedOrder && selectedOrder.id === order.id) {
         setSelectedOrder(prev => ({ ...prev, status: 'Cancelled', cancellationReason: finalReason }));
       }
     } catch (err) {
-      alert(`Failed to cancel order: ${err.message}`);
+      showToast(`Failed to cancel order: ${err.message}`, 'error');
     } finally {
       setActionLoadingId(null);
     }

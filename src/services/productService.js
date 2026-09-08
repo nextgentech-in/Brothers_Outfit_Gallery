@@ -73,7 +73,7 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
 
   inFlightFetch = (async () => {
     try {
-      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(120));
+      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));
       const snapshot = await getDocs(q);
       const rawProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCachedProducts(rawProducts);
@@ -89,6 +89,24 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
   })();
 
   return inFlightFetch;
+};
+
+/**
+ * Fast search helper querying full active catalog for instant suggestion dropdowns
+ */
+export const searchProducts = async (searchQuery, maxResults = 8) => {
+  if (!searchQuery || !searchQuery.trim()) return [];
+  const rawList = await fetchAllActiveProducts();
+  const q = searchQuery.toLowerCase().trim();
+  const matched = rawList.filter(p => {
+    if (p.active === false) return false;
+    const name = (p.name || '').toLowerCase();
+    const category = (p.category || '').toLowerCase();
+    const subCategory = (p.subCategory || '').toLowerCase();
+    const sku = (p.sku || '').toLowerCase();
+    return name.includes(q) || category.includes(q) || subCategory.includes(q) || sku.includes(q);
+  });
+  return matched.slice(0, maxResults);
 };
 
 export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12) => {

@@ -23,9 +23,24 @@ export const CartProvider = ({ children }) => {
     }
   });
 
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [cartToast, setCartToast] = useState(null);
+
+  const openCartDrawer = () => setIsCartDrawerOpen(true);
+  const closeCartDrawer = () => setIsCartDrawerOpen(false);
+
+  const showToast = (item) => {
+    setCartToast(item);
+  };
+
+  const hideToast = () => setCartToast(null);
+
   useEffect(() => {
-    localStorage.setItem('brothers_cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+    if (cartToast) {
+      const timer = setTimeout(() => setCartToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [cartToast]);
 
   const resolveItemPrice = (product, safeSize, safeColor, explicitPrice = null) => {
     if (explicitPrice !== null && explicitPrice !== undefined && !isNaN(Number(explicitPrice))) {
@@ -90,6 +105,16 @@ export const CartProvider = ({ children }) => {
         stock: itemStock,
         quantity: Math.max(1, quantity)
       }];
+    });
+
+    showToast({
+      id: product.id,
+      name: product.name,
+      image: product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
+      size: safeSize,
+      color: safeColor,
+      price: activePrice,
+      quantity
     });
   };
 
@@ -173,7 +198,12 @@ export const CartProvider = ({ children }) => {
       cartSubtotal,
       appliedCoupon,
       applyCoupon,
-      removeCoupon
+      removeCoupon,
+      isCartDrawerOpen,
+      openCartDrawer,
+      closeCartDrawer,
+      cartToast,
+      hideToast
     }}>
       {children}
     </CartContext.Provider>

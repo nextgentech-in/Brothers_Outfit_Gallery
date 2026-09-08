@@ -4,6 +4,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct } from '../../utils/productUtils';
+import { useWishlist } from '../../context/WishlistContext';
 import SizeGuideModal from '../common/SizeGuideModal';
 import AuthModal from '../auth/AuthModal';
 import './ProductInfo.css';
@@ -43,6 +44,10 @@ function MiniCountdown({ targetDate }) {
 export default function ProductInfo({ product }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
+  const { isInWishlist, toggleWishlist } = useWishlist() || {};
+  const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
+  const [sizeError, setSizeError] = useState(false);
+
   const initialColor = product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black';
   const [selectedColor, setSelectedColor] = useState(initialColor);
   const defaultFrontVariant = useMemo(() => {
@@ -61,7 +66,7 @@ export default function ProductInfo({ product }) {
     if (defaultFrontVariant?.size && !selectedSize) {
       setSelectedSize(defaultFrontVariant.size);
     }
-  }, [defaultFrontVariant]);
+  }, [defaultFrontVariant, selectedSize]);
 
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
@@ -127,7 +132,9 @@ export default function ProductInfo({ product }) {
   const handleAddToCart = () => {
     // Only require mandatory size selection if item is Clothing/Apparel and has size options
     if (isClothing && productSizes.length > 0 && !selectedSize) {
-      return alert('PLEASE SELECT A SIZE FOR THIS CLOTHING ITEM');
+      setSizeError(true);
+      setTimeout(() => setSizeError(false), 3500);
+      return;
     }
 
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
@@ -144,7 +151,9 @@ export default function ProductInfo({ product }) {
 
   const handleBuyNow = () => {
     if (isClothing && productSizes.length > 0 && !selectedSize) {
-      return alert('PLEASE SELECT A SIZE FOR THIS CLOTHING ITEM');
+      setSizeError(true);
+      setTimeout(() => setSizeError(false), 3500);
+      return;
     }
 
     // If user does not have an account / is not logged in, pop up AuthModal first!
@@ -285,8 +294,14 @@ export default function ProductInfo({ product }) {
           </button>
         </div>
 
+        {sizeError && (
+          <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '8px 14px', borderRadius: '6px', fontSize: '12.5px', fontWeight: '800', marginBottom: '10px', border: '1px solid #fca5a5' }}>
+            ⚠️ Please select your size below before proceeding.
+          </div>
+        )}
+
         {productSizes.length > 0 ? (
-          <div className="size-buttons">
+          <div className="size-buttons" style={sizeError ? { outline: '2px solid #ef4444', borderRadius: '8px', padding: '4px' } : {}}>
             {productSizes.map(size => {
               // Read active stock distinct to color+size from variants matrix!
               let variantStock = null;
@@ -303,7 +318,10 @@ export default function ProductInfo({ product }) {
                   key={size}
                   className={`size-btn ${selectedSize === size ? 'selected' : ''} ${isSizeOos ? 'disabled' : ''}`}
                   disabled={isSizeOos}
-                  onClick={() => setSelectedSize(size)}
+                  onClick={() => {
+                    setSelectedSize(size);
+                    setSizeError(false);
+                  }}
                 >
                   {size}
                 </button>
@@ -322,9 +340,9 @@ export default function ProductInfo({ product }) {
         {outOfStock ? (
           <span className="stock-out">OUT OF STOCK</span>
         ) : stock <= 5 ? (
-          <span className="stock-low">Only {stock} left - Order soon</span>
+          <span className="stock-low">⚡ Only {stock} left in stock - Order soon</span>
         ) : (
-          <span className="stock-in">In Stock</span>
+          <span className="stock-in">✓ In Stock • Ready to Dispatch</span>
         )}
       </div>
 
@@ -347,6 +365,55 @@ export default function ProductInfo({ product }) {
       <button className="btn-buy-now" onClick={handleBuyNow} disabled={outOfStock}>
         BUY NOW
       </button>
+
+      {/* Wishlist Button on Product Page */}
+      <button
+        type="button"
+        onClick={() => toggleWishlist && toggleWishlist(product)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          padding: '12px 16px',
+          border: '1px solid #e2e8f0',
+          borderRadius: '6px',
+          background: inWishlist ? '#fff1f2' : '#ffffff',
+          color: inWishlist ? '#e11d48' : '#0f172a',
+          fontWeight: '700',
+          fontSize: '12.5px',
+          cursor: 'pointer',
+          width: '100%',
+          marginTop: '10px',
+          marginBottom: '16px',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#e11d48" : "none"} stroke={inWishlist ? "#e11d48" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+        </svg>
+        {inWishlist ? 'SAVED TO WISHLIST ✓' : 'SAVE TO WISHLIST'}
+      </button>
+
+      {/* Delivery & Purchase Confidence Badges */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>🚚 Delhivery Express</div>
+          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Estimated 2-4 business days across India</div>
+        </div>
+        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>🔁 48H Replacement</div>
+          <div style={{ fontSize: '11.5px', color: '#64748b' }}>For damaged/defective items with video</div>
+        </div>
+        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>🔒 100% Genuine</div>
+          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Direct from Himatnagar retail store</div>
+        </div>
+        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>⚡ Free Shipping</div>
+          <div style={{ fontSize: '11.5px', color: '#64748b' }}>On all prepaid & COD orders above ₹999</div>
+        </div>
+      </div>
 
       <div className="delivery-checker">
         <h4 className="checker-title">📦 CHECK DELHIVERY EXPRESS SERVICEABILITY</h4>

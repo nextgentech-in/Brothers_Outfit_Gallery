@@ -1,11 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getAdminCoupons, createCoupon, deleteCoupon } from '../../services/adminService';
+import { useAdminUI } from '../../context/AdminUIContext';
+import { useFocusTrap } from '../../utils/a11yUtils';
 import './AdminCoupons.css';
 
 export default function AdminCoupons() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const modalRef = useRef(null);
+  const { showToast, showConfirm } = useAdminUI();
+
+  useFocusTrap(modalRef, showModal, () => setShowModal(false));
+
   const [newCoupon, setNewCoupon] = useState({
     code: '',
     discountType: 'percentage', // 'percentage' or 'flat'
@@ -28,22 +35,37 @@ export default function AdminCoupons() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newCoupon.code || !newCoupon.discountValue) {
-      return alert('Please enter code and discount value');
+      showToast('Please enter coupon code and discount value', 'warning');
+      return;
     }
-    await createCoupon({
-      ...newCoupon,
-      discountValue: Number(newCoupon.discountValue),
-      minOrderAmount: Number(newCoupon.minOrderAmount) || 0,
-      active: true
-    });
-    setNewCoupon({ code: '', discountType: 'percentage', discountValue: '', minOrderAmount: '', expiryDate: '' });
-    setShowModal(false);
-    fetchCoupons();
+    try {
+      await createCoupon({
+        ...newCoupon,
+        discountValue: Number(newCoupon.discountValue),
+        minOrderAmount: Number(newCoupon.minOrderAmount) || 0,
+        active: true
+      });
+      showToast(`Coupon ${newCoupon.code.toUpperCase()} created successfully!`, 'success');
+      setNewCoupon({ code: '', discountType: 'percentage', discountValue: '', minOrderAmount: '', expiryDate: '' });
+      setShowModal(false);
+      fetchCoupons();
+    } catch (err) {
+      showToast(err.message || 'Failed to create coupon', 'error');
+    }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Delete this coupon code?")) {
+    const confirmed = await showConfirm({
+      title: 'Delete Coupon',
+      message: 'Are you sure you want to delete this coupon code?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      isDestructive: true
+    });
+
+    if (confirmed) {
       await deleteCoupon(id);
+      showToast('Coupon deleted successfully.', 'success');
       fetchCoupons();
     }
   };
@@ -58,8 +80,13 @@ export default function AdminCoupons() {
       </div>
 
       {showModal && (
-        <div className="coupon-modal-backdrop">
-          <form className="coupon-modal-form" onSubmit={handleCreate}>
+        <div className="coupon-modal-backdrop" onClick={() => setShowModal(false)}>
+          <form 
+            ref={modalRef}
+            className="coupon-modal-form" 
+            onSubmit={handleCreate}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3>Create New Discount Coupon</h3>
             
             <div className="admin-form-group">

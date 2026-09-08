@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './Footer.css';
 
 export default function Footer() {
+  const [subscribed, setSubscribed] = useState(false);
+
   return (
     <footer className="site-footer">
       <div className="footer-container">
@@ -13,10 +15,22 @@ export default function Footer() {
             <h2 className="newsletter-title">STAY IN STYLE</h2>
             <p className="newsletter-subtitle">Get first access to new arrivals, limited-time offers and exclusive updates.</p>
           </div>
-          <form className="newsletter-form" onSubmit={(e) => { e.preventDefault(); alert('Subscribed! We\'ll send updates to your mobile number.'); }}>
-            <input type="tel" placeholder="Enter your mobile number" required pattern="[0-9]{10}" maxLength="10" className="newsletter-input" />
-            <button type="submit" className="newsletter-btn">SUBSCRIBE</button>
-          </form>
+          {subscribed ? (
+            <div style={{ color: '#10b981', fontWeight: 600, fontSize: '14px', padding: '10px 0' }}>
+              ✓ Subscribed! Exclusive style drops will be sent to your mobile.
+            </div>
+          ) : (
+            <form 
+              className="newsletter-form" 
+              onSubmit={(e) => { 
+                e.preventDefault(); 
+                setSubscribed(true); 
+              }}
+            >
+              <input type="tel" placeholder="Enter your mobile number" required pattern="[0-9]{10}" maxLength="10" className="newsletter-input" />
+              <button type="submit" className="newsletter-btn">SUBSCRIBE</button>
+            </form>
+          )}
         </div>
 
         {/* Main Footer Links */}
@@ -86,10 +100,10 @@ export default function Footer() {
           <div className="footer-col">
             <h4 className="footer-col-title">LEGAL</h4>
             <ul className="footer-links">
-              <li><Link to="/about#privacy">Privacy Policy</Link></li>
-              <li><Link to="/about#terms">Terms & Conditions</Link></li>
-              <li><Link to="/about#shipping">Shipping Policy</Link></li>
-              <li><Link to="/about#exchange">Exchange Policy</Link></li>
+              <li><Link to="/privacy">Privacy Policy</Link></li>
+              <li><Link to="/terms">Terms & Conditions</Link></li>
+              <li><Link to="/shipping">Shipping Policy</Link></li>
+              <li><Link to="/returns">Returns & Exchange</Link></li>
             </ul>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminProducts, deactivateProduct, deleteProduct, toggleProductTrending } from '../../services/adminService';
+import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminProducts.css';
 
 export default function AdminProducts() {
@@ -9,6 +10,7 @@ export default function AdminProducts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); // 'all' | 'trending' | 'sale' | 'inactive'
   const [togglingId, setTogglingId] = useState(null);
+  const { showToast, showConfirm } = useAdminUI();
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -28,26 +30,44 @@ export default function AdminProducts() {
     setProducts(prev => prev.map(p => p.id === id ? { ...p, isTrending: newStatus } : p));
     try {
       await toggleProductTrending(id, newStatus);
+      showToast(newStatus ? 'Product marked as Trending!' : 'Product removed from Trending.', 'success');
     } catch (err) {
       console.error('Failed to toggle trending status:', err);
       // Rollback on error
       setProducts(prev => prev.map(p => p.id === id ? { ...p, isTrending: currentStatus } : p));
-      alert('Failed to update trending status. Please check your connection.');
+      showToast('Failed to update trending status. Please check your connection.', 'error');
     } finally {
       setTogglingId(null);
     }
   };
 
   const handleDeactivate = async (id) => {
-    if (window.confirm("Are you sure you want to deactivate this product?")) {
+    const confirmed = await showConfirm({
+      title: 'Deactivate Product',
+      message: 'Are you sure you want to deactivate this product? It will be hidden from customer storefront.',
+      confirmText: 'Deactivate',
+      cancelText: 'Cancel'
+    });
+
+    if (confirmed) {
       await deactivateProduct(id);
+      showToast('Product deactivated successfully.', 'success');
       fetchProducts();
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("WARNING: Are you sure you want to PERMANENTLY delete this product?")) {
+    const confirmed = await showConfirm({
+      title: 'Permanently Delete Product',
+      message: 'WARNING: Are you sure you want to PERMANENTLY delete this product? This action cannot be undone.',
+      confirmText: 'Delete Permanently',
+      cancelText: 'Cancel',
+      isDestructive: true
+    });
+
+    if (confirmed) {
       await deleteProduct(id);
+      showToast('Product deleted permanently.', 'success');
       fetchProducts();
     }
   };

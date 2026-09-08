@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createProduct, updateProduct, getAdminProductById, deleteProductImage, generateProductId } from '../../services/adminService';
+import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminProductForm.css';
 
 import { getBackendUrl } from '../../utils/apiConfig';
@@ -72,6 +73,7 @@ export default function AdminProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
+  const { showToast } = useAdminUI();
 
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
@@ -309,7 +311,7 @@ export default function AdminProductForm() {
   // Bulk set price for ALL existing variants simultaneously
   const handleApplyBulkPrice = () => {
     if (bulkPriceToApply === '' || isNaN(Number(bulkPriceToApply))) {
-      alert('Please enter a valid price amount');
+      showToast('Please enter a valid price amount', 'warning');
       return;
     }
     const priceNum = parseFloat(bulkPriceToApply);
@@ -318,13 +320,14 @@ export default function AdminProductForm() {
       ...prev,
       variants: prev.variants.map(v => ({ ...v, price: priceNum, salePrice: priceNum }))
     }));
+    showToast(`Bulk price ₹${priceNum} applied to all variants`, 'success');
   };
 
   // Handle adding user's custom-typed size (e.g. 250ml or 44 Slim)
   const handleAddCustomSize = (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (!customSizeName.trim()) {
-      alert('Please enter a size or volume name (e.g. 250ml, 3XL, or Combo Pack)');
+      showToast('Please enter a size or volume name (e.g. 250ml, 3XL, or Combo Pack)', 'warning');
       return;
     }
     handleAddSizeWithStock(customSizeName.trim(), customSizeStock, customSizePrice);
@@ -406,11 +409,11 @@ export default function AdminProductForm() {
 
     files.forEach((file) => {
       if (!validTypes.includes(file.type) && !file.name.match(/\.(jpe?g|png|webp|avif)$/i)) {
-        alert(`${file.name}: Please upload a JPG, PNG, WEBP or AVIF image.`);
+        showToast(`${file.name}: Please upload a JPG, PNG, WEBP or AVIF image.`, 'warning');
         return;
       }
       if (file.size > MAX_FILE_SIZE) {
-        alert(`${file.name}: Image must be 10 MB or smaller.`);
+        showToast(`${file.name}: Image must be 10 MB or smaller.`, 'error');
         return;
       }
 

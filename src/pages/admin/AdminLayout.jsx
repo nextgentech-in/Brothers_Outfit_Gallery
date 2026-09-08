@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { subscribeAdminNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../../services/notificationService';
+import { AdminUIProvider } from '../../context/AdminUIContext';
+import AdminConfirmModal from '../../components/admin/AdminConfirmModal';
+import AdminToast from '../../components/admin/AdminToast';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
@@ -82,128 +85,131 @@ export default function AdminLayout() {
     { label: 'Coupons', to: '/admin/coupons' },
     { label: 'Homepage', to: '/admin/homepage' },
     { label: 'Settings', to: '/admin/settings' },
-  ];
+  ];  return (
+    <AdminUIProvider>
+      <div className="admin-layout">
+        <AdminToast />
+        <AdminConfirmModal />
 
-  return (
-    <div className="admin-layout">
-      {/* Toast Alert popup for New Orders */}
-      {toastAlert && (
-        <div className="admin-toast-alert" onClick={() => { navigate('/admin/orders'); setToastAlert(null); }}>
-          <div className="toast-icon">🔔</div>
-          <div className="toast-content">
-            <strong>🚨 NEW ORDER RECEIVED!</strong>
-            <p>{toastAlert.message}</p>
+        {/* Toast Alert popup for New Orders */}
+        {toastAlert && (
+          <div className="admin-toast-alert" onClick={() => { navigate('/admin/orders'); setToastAlert(null); }}>
+            <div className="toast-icon">🔔</div>
+            <div className="toast-content">
+              <strong>🚨 NEW ORDER RECEIVED!</strong>
+              <p>{toastAlert.message}</p>
+            </div>
+            <button className="toast-close" onClick={(e) => { e.stopPropagation(); setToastAlert(null); }}>✕</button>
           </div>
-          <button className="toast-close" onClick={(e) => { e.stopPropagation(); setToastAlert(null); }}>✕</button>
-        </div>
-      )}
+        )}
 
-      {/* Mobile Header Toggle with Left Menu and Top Back Option */}
-      <div className="admin-mobile-header">
-        <div className="admin-mobile-header-left">
-          <button 
-            className="admin-menu-toggle" 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Open Navigation Menu"
-          >
-            ☰
-          </button>
-          <h2 className="admin-mobile-title">ADMIN PANEL</h2>
+        {/* Mobile Header Toggle with Left Menu and Top Back Option */}
+        <div className="admin-mobile-header">
+          <div className="admin-mobile-header-left">
+            <button 
+              className="admin-menu-toggle" 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Open Navigation Menu"
+            >
+              ☰
+            </button>
+            <h2 className="admin-mobile-title">ADMIN PANEL</h2>
+          </div>
+          <div className="admin-mobile-header-right">
+            <Link to="/" className="admin-mobile-back-btn" title="Back to Customer Storefront">
+              ← Store
+            </Link>
+            <button className="admin-notif-bell" onClick={handleOpenDropdown} aria-label="Order Alerts">
+              🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+            </button>
+          </div>
         </div>
-        <div className="admin-mobile-header-right">
-          <Link to="/" className="admin-mobile-back-btn" title="Back to Customer Storefront">
-            ← Store
-          </Link>
-          <button className="admin-notif-bell" onClick={handleOpenDropdown} aria-label="Order Alerts">
-            🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-          </button>
-        </div>
-      </div>
 
-      {/* Sidebar Overlay */}
-      {sidebarOpen && <div className="admin-sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
+        {/* Sidebar Overlay */}
+        {sidebarOpen && <div className="admin-sidebar-overlay" onClick={() => setSidebarOpen(false)}></div>}
 
-      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="admin-sidebar__header">
-          <h2 className="admin-sidebar__title">ADMIN PANEL</h2>
-        </div>
-        
-        <nav className="admin-sidebar__nav">
-          {links.map(link => {
-            if (link.isHome) {
+        <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
+          <div className="admin-sidebar__header">
+            <h2 className="admin-sidebar__title">ADMIN PANEL</h2>
+          </div>
+          
+          <nav className="admin-sidebar__nav">
+            {links.map(link => {
+              if (link.isHome) {
+                return (
+                  <Link key={link.label} to={link.to} className="admin-sidebar__link admin-sidebar__home">
+                    {link.label}
+                  </Link>
+                );
+              }
+
+              const isActive = link.to === '/admin' 
+                ? location.pathname === '/admin' // exact match for dashboard
+                : location.pathname.startsWith(link.to); // partial match for sub-routes
+              
               return (
-                <Link key={link.label} to={link.to} className="admin-sidebar__link admin-sidebar__home">
+                <Link 
+                  key={link.label} 
+                  to={link.to} 
+                  className={`admin-sidebar__link ${isActive ? 'active' : ''}`}
+                >
                   {link.label}
+                  {link.label === 'Orders' && unreadCount > 0 && (
+                    <span className="sidebar-orders-badge">{unreadCount}</span>
+                  )}
                 </Link>
               );
-            }
+            })}
+          </nav>
+        </aside>
 
-            const isActive = link.to === '/admin' 
-              ? location.pathname === '/admin' // exact match for dashboard
-              : location.pathname.startsWith(link.to); // partial match for sub-routes
-            
-            return (
-              <Link 
-                key={link.label}
-                to={link.to} 
-                className={`admin-sidebar__link ${isActive ? 'active' : ''}`}
-              >
-                {link.label}
-                {link.label === 'Orders' && unreadCount > 0 && (
-                  <span className="sidebar-orders-badge">{unreadCount}</span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
+        <main className="admin-main">
+          {/* Inline Header Bar with Order Alert Bell */}
+          <div className="admin-inline-header">
+            <div className="admin-inline-notif-container">
+              <button className="admin-notif-bell-btn" onClick={handleOpenDropdown}>
+                🔔 Order Alerts
+                {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+              </button>
 
-      <main className="admin-main">
-        {/* Inline Header Bar with Order Alert Bell */}
-        <div className="admin-inline-header">
-          <div className="admin-inline-notif-container">
-            <button className="admin-notif-bell-btn" onClick={handleOpenDropdown}>
-              🔔 Order Alerts
-              {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-            </button>
-
-            {showNotifDropdown && (
-              <div className="admin-notif-dropdown">
-                <div className="notif-header">
-                  <strong>Notifications ({unreadCount} Unread)</strong>
-                  {unreadCount > 0 && (
-                    <button onClick={handleClearAll} className="btn-clear-notifs">
-                      Mark all as read
-                    </button>
-                  )}
-                </div>
-                <div className="notif-list">
-                  {notifications.length === 0 ? (
-                    <div className="notif-empty">No order alerts yet.</div>
-                  ) : (
-                    notifications.slice(0, 10).map(n => (
-                      <div 
-                        key={n.id} 
-                        className={`notif-item ${n.read ? 'read' : 'unread'}`}
-                        onClick={() => handleNotificationClick(n)}
-                      >
-                        <div className="notif-item-title">{n.title}</div>
-                        <div className="notif-item-msg">{n.message}</div>
-                        <div className="notif-item-time">
-                          {n.createdAt?.toDate ? n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+              {showNotifDropdown && (
+                <div className="admin-notif-dropdown">
+                  <div className="notif-header">
+                    <strong>Notifications ({unreadCount} Unread)</strong>
+                    {unreadCount > 0 && (
+                      <button onClick={handleClearAll} className="btn-clear-notifs">
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div className="notif-list">
+                    {notifications.length === 0 ? (
+                      <div className="notif-empty">No order alerts yet.</div>
+                    ) : (
+                      notifications.slice(0, 10).map(n => (
+                        <div 
+                          key={n.id} 
+                          className={`notif-item ${n.read ? 'read' : 'unread'}`}
+                          onClick={() => handleNotificationClick(n)}
+                        >
+                          <div className="notif-item-title">{n.title}</div>
+                          <div className="notif-item-msg">{n.message}</div>
+                          <div className="notif-item-time">
+                            {n.createdAt?.toDate ? n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                          </div>
                         </div>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
 
-        <Outlet />
-      </main>
-    </div>
+          <Outlet />
+        </main>
+      </div>
+    </AdminUIProvider>
   );
 }
 

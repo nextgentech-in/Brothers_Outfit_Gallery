@@ -8,7 +8,8 @@ import {
   signOut,
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult
+  getRedirectResult,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -159,6 +160,10 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  const resetPassword = (email) => {
+    return sendPasswordResetEmail(auth, email);
+  };
+
   const value = {
     currentUser,
     userProfile,
@@ -166,7 +171,8 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     loginWithGoogle,
-    updateFirestoreProfile
+    updateFirestoreProfile,
+    resetPassword
   };
 
   return (
