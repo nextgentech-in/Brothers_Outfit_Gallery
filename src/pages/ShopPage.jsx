@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
 import { getShopProducts } from '../services/productService';
@@ -41,6 +42,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function ShopPage() {
+  const [searchParams] = useSearchParams();
   const {
     products, setProducts,
     lastVisible, setLastVisible,
@@ -62,7 +64,23 @@ export default function ShopPage() {
   const [subCategory, setSubCategory] = useState('All');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [displayLimit, setDisplayLimit] = useState(12);
-  const mounted = useRef(false);
+
+  // Sync URL search parameters if arriving from links
+  useEffect(() => {
+    const urlCategory = searchParams.get('category');
+    const urlSearch = searchParams.get('search');
+    const urlSort = searchParams.get('sort');
+
+    if (urlCategory && urlCategory !== category) {
+      setCategory(urlCategory);
+    }
+    if (urlSearch && urlSearch !== search) {
+      setSearch(urlSearch);
+    }
+    if (urlSort && urlSort !== sortBy) {
+      setSortBy(urlSort);
+    }
+  }, [searchParams]);
 
   // Debounce search input
   useEffect(() => {
@@ -75,13 +93,13 @@ export default function ShopPage() {
     setDisplayLimit(12);
   }, [category, subCategory, debouncedSearch, priceRange, selectedSizes, selectedColors, sortBy]);
 
-  // Fetch full category or catalog from Firestore/cache
+  // Fetch complete active catalog from Firestore/cache once
   const fetchProducts = async () => {
     setLoading(true);
     try {
       const result = await getShopProducts(
-        category,
-        sortBy,
+        'All',
+        'newest',
         null,
         500
       );
@@ -99,7 +117,7 @@ export default function ShopPage() {
   // Initial load or restore position
   useEffect(() => {
     if (products.length === 0) {
-      fetchProducts(false);
+      fetchProducts();
     } else {
       // Products already exist in context, restore scroll position smoothly
       const position = scrollPosition || 0;
@@ -118,67 +136,26 @@ export default function ShopPage() {
     const handleScroll = () => {
       setScrollPosition(window.scrollY);
     };
-    // Debounce or just passive listener to keep track constantly
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [setScrollPosition]);
-
-  // When filters that map to Firebase queries change, refetch!
-  useEffect(() => {
-    if (mounted.current) {
-      // Only refetch if we are sorting or category-filtering, because these map to Firestore query.
-      // Other filters are handled purely client-side on the fetched `products` array.
-      setProducts([]);
-      setLastVisible(null);
-      setHasMore(true);
-      fetchProducts(false);
-    } else {
-      mounted.current = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, sortBy]); 
+  }, [setScrollPosition]); 
 
   // Reset sub-category when category changes
   useEffect(() => {
     setSubCategory('All');
   }, [category]);
 
-  // Client-side filtering for search, price ranges, sizes, colors
+  // Comprehensive catalog filtering for category, search, price ranges, sizes, colors, and sorting
   const filtered = useMemo(() => {
     let result = [...products];
 
-    // Search (debounced)
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase().trim();
-      result = result.filter(p =>
-        (p.name && p.name.toLowerCase().includes(q)) ||
-        (p.category && p.category.toLowerCase().includes(q)) ||
-        (p.sku && p.sku.toLowerCase().includes(q))
-      );
-    }
-
-    // Price
-    const range = PRICE_RANGES[priceRange];
-    if (range) {
-      result = result.filter(p => p.price >= range.min && p.price <= range.max);
-    }
-
-    // Multi-Size Filter
-    if (selectedSizes && selectedSizes.length > 0) {
+    // Category Filter
+    if (category && category !== 'All') {
+      const catLower = category.toLowerCase().trim();
       result = result.filter(p => {
-        const pSizes = getProductSizes(p).map(s => s.toLowerCase());
-        return selectedSizes.some(sz => pSizes.includes(sz.toLowerCase()));
-      });
-    }
-
-    // Multi-Color Filter (Fixed! Checks objects, strings, variants)
-    if (selectedColors && selectedColors.length > 0) {
-      result = result.filter(p => {
-        const pColors = getProductColors(p).map(c => c.toLowerCase());
-        return selectedColors.some(clr => {
-          const target = clr.toLowerCase();
-          return pColors.some(pc => pc === target || pc.includes(target) || target.includes(pc));
-        });
+        const pCat = String(p.category || '').toLowerCase().trim();
+        const pCatId = String(p.categoryId || '').toLowerCase().trim();
+        return pCat === catLower || pCatId === catLower;
       });
     }
 
@@ -190,8 +167,68 @@ export default function ShopPage() {
       });
     }
 
+    // Search (debounced across title, category, subCategory, and SKU)
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
+      result = result.filter(p =>
+        (p.name && p.name.toLowerCase().includes(q)) ||
+        (p.category && p.category.toLowerCase().includes(q)) ||
+        (p.subCategory && p.subCategory.toLowerCase().includes(q)) ||
+        (p.sku && p.sku.toLowerCase().includes(q))
+      );
+    }
+
+    // Price
+    const range = PRICE_RANGES[priceRange];
+    if (range) {
+      result = result.filter(p => {
+        const itemPrice = p.salePrice || p.price || 0;
+        return itemPrice >= range.min && itemPrice <= range.max;
+      });
+    }
+
+    // Multi-Size Filter
+    if (selectedSizes && selectedSizes.length > 0) {
+      result = result.filter(p => {
+        const pSizes = getProductSizes(p).map(s => s.toLowerCase());
+        return selectedSizes.some(sz => pSizes.includes(sz.toLowerCase()));
+      });
+    }
+
+    // Multi-Color Filter (checks objects, strings, variants)
+    if (selectedColors && selectedColors.length > 0) {
+      result = result.filter(p => {
+        const pColors = getProductColors(p).map(c => c.toLowerCase());
+        return selectedColors.some(clr => {
+          const target = clr.toLowerCase();
+          return pColors.some(pc => pc === target || pc.includes(target) || target.includes(pc));
+        });
+      });
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortBy === 'price-asc') {
+        const pA = a.salePrice || a.price || 0;
+        const pB = b.salePrice || b.price || 0;
+        return pA - pB;
+      }
+      if (sortBy === 'price-desc') {
+        const pA = a.salePrice || a.price || 0;
+        const pB = b.salePrice || b.price || 0;
+        return pB - pA;
+      }
+      if (sortBy === 'best-selling') {
+        return (b.rating || 0) - (a.rating || 0);
+      }
+      // Default newest
+      const timeA = a.createdAt?.seconds || (typeof a.createdAt === 'number' ? a.createdAt : 0);
+      const timeB = b.createdAt?.seconds || (typeof b.createdAt === 'number' ? b.createdAt : 0);
+      return timeB - timeA;
+    });
+
     return result;
-  }, [products, debouncedSearch, priceRange, selectedSizes, selectedColors, subCategory]);
+  }, [products, category, subCategory, debouncedSearch, priceRange, selectedSizes, selectedColors, sortBy]);
 
   const clearFilters = () => {
     setSearch('');
@@ -226,8 +263,8 @@ export default function ShopPage() {
       {/* Header */}
       <div className="shop-header">
         <span className="shop-header__label">COLLECTION</span>
-        <h1 className="shop-header__title">SHOP ALL</h1>
-        <p className="shop-header__subtitle">Discover our latest men's collection.</p>
+        <h1 className="shop-header__title">Shop All</h1>
+        <p className="shop-header__subtitle">Discover our latest menswear collection.</p>
       </div>
 
       {/* Controls */}
@@ -513,9 +550,27 @@ export default function ShopPage() {
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 <line x1="8" y1="11" x2="14" y2="11"/>
               </svg>
-              <h3 className="shop-empty__title">NO PRODUCTS FOUND</h3>
-              <p className="shop-empty__text">Try changing your filters or search for another product.</p>
-              <button className="shop-empty__clear" onClick={clearFilters}>CLEAR FILTERS</button>
+              <h3 className="shop-empty__title">No Products Found</h3>
+              <p className="shop-empty__text">
+                {debouncedSearch.trim() && category !== 'All' 
+                  ? `No matching items found in "${category}".` 
+                  : 'Try changing your filters or searching for a different item.'}
+              </p>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '12px' }}>
+                {debouncedSearch.trim() && category !== 'All' && (
+                  <button 
+                    type="button" 
+                    className="shop-empty__clear" 
+                    onClick={() => setCategory('All')}
+                    style={{ background: 'var(--color-charcoal, #111111)', color: 'var(--color-ivory, #F7F4EE)' }}
+                  >
+                    Search All Categories for "{debouncedSearch}"
+                  </button>
+                )}
+                <button type="button" className="shop-empty__clear" onClick={clearFilters}>
+                  Clear All Filters
+                </button>
+              </div>
             </div>
           )}
 
@@ -527,15 +582,18 @@ export default function ShopPage() {
                 onClick={() => setDisplayLimit(prev => prev + 12)}
                 style={{ 
                   padding: '12px 30px', 
-                  background: 'var(--color-heading)', 
-                  color: 'white', 
+                  background: 'var(--color-charcoal, #111111)', 
+                  color: 'var(--color-ivory, #F7F4EE)', 
                   border: 'none', 
-                  borderRadius: '4px',
+                  borderRadius: 'var(--radius-sm, 4px)',
                   cursor: 'pointer',
-                  fontWeight: '600'
+                  fontWeight: '700',
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  fontSize: '12px'
                 }}
               >
-                LOAD MORE ({filtered.length - displayLimit} REMAINING)
+                Load More ({filtered.length - displayLimit} Remaining)
               </button>
             </div>
           )}

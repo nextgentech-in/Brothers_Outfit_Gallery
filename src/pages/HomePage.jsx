@@ -25,18 +25,18 @@ export default function HomePage() {
     showReviews: true,
     trending: {
       label: 'CURATED FOR YOU',
-      title: 'TRENDING NOW',
+      title: 'Trending Now',
       subtitle: "Discover the styles defining men's fashion right now."
     },
     hero: {
       bannerImage: '/images/hero.png',
       mobileBannerImage: '',
       eyebrow: 'NEW SEASON 2026',
-      heading: 'DEFINE YOUR\nEVERYDAY STYLE',
+      heading: 'Define Your\nEveryday Style',
       description: "Premium men's clothing designed for confidence, comfort and effortless style.",
-      saleButtonText: '🔥 SALE — UP TO 50% OFF',
+      saleButtonText: 'Season Sale — Up to 50% Off',
       saleButtonLink: '/sale',
-      primaryButtonText: 'EXPLORE CATALOG',
+      primaryButtonText: 'Explore Catalog',
       primaryButtonLink: '/shop',
       overlayOpacity: 0.55
     }
@@ -99,9 +99,8 @@ export default function HomePage() {
         <section className="home-section sale-section">
           <div className="home-container">
             <div className="section-header">
-              <h2>SALE — LIMITED TIME</h2>
-              <p className="subtitle">Great styles. Better prices. Only for a limited time.</p>
-              <p className="urgency">Hurry — these offers won't last forever.</p>
+              <h2>Sale & Special Offers</h2>
+              <p className="subtitle">Explore curated seasonal reductions and wardrobe investments.</p>
             </div>
             
             <div className="product-grid">
@@ -114,7 +113,7 @@ export default function HomePage() {
             </div>
             
             <div className="section-footer">
-              <Link to="/sale" className="btn-view-all">VIEW ALL SALE →</Link>
+              <Link to="/sale" className="btn-view-all">View All Sale →</Link>
             </div>
           </div>
         </section>
@@ -125,8 +124,8 @@ export default function HomePage() {
         <section className="home-section new-arrivals-section">
           <div className="home-container">
             <div className="section-header">
-              <h2>NEW ARRIVALS</h2>
-              <p className="subtitle">Fresh styles added in the last 10 days.</p>
+              <h2>New Arrivals</h2>
+              <p className="subtitle">Fresh silhouettes and fabrics added to the collection.</p>
             </div>
             
             <div className="product-grid">
@@ -139,7 +138,7 @@ export default function HomePage() {
             </div>
             
             <div className="section-footer">
-              <Link to="/new-arrivals" className="btn-view-all">VIEW ALL NEW ARRIVALS →</Link>
+              <Link to="/new-arrivals" className="btn-view-all">View All New Arrivals →</Link>
             </div>
           </div>
         </section>
@@ -150,8 +149,8 @@ export default function HomePage() {
         <section className="home-section shop-section">
           <div className="home-container">
             <div className="section-header">
-              <h2>SHOP OUR COLLECTION</h2>
-              <p className="subtitle">Find your everyday essentials, statement pieces and timeless men's styles.</p>
+              <h2>Shop the Collection</h2>
+              <p className="subtitle">Everyday essentials, tailoring, and contemporary menswear.</p>
             </div>
             
             <div className="product-grid">
@@ -164,7 +163,7 @@ export default function HomePage() {
             </div>
             
             <div className="section-footer">
-              <Link to="/shop" className="btn-view-all">VIEW ALL PRODUCTS →</Link>
+              <Link to="/shop" className="btn-view-all">View All Products →</Link>
             </div>
           </div>
         </section>
@@ -176,13 +175,13 @@ export default function HomePage() {
           <div className="home-container">
             <div className="about-grid">
               <div className="about-img-wrap">
-                <img src="/images/store-real-1.jpeg" alt="Brothers Outfit - Our Real Store" className="about-img" />
+                <img src="/images/store-real-1.jpeg" alt="Brothers Outfit - Himatnagar Flagship Store" className="about-img" />
               </div>
               <div className="about-content">
-                <h2>ABOUT BROTHERS OUTFIT GALLERY</h2>
-                <p>At Brothers Outfit Gallery, we bring together modern men's fashion, quality clothing and a shopping experience built around confidence, comfort and personal style.</p>
-                <p>For years, we've focused on delivering the highest quality pieces—from everyday essentials to statement looks. Whether you visit our physical location or shop online, our commitment to excellent customer service remains our cornerstone.</p>
-                <Link to="/about" className="btn-secondary">DISCOVER OUR STORY →</Link>
+                <h2>About Brother's Outfit Gallery</h2>
+                <p>At Brother's Outfit Gallery, we curate modern men's fashion built around impeccable tailoring, fabric integrity, and effortless everyday style.</p>
+                <p>From essential shirts and premium denim to contemporary occasion wear, our store in Himatnagar and online gallery stand for quality, honest pricing, and dedicated customer care.</p>
+                <Link to="/about" className="btn-secondary">Discover Our Story →</Link>
               </div>
             </div>
           </div>
@@ -194,46 +193,46 @@ export default function HomePage() {
         <section className="home-section trust-section">
           <div className="home-container">
             <div className="section-header">
-              <h2>WHY SHOP WITH US</h2>
+              <h2>Why Choose Brother's</h2>
             </div>
             
             <div className="trust-grid">
               <div className="trust-item">
                 <div className="trust-icon" aria-hidden="true">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                   </svg>
                 </div>
-                <h3>PREMIUM QUALITY</h3>
-                <p>Quality-focused men's fashion for everyday wear.</p>
+                <h3>Premium Fabrics</h3>
+                <p>Durable cottons, breathable knits and refined textures made for comfort.</p>
               </div>
               <div className="trust-item">
                 <div className="trust-icon" aria-hidden="true">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20.38 3.46L16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
                   </svg>
                 </div>
-                <h3>MODERN STYLES</h3>
-                <p>Contemporary styles for different occasions.</p>
+                <h3>Modern Silhouettes</h3>
+                <p>Flattering fits tailored for both daily versatility and evening wear.</p>
               </div>
               <div className="trust-item">
                 <div className="trust-icon" aria-hidden="true">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                   </svg>
                 </div>
-                <h3>SECURE SHOPPING</h3>
-                <p>A secure and convenient online shopping experience.</p>
+                <h3>Secure Checkout</h3>
+                <p>Verified UPI, cards, net banking, and cash on delivery options.</p>
               </div>
               <div className="trust-item">
                 <div className="trust-icon" aria-hidden="true">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
                   </svg>
                 </div>
-                <h3>EASY SUPPORT</h3>
-                <p>Customer support when you need help.</p>
+                <h3>Direct Support</h3>
+                <p>Direct WhatsApp & phone assistance for sizing, delivery, and returns.</p>
               </div>
             </div>
           </div>
@@ -245,8 +244,8 @@ export default function HomePage() {
         <section className="home-section reviews-section">
           <div className="home-container">
             <div className="section-header">
-              <h2>WHAT OUR CUSTOMERS SAY</h2>
-              <p className="subtitle">Real experiences from our customers.</p>
+              <h2>What Our Customers Say</h2>
+              <p className="subtitle">Real feedback from verified menswear shoppers.</p>
             </div>
             
             <div className="reviews-grid">
@@ -268,7 +267,7 @@ export default function HomePage() {
             </div>
             
             <div className="section-footer">
-              <Link to="/about" className="btn-view-all">READ CUSTOMER REVIEWS →</Link>
+              <Link to="/about" className="btn-view-all">Read Customer Reviews →</Link>
             </div>
           </div>
         </section>

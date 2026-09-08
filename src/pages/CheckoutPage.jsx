@@ -500,23 +500,26 @@ export default function CheckoutPage() {
 
   if (cartItems.length === 0) {
     return (
-      <div style={{ padding: '80px', textAlign: 'center' }}>
-        <h2>YOUR CART IS EMPTY</h2>
-        <button onClick={() => navigate('/shop')} className="btn-auth-primary" style={{ width: 'auto', margin: '20px auto' }}>
-          RETURN TO SHOP
-        </button>
+      <div className="checkout-page-wrapper">
+        <div style={{ padding: '80px 20px', textAlign: 'center' }}>
+          <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-charcoal, #111111)', letterSpacing: '-0.3px', fontWeight: 700 }}>Your Cart is Empty</h2>
+          <button onClick={() => navigate('/shop')} className="btn-continue-shopping" style={{ margin: '20px auto', display: 'inline-block' }}>
+            Return to Shop
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="checkout-page-container">
-      <div className="checkout-header">
-        <h1>SECURE CHECKOUT</h1>
-        <p>Complete your delivery address and select payment mode.</p>
-      </div>
+    <div className="checkout-page-wrapper">
+      <div className="checkout-page-container">
+        <div className="checkout-header">
+          <h1>Secure Checkout</h1>
+          <p>Complete your delivery address and select payment mode.</p>
+        </div>
 
-      {error && <div className="checkout-error-banner">{error}</div>}
+        {error && <div className="checkout-error-banner">{error}</div>}
 
       <form onSubmit={handlePlaceOrder} className="checkout-grid">
         {/* Left Column: Shipping Address */}
@@ -898,7 +901,7 @@ export default function CheckoutPage() {
             )}
             <div className="summary-row"><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span></div>
             <div className="summary-divider"></div>
-            <div className="summary-row total"><span>TOTAL AMOUNT</span><span>₹{finalTotal.toLocaleString('en-IN')}</span></div>
+            <div className="summary-row total"><span>Total Amount</span><span>₹{finalTotal.toLocaleString('en-IN')}</span></div>
           </div>
 
           <button
@@ -906,7 +909,7 @@ export default function CheckoutPage() {
             disabled={loading}
             className="btn-pay-now"
           >
-            {loading ? 'PROCESSING...' : (paymentMethod === 'razorpay' ? `PAY ₹${finalTotal.toLocaleString('en-IN')} VIA RAZORPAY` : 'PLACE ORDER (COD)')}
+            {loading ? 'Processing...' : (paymentMethod === 'razorpay' ? `Pay ₹${finalTotal.toLocaleString('en-IN')} via Razorpay` : 'Place Order (COD)')}
           </button>
         </div>
       </form>
@@ -924,7 +927,7 @@ export default function CheckoutPage() {
         onClose={() => setPhoneOtpModalOpen(false)}
         onSuccess={handlePhoneVerified}
         title={otpTriggerSource === 'inline' ? "Verify Phone Number" : "Verify Phone to Complete Order"}
-        submitText={otpTriggerSource === 'inline' ? "VERIFY NUMBER" : (paymentMethod === 'razorpay' ? `VERIFY & PAY ₹${finalTotal.toLocaleString('en-IN')}` : 'VERIFY & PLACE ORDER')}
+        submitText={otpTriggerSource === 'inline' ? "Verify Number" : (paymentMethod === 'razorpay' ? `Verify & Pay ₹${finalTotal.toLocaleString('en-IN')}` : 'Verify & Place Order')}
         onChangePhone={() => {
           setPhoneOtpModalOpen(false);
           const phoneInput = document.querySelector('input[name="phone"]');
@@ -934,6 +937,7 @@ export default function CheckoutPage() {
           }
         }}
       />
+      </div>
     </div>
   );
 }

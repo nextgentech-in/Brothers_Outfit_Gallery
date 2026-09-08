@@ -12,8 +12,8 @@ export default function Footer() {
         {/* Newsletter Section - Integrated per prompt */}
         <div className="footer-newsletter">
           <div className="newsletter-text">
-            <h2 className="newsletter-title">STAY IN STYLE</h2>
-            <p className="newsletter-subtitle">Get first access to new arrivals, limited-time offers and exclusive updates.</p>
+            <h2 className="newsletter-title">Stay in Style</h2>
+            <p className="newsletter-subtitle">Get first access to new arrivals, curated offers, and exclusive seasonal updates.</p>
           </div>
           {subscribed ? (
             <div style={{ color: '#10b981', fontWeight: 600, fontSize: '14px', padding: '10px 0' }}>
@@ -36,7 +36,7 @@ export default function Footer() {
         {/* Main Footer Links */}
         <div className="footer-main">
           <div className="footer-col brand-col">
-            <h3 className="footer-brand-title">BROTHERS OUTFIT GALLERY</h3>
+            <h3 className="footer-brand-title">Brother's Outfit Gallery</h3>
             <p className="footer-brand-desc">
               Modern men's fashion for everyday confidence, comfort and style.
             </p>
@@ -61,12 +61,12 @@ export default function Footer() {
             </div>
 
             <a href="https://maps.app.goo.gl/LdPv9pHvtFU8cj4E8" target="_blank" rel="noreferrer" className="btn-visit-store">
-              VISIT OUR STORE →
+              Visit Our Store →
             </a>
           </div>
 
           <div className="footer-col">
-            <h4 className="footer-col-title">SHOP</h4>
+            <h4 className="footer-col-title">Shop</h4>
             <ul className="footer-links">
               <li><Link to="/shop">Shop All</Link></li>
               <li><Link to="/new-arrivals">New Arrivals</Link></li>
@@ -79,7 +79,7 @@ export default function Footer() {
           </div>
 
           <div className="footer-col">
-            <h4 className="footer-col-title">HELP</h4>
+            <h4 className="footer-col-title">Help</h4>
             <ul className="footer-links">
               <li><Link to="/about">Contact Us</Link></li>
               <li><Link to="/about">FAQ</Link></li>
@@ -88,7 +88,7 @@ export default function Footer() {
           </div>
 
           <div className="footer-col">
-            <h4 className="footer-col-title">COMPANY</h4>
+            <h4 className="footer-col-title">Company</h4>
             <ul className="footer-links">
               <li><Link to="/about">About Us</Link></li>
               <li><Link to="/about">Our Story</Link></li>
@@ -98,7 +98,7 @@ export default function Footer() {
           </div>
 
           <div className="footer-col">
-            <h4 className="footer-col-title">LEGAL</h4>
+            <h4 className="footer-col-title">Legal</h4>
             <ul className="footer-links">
               <li><Link to="/privacy">Privacy Policy</Link></li>
               <li><Link to="/terms">Terms & Conditions</Link></li>

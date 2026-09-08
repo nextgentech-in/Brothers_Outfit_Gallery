@@ -1,7 +1,8 @@
 /* --------- Footer component --------- */
 .site-footer {
-  background: var(--color-bg-alt, #fafafa);
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  background: var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
+  border-top: 1px solid rgba(217, 211, 199, 0.12);
   font-family: var(--font-body);
 }
 
@@ -18,7 +19,7 @@
   justify-content: space-between;
   gap: 40px;
   padding-bottom: 60px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(217, 211, 199, 0.12);
   margin-bottom: 60px;
 }
 
@@ -30,14 +31,14 @@
   font-family: var(--font-heading);
   font-size: 28px;
   font-weight: 700;
-  color: var(--color-heading);
+  color: var(--color-ivory, #F7F4EE);
   margin: 0 0 10px;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
 }
 
 .newsletter-subtitle {
   font-size: 15px;
-  color: var(--color-text-muted);
+  color: var(--color-stone, #D9D3C7);
   line-height: 1.5;
   margin: 0;
 }
@@ -52,35 +53,37 @@
 .newsletter-input {
   flex: 1;
   padding: 14px 20px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(217, 211, 199, 0.2);
   border-radius: 4px;
   font-family: var(--font-body);
   font-size: 14px;
   outline: none;
-  background: #fff;
+  background: #1c1c1c;
+  color: var(--color-ivory, #F7F4EE);
   transition: border-color 0.3s;
 }
 
 .newsletter-input:focus {
-  border-color: var(--color-heading);
+  border-color: var(--color-accent-gold);
 }
 
 .newsletter-btn {
   padding: 14px 28px;
-  background: var(--color-heading);
-  color: #fff;
+  background: var(--color-accent-gold);
+  color: #111111;
   border: none;
   border-radius: 4px;
   font-family: var(--font-body);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1.5px;
   cursor: pointer;
-  transition: opacity 0.3s;
+  transition: all 0.3s ease;
 }
 
 .newsletter-btn:hover {
-  opacity: 0.85;
+  background: var(--color-accent-gold-hover);
+  transform: translateY(-1px);
 }
 
 /* Footer Main Layout */
@@ -96,14 +99,14 @@
   font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--color-heading);
+  letter-spacing: 1.5px;
+  color: var(--color-ivory, #F7F4EE);
   margin: 0 0 16px;
 }
 
 .footer-brand-desc {
   font-size: 14px;
-  color: var(--color-text);
+  color: var(--color-stone, #D9D3C7);
   line-height: 1.6;
   margin: 0 0 24px;
   max-width: 280px;
@@ -122,15 +125,17 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--color-heading);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-ivory);
   text-decoration: none;
   transition: all 0.3s ease;
 }
 
 .footer-social-icon:hover {
   transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: var(--color-accent-gold);
+  background: rgba(184, 138, 46, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .footer-social-icon[aria-label="Instagram"]:hover {
@@ -151,28 +156,29 @@
 .btn-visit-store {
   display: inline-block;
   padding: 10px 20px;
-  border: 1px solid var(--color-heading);
-  color: var(--color-heading);
+  border: 1.5px solid var(--color-accent-gold);
+  color: var(--color-accent-gold);
   text-decoration: none;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1.5px;
   border-radius: 4px;
   transition: all 0.3s;
 }
 
 .btn-visit-store:hover {
-  background: var(--color-heading);
-  color: #fff;
+  background: var(--color-accent-gold);
+  color: #111111;
 }
 
 /* Link Columns */
 .footer-col-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1.5px;
-  color: var(--color-heading);
+  color: var(--color-ivory, #F7F4EE);
   margin: 0 0 20px;
+  text-transform: uppercase;
 }
 
 .footer-links {
@@ -185,14 +191,14 @@
 }
 
 .footer-links a {
-  color: var(--color-text);
+  color: var(--color-stone, #D9D3C7);
   text-decoration: none;
   font-size: 14px;
   transition: color 0.3s;
 }
 
 .footer-links a:hover {
-  color: var(--color-heading);
+  color: var(--color-accent-gold);
 }
 
 /* Footer Bottom */
@@ -200,17 +206,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(217, 211, 199, 0.12);
   padding-top: 30px;
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: #8C877D;
 }
 
 .footer-secure-payments span {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 1px;
-  color: var(--color-heading);
+  color: var(--color-stone, #D9D3C7);
 }
 
 /* Responsive */

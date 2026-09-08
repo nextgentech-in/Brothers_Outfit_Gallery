@@ -45,14 +45,14 @@ export default function WishlistPage() {
                 onClick={handleMoveAllToCart}
                 className="wishlist-btn-move-all"
               >
-                MOVE ALL TO CART
+                Move All to Cart
               </button>
               <button
                 type="button"
                 onClick={clearWishlist}
                 className="wishlist-btn-clear"
               >
-                CLEAR ALL
+                Clear All
               </button>
             </div>
           )}
@@ -72,7 +72,7 @@ export default function WishlistPage() {
               Review and order them anytime from here.
             </p>
             <Link to="/shop" className="wishlist-explore-btn">
-              EXPLORE COLLECTION
+              Explore Collection
             </Link>
           </div>
         ) : (
@@ -140,7 +140,7 @@ export default function WishlistPage() {
                           to={`/product/${item.slug}`}
                           className="wishlist-btn-options"
                         >
-                          CHOOSE OPTIONS
+                          Choose Options
                         </Link>
                       ) : (
                         <button
@@ -148,7 +148,7 @@ export default function WishlistPage() {
                           className="wishlist-btn-add"
                           onClick={() => handleMoveToCart(item)}
                         >
-                          MOVE TO CART
+                          Move to Cart
                         </button>
                       )}
                     </div>

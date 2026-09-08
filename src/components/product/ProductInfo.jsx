@@ -221,16 +221,16 @@ export default function ProductInfo({ product }) {
               <span className="price-original" style={{color: '#9ca3af', textDecoration: 'line-through', fontSize: '14px'}}>
                 ₹{activeMrp.toLocaleString('en-IN')}
               </span>
-              <span className="price-discount" style={{background: '#fee2e2', color: '#ef4444', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '800'}}>
+              <span className="price-discount" style={{background: 'var(--color-accent-gold-light)', color: 'var(--color-accent-gold-text)', border: '1px solid #E4CE9F', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700'}}>
                 {currentDiscount}% OFF
               </span>
             </div>
-            <div className="price-current" style={{fontSize: '28px', fontWeight: '800', color: '#111827'}}>
+            <div className="price-current" style={{fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)'}}>
               ₹{activeSale.toLocaleString('en-IN')}
             </div>
           </>
         ) : (
-          <div className="price-current" style={{fontSize: '28px', fontWeight: '800', color: '#111827'}}>
+          <div className="price-current" style={{fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)'}}>
             ₹{activeSale.toLocaleString('en-IN')}
           </div>
         )}
@@ -241,7 +241,7 @@ export default function ProductInfo({ product }) {
       {/* Color Selection: Only show if product has multiple real colors defined */}
       {productColors.length > 0 && !productColors.every(c => c === 'Standard' || c === 'Default') && (
         <div className="product-selector-group">
-          <h3 className="selector-title">COLOR <span className="selector-val">{selectedColor}</span></h3>
+          <h3 className="selector-title">Color <span className="selector-val">{selectedColor}</span></h3>
           <div className="color-swatches">
              {product.colors && product.colors[0]?.hex ? (
                 product.colors.map(col => (
@@ -275,8 +275,8 @@ export default function ProductInfo({ product }) {
         <div className="size-header">
           <h3 className="selector-title">
             {((product.categoryId || product.category || '').toLowerCase().includes('perfume') || (product.name || '').toLowerCase().includes('perfume'))
-              ? 'SELECT VOLUME (ML) *'
-              : (isClothing ? 'SELECT SIZE *' : 'SELECT SIZE')}
+              ? 'Select Volume (ml)'
+              : (isClothing ? 'Select Size *' : 'Select Size')}
           </h3>
           <button 
             type="button" 
@@ -289,19 +289,19 @@ export default function ProductInfo({ product }) {
             title="Open comprehensive sizing chart & fit finder"
           >
             {((product.categoryId || product.category || '').toLowerCase().includes('perfume') || (product.name || '').toLowerCase().includes('perfume'))
-              ? '🧴 VOLUME GUIDE'
-              : '📏 SIZE GUIDE'}
+              ? 'Volume Guide'
+              : 'Size Guide'}
           </button>
         </div>
 
         {sizeError && (
-          <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '8px 14px', borderRadius: '6px', fontSize: '12.5px', fontWeight: '800', marginBottom: '10px', border: '1px solid #fca5a5' }}>
-            ⚠️ Please select your size below before proceeding.
+          <div style={{ background: 'var(--color-accent-gold-light)', color: 'var(--color-accent-gold-text)', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', marginBottom: '10px', border: '1px solid #E4CE9F' }}>
+            Please select your size below before proceeding.
           </div>
         )}
 
         {productSizes.length > 0 ? (
-          <div className="size-buttons" style={sizeError ? { outline: '2px solid #ef4444', borderRadius: '8px', padding: '4px' } : {}}>
+          <div className="size-buttons" style={sizeError ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '8px', padding: '4px' } : {}}>
             {productSizes.map(size => {
               // Read active stock distinct to color+size from variants matrix!
               let variantStock = null;
@@ -315,7 +315,7 @@ export default function ProductInfo({ product }) {
 
               return (
                 <button 
-                  key={size}
+                  key={size} 
                   className={`size-btn ${selectedSize === size ? 'selected' : ''} ${isSizeOos ? 'disabled' : ''}`}
                   disabled={isSizeOos}
                   onClick={() => {
@@ -330,7 +330,7 @@ export default function ProductInfo({ product }) {
           </div>
         ) : (
           <div className="one-size-badge" style={{ fontSize: '13px', fontWeight: '700', color: '#4b5563', padding: '8px 12px', background: '#f3f4f6', borderRadius: '4px', display: 'inline-block' }}>
-            ONE SIZE / STANDARD FIT
+            One Size / Standard Fit
           </div>
         )}
       </div>
@@ -338,9 +338,9 @@ export default function ProductInfo({ product }) {
 
       <div className="product-stock-status">
         {outOfStock ? (
-          <span className="stock-out">OUT OF STOCK</span>
+          <span className="stock-out">Out of Stock</span>
         ) : stock <= 5 ? (
-          <span className="stock-low">⚡ Only {stock} left in stock - Order soon</span>
+          <span className="stock-low">Only {stock} left in stock - Order soon</span>
         ) : (
           <span className="stock-in">✓ In Stock • Ready to Dispatch</span>
         )}
@@ -376,12 +376,13 @@ export default function ProductInfo({ product }) {
           justifyContent: 'center',
           gap: '8px',
           padding: '12px 16px',
-          border: '1px solid #e2e8f0',
-          borderRadius: '6px',
+          border: '1px solid var(--color-stone, #D9D3C7)',
+          borderRadius: '4px',
           background: inWishlist ? '#fff1f2' : '#ffffff',
-          color: inWishlist ? '#e11d48' : '#0f172a',
+          color: inWishlist ? '#e11d48' : 'var(--color-charcoal, #111111)',
           fontWeight: '700',
-          fontSize: '12.5px',
+          fontSize: '12px',
+          letterSpacing: '0.8px',
           cursor: 'pointer',
           width: '100%',
           marginTop: '10px',
@@ -397,26 +398,26 @@ export default function ProductInfo({ product }) {
 
       {/* Delivery & Purchase Confidence Badges */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
-        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>🚚 Delhivery Express</div>
-          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Estimated 2-4 business days across India</div>
+        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>Delhivery Express</div>
+          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>Estimated 2-4 business days across India</div>
         </div>
-        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>🔁 48H Replacement</div>
-          <div style={{ fontSize: '11.5px', color: '#64748b' }}>For damaged/defective items with video</div>
+        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>48H Replacement</div>
+          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>For damaged/defective items with unboxing video</div>
         </div>
-        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>🔒 100% Genuine</div>
-          <div style={{ fontSize: '11.5px', color: '#64748b' }}>Direct from Himatnagar retail store</div>
+        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>100% Genuine</div>
+          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>Direct from Himatnagar flagship store</div>
         </div>
-        <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-          <div style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', marginBottom: '2px' }}>⚡ Free Shipping</div>
-          <div style={{ fontSize: '11.5px', color: '#64748b' }}>On all prepaid & COD orders above ₹999</div>
+        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>Free Shipping</div>
+          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>On all prepaid & COD orders above ₹999</div>
         </div>
       </div>
 
       <div className="delivery-checker">
-        <h4 className="checker-title">📦 CHECK DELHIVERY EXPRESS SERVICEABILITY</h4>
+        <h4 className="checker-title">Check Delhivery Express Serviceability</h4>
         <form className="checker-form" onSubmit={handleDeliveryCheck}>
           <input 
             type="text" 
@@ -431,7 +432,7 @@ export default function ProductInfo({ product }) {
         </form>
 
         {checkingDelivery && (
-          <p className="delivery-status-msg checking">🔄 Checking Delhivery courier coverage...</p>
+          <p className="delivery-status-msg checking">Checking Delhivery courier coverage...</p>
         )}
 
         {deliveryStatus && (
@@ -459,14 +460,14 @@ export default function ProductInfo({ product }) {
       {/* Accordions / Details */}
       <div className="product-details-accordions">
         <details className="accordion-block" open>
-          <summary>DESCRIPTION</summary>
+          <summary>Description</summary>
           <div className="accordion-content">
             {description || shortDescription || "No description provided."}
           </div>
         </details>
         
         <details className="accordion-block">
-          <summary>PRODUCT DETAILS</summary>
+          <summary>Product Details</summary>
           <div className="accordion-content">
             <ul style={{ margin: 0, paddingLeft: '20px' }}>
               {product.gsl && <li><strong>GSL:</strong> {product.gsl}</li>}
@@ -480,7 +481,7 @@ export default function ProductInfo({ product }) {
         </details>
         
         <details className="accordion-block">
-          <summary>SHIPPING & EXCHANGE POLICY</summary>
+          <summary>Shipping & Exchange Policy</summary>
           <div className="accordion-content">
             Standard delivery takes 2-4 business days via Delhivery Express. We offer <strong>exchange or replacement only in the case of damaged or defective items</strong> received. To initiate an exchange, contact us on WhatsApp (+91 84602 33020) with package unboxing video/photo proof within 48 hours of delivery. General returns or refunds are not accepted.
           </div>

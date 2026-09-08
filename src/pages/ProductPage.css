@@ -1,4 +1,8 @@
 /* --------- Product Page Container --------- */
+.product-page-wrapper {
+  background: var(--color-ivory, #F7F4EE);
+  min-height: 100vh;
+}
 
 .product-page-container {
   max-width: 1440px;
@@ -10,19 +14,19 @@
 .product-breadcrumbs {
   font-family: var(--font-body);
   font-size: 13px;
-  color: var(--color-text-muted);
+  color: #716C62;
   margin-bottom: 24px;
 }
 
 .product-breadcrumbs a {
-  color: var(--color-text-muted);
+  color: #716C62;
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s;
 }
 
 .product-breadcrumbs a:hover {
-  color: var(--color-heading);
+  color: var(--color-charcoal, #111111);
 }
 
 .breadcrumb-separator {
@@ -31,7 +35,7 @@
 }
 
 .breadcrumb-current {
-  color: var(--color-heading);
+  color: var(--color-charcoal, #111111);
   font-weight: 600;
 }
 
@@ -56,32 +60,35 @@
 .product-not-found h1 {
   font-family: var(--font-heading);
   font-size: 32px;
-  color: var(--color-heading);
+  color: var(--color-charcoal, #111111);
   margin: 0 0 16px;
 }
 
 .product-not-found p {
   font-family: var(--font-body);
-  color: var(--color-text-muted);
+  color: #5A564E;
   font-size: 15px;
   margin-bottom: 32px;
 }
 
 .btn-back-shop {
   display: inline-block;
-  padding: 14px 32px;
-  background: var(--color-heading);
-  color: #fff;
+  padding: 13px 32px;
+  background: var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
   text-decoration: none;
   font-family: var(--font-body);
   font-weight: 700;
-  letter-spacing: 2px;
-  font-size: 13px;
-  border-radius: 4px;
+  letter-spacing: 1px;
+  font-size: 12px;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm, 4px);
+  transition: all 0.25s ease;
 }
 
 .btn-back-shop:hover {
-  background: #222;
+  background: #2a2a2a;
+  transform: translateY(-2px);
 }
 
 /* Responsive Rules */

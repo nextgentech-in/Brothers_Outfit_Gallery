@@ -18,28 +18,30 @@
 .reviews-header-title {
   font-family: var(--font-heading);
   font-size: 24px;
-  font-weight: 800;
-  color: var(--color-heading);
+  font-weight: 700;
+  color: var(--color-charcoal, #111111);
   margin: 0;
-  letter-spacing: 1px;
+  letter-spacing: -0.3px;
 }
 
 .reviews-btn-toggle {
-  background: none;
-  border: 1px solid var(--color-heading);
-  padding: 10px 24px;
+  background: var(--color-charcoal, #111111);
+  border: 1px solid var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
+  padding: 10px 22px;
   font-family: var(--font-body);
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 4px;
+  transition: all 0.25s ease;
+  border-radius: var(--radius-sm, 4px);
+  text-transform: uppercase;
 }
 
 .reviews-btn-toggle:hover {
-  background: var(--color-heading);
-  color: #ffffff;
+  background: #2a2a2a;
+  transform: translateY(-1px);
 }
 
 .reviews-layout {
@@ -75,7 +77,7 @@
 
 .rating-stars-text {
   font-size: 18px;
-  color: #f59e0b;
+  color: var(--color-accent-gold, #B88A2E);
   letter-spacing: 3px;
   margin-bottom: 4px;
 }
@@ -204,7 +206,7 @@
 }
 
 .star-btn.active {
-  color: #f59e0b;
+  color: var(--color-accent-gold, #B88A2E);
 }
 
 .star-btn:hover {
@@ -304,25 +306,29 @@
 
 /* Submit button */
 .btn-submit-review {
-  background: #0f172a;
-  color: #ffffff;
-  border: none;
+  background: var(--color-accent-gold, #B88A2E);
+  color: #111111;
+  border: 1px solid var(--color-accent-gold, #B88A2E);
   padding: 14px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 1px;
   cursor: pointer;
-  border-radius: 6px;
-  transition: opacity 0.2s;
+  border-radius: var(--radius-sm, 4px);
+  transition: all 0.25s ease;
   width: 100%;
   margin-top: 8px;
+  text-transform: uppercase;
 }
 
-.btn-submit-review:hover {
-  opacity: 0.92;
+.btn-submit-review:hover:not(:disabled) {
+  background: var(--color-accent-gold-hover, #A47724);
+  border-color: var(--color-accent-gold-hover, #A47724);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(184, 138, 46, 0.25);
 }
 
 .btn-submit-review:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 

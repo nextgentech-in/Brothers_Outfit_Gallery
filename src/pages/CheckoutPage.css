@@ -1,7 +1,12 @@
+.checkout-page-wrapper {
+  background: var(--color-ivory, #F7F4EE);
+  min-height: 100vh;
+}
+
 .checkout-page-container {
   max-width: 1200px;
-  margin: 0 auto 60px;
-  padding: 110px 20px 0;
+  margin: 0 auto;
+  padding: 110px 20px 60px;
 }
 
 .checkout-header {
@@ -10,20 +15,26 @@
 }
 
 .checkout-header h1 {
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  color: #0c0a09;
+  font-family: var(--font-heading);
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--color-charcoal, #111111);
   margin: 0 0 8px 0;
 }
 
+.checkout-header p {
+  color: #716C62;
+  font-size: 15px;
+  margin: 0;
+}
 
 .checkout-error-banner {
   background: #fef2f2;
   color: #dc2626;
   border: 1px solid #fca5a5;
   padding: 14px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 4px);
   margin-bottom: 24px;
   font-size: 14px;
 }
@@ -43,8 +54,8 @@
 .checkout-address-section {
   background: white;
   padding: 30px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-stone, #D9D3C7);
 }
 
 .checkout-address-section h3 {
@@ -113,8 +124,8 @@
 .checkout-summary-section {
   background: white;
   padding: 30px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-stone, #D9D3C7);
   height: fit-content;
 }
 
@@ -138,7 +149,7 @@
   width: 50px;
   height: 65px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .checkout-item-details {
@@ -149,26 +160,36 @@
 
 .checkout-item-price {
   font-weight: 700;
-  color: #111827;
+  color: var(--color-charcoal, #111111);
 }
 
 .btn-pay-now {
   width: 100%;
   padding: 16px;
-  background: #22c55e;
-  color: white;
-  font-weight: 800;
-  font-size: 16px;
-  border: none;
-  border-radius: 8px;
+  background: var(--color-accent-gold, #B88A2E);
+  color: #111111;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid var(--color-accent-gold, #B88A2E);
+  border-radius: var(--radius-sm, 4px);
   cursor: pointer;
   margin-top: 24px;
-  letter-spacing: 0.5px;
-  transition: background 0.2s;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(184, 138, 46, 0.25);
 }
 
-.btn-pay-now:hover {
-  background: #16a34a;
+.btn-pay-now:hover:not(:disabled) {
+  background: var(--color-accent-gold-hover, #A47724);
+  border-color: var(--color-accent-gold-hover, #A47724);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(184, 138, 46, 0.35);
+}
+
+.btn-pay-now:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Delhivery Status Banner */

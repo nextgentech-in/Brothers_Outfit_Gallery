@@ -150,12 +150,14 @@
 }
 
 .hero__btn--primary {
-  background: #fff;
-  color: #0a0a0a;
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
 }
 
 .hero__btn--primary:hover {
-  background: #0a0a0a;
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #fff;
   color: #fff;
 }
 
@@ -178,24 +180,23 @@
   border-color: rgba(255, 255, 255, 0.6);
 }
 
-/* Sale Button — High Interaction */
+/* Sale Action Button — Standardized Gold Action */
 .hero__btn--sale {
-  background: linear-gradient(135deg, #ff416c, #ff4b2b);
-  color: #fff;
-  border: none;
+  background: var(--color-accent-gold, #B88A2E);
+  color: #111111;
+  border: 1px solid var(--color-accent-gold, #B88A2E);
   position: relative;
   overflow: hidden;
-  animation: saleGlow 2s ease-in-out infinite;
-  box-shadow: 0 0 20px rgba(255, 65, 108, 0.4), 0 0 40px rgba(255, 75, 43, 0.2);
   font-weight: 700;
   letter-spacing: 1.5px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .hero__btn--sale:hover {
-  background: linear-gradient(135deg, #ff4b2b, #ff416c);
-  box-shadow: 0 0 30px rgba(255, 65, 108, 0.6), 0 0 60px rgba(255, 75, 43, 0.3);
-  transform: scale(1.05);
-  animation: saleShake 0.4s ease-in-out;
+  background: var(--color-accent-gold-hover, #A47724);
+  border-color: var(--color-accent-gold-hover, #A47724);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(184, 138, 46, 0.35);
 }
 
 .hero__btn--sale svg {
@@ -203,17 +204,11 @@
 }
 
 .hero__btn--sale:hover svg {
-  transform: translateX(6px);
+  transform: translateX(4px);
 }
 
-/* Pulse ring behind the sale button */
 .hero__sale-pulse {
-  position: absolute;
-  inset: -4px;
-  border-radius: inherit;
-  border: 2px solid rgba(255, 65, 108, 0.5);
-  animation: salePulseRing 2s ease-out infinite;
-  pointer-events: none;
+  display: none;
 }
 
 @keyframes saleGlow {

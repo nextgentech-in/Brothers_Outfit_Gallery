@@ -210,7 +210,7 @@ export default function ReviewsModule({ product }) {
     <div className="reviews-module" id="reviews">
       {/* Header */}
       <div className="reviews-header">
-        <h2 className="reviews-header-title">CUSTOMER REVIEWS</h2>
+        <h2 className="reviews-header-title">Customer Reviews</h2>
         <button 
           onClick={() => {
             setShowReviewForm(!showReviewForm);
@@ -218,7 +218,7 @@ export default function ReviewsModule({ product }) {
           }}
           className="reviews-btn-toggle"
         >
-          {showReviewForm ? '✕ CANCEL' : '★ WRITE A REVIEW'}
+          {showReviewForm ? 'Cancel' : 'Write a Review'}
         </button>
       </div>
 
@@ -237,7 +237,7 @@ export default function ReviewsModule({ product }) {
           </div>
 
           <div className="rating-recommend-rate">
-            <span>👍</span>
+            <span style={{ fontSize: '14px', fontWeight: 'bold' }}>✓</span>
             <span><strong>{recommendPercentage}%</strong> of reviewers recommend this product</span>
           </div>
           

@@ -60,13 +60,13 @@ export default function SalePage() {
       {/* Promotional Hero */}
       <section className="sale-hero">
         <div className="sale-hero__content">
-          <span className="sale-hero__label">SALE</span>
-          <h1 className="sale-hero__title">LIMITED TIME.<br />EXTRA STYLE.</h1>
+          <span className="sale-hero__label">Special Archive</span>
+          <h1 className="sale-hero__title">Curated Menswear.<br />Seasonal Archive.</h1>
           <p className="sale-hero__desc">
-            Your favorite men's styles, now at prices worth grabbing before they're gone.
+            Selected signature silhouettes and premium fabrics at exclusive seasonal pricing.
           </p>
           <button className="sale-hero__cta" onClick={scrollToSales}>
-            SHOP SALE →
+            Explore Archive Offers
           </button>
         </div>
       </section>
@@ -76,8 +76,8 @@ export default function SalePage() {
         {saleProducts.length > 0 ? (
           <>
             <div className="sale-urgency-banner">
-              <h2>ENDING SOON 🔥</h2>
-              <p>These offers won't last forever. Lowest times shown first.</p>
+              <h2>Seasonal Reductions</h2>
+              <p>Limited edition pieces and archive garments available while quantities last.</p>
             </div>
             
             <div className="sale-grid-container">
@@ -93,11 +93,11 @@ export default function SalePage() {
           </>
         ) : (
           <div className="sale-empty">
-            <h3 className="sale-empty__title">SALE IS TAKING A BREAK</h3>
+            <h3 className="sale-empty__title">No Active Archive Offers</h3>
             <p className="sale-empty__text">
-              Our next offers are coming soon. Explore the latest collection while you wait.
+              Our archive curation will refresh shortly. Discover timeless staples from our main catalog.
             </p>
-            <Link to="/shop" className="sale-empty__btn">SHOP ALL PRODUCTS</Link>
+            <Link to="/shop" className="sale-empty__btn">Explore Full Collection</Link>
           </div>
         )}
       </section>

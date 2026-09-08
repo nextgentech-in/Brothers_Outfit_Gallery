@@ -1,39 +1,39 @@
 .order-summary-card {
-  background: #fdfdfd;
-  border: 1px solid #ddd;
+  background: #ffffff;
+  border: 1px solid var(--color-stone, #D9D3C7);
   padding: 32px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 4px);
   position: sticky;
-  top: 100px; /* Offset matching standard navbar clearances seamlessly */
+  top: 100px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.03);
 }
 
 .summary-title {
   font-family: var(--font-heading);
   font-size: 16px;
-  font-weight: 800;
-  color: var(--color-heading);
+  font-weight: 700;
+  color: var(--color-charcoal, #111111);
   margin: 0 0 18px;
-  letter-spacing: 1px;
+  letter-spacing: -0.2px;
 }
 
 /* Free Shipping Progress Box */
 .shipping-progress-box {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 12px 14px;
   margin-bottom: 20px;
 }
 
 .shipping-progress-text {
   font-size: 12px;
-  color: #334155;
+  color: #5A564E;
   margin-bottom: 8px;
 }
 
 .shipping-progress-text strong {
-  color: #0f172a;
+  color: var(--color-charcoal, #111111);
 }
 
 .shipping-unlocked-banner {
@@ -55,7 +55,7 @@
 
 .shipping-progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ca8a04 0%, #16a34a 100%);
+  background: var(--color-accent-gold, #B88A2E);
   border-radius: 3px;
   transition: width 0.4s ease;
 }
@@ -66,51 +66,53 @@
   margin-bottom: 16px;
   font-family: var(--font-body);
   font-size: 14px;
-  color: var(--color-text);
+  color: var(--color-charcoal, #111111);
 }
 
 .summary-row.discount {
-  color: #c0392b;
+  color: var(--color-accent-gold-text, #855E18);
   font-weight: 600;
 }
 
 .summary-divider {
   height: 1px;
-  background: #ddd;
+  background: var(--color-stone, #D9D3C7);
   margin: 24px 0;
 }
 
 .summary-row.total {
   font-weight: 800;
   font-size: 20px;
-  color: var(--color-heading);
-  margin-bottom: 32px;
+  color: var(--color-charcoal, #111111);
+  margin-bottom: 28px;
 }
 
-/* THE CRITICAL GREEN CHECKOUT BUTTON */
+/* Primary Action Checkout Button */
 .btn-checkout-green {
-  background: #16a34a; /* Required specific Trust Green */
-  color: #ffffff;
+  background: var(--color-accent-gold, #B88A2E);
+  color: #111111;
   width: 100%;
-  padding: 18px 24px;
-  border: none;
-  border-radius: 4px;
+  padding: 16px 24px;
+  border: 1px solid var(--color-accent-gold, #B88A2E);
+  border-radius: var(--radius-sm, 4px);
   font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
-  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px rgba(184, 138, 46, 0.25);
+  transition: all 0.25s ease;
   display: flex;
   justify-content: center;
   align-items: center;
+  text-transform: uppercase;
 }
 
 .btn-checkout-green:hover {
-  background: #15803d; /* Darker green on hover */
+  background: var(--color-accent-gold-hover, #A47724);
+  border-color: var(--color-accent-gold-hover, #A47724);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(22, 163, 74, 0.5);
+  box-shadow: 0 6px 20px rgba(184, 138, 46, 0.35);
 }
 
 .summary-trust-badges {

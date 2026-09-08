@@ -319,13 +319,13 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
 
         {/* Sizes */}
         {sizePrompt && (
-          <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: '800', background: '#fee2e2', padding: '3px 8px', borderRadius: '4px', textAlign: 'center' }}>
-            ⚠️ Please select a size first
+          <div style={{ fontSize: '11px', color: 'var(--color-accent-gold-text)', fontWeight: '700', background: 'var(--color-accent-gold-light)', border: '1px solid #E4CE9F', padding: '3px 8px', borderRadius: '4px', textAlign: 'center' }}>
+            Please select a size first
           </div>
         )}
         <div 
           className="product-card__sizes"
-          style={sizePrompt ? { outline: '2px solid #ef4444', borderRadius: '6px', padding: '4px' } : {}}
+          style={sizePrompt ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '6px', padding: '4px' } : {}}
         >
           {availableSizes.map((size) => (
             <button
@@ -359,15 +359,15 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         <div className="product-card__price-area">
           {hasDiscount && (
             <div className="product-card__price-top">
-              <span className="product-card__compare-price" style={{fontSize: '12px', color: '#9ca3af', textDecoration: 'line-through'}}>
+              <span className="product-card__compare-price">
                 ₹{displayCompare.toLocaleString('en-IN')}
               </span>
-              <span className="product-card__discount" style={{background: '#fee2e2', color: '#ef4444', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', fontWeight: '800'}}>
+              <span className="product-card__discount">
                 {Math.round(((displayCompare - displayPrice) / displayCompare) * 100)}% OFF
               </span>
             </div>
           )}
-          <span className="product-card__price" style={{fontSize: '18px', fontWeight: '800', color: '#111827'}}>
+          <span className="product-card__price">
             ₹{displayPrice.toLocaleString('en-IN')}
           </span>
         </div>
@@ -375,40 +375,26 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         {/* Stock */}
         {lowStock && (
           <span className="product-card__stock product-card__stock--low">
-            Only {product.stock} left
+            Only {product.stock} left in stock
           </span>
         )}
 
         {/* Buttons Row: Add to Cart & Buy Now */}
-        <div className="product-card__btn-group" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+        <div className="product-card__btn-group">
           <button
-            className={`product-card__add-btn ${isOutOfStock ? 'product-card__add-btn--disabled' : ''} ${addedAnimation ? 'product-card__add-btn--added' : ''}`}
+            className={`product-card__add-btn ${isOutOfStock ? 'product-card__add-btn--disabled' : ''} ${needsSizeSelection ? 'product-card__add-btn--options' : ''} ${addedAnimation ? 'product-card__add-btn--added' : ''}`}
             onClick={handleAddToCart}
             disabled={isOutOfStock}
-            style={{ flex: 1, margin: 0, ...(addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}) }}
           >
-            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : (needsSizeSelection ? 'CHOOSE SIZE' : 'ADD TO CART'))}
+            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : (needsSizeSelection ? 'CHOOSE OPTIONS' : 'ADD TO CART'))}
           </button>
 
           {!isOutOfStock && (
             <button
               className="product-card__buy-btn"
               onClick={handleBuyNow}
-              style={{
-                flex: 1,
-                background: '#111827',
-                color: '#ffffff',
-                border: '1px solid #111827',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '800',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                padding: '10px 8px',
-                transition: 'all 0.2s ease',
-              }}
             >
-              ⚡ BUY NOW
+              BUY NOW
             </button>
           )}
         </div>

@@ -38,9 +38,9 @@ export default function Hero({ heroConfig: propConfig }) {
   const eyebrow = heroConfig?.eyebrow || 'NEW SEASON 2026';
   const heading = heroConfig?.heading || 'DEFINE YOUR\nEVERYDAY STYLE';
   const description = heroConfig?.description || "Premium men's clothing designed for confidence, comfort and effortless style.";
-  const saleBtnText = heroConfig?.saleButtonText || '🔥 SALE — UP TO 50% OFF';
+  const saleBtnText = heroConfig?.saleButtonText ? heroConfig.saleButtonText.replace(/^[🔥⚡\s]+/, '') : 'Season Sale — Up to 50% Off';
   const saleBtnLink = heroConfig?.saleButtonLink || '/sale';
-  const primaryBtnText = heroConfig?.primaryButtonText || 'EXPLORE CATALOG';
+  const primaryBtnText = heroConfig?.primaryButtonText || 'Explore Catalog';
   const primaryBtnLink = heroConfig?.primaryButtonLink || '/shop';
   const overlayOpacity = typeof heroConfig?.overlayOpacity === 'number' ? heroConfig.overlayOpacity : 0.55;
 

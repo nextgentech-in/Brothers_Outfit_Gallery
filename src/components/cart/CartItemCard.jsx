@@ -41,7 +41,7 @@ export default function CartItemCard({ item }) {
             onClick={() => removeFromCart(item.cartItemId)}
             aria-label="Remove item"
           >
-            🗑 Remove
+            Remove
           </button>
         </div>
       </div>

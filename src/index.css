@@ -5,24 +5,34 @@
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Color Palette */
-  --color-heading: #09090b;
-  --color-primary: #0f172a;
-  --color-accent-gold: #d97706;
-  --color-accent-gold-light: #fef3c7;
-  --color-text: #334155;
-  --color-text-muted: #64748b;
-  --color-bg: #ffffff;
-  --color-bg-alt: #f8fafc;
-  --color-bg-subtle: #f1f5f9;
-  --color-border: rgba(15, 23, 42, 0.08);
-  --color-border-subtle: #e2e8f0;
+  /* Refined Timeless Menswear Palette */
+  --color-charcoal: #111111;
+  --color-ivory: #F7F4EE;
+  --color-ivory-warm: #FAF8F4;
+  --color-stone: #D9D3C7;
+  --color-stone-subtle: #EFECE6;
+  --color-accent-gold: #B88A2E;
+  --color-accent-gold-hover: #A37926;
+  --color-accent-gold-text: #855E18; /* High-contrast antique gold for text on ivory (>4.7:1 WCAG AA) */
+  --color-accent-gold-light: #F5EBD7;
+
+  /* Semantic Color Mappings */
+  --color-heading: #111111;
+  --color-primary: #111111;
+  --color-text: #2D2D2D;
+  --color-text-muted: #6B6862;
+  --color-bg: #F7F4EE;
+  --color-bg-alt: #EFECE6;
+  --color-bg-subtle: #FAF8F4;
+  --color-card: #FFFFFF;
+  --color-border: rgba(17, 17, 17, 0.09);
+  --color-border-subtle: #D9D3C7;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 12px 30px -4px rgba(15, 23, 42, 0.12);
-  --shadow-hover: 0 20px 40px -6px rgba(15, 23, 42, 0.16);
+  --shadow-sm: 0 1px 3px 0 rgba(17, 17, 17, 0.05);
+  --shadow-md: 0 4px 16px -2px rgba(17, 17, 17, 0.08);
+  --shadow-lg: 0 12px 30px -4px rgba(17, 17, 17, 0.12);
+  --shadow-hover: 0 20px 40px -6px rgba(17, 17, 17, 0.16);
 
   /* Border Radii */
   --radius-sm: 6px;
@@ -97,8 +107,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ───────── Selection ───────── */
 ::selection {
-  background: #0f172a;
-  color: #fef3c7;
+  background: var(--color-charcoal);
+  color: var(--color-ivory);
 }
 
 /* ───────── Scrollbar ───────── */
@@ -108,16 +118,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f8fafc;
+  background: var(--color-ivory);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-stone);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-accent-gold);
 }
 
 /* ───────── Page Transitions & Smooth Hardware Accelerated Animations ───────── */
@@ -148,12 +158,140 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ───────── Standardized Button Hierarchy ───────── */
+/* 1. Primary Action: Antique Gold (#B88A2E), charcoal text, subtle lift */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 28px;
+  background: var(--color-accent-gold);
+  color: #111111 !important;
+  border: 1px solid var(--color-accent-gold);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(184, 138, 46, 0.2);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-gold-hover);
+  border-color: var(--color-accent-gold-hover);
+  color: #111111 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(184, 138, 46, 0.32);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 2. Secondary Action: Sleek Charcoal (#111111), ivory text */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 28px;
+  background: var(--color-charcoal);
+  color: var(--color-ivory) !important;
+  border: 1px solid var(--color-charcoal);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(17, 17, 17, 0.15);
+}
+
+.btn-secondary:hover {
+  background: #2a2a2a;
+  border-color: #2a2a2a;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 2b. Secondary Action Outline: Charcoal border on ivory */
+.btn-secondary-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 28px;
+  background: transparent;
+  color: var(--color-charcoal) !important;
+  border: 1.5px solid var(--color-charcoal);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.btn-secondary-outline:hover {
+  background: var(--color-charcoal);
+  color: var(--color-ivory) !important;
+  transform: translateY(-1px);
+}
+
+/* 3. Quiet Text Link: Understated link with stone underline */
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  color: var(--color-charcoal);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-stone);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-link:hover {
+  color: var(--color-accent-gold-text);
+  border-color: var(--color-accent-gold);
+}
+
 /* ───────── Common Luxury Utilities ───────── */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(247, 244, 238, 0.88);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--color-stone);
 }
 
 .luxury-badge {
@@ -170,15 +308,15 @@ h1, h2, h3, h4, h5, h6 {
 
 .luxury-badge--gold {
   background: var(--color-accent-gold-light);
-  color: #92400e;
-  border: 1px solid #fde68a;
+  color: var(--color-accent-gold-text);
+  border: 1px solid #E4CE9F;
 }
 
 /* ───────── Accessibility: Keyboard Focus Indicators ───────── */
 :focus-visible {
-  outline: 2px solid #d97706 !important;
+  outline: 2px solid var(--color-accent-gold) !important;
   outline-offset: 3px !important;
-  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.18) !important;
+  box-shadow: 0 0 0 4px rgba(184, 138, 46, 0.22) !important;
 }
 
 :focus:not(:focus-visible) {

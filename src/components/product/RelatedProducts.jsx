@@ -36,18 +36,18 @@ export default function RelatedProducts({ currentProductId, category }) {
     <section className="related-products-section">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '2px', color: '#d97706', textTransform: 'uppercase' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '2px', color: 'var(--color-accent-gold, #B88A2E)', textTransform: 'uppercase' }}>
             Curated For You
           </span>
           <h2 style={{ 
             fontFamily: 'var(--font-heading)',
             fontSize: 'clamp(20px, 3vw, 26px)',
-            fontWeight: 800,
-            color: 'var(--color-heading)',
+            fontWeight: 700,
+            color: 'var(--color-charcoal, #111111)',
             margin: '4px 0 0',
-            letterSpacing: '0.5px'
+            letterSpacing: '-0.3px'
           }}>
-            RECOMMENDED PRODUCTS
+            Recommended Products
           </h2>
         </div>
         {category && (
@@ -55,14 +55,14 @@ export default function RelatedProducts({ currentProductId, category }) {
             fontFamily: 'var(--font-body)',
             fontSize: '12px',
             fontWeight: 700,
-            color: '#0f172a',
+            color: 'var(--color-charcoal, #111111)',
             textDecoration: 'none',
-            textTransform: 'uppercase',
-            letterSpacing: '1px',
+            letterSpacing: '0.5px',
             padding: '6px 14px',
-            borderRadius: '20px',
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc'
+            borderRadius: 'var(--radius-sm, 4px)',
+            border: '1px solid var(--color-stone, #D9D3C7)',
+            background: '#ffffff',
+            transition: 'all 0.2s ease'
           }}>
             View All {category} →
           </Link>

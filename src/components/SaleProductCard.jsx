@@ -157,13 +157,13 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
 
         {/* Sizes */}
         {sizePrompt && (
-          <div style={{ fontSize: '11px', color: '#dc2626', fontWeight: '800', background: '#fee2e2', padding: '3px 8px', borderRadius: '4px', textAlign: 'center', marginBottom: '4px' }}>
-            ⚠️ Please select a size first
+          <div style={{ fontSize: '11px', color: 'var(--color-accent-gold-text)', fontWeight: '700', background: 'var(--color-accent-gold-light)', border: '1px solid #E4CE9F', padding: '3px 8px', borderRadius: '4px', textAlign: 'center', marginBottom: '4px' }}>
+            Please select a size first
           </div>
         )}
         <div 
           className="sale-card__sizes"
-          style={sizePrompt ? { outline: '2px solid #ef4444', borderRadius: '6px', padding: '4px' } : {}}
+          style={sizePrompt ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '6px', padding: '4px' } : {}}
         >
           {availableSizes.map((size) => (
             <button
@@ -183,37 +183,24 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
         </div>
 
         {lowStock && (
-          <span className="sale-card__stock-warning">Only {product.stock} left</span>
+          <span className="sale-card__stock-warning">Only {product.stock} left in stock</span>
         )}
 
-        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+        <div className="sale-card__btn-group">
           <button
-            className={`sale-card__add-btn ${isOutOfStock ? 'sale-card__add-btn--disabled' : ''}`}
+            className={`sale-card__add-btn ${isOutOfStock ? 'sale-card__add-btn--disabled' : ''} ${needsSizeSelection ? 'sale-card__add-btn--options' : ''} ${addedAnimation ? 'sale-card__add-btn--added' : ''}`}
             onClick={handleAddToCart}
             disabled={isOutOfStock}
-            style={{ flex: 1, margin: 0, ...(addedAnimation ? { background: '#22c55e', borderColor: '#22c55e', color: '#fff' } : {}) }}
           >
-            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : (needsSizeSelection ? 'CHOOSE SIZE' : 'ADD TO CART'))}
+            {isOutOfStock ? 'OUT OF STOCK' : (addedAnimation ? 'ADDED ✓' : (needsSizeSelection ? 'CHOOSE OPTIONS' : 'ADD TO CART'))}
           </button>
 
           {!isOutOfStock && (
             <button
+              className="sale-card__buy-btn"
               onClick={handleBuyNow}
-              style={{
-                flex: 1,
-                background: '#111827',
-                color: '#ffffff',
-                border: '1px solid #111827',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: '800',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                padding: '10px 8px',
-                transition: 'all 0.2s ease',
-              }}
             >
-              ⚡ BUY NOW
+              BUY NOW
             </button>
           )}
         </div>

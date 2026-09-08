@@ -70,19 +70,18 @@
 }
 
 .sale-card__badge-sale {
-  background: #000;
-  color: #fff;
+  background: var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
   padding: 4px 10px;
   font-family: var(--font-heading);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 1px;
 }
 
 .sale-card__badge-discount {
-  background: #f51b02;
-  /* Bold promotional red */
-  color: #fff;
+  background: var(--color-accent-gold, #B88A2E);
+  color: #111111;
   padding: 4px 10px;
   font-family: var(--font-body);
   font-size: 11px;
@@ -131,10 +130,10 @@
 }
 
 .sale-card__name {
-  font-family: var(--font-body);
+  font-family: var(--font-heading);
   font-size: 14px;
-  font-weight: 500;
-  color: var(--color-heading);
+  font-weight: 600;
+  color: var(--color-charcoal, #111111);
   text-decoration: none;
   line-height: 1.4;
   display: -webkit-box;
@@ -142,14 +141,20 @@
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  letter-spacing: 0.2px;
+  transition: color 0.2s ease;
+}
+
+.sale-card__name:hover {
+  color: var(--color-accent-gold-text);
 }
 
 /* Timer component embedded styles */
 .offer-countdown {
-  background: rgba(192, 57, 43, 0.05);
+  background: var(--color-accent-gold-light, #FBF6EC);
   border-radius: 4px;
   padding: 8px 10px;
-  border: 1px solid rgba(192, 57, 43, 0.1);
+  border: 1px solid rgba(184, 138, 46, 0.25);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -163,19 +168,19 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: #c0392b;
+  color: var(--color-accent-gold-text, #855E18);
   text-transform: uppercase;
 }
 
 .offer-countdown__timer {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  color: #c0392b;
+  color: var(--color-accent-gold-text, #855E18);
   letter-spacing: 1px;
 }
 
-/* Pricing - Huge Sale Emphasis */
+/* Pricing - Refined Hierarchy */
 .sale-card__price-box {
   display: flex;
   flex-direction: column;
@@ -190,17 +195,17 @@
 
 .sale-card__price-old {
   font-family: var(--font-body);
-  font-size: 14px;
-  color: #888;
+  font-size: 13px;
+  color: #9ca3af;
   text-decoration: line-through;
   font-weight: 500;
 }
 
 .sale-card__price-new {
   font-family: var(--font-heading);
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
-  color: #c0392b;
+  color: var(--color-charcoal, #111111);
   letter-spacing: -0.5px;
 }
 
@@ -213,25 +218,25 @@
 
 .sale-card__size {
   padding: 4px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;
   background: #fff;
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-heading);
+  color: var(--color-charcoal, #111111);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .sale-card__size:hover:not(:disabled) {
-  border-color: var(--color-heading);
+  border-color: var(--color-charcoal, #111111);
 }
 
 .sale-card__size--selected {
-  background: var(--color-heading);
-  color: #fff;
-  border-color: var(--color-heading);
+  background: var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
+  border-color: var(--color-charcoal, #111111);
 }
 
 .sale-card__size--disabled {
@@ -242,37 +247,85 @@
 
 .sale-card__stock-warning {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #e67e22;
+  color: var(--color-accent-gold-text, #855E18);
 }
 
-/* Add to Cart CTA */
+/* Button Group: Standardized Hierarchy */
+.sale-card__btn-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .sale-card__add-btn {
-  width: 100%;
-  padding: 12px 0;
-  background: var(--color-heading);
-  color: #fff;
-  border: none;
+  flex: 1;
+  padding: 10px 8px;
+  background: var(--color-accent-gold, #B88A2E);
+  color: #111111;
+  border: 1px solid var(--color-accent-gold, #B88A2E);
   font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.3s ease;
-  margin-top: auto;
+  border-radius: var(--radius-sm, 4px);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sale-card__add-btn:hover:not(:disabled) {
-  background: #c0392b;
+  background: var(--color-accent-gold-hover, #A47724);
+  border-color: var(--color-accent-gold-hover, #A47724);
+  transform: translateY(-1px);
+}
+
+.sale-card__add-btn--options {
+  background: transparent;
+  color: var(--color-charcoal, #111111);
+  border: 1.5px solid var(--color-charcoal, #111111);
+}
+
+.sale-card__add-btn--options:hover:not(:disabled) {
+  background: var(--color-charcoal, #111111);
+  border-color: var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
 }
 
 .sale-card__add-btn--disabled {
-  background: #eee;
-  color: #aaa;
+  background: #e5e5e5;
+  border-color: var(--color-stone, #D9D3C7);
+  color: #888888;
   cursor: not-allowed;
+}
+
+.sale-card__buy-btn {
+  flex: 1;
+  padding: 10px 8px;
+  background: var(--color-charcoal, #111111);
+  color: var(--color-ivory, #F7F4EE);
+  border: 1px solid var(--color-charcoal, #111111);
+  border-radius: var(--radius-sm, 4px);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sale-card__buy-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  border-color: #2a2a2a;
+  transform: translateY(-1px);
 }
 
 /* Responsive adjustments */

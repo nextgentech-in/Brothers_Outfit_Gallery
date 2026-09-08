@@ -73,8 +73,15 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
 
   inFlightFetch = (async () => {
     try {
-      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));
-      const snapshot = await getDocs(q);
+      let snapshot;
+      try {
+        const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));
+        snapshot = await getDocs(q);
+      } catch (orderErr) {
+        console.warn('orderBy query failed, falling back to unordered query:', orderErr.message);
+        const fallbackQ = query(collection(db, PRODUCTS), limit(500));
+        snapshot = await getDocs(fallbackQ);
+      }
       const rawProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCachedProducts(rawProducts);
       return rawProducts;
@@ -111,15 +118,16 @@ export const searchProducts = async (searchQuery, maxResults = 8) => {
 
 export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12) => {
   const rawList = await fetchAllActiveProducts();
-  let products = rawList.filter(p => p.active === true);
+  let products = rawList.filter(p => p.active !== false);
 
   // 1. Filter Category
-  if (category !== 'All') {
-    const catLower = String(category).toLowerCase();
-    products = products.filter(p => 
-      String(p.category || '').toLowerCase() === catLower || 
-      String(p.categoryId || '').toLowerCase() === catLower
-    );
+  if (category && category !== 'All') {
+    const catLower = String(category).toLowerCase().trim();
+    products = products.filter(p => {
+      const pCat = String(p.category || '').toLowerCase().trim();
+      const pCatId = String(p.categoryId || '').toLowerCase().trim();
+      return pCat === catLower || pCatId === catLower;
+    });
   }
 
   // 2. Sort
@@ -152,7 +160,7 @@ export const getShopProducts = async (category = 'All', sortBy = 'newest', _last
 
 export const getNewArrivals = async (qty = 4) => {
   const rawList = await fetchAllActiveProducts();
-  let products = rawList.filter(p => p.active === true);
+  let products = rawList.filter(p => p.active !== false);
 
   const tenDaysAgo = new Date();
   tenDaysAgo.setDate(tenDaysAgo.getDate() - 15);

@@ -80,21 +80,22 @@ export default function ProductPage() {
   const allImages = rawImages.filter(Boolean);
 
   return (
-    <div className="product-page-container">
-      
-      <div className="product-main-grid">
-        <div className="product-gallery-section">
-          <ProductGallery images={allImages} />
+    <div className="product-page-wrapper">
+      <div className="product-page-container">
+        <div className="product-main-grid">
+          <div className="product-gallery-section">
+            <ProductGallery images={allImages} />
+          </div>
+          
+          <div className="product-info-section">
+            <ProductInfo product={product} />
+          </div>
         </div>
-        
-        <div className="product-info-section">
-          <ProductInfo product={product} />
-        </div>
+
+        <RelatedProducts currentProductId={product.id} category={product.category || product.categoryId} />
+
+        <ReviewsModule product={product} />
       </div>
-
-      <RelatedProducts currentProductId={product.id} category={product.category || product.categoryId} />
-
-      <ReviewsModule product={product} />
     </div>
   );
 }

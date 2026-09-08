@@ -47,13 +47,13 @@ export default function OrderSummary({ subtotal, itemCount }) {
 
   return (
     <div className="order-summary-card">
-      <h3 className="summary-title">ORDER SUMMARY</h3>
+      <h3 className="summary-title">Order Summary</h3>
       
       {/* Free Shipping Progress Tracker */}
       <div className="shipping-progress-box">
         {subtotal >= freeShippingThreshold ? (
           <div className="shipping-unlocked-banner">
-            <span>🎉</span>
+            <span>✓</span>
             <strong>Congratulations! You unlocked FREE Express Shipping!</strong>
           </div>
         ) : (
@@ -173,7 +173,7 @@ export default function OrderSummary({ subtotal, itemCount }) {
       <div className="summary-divider" style={{ margin: '16px 0' }}></div>
       
       <div className="summary-row total">
-        <span>TOTAL</span>
+        <span>Total</span>
         <span>₹{finalTotal.toLocaleString('en-IN')}</span>
       </div>
 
@@ -182,9 +182,9 @@ export default function OrderSummary({ subtotal, itemCount }) {
       </button>
 
       <div className="summary-trust-badges">
-        <span>🔒 Secure Checkout</span>
-        <span>🛡️ Safe Payments</span>
-        <span>🔁 Exchange on Damaged Items</span>
+        <span>Secure Checkout via Delhivery</span>
+        <span>100% Genuine Himatnagar Store Products</span>
+        <span>48H Replacement on Damaged Items</span>
       </div>
     </div>
   );
