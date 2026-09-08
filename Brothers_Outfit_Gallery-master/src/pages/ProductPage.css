@@ -1,0 +1,133 @@
+/* --------- Product Page Container --------- */
+
+.product-page-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 100px 24px 60px;
+}
+
+/* Breadcrumbs */
+.product-breadcrumbs {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 24px;
+}
+
+.product-breadcrumbs a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.product-breadcrumbs a:hover {
+  color: var(--color-heading);
+}
+
+.breadcrumb-separator {
+  margin: 0 8px;
+  opacity: 0.5;
+}
+
+.breadcrumb-current {
+  color: var(--color-heading);
+  font-weight: 600;
+}
+
+/* Main Spilt layout */
+.product-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 60px;
+}
+
+/* Error States */
+.product-not-found {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
+
+.product-not-found h1 {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  color: var(--color-heading);
+  margin: 0 0 16px;
+}
+
+.product-not-found p {
+  font-family: var(--font-body);
+  color: var(--color-text-muted);
+  font-size: 15px;
+  margin-bottom: 32px;
+}
+
+.btn-back-shop {
+  display: inline-block;
+  padding: 14px 32px;
+  background: var(--color-heading);
+  color: #fff;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 13px;
+  border-radius: 4px;
+}
+
+.btn-back-shop:hover {
+  background: #222;
+}
+
+/* Responsive Rules */
+@media (max-width: 1024px) {
+  .product-main-grid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .product-page-container {
+    padding: calc(var(--total-header-height, 88px) + 16px) 16px 90px;
+  }
+  .product-main-grid {
+    gap: 24px;
+  }
+}
+
+/* ───────── Recommended Products Layout ───────── */
+.related-products-section {
+  margin-top: 56px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 36px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* PC / Desktop: 1 single row (4 columns across) */
+.related-products-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+/* Mobile & Small Screens (<= 768px): strictly 2 columns */
+@media (max-width: 768px) {
+  .related-products-section {
+    padding-left: 4px;
+    padding-right: 4px;
+    margin-top: 40px;
+    padding-top: 24px;
+  }
+
+  .related-products-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+}

@@ -1,0 +1,296 @@
+.checkout-page-container {
+  max-width: 1200px;
+  margin: 0 auto 60px;
+  padding: 110px 20px 0;
+}
+
+.checkout-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.checkout-header h1 {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #0c0a09;
+  margin: 0 0 8px 0;
+}
+
+
+.checkout-error-banner {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  padding: 14px 20px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.checkout-grid {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 40px;
+}
+
+@media (max-width: 868px) {
+  .checkout-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .checkout-page-container {
+    padding: 85px 12px 20px;
+  }
+  .checkout-address-section, .checkout-summary-section {
+    padding: 20px 16px;
+  }
+  .checkout-form-row {
+    grid-template-columns: 1fr;
+  }
+  .checkout-header {
+    margin-bottom: 24px;
+  }
+  .checkout-header h1 {
+    font-size: 24px;
+  }
+}
+
+.checkout-address-section {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.checkout-address-section h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 10px;
+}
+
+.checkout-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.checkout-form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.checkout-form-group input {
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.checkout-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.payment-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.payment-option.active {
+  border-color: #111827;
+  background: #fafafa;
+}
+
+.payment-option p {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.checkout-summary-section {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  height: fit-content;
+}
+
+.checkout-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 24px;
+  padding-right: 6px;
+}
+
+.checkout-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.checkout-item-thumb {
+  width: 50px;
+  height: 65px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.checkout-item-details {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.checkout-item-price {
+  font-weight: 700;
+  color: #111827;
+}
+
+.btn-pay-now {
+  width: 100%;
+  padding: 16px;
+  background: #22c55e;
+  color: white;
+  font-weight: 800;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 24px;
+  letter-spacing: 0.5px;
+  transition: background 0.2s;
+}
+
+.btn-pay-now:hover {
+  background: #16a34a;
+}
+
+/* Delhivery Status Banner */
+.delhivery-status-banner {
+  margin-top: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+}
+
+.delhivery-status-banner.checking {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.delhivery-status-banner.success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.delhivery-status-banner.warning {
+  background: #fffbebfb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.delhivery-badge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.badge-available {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.badge-unavailable {
+  background: #fef3c7;
+  color: #b45309;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.delhivery-status-banner p {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* Place Suggestions Dropdown */
+.place-suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 99;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.suggestions-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  background: #f9fafb;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.suggestion-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+}
+
+.suggestion-item:hover {
+  background: #f3f4f6;
+}
+
+.suggestion-item strong {
+  font-size: 13px;
+  color: #111827;
+}
+
+.suggestion-item span {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+

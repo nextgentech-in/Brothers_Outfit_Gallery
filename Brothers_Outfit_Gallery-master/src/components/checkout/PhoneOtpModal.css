@@ -1,0 +1,300 @@
+/* PhoneOtpModal.css - Premium OTP Verification Modal for Brothers Outfit */
+
+.phone-otp-backdrop {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 15, 29, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: phoneOtpFadeIn 0.2s ease-out;
+}
+
+@keyframes phoneOtpFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.phone-otp-card,
+.phone-otp-modal {
+  position: relative;
+  background: #ffffff;
+  width: 100%;
+  max-width: 440px;
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  animation: phoneOtpSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+  font-family: inherit;
+}
+
+@keyframes phoneOtpSlideUp {
+  from {
+    transform: translateY(16px) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.phone-otp-close,
+.phone-otp-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: none;
+  color: #64748b;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.phone-otp-close:hover,
+.phone-otp-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.phone-otp-header {
+  margin-bottom: 24px;
+}
+
+.phone-otp-icon-wrap {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #d97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.15);
+}
+
+.phone-otp-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #64748b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.phone-otp-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.3px;
+}
+
+.phone-otp-subtitle {
+  font-size: 13.5px;
+  color: #475569;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.phone-otp-number {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.phone-otp-edit-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.phone-otp-edit-btn:hover {
+  color: #1d4ed8;
+}
+
+/* Sandbox Dev Hint */
+.phone-otp-dev-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 18px;
+  font-size: 12px;
+  color: #166534;
+}
+
+.phone-otp-autofill-btn {
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.phone-otp-autofill-btn:hover {
+  background: #15803d;
+}
+
+.phone-otp-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+/* 6-box input container */
+.phone-otp-boxes {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.phone-otp-box {
+  width: 48px;
+  height: 56px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.15s ease;
+  caret-color: #0f172a;
+}
+
+.phone-otp-box:focus {
+  border-color: #d97706;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+.phone-otp-box.filled {
+  border-color: #0f172a;
+  background: #ffffff;
+}
+
+/* Resend Row */
+.phone-otp-resend-row {
+  margin-bottom: 22px;
+  font-size: 13px;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phone-otp-timer-text {
+  color: #64748b;
+}
+
+.phone-otp-timer-text strong {
+  color: #0f172a;
+}
+
+.phone-otp-resend-btn {
+  background: none;
+  border: none;
+  color: #d97706;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.phone-otp-resend-btn:hover:not(:disabled) {
+  color: #b45309;
+}
+
+.phone-otp-resend-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Verify Submit Button */
+.phone-otp-submit-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.phone-otp-submit-btn:hover:not(:disabled) {
+  background: #1e293b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+.phone-otp-submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.phone-otp-footer-note {
+  margin: 16px 0 0 0;
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .phone-otp-card {
+    padding: 24px 16px;
+  }
+  .phone-otp-box {
+    width: 42px;
+    height: 50px;
+    font-size: 20px;
+  }
+}

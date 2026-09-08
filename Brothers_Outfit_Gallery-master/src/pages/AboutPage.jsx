@@ -1,0 +1,481 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { businessInfo } from '../config/business';
+import PhotoGallery from '../components/PhotoGallery';
+import TestimonialMarquee from '../components/TestimonialMarquee';
+import './AboutPage.css';
+
+const WA_GROUP_LINK = 'https://chat.whatsapp.com/YOUR_GROUP_LINK';
+
+export default function AboutPage() {
+  const [phone, setPhone] = useState('');
+  const [joined, setJoined] = useState(false);
+
+  const handleJoin = () => {
+    if (phone.replace(/\D/g, '').length < 10) {
+      alert('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setJoined(true);
+    window.open(WA_GROUP_LINK, '_blank', 'noopener');
+  };
+  
+  // Inject explicit LD+JSON structured data strictly aligned with known local business data
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.innerHTML = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": ["LocalBusiness", "ClothingStore"],
+      "name": businessInfo.name,
+      "address": businessInfo.address,
+      "telephone": businessInfo.phone,
+      "url": window.location.origin,
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": businessInfo.coordinates?.lat || 23.5875977,
+        "longitude": businessInfo.coordinates?.lng || 72.9697925
+      },
+      "sameAs": [businessInfo.googleMapsUrl]
+    });
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  const storeImages = [
+    { 
+      url: "/images/store-real-1.jpeg", 
+      alt: "Brothers Outfit Gallery Storefront & Main Entrance", 
+      caption: "Our Official Storefront - Welcome to Brothers Outfit Gallery" 
+    },
+    { 
+      url: "/images/store-real-2.jpeg", 
+      alt: "Brothers Outfit Gallery Interior Collection Display", 
+      caption: "Spacious Interior & Contemporary Styles" 
+    },
+    { 
+      url: "/images/store-real-3.jpeg", 
+      alt: "Brothers Outfit Gallery Casuals & Designer Shirts Rack", 
+      caption: "Pure Cotton Casuals & Designer Shirts Collection" 
+    },
+    { 
+      url: "/images/store-real-4.jpeg", 
+      alt: "Brothers Outfit Gallery Premium T-Shirts & Smart Formals", 
+      caption: "High-Density Graphic Tees & Formal Shirts" 
+    },
+    { 
+      url: "/images/store-real-5.jpeg", 
+      alt: "Brothers Outfit Gallery Denims, Jeans & Trousers Area", 
+      caption: "Curated Denims, Cargoes & Comfort-Fit Trousers" 
+    },
+    { 
+      url: "/images/store-real-6.jpeg", 
+      alt: "Brothers Outfit Gallery Customer Care & Styling Counter", 
+      caption: "Friendly Service & Personal Styling Consultation" 
+    }
+  ];
+
+  return (
+    <div className="about-page">
+      {/* 1. Hero Section with Real Store Showcase */}
+      <section className="about-hero">
+        <div className="about-container">
+          <div className="about-hero-badge">
+            <span className="hero-badge-dot"></span>
+            <span>OFFICIAL STORE • HIMATNAGAR, GUJARAT</span>
+          </div>
+          <h1 className="about-hero__title">MORE THAN CLOTHING.<br />IT'S YOUR STYLE.</h1>
+          <p className="about-hero__desc">
+            Discover modern men's fashion, high-grade fabrics, and a shopping experience built around confidence, comfort, and effortless individuality.
+          </p>
+          <div className="about-hero__actions">
+            <Link to="/shop" className="btn-primary">EXPLORE COLLECTION →</Link>
+            <a href="#store-location" className="btn-secondary">VIEW STORE LOCATION ↓</a>
+          </div>
+
+          {/* Hero Photos Strip Preview */}
+          <div className="about-hero-collage">
+            <div className="hero-collage-item primary">
+              <img src="/images/store-real-1.jpeg" alt="Brothers Outfit Gallery Front" />
+              <div className="collage-label">Main Entrance</div>
+            </div>
+            <div className="hero-collage-item">
+              <img src="/images/store-real-2.jpeg" alt="Men's Wear Display" />
+              <div className="collage-label">New Arrivals</div>
+            </div>
+            <div className="hero-collage-item">
+              <img src="/images/store-real-3.jpeg" alt="Designer Shirts Rack" />
+              <div className="collage-label">Apparel Racks</div>
+            </div>
+            <div className="hero-collage-item">
+              <img src="/images/store-real-4.jpeg" alt="Casual & Streetwear Collection" />
+              <div className="collage-label">Signature Styles</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Key Metrics / Stats Bar */}
+      <section className="about-stats-bar">
+        <div className="about-container">
+          <div className="stats-grid">
+            <div className="stat-item">
+              <div className="stat-num">5,000+</div>
+              <div className="stat-label">Gentlemen Styled</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-num">500+</div>
+              <div className="stat-label">Curated Clothing Styles</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-num">4.9 ★</div>
+              <div className="stat-label">Google Rating</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-num">100%</div>
+              <div className="stat-label">Quality Assured</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Story Section with Real Store Photo Highlight */}
+      <section className="about-story">
+        <div className="about-container">
+          <div className="about-story-grid">
+            <div className="about-story__content">
+              <span className="section-eyebrow">OUR HERITAGE & VISION</span>
+              <h2 className="section-title">THE BROTHERS OUTFIT STORY</h2>
+              <p>
+                At <strong>{businessInfo.name}</strong>, we believe that modern menswear should be bold yet effortless, comfortable yet sharp. Founded with a vision to provide accessible, top-tier men's fashion, we have grown into one of the most trusted clothing destinations in the region.
+              </p>
+              <p>
+                Every piece in our catalog is handpicked for its fabric longevity, colorfastness, and tailored fit. Whether you walk into our Himatnagar gallery or shop conveniently online, we ensure you receive attentive customer service, honest sizing advice, and garments you'll be proud to wear.
+              </p>
+              
+              <div className="story-highlights-list">
+                <div className="story-highlight-card">
+                  <span className="highlight-icon">🧵</span>
+                  <div>
+                    <strong>Premium Fabrics Only</strong>
+                    <p>Heavyweight pure cottons, breathable linens, and durable stretch-denims.</p>
+                  </div>
+                </div>
+                <div className="story-highlight-card">
+                  <span className="highlight-icon">✂️</span>
+                  <div>
+                    <strong>Precision Fits</strong>
+                    <p>From drop-shoulder oversized fits to tailored slim cuts made for comfort.</p>
+                  </div>
+                </div>
+                <div className="story-highlight-card">
+                  <span className="highlight-icon">🤝</span>
+                  <div>
+                    <strong>In-Store Personal Styling</strong>
+                    <p>Visit us for one-on-one styling guidance and trial assistance.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="about-story__media">
+              <div className="story-image-card">
+                <img src="/images/store-real-3.jpeg" alt="Brothers Outfit Interior Showroom" className="story-image-main" />
+                <div className="story-floating-badge">
+                  <span className="badge-star">★</span>
+                  <div>
+                    <strong>Authentic In-Store Experience</strong>
+                    <span>Himatnagar's Top Fashion Gallery</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Real Store Photo Tour */}
+      <section className="about-gallery-section">
+        <div className="about-container">
+          <div className="gallery-header-row">
+            <div>
+              <span className="section-eyebrow">PHOTO TOUR</span>
+              <h2 className="section-title">INSIDE OUR GALLERY</h2>
+              <p className="section-subtitle">Take a visual tour through our aisles, racks, and premium collections.</p>
+            </div>
+          </div>
+          
+          <PhotoGallery images={storeImages} />
+        </div>
+      </section>
+
+      {/* 5. Features Grid */}
+      <section className="about-features">
+        <div className="about-container">
+          <div className="text-center" style={{ marginBottom: '40px' }}>
+            <span className="section-eyebrow">WHY CHOOSE US</span>
+            <h2 className="section-title">WHY SHOP WITH {businessInfo.name}?</h2>
+          </div>
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-icon">✨</div>
+              <h3>QUALITY FIRST</h3>
+              <p>Every shirt, denim, and t-shirt is rigorously checked for stitch durability and comfort.</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">⚡</div>
+              <h3>TRENDING MEN'S STYLES</h3>
+              <p>Weekly updates of drop-shoulder tees, textured shirts, cargo pants, and partywear.</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">🛡️</div>
+              <h3>HONEST PRICING</h3>
+              <p>Direct fair pricing without hidden markups, giving you true value for your wardrobe.</p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">📦</div>
+              <h3>STORE + ONLINE SYNC</h3>
+              <p>Browse our catalog online with fast doorstep shipping or try before buying in store.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Simple WhatsApp Group Banner */}
+      <section className="about-whatsapp-banner" style={{ background: '#0f172a', padding: '60px 24px', textAlign: 'center', color: '#fff' }}>
+        <div className="about-container">
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" fill="#25D366" width="36" height="36">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
+            </svg>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0, letterSpacing: '1px' }}>JOIN OUR WHATSAPP V.I.P CLUB</h2>
+          </div>
+          <p style={{ fontSize: '15px', color: '#cbd5e1', maxWidth: '500px', margin: '0 auto 28px', lineHeight: '1.5' }}>
+            Get first access to new collections, flash sales, and store events directly to your phone. <strong>(No spam, only the good stuff.)</strong>
+          </p>
+          
+          {!joined ? (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', maxWidth: '420px', margin: '0 auto' }}>
+              <input 
+                type="tel"
+                placeholder="Enter 10-digit mobile number"
+                maxLength="10"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(0, 10))}
+                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                style={{ flex: 1, padding: '14px 16px', borderRadius: '8px', border: '1px solid #334155', background: '#1e293b', color: '#fff', fontSize: '15px', outline: 'none' }}
+              />
+              <button 
+                onClick={handleJoin}
+                style={{ background: '#25D366', color: '#fff', border: 'none', padding: '0 28px', borderRadius: '8px', fontWeight: '800', fontSize: '14px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.2)' }}
+              >
+                JOIN
+              </button>
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(37, 211, 102, 0.1)', border: '1px solid #25D366', color: '#25D366', padding: '12px', borderRadius: '8px', maxWidth: '420px', margin: '0 auto', fontWeight: '700' }}>
+              ✓ Invite link opened! You can now join us on WhatsApp.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 6. Live Google Maps Integration & Store Directions */}
+      <section className="about-location" id="store-location">
+        <div className="about-container">
+          <div className="text-center" style={{ marginBottom: '32px' }}>
+            <span className="section-eyebrow">MAP & LOCATION</span>
+            <h2 className="section-title">OUR STORE LOCATION</h2>
+            <p className="section-subtitle">Conveniently located with easy parking and direct highway access.</p>
+          </div>
+          
+          <div className="location-grid">
+            <div className="location-info-card">
+              <div className="location-live-status">
+                <span className="live-pulsing-dot"></span>
+                <span>STORE OPEN FOR SHOPPING</span>
+              </div>
+
+              <h3>BROTHERS OUTFIT GALLERY</h3>
+              <p>
+                Experience our full collections in person at our flagship destination. Our team is ready to help you find the perfect size, match coordinates, and elevate your wardrobe.
+              </p>
+              
+              <div className="location-contact-list">
+                <div className="contact-detail-row">
+                  <span className="contact-icon">📍</span>
+                  <div>
+                    <strong>Store Address:</strong>
+                    <p>{businessInfo.address}</p>
+                  </div>
+                </div>
+
+                <div className="contact-detail-row">
+                  <span className="contact-icon">📞</span>
+                  <div>
+                    <strong>Phone Support:</strong>
+                    <p>{businessInfo.phone}</p>
+                  </div>
+                </div>
+
+                <div className="contact-detail-row">
+                  <span className="contact-icon">✉️</span>
+                  <div>
+                    <strong>Email:</strong>
+                    <p>{businessInfo.email}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="location-hours-box">
+                <h4>Store Opening Hours</h4>
+                {businessInfo.openingHours.map((slot, i) => (
+                  <div key={i} className="hours-row">
+                    <span>{slot.day}</span>
+                    <strong>{slot.hours}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="location-buttons-wrap">
+                <a 
+                  href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} 
+                  className="btn-primary"
+                  style={{ width: '100%', textAlign: 'center' }}
+                >
+                  CALL STORE: {businessInfo.phone}
+                </a>
+              </div>
+            </div>
+            
+            {/* Store Map Visual Showcase */}
+            <div 
+              className="location-map-photo-wrap"
+            >
+              <img 
+                src="/images/store-map-photo.jpg" 
+                alt="Brothers Outfit Gallery Location Map" 
+                className="location-map-photo"
+              />
+              <div className="map-photo-overlay-card">
+                <div className="map-pin-pulse-icon">📍</div>
+                <div className="map-photo-details">
+                  <strong>BROTHERS OUTFIT GALLERY</strong>
+                  <p>Pratham Square, Sahakari Jin Road, Himatnagar, Gujarat 383001</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Reviews Section */}
+      <section className="about-reviews">
+        <div className="about-container">
+          <div className="text-center" style={{ marginBottom: '24px' }}>
+            <span className="section-eyebrow">CUSTOMER FEEDBACK</span>
+            <h2 className="section-title">WHAT OUR CUSTOMERS SAY</h2>
+            <p className="section-subtitle">Real experiences from customers of {businessInfo.name}.</p>
+          </div>
+          
+          <div className="reviews-trust-block">
+            <div className="reviews-stars">★★★★★</div>
+            <p className="reviews-rating">
+              Rated <strong>4.9 / 5.0</strong> by shoppers across Gujarat for quality, styling and fit.
+            </p>
+            <a href={businessInfo.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn-ghost">
+              READ REVIEWS ON GOOGLE →
+            </a>
+          </div>
+
+          <TestimonialMarquee />
+        </div>
+      </section>
+
+      {/* 8. FAQ */}
+      <section className="about-faq">
+        <div className="about-container">
+          <div className="text-center" style={{ marginBottom: '32px' }}>
+            <span className="section-eyebrow">HELP & DETAILS</span>
+            <h2 className="section-title">FREQUENTLY ASKED QUESTIONS</h2>
+          </div>
+          
+          <div className="faq-list">
+            <div className="faq-item">
+              <h4>Where is {businessInfo.name} located?</h4>
+              <p>Our store is located at {businessInfo.address}. We are easily accessible via Google Maps navigation.</p>
+            </div>
+            <div className="faq-item">
+              <h4>What types of men's clothing do you offer?</h4>
+              <p>We provide oversized graphic t-shirts, casual & formal shirts, premium denim jeans, trousers, jackets, and seasonal outfits.</p>
+            </div>
+            <div className="faq-item">
+              <h4>Can I order online and get home delivery?</h4>
+              <p>Yes! Browse our entire catalog on this website. We ship across India with tracking and secure online payment or Cash on Delivery.</p>
+            </div>
+            <div className="faq-item">
+              <h4>Can I try clothes in the store?</h4>
+              <p>Yes, our Himatnagar store features spacious, comfortable trial rooms and dedicated styling assistants to ensure your ideal fit.</p>
+            </div>
+            <div className="faq-item">
+              <h4>What is your Return & Exchange Policy?</h4>
+              <p>We provide <strong>exchanges exclusively in the case of damaged or defective items</strong> received. To request an exchange, please notify us within 48 hours of delivery on WhatsApp (+91 84602 33020) with unboxing video/photo proof of the defect. Non-defective returns or general refunds are not accepted.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 9. Store Policies & Legal */}
+      <section className="about-policies-section" style={{ background: '#f8fafc', padding: '60px 24px', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+        <div className="about-container">
+          <div className="text-center" style={{ marginBottom: '36px' }}>
+            <span className="section-eyebrow">TRANSPARENT & RELIABLE</span>
+            <h2 className="section-title">STORE POLICIES & LEGAL TERMS</h2>
+            <p className="section-subtitle">Everything you need to know about shopping with Brothers Outfit Gallery.</p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            <div id="exchange" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                🔁 Exchange Policy (Damage Only)
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                We provide <strong>exchanges/replacements exclusively for damaged or defective items</strong> received. To initiate an exchange, please reach out via WhatsApp at <strong>+91 84602 33020</strong> within 48 hours of delivery with clear unboxing video or photo evidence of the defect. General returns, change-of-mind, or non-defective refunds are not accepted.
+              </p>
+            </div>
+
+            <div id="shipping" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                🚚 Shipping & Delivery Policy
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                Orders are processed within 24 hours and shipped via <strong>Delhivery Express</strong> across India. Standard transit time is <strong>2 to 4 business days</strong>. Orders of ₹1,000 or above receive <strong>FREE Express Shipping</strong>. Live tracking links and AWB waybills are provided for every parcel.
+              </p>
+            </div>
+
+            <div id="terms" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                📜 Terms & Order Cancellation
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                Customers can cancel any order directly from <strong>My Orders</strong> while the status is in <em>Processing</em> (prior to dispatch). Once manifest and shipped with Delhivery, orders cannot be recalled. We reserve the right to cancel unserviceable or fraudulent orders with immediate refund.
+              </p>
+            </div>
+
+            <div id="privacy" style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', scrollMarginTop: '110px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '10px' }}>
+                🔒 Privacy & Data Security
+              </h3>
+              <p style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6', margin: 0 }}>
+                Your personal details (name, phone, delivery address, email) are strictly used for order fulfillment and courier delivery. All online payments are handled directly by RBI-authorized <strong>Razorpay</strong> with 256-bit encryption. We never store or access credit card or banking credentials.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

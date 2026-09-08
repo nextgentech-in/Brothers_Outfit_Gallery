@@ -1,0 +1,82 @@
+.order-confirm-container {
+  max-width: 700px;
+  margin: 60px auto;
+  padding: 0 20px;
+}
+
+.order-confirm-card {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  text-align: center;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+.success-icon {
+  width: 70px;
+  height: 70px;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 36px;
+  font-weight: bold;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.order-confirm-card h1 {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.order-id-badge {
+  font-family: monospace;
+  font-size: 14px;
+  background: #f3f4f6;
+  padding: 6px 14px;
+  border-radius: 20px;
+  display: inline-block;
+  color: #4b5563;
+  margin-bottom: 16px;
+}
+
+.thank-you-msg {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.order-details-box {
+  background: #fafafa;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: left;
+  margin-bottom: 30px;
+  border: 1px solid #f3f4f6;
+}
+
+.order-details-box h3 {
+  margin-top: 0;
+  font-size: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.order-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}

@@ -1,0 +1,10 @@
+.admin-settings-page {
+  padding: 0;
+}
+
+.admin-settings-form {
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}

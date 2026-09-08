@@ -1,0 +1,73 @@
+.admin-inventory-page {
+  padding: 0;
+}
+
+.admin-inventory-controls {
+  margin-bottom: 24px;
+}
+
+.admin-inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.inventory-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.inventory-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #f3f4f6;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.inventory-product-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+}
+
+.inventory-product-sku {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.inventory-total-badge {
+  font-size: 13px;
+  background: #f3f4f6;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.inventory-variants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inventory-variant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  background: #fafafa;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.variant-stock-input {
+  width: 70px;
+  padding: 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  text-align: center;
+  font-weight: 700;
+}

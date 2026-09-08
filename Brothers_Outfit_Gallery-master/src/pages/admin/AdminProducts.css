@@ -1,0 +1,173 @@
+.admin-products-controls {
+  margin-bottom: 24px;
+}
+
+.admin-search-input {
+  width: 100%;
+  max-width: 440px;
+  padding: 14px 20px;
+  border: 1px solid #e7e5e4;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  background: #ffffff;
+  color: #1c1917;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.admin-search-input:focus {
+  border-color: #a8a29e;
+  box-shadow: 0 0 0 4px rgba(168, 162, 158, 0.1);
+}
+
+.admin-table-container {
+  background: #ffffff;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  overflow-x: auto;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-table th {
+  background-color: #fafaf9;
+  padding: 16px 20px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #78716c;
+  border-bottom: 1px solid #e7e5e4;
+  letter-spacing: 0.5px;
+}
+
+.admin-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f5f5f4;
+  vertical-align: middle;
+  font-size: 13.5px;
+  color: #292524;
+}
+
+/* Remove last border for clean look */
+.admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table-img-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f4;
+  border: 1px solid #e7e5e4;
+}
+
+.admin-table-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-table-product-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #1c1917;
+}
+
+.admin-table-sku {
+  font-size: 11px;
+  color: #a8a29e;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.admin-table-mrp {
+  color: #a8a29e;
+  text-decoration: line-through;
+  font-size: 13px;
+}
+
+.admin-table-sale-price {
+  font-weight: 800;
+  font-size: 15px;
+  color: #1c1917;
+}
+
+.admin-discount-badge {
+  display: inline-block;
+  background: #fef2f2;
+  color: #dc2626;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  border-radius: 20px;
+  font-weight: 800;
+  margin-top: 6px;
+  letter-spacing: 0.5px;
+}
+
+.admin-stock-badge {
+  font-weight: 800;
+  font-size: 14px;
+}
+.stock-in { color: #059669; }
+.stock-low { color: #d97706; }
+.stock-out { color: #dc2626; }
+
+.admin-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.admin-badge--active { background: #dcfce7; color: #166534; }
+.admin-badge--inactive { background: #f5f5f4; color: #57534e; }
+.admin-badge--sale { background: #e0e7ff; color: #3730a3; }
+.admin-badge--neutral { background: #f5f5f4; color: #78716c; }
+
+.admin-table-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-action-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.admin-action-btn.edit {
+  background: #f5f5f4;
+  color: #1c1917;
+  border: 1px solid #e7e5e4;
+}
+
+.admin-action-btn.deactivate {
+  background: #fefce8;
+  color: #a16207;
+  border: 1px solid #fef08a;
+}
+
+.admin-action-btn.delete {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.admin-action-btn:hover {
+  filter: brightness(0.95);
+  transform: translateY(-1px);
+}

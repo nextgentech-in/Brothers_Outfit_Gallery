@@ -1,0 +1,306 @@
+/* ───────── Sale Card specific styles ───────── */
+.sale-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  /* slightly stronger border */
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.sale-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+  border-color: rgba(192, 57, 43, 0.2);
+  /* Red tint on hover for urgency */
+}
+
+.sale-card--oos {
+  opacity: 0.6;
+}
+
+/* Image */
+.sale-card__image-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+
+.sale-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.sale-card:hover .sale-card__image {
+  transform: scale(1.06);
+}
+
+.sale-card__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  letter-spacing: 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Badges */
+.sale-card__badges {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 1;
+}
+
+.sale-card__badge-sale {
+  background: #000;
+  color: #fff;
+  padding: 4px 10px;
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.sale-card__badge-discount {
+  background: #f51b02;
+  /* Bold promotional red */
+  color: #fff;
+  padding: 4px 10px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Wishlist */
+.sale-card__wishlist {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+  z-index: 2;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.sale-card__wishlist:hover {
+  background: #fff;
+  color: #c0392b;
+  transform: scale(1.05);
+}
+
+.sale-card__wishlist--active {
+  color: #c0392b;
+}
+
+/* Info */
+.sale-card__info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  background: #fff;
+}
+
+.sale-card__name {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-heading);
+  text-decoration: none;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Timer component embedded styles */
+.offer-countdown {
+  background: rgba(192, 57, 43, 0.05);
+  border-radius: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(192, 57, 43, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.offer-countdown__message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #c0392b;
+  text-transform: uppercase;
+}
+
+.offer-countdown__timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #c0392b;
+  letter-spacing: 1px;
+}
+
+/* Pricing - Huge Sale Emphasis */
+.sale-card__price-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sale-card__price-original {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sale-card__price-old {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: #888;
+  text-decoration: line-through;
+  font-weight: 500;
+}
+
+.sale-card__price-new {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 800;
+  color: #c0392b;
+  letter-spacing: -0.5px;
+}
+
+/* Sizes */
+.sale-card__sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sale-card__size {
+  padding: 4px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  background: #fff;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-heading);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sale-card__size:hover:not(:disabled) {
+  border-color: var(--color-heading);
+}
+
+.sale-card__size--selected {
+  background: var(--color-heading);
+  color: #fff;
+  border-color: var(--color-heading);
+}
+
+.sale-card__size--disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.sale-card__stock-warning {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: #e67e22;
+}
+
+/* Add to Cart CTA */
+.sale-card__add-btn {
+  width: 100%;
+  padding: 12px 0;
+  background: var(--color-heading);
+  color: #fff;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+  margin-top: auto;
+}
+
+.sale-card__add-btn:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.sale-card__add-btn--disabled {
+  background: #eee;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sale-card__info {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .sale-card__name {
+    font-size: 13px;
+  }
+
+  .sale-card__badge-sale,
+  .sale-card__badge-discount {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .sale-card__price-new {
+    font-size: 20px;
+  }
+
+  .offer-countdown__message {
+    font-size: 10px;
+  }
+
+  .offer-countdown__timer {
+    font-size: 12px;
+  }
+}
