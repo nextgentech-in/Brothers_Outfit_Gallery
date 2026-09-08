@@ -8,11 +8,20 @@ import { getBackendUrl } from './apiConfig';
  * @param {number} width - The desired width in pixels
  * @returns {string} - The optimized URL
  */
-export const optimizeImage = (url, width = 500) => {
-  if (typeof url !== 'string' || !url) return url;
+export const optimizeImage = (input, width = 500) => {
+  if (!input) return '/images/hero.png';
+  const url = (typeof input === 'object' && input !== null)
+    ? (input.url || input.thumbnailUrl || input.path || '')
+    : String(input);
+
+  if (!url || typeof url !== 'string' || url === '[object Object]') {
+    return '/images/hero.png';
+  }
+
   if (url.includes('ik.imagekit.io')) {
+    if (url.includes('tr=')) return url;
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}tr=w-${width},f-auto,q-80`;
+    return `${url}${separator}tr=w-${width},f-auto,q-75`;
   }
   return url;
 };

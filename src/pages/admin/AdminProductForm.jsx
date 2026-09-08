@@ -684,6 +684,27 @@ export default function AdminProductForm() {
     <div className="admin-product-form-container">
       <div className="admin-form-header-bar">
         <div className="admin-header-title-wrap">
+          <button 
+            type="button" 
+            onClick={() => navigate('/admin/products')} 
+            className="admin-top-back-link"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#64748b',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '0 0 6px 0',
+              letterSpacing: '0.3px',
+              width: 'fit-content'
+            }}
+          >
+            ← Back to Products
+          </button>
           <h1 className="admin-title">{isEdit ? 'EDIT PRODUCT' : 'ADD NEW PRODUCT'}</h1>
           <span className="admin-header-subtitle">
             {isEdit ? `ID: ${id} • Edit pricing, inventory and photos` : 'Single-window product publishing with live inventory'}

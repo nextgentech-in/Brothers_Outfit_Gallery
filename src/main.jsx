@@ -18,6 +18,20 @@ window.addEventListener('vite:preloadError', (event) => {
   }
 });
 
+// Resilient handler for non-fatal background promise rejections (e.g. cancelled analytics, network drop)
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason?.message || (typeof event.reason === 'string' ? event.reason : '');
+  if (
+    reason.includes('network') || 
+    reason.includes('Failed to fetch') || 
+    reason.includes('aborted') || 
+    reason.includes('cancelled')
+  ) {
+    // Gracefully handle expected network hiccups without crashing
+    event.preventDefault();
+  }
+});
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

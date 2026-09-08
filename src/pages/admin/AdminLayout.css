@@ -10,25 +10,72 @@
   display: none;
   background-color: #0c0a09;
   color: #fff;
-  padding: 16px 24px;
+  padding: 12px 18px;
   align-items: center;
   justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 50;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
+
+.admin-mobile-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-mobile-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .admin-mobile-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
+  color: #ffffff;
 }
+
 .admin-menu-toggle {
   background: transparent;
   color: #fff;
   border: none;
-  font-size: 24px;
+  font-size: 22px;
   cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.admin-menu-toggle:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-mobile-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.admin-mobile-back-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+  color: #facc15;
 }
 
 .admin-sidebar-overlay {

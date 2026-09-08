@@ -74,9 +74,10 @@ export default function ProductPage() {
   }
 
   // Pre-bake images array ensuring a main image is pushed if images doesn't exist logically
-  const allImages = product.images && product.images.length > 0 
+  const rawImages = product.images && product.images.length > 0 
     ? product.images 
-    : [product.thumbnailUrl || product.image];
+    : [product.thumbnailUrl || product.image || '/images/hero.png'];
+  const allImages = rawImages.filter(Boolean);
 
   return (
     <div className="product-page-container">

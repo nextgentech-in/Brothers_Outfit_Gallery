@@ -98,15 +98,24 @@ export default function AdminLayout() {
         </div>
       )}
 
-      {/* Mobile Header Toggle */}
+      {/* Mobile Header Toggle with Left Menu and Top Back Option */}
       <div className="admin-mobile-header">
-        <h2 className="admin-mobile-title">ADMIN PANEL</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button className="admin-notif-bell" onClick={handleOpenDropdown}>
-            🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-          </button>
-          <button className="admin-menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+        <div className="admin-mobile-header-left">
+          <button 
+            className="admin-menu-toggle" 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Open Navigation Menu"
+          >
             ☰
+          </button>
+          <h2 className="admin-mobile-title">ADMIN PANEL</h2>
+        </div>
+        <div className="admin-mobile-header-right">
+          <Link to="/" className="admin-mobile-back-btn" title="Back to Customer Storefront">
+            ← Store
+          </Link>
+          <button className="admin-notif-bell" onClick={handleOpenDropdown} aria-label="Order Alerts">
+            🔔 {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
           </button>
         </div>
       </div>
