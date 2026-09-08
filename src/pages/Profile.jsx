@@ -549,7 +549,7 @@ export default function Profile() {
                   placeholder="Please describe your reason..."
                   value={cancelCustomReason}
                   onChange={(e) => setCancelCustomReason(e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
               )}
               <div className="cancel-modal-actions">

@@ -619,7 +619,7 @@ export default function AdminOrders() {
                   placeholder="Type your specific reason here..."
                   value={cancelCustomReason}
                   onChange={(e) => setCancelCustomReason(e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
               )}
               <div className="cancel-reason-actions">
