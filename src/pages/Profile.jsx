@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
@@ -84,12 +85,18 @@ export default function Profile() {
     setCancelModal({ open: true, order });
     setCancelReason('');
     setCancelCustomReason('');
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
   };
 
   const closeCancelModal = () => {
     setCancelModal({ open: false, order: null });
     setCancelReason('');
     setCancelCustomReason('');
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = '';
+    }
   };
 
   const handleConfirmCancel = async () => {
@@ -541,7 +548,7 @@ export default function Profile() {
       </div>
 
       {/* Customer Cancel Reason Modal */}
-      {cancelModal.open && (
+      {cancelModal.open && typeof document !== 'undefined' && createPortal(
         <div className="cancel-overlay" onClick={closeCancelModal}>
           <div className="cancel-modal" onClick={e => e.stopPropagation()}>
             <div className="cancel-modal-header">
@@ -585,7 +592,8 @@ export default function Profile() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import { useAdminUI } from '../../context/AdminUIContext';
@@ -107,12 +108,18 @@ export default function AdminOrders() {
     setCancelModal({ open: true, order });
     setCancelReason('');
     setCancelCustomReason('');
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
   };
 
   const closeCancelModal = () => {
     setCancelModal({ open: false, order: null });
     setCancelReason('');
     setCancelCustomReason('');
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = '';
+    }
   };
 
   const handleConfirmCancel = async () => {
@@ -589,7 +596,7 @@ export default function AdminOrders() {
       )}
 
       {/* Admin Cancel Reason Modal */}
-      {cancelModal.open && (
+      {cancelModal.open && typeof document !== 'undefined' && createPortal(
         <div className="tracking-modal-overlay" onClick={closeCancelModal}>
           <div className="cancel-reason-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ background: '#b91c1c' }}>
@@ -633,7 +640,8 @@ export default function AdminOrders() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

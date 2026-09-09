@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusTrap } from '../../utils/a11yUtils';
 import './AuthModal.css';
@@ -164,7 +165,10 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
     }
   };
 
-  return (
+  if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div className="auth-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div ref={modalRef} className="auth-modal-card" onClick={(e) => e.stopPropagation()}>
         <button className="auth-modal-close" onClick={onClose} aria-label="Close modal">
@@ -386,6 +390,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess, initialTab = 'lo
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
