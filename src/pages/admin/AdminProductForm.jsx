@@ -20,6 +20,8 @@ const CATEGORY_SIZES_MAP = {
   'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
   'Watches': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
   'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
+  'Caps': ['Free Size', 'Adjustable', 'S/M', 'L/XL', 'Snapback', 'Standard'],
+  'Sunglasses': ['Standard', 'Free Size', 'Medium (54mm)', 'Large (58mm)', 'Small (50mm)'],
 };
 
 const SUB_CATEGORY_MAP = {
@@ -36,6 +38,8 @@ const SUB_CATEGORY_MAP = {
   'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
   'Watches': ['Analog', 'Digital', 'Smart Watch', 'Chronograph', 'Dress Watch'],
   'Belts': ['Leather', 'Canvas', 'Reversible', 'Auto-Lock', 'Braided'],
+  'Caps': ['Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
+  'Sunglasses': ['Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
 };
 
 const COMMON_BATCH_SIZES = {
@@ -47,6 +51,8 @@ const COMMON_BATCH_SIZES = {
   'Wallets': ['Standard', 'Slim'],
   'Watches': ['Standard', 'Dial 40mm'],
   'Belts': ['32-36', '36-40'],
+  'Caps': ['Free Size', 'Adjustable'],
+  'Sunglasses': ['Standard', 'Free Size'],
   'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
 };
 
@@ -756,6 +762,8 @@ export default function AdminProductForm() {
                   <option value="Slippers">Slippers</option>
                   <option value="Watches">Watches</option>
                   <option value="Belts">Belts</option>
+                  <option value="Caps">Caps / Hats</option>
+                  <option value="Sunglasses">Sunglasses</option>
                 </select>
               </div>
               {/* Sub-Category */}

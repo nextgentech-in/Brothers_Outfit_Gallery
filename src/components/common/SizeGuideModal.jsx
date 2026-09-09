@@ -445,6 +445,11 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                 <h4>👜 Wallets & Everyday Carry (EDC)</h4>
                 <p>All Brothers Outfit genuine leather wallets are crafted with RFID blocking and calibrated to comfortably fit Indian currency notes (₹500, ₹200, ₹100) and up to 8 cards without excessive pocket bulk.</p>
               </div>
+
+              <div className="accessory-faq" style={{ marginTop: '12px' }}>
+                <h4>🧢 Caps & Sunglasses</h4>
+                <p><strong>Caps:</strong> Feature premium adjustable snapbacks / brass buckles designed for universal Free Size fit (head circumferences 54–60 cm).<br /><strong>Sunglasses:</strong> Feature lightweight ergonomic frames with 100% UV400 polarized protection, sized for universal facial comfort.</p>
+              </div>
             </div>
           )}
 

@@ -678,7 +678,7 @@
 
   .navbar__inner {
     padding: 0 10px;
-    height: 54px;
+    height: 58px;
     box-sizing: border-box;
     width: 100%;
     max-width: 100vw;
@@ -692,8 +692,9 @@
   }
 
   .navbar__logo-svg {
-    height: 28px;
-    max-width: 120px;
+    height: 38px;
+    max-width: 165px;
+    width: auto;
   }
 
   .navbar__icons {
@@ -733,11 +734,13 @@
 
   .navbar__inner {
     padding: 0 6px;
+    height: 54px;
   }
 
   .navbar__logo-svg {
-    height: 24px;
-    max-width: 100px;
+    height: 32px;
+    max-width: 135px;
+    width: auto;
   }
 
   .navbar__icons {

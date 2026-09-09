@@ -7,7 +7,7 @@ import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
 
 const SUB_CATEGORIES = {
   'T-Shirts': ['All', 'Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley'],
@@ -20,6 +20,8 @@ const SUB_CATEGORIES = {
   'Ethnic Wear': ['All', 'Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
   'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
+  'Caps': ['All', 'Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
+  'Sunglasses': ['All', 'Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
   'Accessories': ['All', 'Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
   'Watches': ['All', 'Analog', 'Digital', 'Smart Watch', 'Chronograph'],
   'Wallets': ['All', 'Bifold', 'Trifold', 'Card Holder', 'Money Clip'],
