@@ -63,26 +63,28 @@
 
 .btn-primary {
   background: #0f172a;
-  color: #fff;
+  color: #ffffff !important;
   border: 1px solid #0f172a;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
 
 .btn-primary:hover {
   background: #1e293b;
+  color: #ffffff !important;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.25);
 }
 
 .btn-secondary {
   background: #ffffff;
-  color: #0f172a;
-  border: 1px solid #cbd5e1;
+  color: #0f172a !important;
+  border: 1.5px solid #cbd5e1;
 }
 
 .btn-secondary:hover {
   background: #f8fafc;
   border-color: #94a3b8;
+  color: #0f172a !important;
   transform: translateY(-2px);
 }
 
@@ -716,23 +718,25 @@
 
 .about-final-cta .btn-primary {
   background: #facc15;
-  color: #0f172a;
+  color: #0f172a !important;
   border-color: #facc15;
   font-weight: 800;
 }
 
 .about-final-cta .btn-primary:hover {
   background: #eab308;
+  color: #0f172a !important;
 }
 
 .about-final-cta .btn-secondary {
   background: transparent;
-  color: #ffffff;
+  color: #ffffff !important;
   border-color: #ffffff;
 }
 
 .about-final-cta .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff !important;
 }
 
 /* ───────── Responsive ───────── */

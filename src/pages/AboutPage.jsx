@@ -332,7 +332,7 @@ export default function AboutPage() {
                 <a 
                   href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} 
                   className="btn-primary"
-                  style={{ width: '100%', textAlign: 'center' }}
+                  style={{ width: '100%', textAlign: 'center', color: '#ffffff', backgroundColor: '#0f172a', textDecoration: 'none' }}
                 >
                   CALL STORE: {businessInfo.phone}
                 </a>

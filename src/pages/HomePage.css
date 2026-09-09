@@ -85,7 +85,7 @@
   gap: 8px;
   padding: 13px 32px;
   background: transparent;
-  color: var(--color-charcoal, #111111);
+  color: var(--color-charcoal, #111111) !important;
   border: 1.5px solid var(--color-charcoal, #111111);
   font-family: var(--font-body);
   font-size: 12px;
@@ -99,7 +99,7 @@
 
 .btn-secondary:hover {
   background: var(--color-charcoal, #111111);
-  color: var(--color-ivory, #F7F4EE);
+  color: #ffffff !important;
   transform: translateY(-2px);
 }
 
