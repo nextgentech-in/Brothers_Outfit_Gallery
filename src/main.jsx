@@ -6,6 +6,7 @@ import App from './App.jsx'
 // Global handler for Vite dynamic import & CSS preload errors after new deployments
 window.addEventListener('vite:preloadError', (event) => {
   console.warn('Vite preload error intercepted (new deployment detected). Auto-refreshing...', event);
+  // Prevent unhandled rejection / error bubbling to ErrorBoundary
   if (event && typeof event.preventDefault === 'function') {
     event.preventDefault();
   }
@@ -17,54 +18,22 @@ window.addEventListener('vite:preloadError', (event) => {
   }
 });
 
-// Resilient handler for non-fatal background promise rejections
+// Resilient handler for non-fatal background promise rejections (e.g. cancelled analytics, network drop)
 window.addEventListener('unhandledrejection', (event) => {
-  const reason = event.reason;
-  const msg = reason?.message || (typeof reason === 'string' ? reason : '');
-
-  // Gracefully suppress expected non-fatal errors
-  const suppressPatterns = [
-    'network', 'Failed to fetch', 'aborted', 'cancelled',
-    'ResizeObserver', 'Loading chunk', 'Unable to preload CSS',
-    'Failed to fetch dynamically imported module',
-    'PERMISSION_DENIED', 'quota-exceeded', 'auth/',
-    'firestore/', 'deadline-exceeded', 'unavailable',
-    'Load failed', 'NetworkError', 'TypeError: Load failed',
-    'The play() request was interrupted'
-  ];
-
-  if (suppressPatterns.some(p => msg.includes(p))) {
+  const reason = event.reason?.message || (typeof event.reason === 'string' ? event.reason : '');
+  if (
+    reason.includes('network') || 
+    reason.includes('Failed to fetch') || 
+    reason.includes('aborted') || 
+    reason.includes('cancelled')
+  ) {
+    // Gracefully handle expected network hiccups without crashing
     event.preventDefault();
-    return;
   }
-
-  // Log non-suppressed rejections for debugging
-  console.warn('[Unhandled Rejection]', msg || reason);
 });
-
-// Catch uncaught runtime errors globally
-window.addEventListener('error', (event) => {
-  const msg = event.message || '';
-
-  // Suppress known benign browser errors
-  const benignPatterns = [
-    'ResizeObserver loop',
-    'ResizeObserver loop completed with undelivered notifications',
-    'Script error.',
-    'Loading chunk',
-    'Unable to preload CSS',
-    'Non-Error promise rejection'
-  ];
-
-  if (benignPatterns.some(p => msg.includes(p))) {
-    event.preventDefault();
-    return true;
-  }
-}, true);
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
   </StrictMode>,
 )
-

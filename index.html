@@ -9,11 +9,7 @@
 
     <!-- Security Headers -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://www.googletagmanager.com https://va.vercel-scripts.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://ik.imagekit.io https://firebasestorage.googleapis.com https://*.googleusercontent.com https://lh3.googleusercontent.com; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://checkout.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://ik.imagekit.io https://va.vercel-scripts.com https://*.vercel-insights.com wss://*.firebaseio.com; frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://accounts.google.com https://*.firebaseapp.com; object-src 'none'; base-uri 'self';" />
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(self), payment=(self)" />
 
     <!-- Performance: Fast DNS Prefetch & Preconnect for Fonts, ImageKit, Firestore & Razorpay -->
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
@@ -31,14 +27,7 @@
     <link rel="preload" as="image" href="/images/hero.png" fetchpriority="high" />
   </head>
   <body>
-    <noscript>
-      <div style="padding:40px;text-align:center;font-family:system-ui,sans-serif">
-        <h2>JavaScript Required</h2>
-        <p>Brothers Outfit requires JavaScript to run. Please enable it in your browser settings.</p>
-      </div>
-    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-
