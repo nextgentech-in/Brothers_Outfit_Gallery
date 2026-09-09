@@ -477,17 +477,28 @@ function getTrustedFirestore() {
 
   try {
     if (!getApps().length) {
+      const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
       let serviceAccount;
       if (rawServiceAccount) {
-        serviceAccount = JSON.parse(rawServiceAccount);
+        serviceAccount = typeof rawServiceAccount === 'string' ? JSON.parse(rawServiceAccount) : rawServiceAccount;
       } else {
         const rawProjectId = (process.env.FIREBASE_ADMIN_PROJECT_ID || FIREBASE_PROJECT_ID || '').trim();
         const rawClientEmail = (process.env.FIREBASE_CLIENT_EMAIL || '').trim();
-        const rawPrivateKey = (process.env.FIREBASE_PRIVATE_KEY || '').trim();
+        let rawPrivateKey = (process.env.FIREBASE_PRIVATE_KEY || '').trim();
+        
+        // Remove enclosing quotes if any
+        if ((rawPrivateKey.startsWith('"') && rawPrivateKey.endsWith('"')) ||
+            (rawPrivateKey.startsWith("'") && rawPrivateKey.endsWith("'"))) {
+          rawPrivateKey = rawPrivateKey.slice(1, -1);
+        }
+        
+        // Handle escaped newlines
+        rawPrivateKey = rawPrivateKey.replace(/\\n/g, '\n');
+
         serviceAccount = {
           projectId: rawProjectId,
           clientEmail: rawClientEmail,
-          privateKey: rawPrivateKey.replace(/\\n/g, '\n')
+          privateKey: rawPrivateKey
         };
       }
 
@@ -499,7 +510,7 @@ function getTrustedFirestore() {
       }
 
       if (!serviceAccount.clientEmail || !serviceAccount.privateKey) {
-        throw new Error('Firebase Admin credentials are not configured.');
+        throw new Error('Firebase Admin credentials are not configured. Check clientEmail and privateKey.');
       }
 
       initializeAdminApp({ credential: cert(serviceAccount) });
@@ -507,8 +518,8 @@ function getTrustedFirestore() {
     adminFirestoreDb = getAdminFirestore();
     return adminFirestoreDb;
   } catch (error) {
-    console.error('Firebase Admin initialization failed:', error.message);
-    throw new Error('Secure order service is unavailable. Please contact support.');
+    console.error('Firebase Admin initialization failed:', error);
+    throw new Error(`Secure order service initialization error: ${error.message}`);
   }
 }
 
