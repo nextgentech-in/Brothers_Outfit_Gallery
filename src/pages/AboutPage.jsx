@@ -332,16 +332,29 @@ export default function AboutPage() {
                 <a 
                   href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} 
                   className="btn-primary"
-                  style={{ width: '100%', textAlign: 'center', color: '#ffffff', backgroundColor: '#0f172a', textDecoration: 'none' }}
+                  style={{ flex: '1 1 200px', textAlign: 'center', color: '#ffffff', backgroundColor: '#0f172a', textDecoration: 'none' }}
                 >
                   CALL STORE: {businessInfo.phone}
+                </a>
+                <a 
+                  href={businessInfo.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary"
+                  style={{ flex: '1 1 200px', textAlign: 'center', color: '#0f172a', backgroundColor: '#ffffff', textDecoration: 'none' }}
+                >
+                  GET DIRECTIONS ↗
                 </a>
               </div>
             </div>
             
-            {/* Store Map Visual Showcase */}
-            <div 
+            {/* Store Map Visual Showcase with Google Maps Link */}
+            <a 
+              href={businessInfo.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="location-map-photo-wrap"
+              title="Open Brothers Outfit Gallery in Google Maps"
             >
               <img 
                 src="/images/store-map-photo.jpg" 
@@ -353,9 +366,10 @@ export default function AboutPage() {
                 <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
                   <p>Pratham Square, Sahakari Jin Road, Himatnagar, Gujarat 383001</p>
+                  <span className="map-photo-link-badge">Open in Google Maps ↗</span>
                 </div>
               </div>
-            </div>
+            </a>
           </div>
         </div>
       </section>

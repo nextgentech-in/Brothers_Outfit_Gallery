@@ -107,15 +107,6 @@ export default function Hero({ heroConfig: propConfig }) {
                 </Link>
               )}
             </div>
-
-            {/* Quick Explore Chips */}
-            <div className="hero__quick-chips">
-              <span className="quick-chips__label">POPULAR:</span>
-              <Link to="/shop?category=Shirts" className="quick-chip">Casual Shirts</Link>
-              <Link to="/shop?category=T-Shirts" className="quick-chip">Oversized Tees</Link>
-              <Link to="/shop?category=Jeans" className="quick-chip">Premium Denim</Link>
-              <Link to="/new-arrivals" className="quick-chip highlight">✨ New Drops</Link>
-            </div>
           </div>
         </div>
 

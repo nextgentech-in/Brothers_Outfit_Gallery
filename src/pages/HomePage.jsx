@@ -184,11 +184,11 @@ export default function HomePage() {
             <div className="about-grid">
               <div className="about-img-wrap">
                 <img
-                  src="/images/store-real-1.jpeg"
-                  alt="Brothers Outfit - Himatnagar Flagship Store"
+                  src="/images/store-real-2.jpeg"
+                  alt="Brothers Outfit Gallery - Store Collection & Interior"
                   className="about-img"
                   width="1280"
-                  height="741"
+                  height="960"
                   loading="lazy"
                   decoding="async"
                 />
