@@ -7,16 +7,16 @@ import './AdminProductForm.css';
 import { getBackendUrl } from '../../utils/apiConfig';
 
 const CATEGORY_SIZES_MAP = {
-  'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'],
+  'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
   'T-Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
   'Jeans': ['28', '30', '32', '34', '36', '38', '40', '42'],
   'Trousers': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'Shorts': ['28', '30', '32', '34', '36', '38', '40', '42'],
   'Jackets': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
   'Hoodies': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
   'Ethnic Wear': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
   'Perfumes': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
   'Slippers': ['6', '7', '8', '9', '10', '11', 'Custom'],
-  'Accessories': ['One Size', 'Free Size', 'Regular', 'Adjustable', 'Standard'],
   'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
   'Watches': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
   'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
@@ -27,12 +27,12 @@ const SUB_CATEGORY_MAP = {
   'Shirts': ['Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
   'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
   'Trousers': ['Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
+  'Shorts': ['Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
   'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
   'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
   'Ethnic Wear': ['Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Deodorant', 'Gift Set'],
-  'Accessories': ['Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
+  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
   'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
   'Watches': ['Analog', 'Digital', 'Smart Watch', 'Chronograph', 'Dress Watch'],
   'Belts': ['Leather', 'Canvas', 'Reversible', 'Auto-Lock', 'Braided'],
@@ -42,8 +42,8 @@ const COMMON_BATCH_SIZES = {
   'Perfumes': ['30ml', '50ml', '100ml'],
   'Jeans': ['30', '32', '34', '36', '38'],
   'Trousers': ['30', '32', '34', '36', '38'],
+  'Shorts': ['30', '32', '34', '36', '38'],
   'Slippers': ['7', '8', '9', '10', '11'],
-  'Accessories': ['One Size', 'Free Size'],
   'Wallets': ['Standard', 'Slim'],
   'Watches': ['Standard', 'Dial 40mm'],
   'Belts': ['32-36', '36-40'],
@@ -747,10 +747,10 @@ export default function AdminProductForm() {
                   <option value="T-Shirts">T-Shirts</option>
                   <option value="Jeans">Jeans</option>
                   <option value="Trousers">Trousers</option>
+                  <option value="Shorts">Shorts</option>
                   <option value="Jackets">Jackets</option>
                   <option value="Hoodies">Hoodies</option>
                   <option value="Ethnic Wear">Ethnic Wear</option>
-                  <option value="Accessories">Accessories</option>
                   <option value="Perfumes">Perfumes</option>
                   <option value="Wallets">Wallets</option>
                   <option value="Slippers">Slippers</option>

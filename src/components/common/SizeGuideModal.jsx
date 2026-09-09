@@ -285,18 +285,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                   <div className="fit-recommendation-result">
                     <span>{recommendation.text}</span>
                     <strong className="recommendation-badge">{recommendation.recommendedSize}</strong>
-                    {onSelectSize && (
-                      <button 
-                        type="button"
-                        className="btn-apply-recommended-size"
-                        onClick={() => {
-                          onSelectSize(recommendation.recommendedSize);
-                          onClose();
-                        }}
-                      >
-                        Select Size {recommendation.recommendedSize}
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -309,7 +297,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                       {currentChart.columns.map((col, idx) => (
                         <th key={idx}>{col}</th>
                       ))}
-                      {onSelectSize && <th style={{ textAlign: 'center' }}>Action</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -321,17 +308,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                           <td>{row.eu}</td>
                           <td>{row.lengthCm} cm</td>
                           <td>{row.lengthIn} in</td>
-                          {onSelectSize && (
-                            <td style={{ textAlign: 'center' }}>
-                              <button 
-                                type="button"
-                                className="btn-choose-size-row"
-                                onClick={() => { onSelectSize(row.size); onClose(); }}
-                              >
-                                Pick {row.size}
-                              </button>
-                            </td>
-                          )}
                         </tr>
                       ))
                     ) : activeTab === 'jeans' ? (
@@ -343,17 +319,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                           <td>{unit === 'in' ? `${row.inseamIn}"` : `${row.inseamCm} cm`}</td>
                           <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
                           <td>{unit === 'in' ? `${row.thighIn}"` : `${row.thighCm} cm`}</td>
-                          {onSelectSize && (
-                            <td style={{ textAlign: 'center' }}>
-                              <button 
-                                type="button"
-                                className="btn-choose-size-row"
-                                onClick={() => { onSelectSize(row.size); onClose(); }}
-                              >
-                                Pick {row.size}
-                              </button>
-                            </td>
-                          )}
                         </tr>
                       ))
                     ) : (
@@ -364,17 +329,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                           <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
                           <td>{unit === 'in' ? `${row.shoulderIn}"` : `${row.shoulderCm} cm`}</td>
                           <td>{unit === 'in' ? `${row.sleeveIn}"` : `${row.sleeveCm} cm`}</td>
-                          {onSelectSize && (
-                            <td style={{ textAlign: 'center' }}>
-                              <button 
-                                type="button"
-                                className="btn-choose-size-row"
-                                onClick={() => { onSelectSize(row.size); onClose(); }}
-                              >
-                                Pick {row.size}
-                              </button>
-                            </td>
-                          )}
                         </tr>
                       ))
                     )}
@@ -440,15 +394,6 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                       </div>
                     </div>
                     <p className="perfume-desc">{t.bestFor}</p>
-                    {onSelectSize && (
-                      <button 
-                        type="button"
-                        className="btn-choose-size-row full-width"
-                        onClick={() => { onSelectSize(t.volume); onClose(); }}
-                      >
-                        Choose {t.volume}
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>

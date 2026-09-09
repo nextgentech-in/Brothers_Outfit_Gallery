@@ -42,7 +42,8 @@
 .product-gallery-main {
   flex: 1;
   position: relative;
-  aspect-ratio: 3/4; /* Match typical fashion aspect ratio constraints cleanly */
+  aspect-ratio: 4/5;
+  max-height: calc(100vh - 160px);
   overflow: hidden;
   border-radius: 8px;
   background-color: #f7f7f7;

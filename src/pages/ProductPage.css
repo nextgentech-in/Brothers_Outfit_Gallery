@@ -39,11 +39,12 @@
   font-weight: 600;
 }
 
-/* Main Spilt layout */
+/* Main Split layout */
 .product-main-grid {
   display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 60px;
+  grid-template-columns: 1fr 420px;
+  gap: 48px;
+  align-items: start;
 }
 
 /* Error States */
@@ -95,7 +96,7 @@
 @media (max-width: 1024px) {
   .product-main-grid {
     grid-template-columns: 1fr;
-    gap: 40px;
+    gap: 24px;
   }
 }
 
