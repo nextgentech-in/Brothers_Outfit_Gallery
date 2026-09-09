@@ -477,14 +477,26 @@ function getTrustedFirestore() {
 
   try {
     if (!getApps().length) {
-      const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-      const serviceAccount = rawServiceAccount
-        ? JSON.parse(rawServiceAccount)
-        : {
-            projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-          };
+      let serviceAccount;
+      if (rawServiceAccount) {
+        serviceAccount = JSON.parse(rawServiceAccount);
+      } else {
+        const rawProjectId = (process.env.FIREBASE_ADMIN_PROJECT_ID || FIREBASE_PROJECT_ID || '').trim();
+        const rawClientEmail = (process.env.FIREBASE_CLIENT_EMAIL || '').trim();
+        const rawPrivateKey = (process.env.FIREBASE_PRIVATE_KEY || '').trim();
+        serviceAccount = {
+          projectId: rawProjectId,
+          clientEmail: rawClientEmail,
+          privateKey: rawPrivateKey.replace(/\\n/g, '\n')
+        };
+      }
+
+      if (serviceAccount.projectId) {
+        serviceAccount.projectId = serviceAccount.projectId.trim();
+      }
+      if (serviceAccount.clientEmail) {
+        serviceAccount.clientEmail = serviceAccount.clientEmail.trim();
+      }
 
       if (!serviceAccount.clientEmail || !serviceAccount.privateKey) {
         throw new Error('Firebase Admin credentials are not configured.');
