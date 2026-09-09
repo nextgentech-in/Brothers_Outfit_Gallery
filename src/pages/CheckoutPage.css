@@ -375,4 +375,40 @@
   color: #6b7280;
 }
 
+/* ── Checkout Order Summary Totals ── */
+.checkout-totals {
+  margin-top: 8px;
+}
 
+.checkout-totals .summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-charcoal, #111111);
+}
+
+.checkout-totals .summary-row.discount {
+  color: var(--color-accent-gold-text, #855E18);
+  font-weight: 600;
+}
+
+.checkout-totals .summary-divider {
+  height: 1px;
+  background: var(--color-stone, #D9D3C7);
+  margin: 16px 0;
+}
+
+.checkout-totals .summary-row.total {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--color-charcoal, #111111);
+  margin-bottom: 0;
+}
+
+.checkout-totals .summary-row span:last-child {
+  font-weight: 700;
+  text-align: right;
+}

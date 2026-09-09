@@ -10,13 +10,16 @@ const SIZE_CHARTS = {
     icon: '👕',
     columns: ['Size', 'Chest', 'Length', 'Shoulder', 'Sleeve'],
     data: [
-      { size: 'XS', chestIn: 36, chestCm: 91.4, lengthIn: 27, lengthCm: 68.6, shoulderIn: 16.5, shoulderCm: 41.9, sleeveIn: 8, sleeveCm: 20.3 },
-      { size: 'S', chestIn: 38, chestCm: 96.5, lengthIn: 28, lengthCm: 71.1, shoulderIn: 17, shoulderCm: 43.2, sleeveIn: 8.5, sleeveCm: 21.6 },
-      { size: 'M', chestIn: 40, chestCm: 101.6, lengthIn: 29, lengthCm: 73.7, shoulderIn: 18, shoulderCm: 45.7, sleeveIn: 9, sleeveCm: 22.9 },
-      { size: 'L', chestIn: 42, chestCm: 106.7, lengthIn: 30, lengthCm: 76.2, shoulderIn: 19, shoulderCm: 48.3, sleeveIn: 9.5, sleeveCm: 24.1 },
-      { size: 'XL', chestIn: 44, chestCm: 111.8, lengthIn: 31, lengthCm: 78.7, shoulderIn: 20, shoulderCm: 50.8, sleeveIn: 10, sleeveCm: 25.4 },
-      { size: 'XXL', chestIn: 46, chestCm: 116.8, lengthIn: 31.5, lengthCm: 80.0, shoulderIn: 21, shoulderCm: 53.3, sleeveIn: 10.5, sleeveCm: 26.7 },
-      { size: '3XL', chestIn: 48, chestCm: 121.9, lengthIn: 32, lengthCm: 81.3, shoulderIn: 22, shoulderCm: 55.9, sleeveIn: 11, sleeveCm: 27.9 },
+      { size: 'XS', chestIn: 37, chestCm: 94.0, lengthIn: 26, lengthCm: 66.0, shoulderIn: 16, shoulderCm: 40.6, sleeveIn: 24.5, sleeveCm: 62.2 },
+      { size: 'S', chestIn: 39.5, chestCm: 100.3, lengthIn: 27, lengthCm: 68.6, shoulderIn: 17, shoulderCm: 43.2, sleeveIn: 25, sleeveCm: 63.5 },
+      { size: 'M', chestIn: 41.75, chestCm: 106.0, lengthIn: 28, lengthCm: 71.1, shoulderIn: 18, shoulderCm: 45.7, sleeveIn: 25.5, sleeveCm: 64.8 },
+      { size: 'L', chestIn: 45, chestCm: 114.3, lengthIn: 29, lengthCm: 73.7, shoulderIn: 19, shoulderCm: 48.3, sleeveIn: 26, sleeveCm: 66.0 },
+      { size: 'XL', chestIn: 47.5, chestCm: 120.7, lengthIn: 30, lengthCm: 76.2, shoulderIn: 20, shoulderCm: 50.8, sleeveIn: 26.88, sleeveCm: 68.3 },
+      { size: 'XXL', chestIn: 50.5, chestCm: 128.3, lengthIn: 30.63, lengthCm: 77.8, shoulderIn: 21.25, shoulderCm: 54.0, sleeveIn: 27.13, sleeveCm: 68.9 },
+      { size: '3XL', chestIn: 51, chestCm: 129.5, lengthIn: 30, lengthCm: 76.2, shoulderIn: 20.5, shoulderCm: 52.1, sleeveIn: 26, sleeveCm: 66.0 },
+      { size: '4XL', chestIn: 53, chestCm: 134.6, lengthIn: 31, lengthCm: 78.7, shoulderIn: 21.25, shoulderCm: 54.0, sleeveIn: 26.5, sleeveCm: 67.3 },
+      { size: '5XL', chestIn: 55, chestCm: 139.7, lengthIn: 31.5, lengthCm: 80.0, shoulderIn: 22, shoulderCm: 55.9, sleeveIn: 27, sleeveCm: 68.6 },
+      { size: '6XL', chestIn: 57, chestCm: 144.8, lengthIn: 32, lengthCm: 81.3, shoulderIn: 22.75, shoulderCm: 57.8, sleeveIn: 27.5, sleeveCm: 69.9 },
     ],
     fitTip: '💡 For an Oversized / Drop-Shoulder aesthetic, order one size up. For a tailored slim look, order your standard size.'
   },
@@ -109,7 +112,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
   const detectCategoryTab = (cat) => {
     const c = (cat || '').toLowerCase();
     if (c.includes('perfume') || c.includes('fragrance')) return 'perfumes';
-    if (c.includes('jean') || c.includes('trouser') || c.includes('pant')) return 'jeans';
+    if (c.includes('jean') || c.includes('trouser') || c.includes('pant') || c.includes('short')) return 'jeans';
     if (c.includes('jacket') || c.includes('hoodie')) return 'jackets';
     if (c.includes('slipper') || c.includes('shoe') || c.includes('footwear')) return 'footwear';
     if (c.includes('belt') || c.includes('wallet') || c.includes('accessory') || c.includes('accessories')) return 'accessories';

@@ -7,23 +7,25 @@ import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Accessories', 'Watches', 'Wallets', 'Belts'];
 
 const SUB_CATEGORIES = {
   'T-Shirts': ['All', 'Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley'],
   'Shirts': ['All', 'Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
   'Jeans': ['All', 'Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
   'Trousers': ['All', 'Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
+  'Shorts': ['All', 'Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
   'Jackets': ['All', 'Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
   'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
   'Ethnic Wear': ['All', 'Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar'],
+  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
   'Accessories': ['All', 'Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
   'Watches': ['All', 'Analog', 'Digital', 'Smart Watch', 'Chronograph'],
   'Wallets': ['All', 'Bifold', 'Trifold', 'Card Holder', 'Money Clip'],
   'Belts': ['All', 'Leather', 'Canvas', 'Reversible', 'Auto-Lock'],
 };
+
 const PRICE_RANGES = [
   { label: 'All Prices', min: 0, max: Infinity },
   { label: 'Under ₹500', min: 0, max: 499 },
