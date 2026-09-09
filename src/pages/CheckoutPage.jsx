@@ -354,7 +354,10 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: cartItems.map(item => ({ ...item, id: item.id || item.productId })),
+          items: cartItems.map(item => ({
+            ...item,
+            id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null)
+          })),
           couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
           clientTotal: finalTotal,
           amount: finalTotal
