@@ -1,0 +1,178 @@
+/* ───────── Customer Trust Bar Styles ───────── */
+
+.trust-bar-section {
+  position: relative;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 24px 0;
+  width: 100%;
+}
+
+.trust-bar-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.trust-bar-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  transition: all 0.25s ease;
+}
+
+.trust-bar-card:hover {
+  background: #ffffff;
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.trust-bar-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  transition: all 0.25s ease;
+}
+
+.trust-bar-card:hover .trust-bar-icon {
+  background: #ca8a04;
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.trust-bar-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.trust-bar-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trust-bar-text strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.2px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trust-bar-text span {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* ───────── Responsive Visibility By Placement ───────── */
+
+/* 1. Top Bar: Visible on desktop/tablet, hidden on mobile */
+@media (max-width: 768px) {
+  .trust-bar-section--top {
+    display: none !important;
+  }
+}
+
+/* 2. Bottom Bar: Hidden on desktop, visible on mobile */
+@media (min-width: 769px) {
+  .trust-bar-section--bottom {
+    display: none !important;
+  }
+}
+
+/* ───────── Mobile Redesign for Bottom Placement (max-width: 768px) ───────── */
+@media (max-width: 768px) {
+  .trust-bar-section--bottom {
+    padding: 28px 0;
+    background: #FAF8F4;
+    border-top: 1px solid rgba(217, 211, 199, 0.6);
+    border-bottom: 1px solid rgba(217, 211, 199, 0.6);
+  }
+
+  .trust-bar-section--bottom .trust-bar-container {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .trust-bar-section--bottom .trust-bar-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 12px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  }
+
+  .trust-bar-section--bottom .trust-bar-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #0f172a;
+    color: #fbbf24;
+  }
+
+  .trust-bar-section--bottom .trust-bar-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .trust-bar-section--bottom .trust-bar-text strong {
+    font-size: 12px;
+    font-weight: 800;
+    color: #111111;
+    white-space: normal;
+    line-height: 1.25;
+    margin-bottom: 3px;
+  }
+
+  .trust-bar-section--bottom .trust-bar-text span {
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: #666055;
+  }
+}
+
+@media (max-width: 360px) {
+  .trust-bar-section--bottom .trust-bar-container {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .trust-bar-section--bottom .trust-bar-card {
+    padding: 12px 10px;
+  }
+
+  .trust-bar-section--bottom .trust-bar-text strong {
+    font-size: 11px;
+  }
+
+  .trust-bar-section--bottom .trust-bar-text span {
+    font-size: 9.5px;
+  }
+}

@@ -7,6 +7,7 @@ import SaleProductCard from '../components/SaleProductCard';
 import ProductCard from '../components/ProductCard';
 import { getSaleProducts, getNewArrivals, getShopProducts } from '../services/productService';
 import { getHomepageConfig } from '../services/adminService';
+import TrustBar from '../components/TrustBar';
 import './HomePage.css';
 
 export default function HomePage() {
@@ -272,6 +273,9 @@ export default function HomePage() {
           </div>
         </section>
       )}
+ 
+      {/* 9. Customer Trust Bar (Mobile-specific placement at the bottom of the page) */}
+      <TrustBar placement="bottom" />
 
     </div>
   );

@@ -67,6 +67,7 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body {
@@ -76,6 +77,15 @@ body {
   color: var(--color-text);
   background: var(--color-bg);
   overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+}
+
+#root {
+  overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 img {

@@ -331,29 +331,69 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .sale-card__info {
-    padding: 12px;
-    gap: 10px;
+    padding: 10px 8px 12px;
+    gap: 8px;
   }
 
   .sale-card__name {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .sale-card__badge-sale,
   .sale-card__badge-discount {
-    font-size: 10px;
-    padding: 3px 8px;
+    font-size: 9px;
+    padding: 2px 6px;
   }
 
   .sale-card__price-new {
-    font-size: 20px;
+    font-size: 16px;
+  }
+
+  .offer-countdown {
+    padding: 6px 8px;
   }
 
   .offer-countdown__message {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .offer-countdown__timer {
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .sale-card__btn-group {
+    margin-top: 6px;
+    gap: 4px;
+  }
+
+  .sale-card__add-btn,
+  .sale-card__buy-btn {
+    padding: 7px 4px;
+    font-size: 9px;
+    letter-spacing: 0.4px;
+    height: 30px;
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 380px) {
+  .sale-card__info {
+    padding: 8px 6px 10px;
+    gap: 6px;
+  }
+
+  .sale-card__name {
+    font-size: 11px;
+  }
+
+  .sale-card__price-new {
+    font-size: 14px;
+  }
+
+  .sale-card__add-btn,
+  .sale-card__buy-btn {
+    padding: 6px 2px;
+    font-size: 8.5px;
+    height: 28px;
   }
 }

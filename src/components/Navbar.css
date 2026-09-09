@@ -629,31 +629,82 @@
 }
 
 @media (max-width: 768px) {
+  .top-announcement-bar {
+    padding: 4px 10px;
+  }
+
+  .top-announcement-bar__link {
+    gap: 6px;
+    font-size: 10px;
+  }
+
+  .announcement-text {
+    max-width: 240px;
+    font-size: 9.5px;
+  }
+
+  .announcement-arrow {
+    display: none;
+  }
+
   .navbar__links {
     display: none;
   }
 
   .navbar__hamburger {
     display: flex;
+    width: 36px;
+    height: 36px;
+    padding: 6px;
   }
 
   .navbar__inner {
-    padding: 0 16px;
-    height: 60px;
+    padding: 0 12px;
+    height: 56px;
   }
 
-  .navbar__brand {
-    font-size: 15px;
-    letter-spacing: 2px;
+  .navbar__logo-svg {
+    height: 34px;
+    max-width: 140px;
   }
 
-  .navbar__brand-sub {
-    font-size: 7px;
-    letter-spacing: 2.5px;
+  .navbar__icons {
+    gap: 2px;
   }
 
-  .navbar__logo-icon {
-    width: 30px;
-    height: 30px;
+  .navbar__icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .navbar__icon-btn svg {
+    width: 18px;
+    height: 18px;
   }
 }
+
+@media (max-width: 360px) {
+  .announcement-text {
+    max-width: 180px;
+  }
+
+  .navbar__inner {
+    padding: 0 8px;
+  }
+
+  .navbar__logo-svg {
+    height: 28px;
+    max-width: 115px;
+  }
+
+  .navbar__icon-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .navbar__icon-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+

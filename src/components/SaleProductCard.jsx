@@ -66,8 +66,9 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
       return;
     }
 
-    // If not logged in, trigger account creation / login modal first
-    if (!currentUser) {
+    // Display auth modal on mobile only when not logged in; desktop proceeds directly to checkout
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobile && !currentUser) {
       setAuthModalOpen(true);
       return;
     }

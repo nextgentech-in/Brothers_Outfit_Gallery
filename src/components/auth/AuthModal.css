@@ -3,14 +3,17 @@
 .auth-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 99999;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 16px;
+  padding: 24px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   animation: authModalFadeIn 0.2s ease-out;
 }
 
@@ -23,13 +26,16 @@
   position: relative;
   width: 100%;
   max-width: 440px;
+  margin: auto;
   background: #ffffff;
   border-radius: 16px;
-  padding: 32px 28px;
+  padding: 30px 24px 24px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
   animation: authModalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: 90vh;
+  max-height: calc(100vh - 48px);
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 @keyframes authModalSlideUp {
@@ -266,4 +272,37 @@
   padding: 0;
   font-size: 12px;
   text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .auth-modal-overlay {
+    padding: 12px 10px;
+    align-items: flex-end;
+  }
+
+  .auth-modal-card {
+    padding: 24px 18px 20px;
+    border-radius: 20px 20px 12px 12px;
+    max-height: calc(100vh - 24px);
+  }
+
+  .auth-modal-title {
+    font-size: 18px;
+  }
+
+  .auth-modal-subtitle {
+    font-size: 12px;
+  }
+
+  .auth-modal-close {
+    top: 14px;
+    right: 14px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .auth-modal-submit-btn {
+    padding: 12px;
+    font-size: 12px;
+  }
 }

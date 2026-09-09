@@ -156,8 +156,9 @@ export default function ProductInfo({ product }) {
       return;
     }
 
-    // If user does not have an account / is not logged in, pop up AuthModal first!
-    if (!currentUser) {
+    // Display auth modal on mobile only when not logged in; desktop proceeds directly to checkout
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (isMobile && !currentUser) {
       setAuthModalOpen(true);
       return;
     }
