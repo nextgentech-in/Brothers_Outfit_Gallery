@@ -7,7 +7,7 @@
 .product-page-container {
   max-width: 1440px;
   margin: 0 auto;
-  padding: calc(var(--total-header-height, 104px) + 36px) 24px 60px;
+  padding: calc(var(--total-header-height, 104px) + 20px) 24px 60px;
 }
 
 /* Breadcrumbs */
@@ -15,7 +15,7 @@
   font-family: var(--font-body);
   font-size: 13px;
   color: #716C62;
-  margin-bottom: 24px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
