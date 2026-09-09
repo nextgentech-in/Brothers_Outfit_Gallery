@@ -225,15 +225,96 @@ class ErrorBoundary extends Component {
   }
 }
 
+// Route-level ErrorBoundary that resets gracefully when navigating to another URL
+class RouteErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.warn('[Route Error Intercepted]:', error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.props.pathname !== prevProps.pathname && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '60vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px 20px',
+          textAlign: 'center',
+          fontFamily: 'var(--font-body, system-ui, sans-serif)'
+        }}>
+          <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+            Content Temporarily Unavailable
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '14px', maxWidth: '420px', marginBottom: '24px' }}>
+            A temporary issue occurred while loading this section. You can retry or browse the collection.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                padding: '10px 22px',
+                background: '#111827',
+                color: '#fff',
+                borderRadius: '6px',
+                border: 'none',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              Try Again
+            </button>
+            <Link
+              to="/shop"
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                padding: '10px 22px',
+                background: '#f1f5f9',
+                color: '#111827',
+                borderRadius: '6px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: '13px'
+              }}
+            >
+              Explore Shop
+            </Link>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function RouteLayout() {
   const location = useLocation();
   return (
     <>
       <ScrollToTop />
       <div key={location.pathname} className="page-transition">
-        <Suspense fallback={<PageLoadingFallback />}>
-          <Outlet />
-        </Suspense>
+        <RouteErrorBoundary pathname={location.pathname}>
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Outlet />
+          </Suspense>
+        </RouteErrorBoundary>
       </div>
     </>
   );

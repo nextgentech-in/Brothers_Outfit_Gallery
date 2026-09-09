@@ -101,6 +101,25 @@ export default function ProductPage() {
   return (
     <div className="product-page-wrapper">
       <div className="product-page-container">
+        {/* Navigation Breadcrumb creating natural space below navbar */}
+        <nav aria-label="Breadcrumb" className="product-breadcrumbs">
+          <Link to="/">Home</Link>
+          <span className="breadcrumb-separator">/</span>
+          <Link to="/shop">Shop</Link>
+          {product.category && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <Link to={`/shop?category=${encodeURIComponent(product.category)}`}>
+                {product.category}
+              </Link>
+            </>
+          )}
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current" title={product.title || product.name}>
+            {product.title || product.name}
+          </span>
+        </nav>
+
         <div className="product-main-grid">
           <div className="product-gallery-section">
             <ProductGallery images={allImages} />

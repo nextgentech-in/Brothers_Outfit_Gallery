@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import './WhatsAppFloat.css';
 
 const WA_NUMBER = '918460233020';
@@ -6,6 +7,8 @@ const WA_MESSAGE = "Hi Brothers Outfit Gallery! I'd like styling and sizing assi
 
 export default function WhatsAppFloat() {
   const [showPrompt, setShowPrompt] = useState(true);
+  const location = useLocation();
+  const isProductPage = location.pathname.startsWith('/product/');
   const waUrl = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_MESSAGE)}`;
 
   useEffect(() => {
@@ -16,7 +19,7 @@ export default function WhatsAppFloat() {
   }, []);
 
   return (
-    <div className="whatsapp-float-container">
+    <div className={`whatsapp-float-container ${isProductPage ? 'whatsapp-float-container--product-page' : ''}`}>
       {showPrompt && (
         <div className="whatsapp-concierge-pill">
           <button 
@@ -38,7 +41,7 @@ export default function WhatsAppFloat() {
           <a
             href={waUrl}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             className="concierge-chat-link"
           >
             Ask Us Now 💬
@@ -49,7 +52,7 @@ export default function WhatsAppFloat() {
       <a
         href={waUrl}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         className="whatsapp-float"
         aria-label="Chat on WhatsApp"
         title="Chat with Brothers Outfit Stylist on WhatsApp"

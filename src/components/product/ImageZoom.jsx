@@ -46,7 +46,7 @@ export default function ImageZoom({ src, alt, onClick }) {
         if (onClick) onClick(e);
       }}
     >
-      <img src={src} alt={alt} className="image-zoom-base" loading="eager" />
+      <img src={src} alt={alt} className="image-zoom-base" loading="eager" decoding="async" fetchPriority="high" />
       <div className="image-zoom-lens" style={zoomStyle}></div>
       <div className="image-zoom-hint">🔍 Click to enlarge / Fullscreen</div>
     </div>

@@ -13,6 +13,8 @@ export default defineConfig({
     }
   },
   build: {
+    target: 'es2020',
+    cssMinify: 'lightningcss',
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -36,5 +38,3 @@ export default defineConfig({
     chunkSizeWarningLimit: 600
   }
 })
-
-

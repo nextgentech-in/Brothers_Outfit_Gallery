@@ -57,7 +57,7 @@ export default function ProductGallery({ images }) {
               onClick={() => setCurrentIndex(idx)}
               aria-label={`View image ${idx + 1}`}
             >
-              <img loading="lazy" src={optimizeImage(thumbUrl, 200)} alt={`Thumbnail ${idx + 1}`} />
+              <img loading="lazy" decoding="async" src={optimizeImage(thumbUrl, 160)} alt={`Thumbnail ${idx + 1}`} />
             </button>
           )
         })}
@@ -70,7 +70,7 @@ export default function ProductGallery({ images }) {
         onTouchEnd={handleTouchEnd}
       >
         <ImageZoom 
-          src={optimizeImage(currentImage, 1000)} 
+          src={optimizeImage(currentImage, typeof window !== 'undefined' && window.innerWidth < 768 ? 720 : 1000)} 
           alt={`Product view ${currentIndex + 1}`} 
           onClick={() => setLightboxOpen(true)}
         />

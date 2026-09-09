@@ -237,7 +237,7 @@ export default function AdminHomepage() {
           <a 
             href="/" 
             target="_blank" 
-            rel="noreferrer" 
+            rel="noopener noreferrer" 
             className="admin-action-btn" 
             style={{ padding: '10px 18px', background: '#0f172a', color: '#fff', textDecoration: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >

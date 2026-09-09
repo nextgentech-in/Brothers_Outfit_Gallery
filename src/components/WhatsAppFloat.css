@@ -134,6 +134,9 @@
     right: 14px;
     gap: 8px;
   }
+  .whatsapp-float-container.whatsapp-float-container--product-page {
+    bottom: 76px; /* Clean clearance above the mobile sticky buy bar */
+  }
   .whatsapp-float {
     width: 46px;
     height: 46px;
