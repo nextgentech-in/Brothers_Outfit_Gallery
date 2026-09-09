@@ -43,10 +43,12 @@ export default function PhotoGallery({ images }) {
     <>
       <div className="photo-gallery-grid">
         {images.map((img, index) => (
-          <div 
+          <button
+            type="button"
             key={index} 
             className="photo-gallery-item"
             onClick={() => openLightbox(index)}
+            aria-label={`Open ${img.alt || `photo ${index + 1}`}`}
           >
             {img.url.includes('placeholder') ? (
               <div className="photo-gallery-placeholder">
@@ -75,7 +77,7 @@ export default function PhotoGallery({ images }) {
                 <span>{img.caption}</span>
               </div>
             )}
-          </div>
+          </button>
         ))}
       </div>
 

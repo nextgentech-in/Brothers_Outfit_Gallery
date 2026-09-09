@@ -7,6 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
+import { cert, getApps, initializeApp as initializeAdminApp } from 'firebase-admin/app';
+import { FieldValue, getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 
 // Basic .env parsing for local dev without requiring dotenv package
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -467,6 +469,37 @@ const adminTokenCache = new Map();
 const FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY || "AIzaSyB7HF5zw63Rt2sxj2BiIGx3AgPZTqoxgvw";
 const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || "brothersoutfitgallary";
 
+// Administrative Firestore access is deliberately server-only. Customer-created
+// order documents are not trusted because browser state can be modified.
+let adminFirestoreDb = null;
+function getTrustedFirestore() {
+  if (adminFirestoreDb) return adminFirestoreDb;
+
+  try {
+    if (!getApps().length) {
+      const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      const serviceAccount = rawServiceAccount
+        ? JSON.parse(rawServiceAccount)
+        : {
+            projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || FIREBASE_PROJECT_ID,
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+          };
+
+      if (!serviceAccount.clientEmail || !serviceAccount.privateKey) {
+        throw new Error('Firebase Admin credentials are not configured.');
+      }
+
+      initializeAdminApp({ credential: cert(serviceAccount) });
+    }
+    adminFirestoreDb = getAdminFirestore();
+    return adminFirestoreDb;
+  } catch (error) {
+    console.error('Firebase Admin initialization failed:', error.message);
+    throw new Error('Secure order service is unavailable. Please contact support.');
+  }
+}
+
 async function verifyUserToken(idToken) {
   if (!idToken || typeof idToken !== 'string') return null;
   const tokenHash = crypto.createHash('sha256').update(idToken).digest('hex');
@@ -508,7 +541,7 @@ setInterval(() => {
 }, 10 * 60 * 1000).unref();
 
 async function requireAdminAuth(req, res, next) {
-  const adminSecret = (process.env.ADMIN_SECRET || process.env.VITE_ADMIN_SECRET || '').trim();
+  const adminSecret = (process.env.ADMIN_SECRET || '').trim();
   const reqSecret = req.headers['x-admin-secret'];
   if (adminSecret && reqSecret && reqSecret === adminSecret) {
     req.isAdmin = true;
@@ -532,7 +565,7 @@ async function requireAdminAuth(req, res, next) {
 }
 
 async function requireAuth(req, res, next) {
-  const adminSecret = (process.env.ADMIN_SECRET || process.env.VITE_ADMIN_SECRET || '').trim();
+  const adminSecret = (process.env.ADMIN_SECRET || '').trim();
   const reqSecret = req.headers['x-admin-secret'];
   if (adminSecret && reqSecret && reqSecret === adminSecret) {
     req.isAdmin = true;
@@ -622,10 +655,15 @@ async function fetchCouponsFromFirestore() {
 }
 
 async function calculateServerOrderTotal(items, couponCode) {
+  if (!Array.isArray(items) || items.length === 0 || items.length > 30) {
+    throw new Error('Cart must contain between 1 and 30 items.');
+  }
+
   const products = await fetchProductsFromFirestore();
   const productsMap = new Map(products.map(p => [p.id, p]));
 
   let subtotal = 0;
+  const authoritativeItems = [];
   for (const item of items) {
     const rawId = item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null);
     let product = rawId ? productsMap.get(rawId) : null;
@@ -638,27 +676,49 @@ async function calculateServerOrderTotal(items, couponCode) {
       );
     }
 
-    let unitPrice = 0;
-    if (product) {
-      unitPrice = Number(product.salePrice ?? product.price ?? 0);
-      if (product.variants && product.variants.length > 0 && (item.size || item.selectedSize)) {
-        const targetSize = item.size || item.selectedSize;
-        const targetColor = item.color || item.selectedColor;
-        const matchedVariant = product.variants.find(v =>
-          v.size === targetSize && (!targetColor || v.color === targetColor || v.color === 'Standard' || v.color === 'Default')
-        ) || product.variants.find(v => v.size === targetSize);
-        if (matchedVariant) {
-          unitPrice = Number(matchedVariant.salePrice ?? matchedVariant.price ?? unitPrice);
-        }
-      }
-    } else {
-      // Graceful fallback to client price if item is not found in cache to prevent checkout failure
-      unitPrice = Number(item.price ?? item.salePrice ?? item.finalPrice ?? 0);
-      console.warn(`Product not found in catalog cache (${rawId || item.name}), using client price: ₹${unitPrice}`);
+    if (!product || product.active === false) {
+      throw new Error(`One or more products are unavailable. Please refresh your cart.`);
     }
 
     const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    let matchedVariant = null;
+    let unitPrice = Number(product.salePrice ?? product.price ?? 0);
+    const targetSize = item.size || item.selectedSize || null;
+    const targetColor = item.color || item.selectedColor || null;
+
+    if (product.variants && product.variants.length > 0 && targetSize) {
+      matchedVariant = product.variants.find(v =>
+        v.size === targetSize && (!targetColor || v.color === targetColor || v.color === 'Standard' || v.color === 'Default')
+      ) || product.variants.find(v => v.size === targetSize);
+      if (!matchedVariant) {
+        throw new Error(`The selected size is no longer available for ${product.name || 'this item'}.`);
+      }
+      unitPrice = Number(matchedVariant.salePrice ?? matchedVariant.price ?? unitPrice);
+    }
+
+    const availableStock = Number(matchedVariant?.stock ?? product.stock);
+    if (Number.isFinite(availableStock) && (availableStock < 1 || qty > availableStock)) {
+      throw new Error(`${product.name || 'This item'} does not have enough stock available.`);
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw new Error(`A valid store price could not be found for ${product.name || 'this item'}.`);
+    }
+
     subtotal += unitPrice * qty;
+    authoritativeItems.push({
+      id: product.id,
+      productId: product.id,
+      slug: product.slug || '',
+      name: product.name || 'Product',
+      image: product.image || product.thumbnailUrl || product.images?.[0]?.url || product.images?.[0] || '',
+      size: targetSize || matchedVariant?.size || 'One Size',
+      selectedSize: targetSize || matchedVariant?.size || 'One Size',
+      color: targetColor || matchedVariant?.color || product.colors?.[0]?.name || product.colors?.[0] || 'Default',
+      selectedColor: targetColor || matchedVariant?.color || product.colors?.[0]?.name || product.colors?.[0] || 'Default',
+      quantity: qty,
+      price: unitPrice,
+      mrp: Number(matchedVariant?.mrp ?? product.mrp ?? product.compareAtPrice ?? unitPrice)
+    });
   }
 
   // Tiered store discount: ₹250 off if cart subtotal >= ₹2500
@@ -693,7 +753,8 @@ async function calculateServerOrderTotal(items, couponCode) {
     discount,
     couponDiscount,
     shippingCost,
-    finalTotal
+    finalTotal,
+    items: authoritativeItems
   };
 }
 
@@ -725,41 +786,23 @@ app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], require
 });
 
 // ─── Razorpay: Create Order (Server-Recalculated & Rate-Limited) ─────────────
-app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, res) => {
+app.post(['/api/razorpay/create-order', '/razorpay/create-order'], requireAuth, async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 15)) return;
 
-  const { items, couponCode, amount, clientTotal } = req.body;
-  let orderTotalInRupees = 0;
+  const { items, couponCode } = req.body;
+  let serverCalc;
 
-  // Recalculate and verify authoritative totals on server if cart items provided
-  if (Array.isArray(items) && items.length > 0) {
-    try {
-      const serverCalc = await calculateServerOrderTotal(items, couponCode);
-      orderTotalInRupees = serverCalc.finalTotal;
-
-      const requestedTotal = Number(clientTotal || amount);
-      if (requestedTotal && Math.abs(serverCalc.finalTotal - requestedTotal) > 2) {
-        console.warn(`Price mismatch: client sent ₹${requestedTotal}, server calculated ₹${serverCalc.finalTotal}`);
-        return res.status(400).json({
-          error: 'Order price mismatch detected. Cart totals have been updated to match store prices. Please refresh.'
-        });
-      }
-    } catch (calcErr) {
-      console.error('Server order total calculation error:', calcErr);
-      return res.status(400).json({ error: calcErr.message || 'Error computing order total.' });
-    }
-  } else {
-    const numAmount = Number(amount);
-    if (!numAmount || isNaN(numAmount) || numAmount < 1 || numAmount > 500000) {
-      return res.status(400).json({ error: 'Valid items array or amount between ₹1 and ₹5,00,000 required.' });
-    }
-    orderTotalInRupees = numAmount;
+  try {
+    serverCalc = await calculateServerOrderTotal(items, couponCode);
+  } catch (calcErr) {
+    console.error('Server order total calculation error:', calcErr);
+    return res.status(400).json({ error: calcErr.message || 'Error computing order total.' });
   }
 
   try {
     const rzp = getRazorpayClient();
     const order = await rzp.orders.create({
-      amount: Math.round(orderTotalInRupees * 100), // rupees → paise
+      amount: Math.round(serverCalc.finalTotal * 100), // rupees → paise
       currency: 'INR',
       receipt: `rcpt_${Date.now().toString().slice(-8)}`,
     });
@@ -767,7 +810,7 @@ app.post(['/api/razorpay/create-order', '/razorpay/create-order'], async (req, r
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      verifiedTotal: orderTotalInRupees,
+      verifiedTotal: serverCalc.finalTotal,
       key: (process.env.RAZORPAY_KEY_ID || '').trim(),
     });
   } catch (error) {
@@ -809,6 +852,132 @@ app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
   } catch (err) {
     console.error('Razorpay verification error:', err);
     res.status(400).json({ success: false, error: 'Payment signature verification failed.' });
+  }
+});
+
+function normalizeShippingAddress(address = {}) {
+  const fullName = String(address.fullName || '').trim();
+  const phone = String(address.phone || '').replace(/\D/g, '').slice(-10);
+  const addressLine = String(address.addressLine || '').trim();
+  const city = String(address.city || '').trim();
+  const state = String(address.state || '').trim();
+  const pincode = String(address.pincode || '').replace(/\D/g, '').slice(0, 6);
+  const email = String(address.email || '').trim().toLowerCase();
+
+  if (!fullName || !addressLine || !city || !/^[6-9]\d{9}$/.test(phone) || !/^\d{6}$/.test(pincode)) {
+    throw new Error('A complete delivery address and valid Indian mobile number are required.');
+  }
+
+  return { fullName, phone, addressLine, city, state, pincode, email };
+}
+
+async function verifyRazorpayPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature }, expectedAmount) {
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    throw new Error('Missing payment verification details.');
+  }
+
+  const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+  if (!secret) throw new Error('Payment service is not configured.');
+
+  const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+  const expectedBuf = Buffer.from(expected, 'utf-8');
+  const receivedBuf = Buffer.from(String(razorpay_signature), 'utf-8');
+  if (expectedBuf.length !== receivedBuf.length || !crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
+    throw new Error('Payment signature verification failed.');
+  }
+
+  const rzp = getRazorpayClient();
+  const [gatewayOrder, gatewayPayment] = await Promise.all([
+    rzp.orders.fetch(razorpay_order_id),
+    rzp.payments.fetch(razorpay_payment_id)
+  ]);
+  if (
+    gatewayOrder.amount !== Math.round(expectedAmount * 100) ||
+    gatewayPayment.order_id !== razorpay_order_id ||
+    gatewayPayment.status !== 'captured'
+  ) {
+    throw new Error('Payment details do not match the verified order.');
+  }
+
+  return { orderId: razorpay_order_id, paymentId: razorpay_payment_id };
+}
+
+// Creates an immutable, server-validated order. Firebase Admin bypasses client
+// Firestore rules, so users cannot forge prices or a paid order in the browser.
+app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 10)) return;
+
+  try {
+    const { items, couponCode, shippingAddress, paymentMethod, payment } = req.body;
+    const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
+    if (!['cod', 'razorpay'].includes(normalizedPaymentMethod)) {
+      return res.status(400).json({ error: 'Unsupported payment method.' });
+    }
+
+    const [calculation, address] = await Promise.all([
+      calculateServerOrderTotal(items, couponCode),
+      Promise.resolve(normalizeShippingAddress(shippingAddress))
+    ]);
+
+    let paymentDetails = null;
+    if (normalizedPaymentMethod === 'razorpay') {
+      paymentDetails = await verifyRazorpayPayment(payment || {}, calculation.finalTotal);
+    }
+
+    const orderId = paymentDetails
+      ? `ORD-${paymentDetails.paymentId.replace(/[^A-Za-z0-9_-]/g, '')}`
+      : `ORD-${crypto.randomUUID()}`;
+    const db = getTrustedFirestore();
+    const orderRef = db.collection('orders').doc(orderId);
+    const order = {
+      userId: req.user.uid,
+      userEmail: req.user.email || address.email || '',
+      userPhone: address.phone,
+      shippingAddress: { ...address, email: req.user.email || address.email || '' },
+      items: calculation.items,
+      subtotal: calculation.subtotal,
+      discount: calculation.discount,
+      couponCode: couponCode ? String(couponCode).trim().toUpperCase() : null,
+      couponDiscount: calculation.couponDiscount,
+      shippingCost: calculation.shippingCost,
+      totalAmount: calculation.finalTotal,
+      paymentMethod: normalizedPaymentMethod === 'cod' ? 'Cash on Delivery' : 'Razorpay Online Payment',
+      paymentStatus: normalizedPaymentMethod === 'cod' ? 'Pending (COD)' : 'Paid',
+      paymentId: paymentDetails?.paymentId || null,
+      razorpayOrderId: paymentDetails?.orderId || null,
+      status: 'Processing',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      createdBy: 'secure-server'
+    };
+
+    try {
+      await orderRef.create(order);
+    } catch (error) {
+      if (error.code !== 6) throw error; // ALREADY_EXISTS is safe idempotency for payment retries.
+      const existing = await orderRef.get();
+      if (!existing.exists || existing.data().userId !== req.user.uid) {
+        throw new Error('This payment has already been associated with another order.');
+      }
+      return res.json({ success: true, orderId, duplicate: true });
+    }
+
+    await db.collection('notifications').doc(orderId).set({
+      type: 'NEW_ORDER',
+      orderId,
+      message: `Order #${orderId.substring(0, 14)} placed by ${address.fullName} (₹${calculation.finalTotal})`,
+      customerName: address.fullName,
+      totalAmount: calculation.finalTotal,
+      paymentMethod: order.paymentMethod,
+      read: false,
+      createdAt: FieldValue.serverTimestamp()
+    });
+
+    res.status(201).json({ success: true, orderId, totalAmount: calculation.finalTotal });
+  } catch (error) {
+    console.error('Secure order creation failed:', error.message);
+    res.status(400).json({ error: error.message || 'Unable to create order.' });
   }
 });
 
@@ -1207,4 +1376,3 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
 }
 
 export default app;
-

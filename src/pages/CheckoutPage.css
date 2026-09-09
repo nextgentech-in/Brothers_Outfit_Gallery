@@ -353,12 +353,24 @@
 }
 
 .suggestion-item {
+  width: 100%;
   padding: 10px 12px;
+  border: 0;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid #f3f4f6;
+  background: #ffffff;
+  text-align: left;
+  font: inherit;
   transition: background 0.15s;
+}
+
+.place-search-status {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
 }
 
 .suggestion-item:hover {

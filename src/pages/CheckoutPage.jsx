@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { createOrder } from '../services/orderService';
 import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
-import { createAdminOrderNotification } from '../services/notificationService';
 import { validateCoupon } from '../services/couponService';
 import { getBackendUrl } from '../utils/apiConfig';
 import AuthModal from '../components/auth/AuthModal';
@@ -76,6 +74,45 @@ export default function CheckoutPage() {
   const shippingCost = cartSubtotal >= 1000 ? 0 : 70;
   const finalTotal = Math.max(0, cartSubtotal - discount - couponDiscount + shippingCost);
 
+  // The server derives every price and writes the order. The browser only sends
+  // product identifiers and customer-entered delivery details.
+  const createSecureOrder = async (method, activePhone, payment = null) => {
+    const idToken = await currentUser?.getIdToken();
+    if (!idToken) throw new Error('Please sign in again before placing your order.');
+
+    const response = await fetch(`${getBackendUrl()}/api/orders/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify({
+        paymentMethod: method,
+        payment,
+        couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
+        shippingAddress: {
+          ...shippingAddress,
+          phone: activePhone,
+          email: (currentUser.email || shippingAddress.email || '').toLowerCase().trim()
+        },
+        items: cartItems.map(item => ({
+          id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
+          slug: item.slug,
+          name: item.name,
+          size: item.size || item.selectedSize,
+          selectedSize: item.selectedSize || item.size,
+          color: item.color || item.selectedColor,
+          selectedColor: item.selectedColor || item.color,
+          quantity: item.quantity
+        }))
+      })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Unable to create your order.');
+    return data;
+  };
+
   const handleCheckoutApplyCoupon = async (e) => {
     e.preventDefault();
     if (!couponInput.trim()) return;
@@ -126,6 +163,10 @@ export default function CheckoutPage() {
 
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
   const [searchingPlace, setSearchingPlace] = useState(false);
+  const placeSearchTimerRef = useRef(null);
+  const placeSearchRequestRef = useRef(0);
+
+  useEffect(() => () => clearTimeout(placeSearchTimerRef.current), []);
 
 
   // Auto-verify Delhivery pincode serviceability & auto-fill city/state
@@ -176,17 +217,30 @@ export default function CheckoutPage() {
       }
     }
 
-    // Auto-search pincode if user types city or place (>= 3 chars)
-    if (name === 'city' && value.trim().length >= 3) {
+    // Debounce place lookup to avoid a network request for every keystroke.
+    if (name === 'city') {
+      clearTimeout(placeSearchTimerRef.current);
+      const query = value.trim();
+      const requestId = ++placeSearchRequestRef.current;
+      if (query.length < 3) {
+        setPlaceSuggestions([]);
+        setSearchingPlace(false);
+        return;
+      }
+
       setSearchingPlace(true);
-      lookupPincodeByPlace(value)
-        .then(results => {
-          setPlaceSuggestions(results);
-          setSearchingPlace(false);
-        })
-        .catch(() => setSearchingPlace(false));
-    } else if (name === 'city' && value.trim().length < 3) {
-      setPlaceSuggestions([]);
+      placeSearchTimerRef.current = setTimeout(() => {
+        lookupPincodeByPlace(query)
+          .then(results => {
+            if (requestId === placeSearchRequestRef.current) setPlaceSuggestions(results);
+          })
+          .catch(() => {
+            if (requestId === placeSearchRequestRef.current) setPlaceSuggestions([]);
+          })
+          .finally(() => {
+            if (requestId === placeSearchRequestRef.current) setSearchingPlace(false);
+          });
+      }, 350);
     }
   };
 
@@ -286,32 +340,7 @@ export default function CheckoutPage() {
     if (paymentMethod === 'cod') {
       // Cash on Delivery
       try {
-        const newOrderId = `ORD-${Date.now()}`;
-        const emailToSave = (currentUser.email || shippingAddress.email || '').toLowerCase().trim();
-        const orderPayload = {
-          userId: currentUser.uid,
-          userEmail: emailToSave,
-          userPhone: finalPhone,
-          phoneVerified: true,
-          shippingAddress: {
-            ...shippingAddress,
-            phone: finalPhone,
-            email: emailToSave
-          },
-          items: cartItems,
-          subtotal: cartSubtotal,
-          discount,
-          couponCode: appliedCoupon?.coupon?.code || null,
-          couponDiscount,
-          shippingCost,
-          totalAmount: finalTotal,
-          paymentMethod: 'Cash on Delivery',
-          paymentStatus: 'Pending (COD)',
-          status: 'Processing',
-          createdAt: new Date(),
-        };
-
-        await createOrder(newOrderId, orderPayload);
+        const { orderId: newOrderId } = await createSecureOrder('cod', finalPhone);
 
         // Save delivery info to user profile
         if (currentUser && updateFirestoreProfile) {
@@ -331,9 +360,6 @@ export default function CheckoutPage() {
         try {
           localStorage.setItem('last_placed_order', newOrderId);
         } catch { }
-        // Trigger Admin Alert
-        await createAdminOrderNotification(newOrderId, orderPayload);
-
         clearCart();
         navigate(`/order-confirmation/${newOrderId}`);
       } catch (err) {
@@ -353,15 +379,22 @@ export default function CheckoutPage() {
       // 1. Create order on backend with authoritative server calculation
       const res = await fetch(`${backendUrl}/api/razorpay/create-order`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await currentUser.getIdToken()}`
+        },
         body: JSON.stringify({
           items: cartItems.map(item => ({
-            ...item,
-            id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null)
+            id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
+            slug: item.slug,
+            name: item.name,
+            size: item.size || item.selectedSize,
+            selectedSize: item.selectedSize || item.size,
+            color: item.color || item.selectedColor,
+            selectedColor: item.selectedColor || item.color,
+            quantity: item.quantity
           })),
-          couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
-          clientTotal: finalTotal,
-          amount: finalTotal
+          couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null
         }),
       });
 
@@ -408,76 +441,29 @@ export default function CheckoutPage() {
         },
         handler: async function (response) {
           try {
-            // Verify signature
-            const verifyRes = await fetch(`${backendUrl}/api/razorpay/verify`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            });
+            const { orderId: newOrderId } = await createSecureOrder('razorpay', finalPhone, response);
 
-            const verifyData = await verifyRes.json();
-
-            if (verifyData.success) {
-              const newOrderId = `ORD-${Date.now()}`;
-              const emailToSave = (currentUser.email || shippingAddress.email || '').toLowerCase().trim();
-              const orderPayload = {
-                userId: currentUser.uid,
-                userEmail: emailToSave,
-                userPhone: finalPhone,
+            // Save delivery info to user profile
+            if (currentUser && updateFirestoreProfile) {
+              updateFirestoreProfile(currentUser.uid, {
+                fullName: shippingAddress.fullName,
+                phone: finalPhone,
                 phoneVerified: true,
-                shippingAddress: {
-                  ...shippingAddress,
-                  phone: finalPhone,
-                  email: emailToSave
-                },
-                items: cartItems,
-                subtotal: cartSubtotal,
-                discount,
-                couponCode: appliedCoupon?.coupon?.code || null,
-                couponDiscount,
-                shippingCost,
-                totalAmount: finalTotal,
-                paymentMethod: 'Razorpay Online Payment',
-                paymentId: response.razorpay_payment_id,
-                razorpayOrderId: response.razorpay_order_id,
-                paymentStatus: 'Paid',
-                status: 'Processing',
-                createdAt: new Date(),
-              };
-
-              await createOrder(newOrderId, orderPayload);
-
-              // Save delivery info to user profile
-              if (currentUser && updateFirestoreProfile) {
-                updateFirestoreProfile(currentUser.uid, {
-                  fullName: shippingAddress.fullName,
-                  phone: finalPhone,
-                  phoneVerified: true,
-                  address: {
-                    line1: shippingAddress.addressLine,
-                    city: shippingAddress.city,
-                    state: shippingAddress.state,
-                    pincode: shippingAddress.pincode
-                  }
-                }).catch(() => {});
-              }
-
-              try {
-                localStorage.setItem('last_placed_order', newOrderId);
-              } catch { }
-              // Trigger Admin Alert
-              await createAdminOrderNotification(newOrderId, orderPayload);
-
-              clearCart();
-              navigate(`/order-confirmation/${newOrderId}`);
-            } else {
-              setError('Payment verification failed: Signature mismatch.');
-              setLoading(false);
+                address: {
+                  line1: shippingAddress.addressLine,
+                  city: shippingAddress.city,
+                  state: shippingAddress.state,
+                  pincode: shippingAddress.pincode
+                }
+              }).catch(() => {});
             }
+
+            try {
+              localStorage.setItem('last_placed_order', newOrderId);
+            } catch { }
+
+            clearCart();
+            navigate(`/order-confirmation/${newOrderId}`);
           } catch (err) {
             setError(`Error processing payment verification: ${err.message}`);
             setLoading(false);
@@ -661,18 +647,22 @@ export default function CheckoutPage() {
                 required
                 placeholder="Type City or Area..."
               />
+              {searchingPlace && (
+                <span className="place-search-status" role="status">Finding locations…</span>
+              )}
               {placeSuggestions.length > 0 && (
                 <div className="place-suggestions-dropdown">
                   <div className="suggestions-header">Click to select PIN code & location:</div>
                   {placeSuggestions.map((s, idx) => (
-                    <div 
+                    <button
+                      type="button"
                       key={idx} 
                       className="suggestion-item"
                       onClick={() => handleSelectPlaceSuggestion(s)}
                     >
                       <strong>📍 {s.area || s.city} ({s.pincode})</strong>
                       <span>{s.city}, {s.state}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
