@@ -354,7 +354,7 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: cartItems,
+          items: cartItems.map(item => ({ ...item, id: item.id || item.productId })),
           couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
           clientTotal: finalTotal,
           amount: finalTotal
@@ -537,122 +537,100 @@ export default function CheckoutPage() {
             />
           </div>
 
-          <div className="checkout-form-row">
-            <div className="checkout-form-group">
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <span>Phone Number *</span>
-                {isPhoneVerified ? (
-                  <span style={{
-                    fontSize: '0.72rem',
-                    fontWeight: '700',
-                    color: '#15803d',
-                    background: '#dcfce7',
-                    border: '1px solid #86efac',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '3px'
-                  }}>
-                    ✓ Verified
-                  </span>
-                ) : (
-                  <span style={{
-                    fontSize: '0.72rem',
-                    color: '#b45309',
-                    background: '#fef3c7',
-                    border: '1px solid #fde68a',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    fontWeight: '600'
-                  }}>
-                    Verification Required
-                  </span>
-                )}
-              </label>
-
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={shippingAddress.phone}
-                  onChange={handleInputChange}
-                  required
-                  disabled={isPhoneVerified}
-                  placeholder="10-digit mobile number"
-                  style={{
-                    flex: 1,
-                    backgroundColor: isPhoneVerified ? '#f8fafc' : '#ffffff',
-                    borderColor: isPhoneVerified ? '#86efac' : undefined
-                  }}
-                />
-                {!isPhoneVerified ? (
-                  <button
-                    type="button"
-                    onClick={handleVerifyPhoneInline}
-                    style={{
-                      background: '#111827',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '0 14px',
-                      fontSize: '12px',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    Verify via OTP
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVerifiedPhone(null);
-                      setPhoneFeedback(null);
-                    }}
-                    style={{
-                      background: '#f1f5f9',
-                      color: '#334155',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '0 12px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Change
-                  </button>
-                )}
-              </div>
-
-              {phoneFeedback && (
-                <div style={{
-                  fontSize: '0.78rem',
-                  marginTop: '4px',
-                  color: phoneFeedback.type === 'error' ? '#dc2626' : '#15803d',
+          {/* Phone Number with OTP Verification */}
+          <div className="checkout-form-group">
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+              <span>Phone Number *</span>
+              {isPhoneVerified ? (
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: '700',
+                  color: '#15803d',
+                  background: '#dcfce7',
+                  border: '1px solid #86efac',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}>
+                  ✓ Verified
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: '0.72rem',
+                  color: '#b45309',
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
                   fontWeight: '600'
                 }}>
-                  {phoneFeedback.message}
-                </div>
+                  Verification Required
+                </span>
               )}
-            </div>
-            <div className="checkout-form-group">
-              <label>Email *</label>
+            </label>
+
+            <div className="checkout-phone-input-row">
               <input
-                type="email"
-                name="email"
-                value={shippingAddress.email}
+                type="tel"
+                name="phone"
+                value={shippingAddress.phone}
                 onChange={handleInputChange}
                 required
-                placeholder="email@example.com"
+                disabled={isPhoneVerified}
+                placeholder="10-digit mobile number"
+                className="checkout-phone-input"
+                style={{
+                  backgroundColor: isPhoneVerified ? '#f8fafc' : '#ffffff',
+                  borderColor: isPhoneVerified ? '#86efac' : undefined
+                }}
               />
+              {!isPhoneVerified ? (
+                <button
+                  type="button"
+                  onClick={handleVerifyPhoneInline}
+                  className="checkout-verify-btn"
+                >
+                  Verify via OTP
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerifiedPhone(null);
+                    setPhoneFeedback(null);
+                  }}
+                  className="checkout-change-phone-btn"
+                >
+                  Change
+                </button>
+              )}
             </div>
+
+            {phoneFeedback && (
+              <div style={{
+                fontSize: '0.78rem',
+                marginTop: '4px',
+                color: phoneFeedback.type === 'error' ? '#dc2626' : '#15803d',
+                fontWeight: '600'
+              }}>
+                {phoneFeedback.message}
+              </div>
+            )}
+          </div>
+
+          {/* Email Address */}
+          <div className="checkout-form-group">
+            <label>Email *</label>
+            <input
+              type="email"
+              name="email"
+              value={shippingAddress.email}
+              onChange={handleInputChange}
+              required
+              placeholder="email@example.com"
+            />
           </div>
 
           <div className="checkout-form-group">
@@ -667,6 +645,7 @@ export default function CheckoutPage() {
             />
           </div>
 
+          {/* City and State */}
           <div className="checkout-form-row">
             <div className="checkout-form-group" style={{ position: 'relative' }}>
               <label>City / Place *</label>
@@ -706,18 +685,20 @@ export default function CheckoutPage() {
                 placeholder="State"
               />
             </div>
-            <div className="checkout-form-group">
-              <label>Pincode *</label>
-              <input
-                type="text"
-                name="pincode"
-                value={shippingAddress.pincode}
-                onChange={handleInputChange}
-                required
-                maxLength={6}
-                placeholder="380001"
-              />
-            </div>
+          </div>
+
+          {/* Pincode */}
+          <div className="checkout-form-group">
+            <label>Pincode *</label>
+            <input
+              type="text"
+              name="pincode"
+              value={shippingAddress.pincode}
+              onChange={handleInputChange}
+              required
+              maxLength={6}
+              placeholder="380001"
+            />
           </div>
 
           {/* Delhivery Express Serviceability Badge */}
@@ -918,7 +899,8 @@ export default function CheckoutPage() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={() => handlePlaceOrder()}
-        message="Sign in or create an account to place your order."
+        initialTab="signup"
+        message="Please create an account or sign in to place your order."
       />
 
       <PhoneOtpModal

@@ -271,7 +271,7 @@ export default function Navbar() {
             {/* Account - desktop & mobile */}
             <Link to={authAccountLink} className="navbar__icon-btn navbar__icon-btn--account" aria-label="Account">
               {currentUser ? (
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--color-heading)', color: '#fff', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                <div className="navbar__avatar-circle">
                   {userProfile?.fullName ? userProfile.fullName.charAt(0).toUpperCase() : currentUser.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
               ) : (

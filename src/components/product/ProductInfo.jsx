@@ -156,9 +156,8 @@ export default function ProductInfo({ product }) {
       return;
     }
 
-    // Display auth modal on mobile only when not logged in; desktop proceeds directly to checkout
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-    if (isMobile && !currentUser) {
+    // Require account creation/login before navigating to checkout
+    if (!currentUser) {
       setAuthModalOpen(true);
       return;
     }
@@ -502,7 +501,8 @@ export default function ProductInfo({ product }) {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={onAuthSuccess}
-        message="Sign in or create an account to proceed with your order."
+        initialTab="signup"
+        message="Please create an account or sign in to proceed with your order."
       />
     </div>
   );

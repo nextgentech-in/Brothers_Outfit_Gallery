@@ -95,6 +95,7 @@ export const CartProvider = ({ children }) => {
 
       return [...prev, {
         cartItemId,
+        id: product.id,
         productId: product.id,
         name: product.name,
         image: product.image || product.thumbnailUrl,
@@ -127,6 +128,7 @@ export const CartProvider = ({ children }) => {
 
     const singleItem = {
       cartItemId: `${product.id}-${safeSize}-${safeColor}`,
+      id: product.id,
       productId: product.id,
       name: product.name,
       image: product.image || product.thumbnailUrl,

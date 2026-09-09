@@ -627,9 +627,13 @@ async function calculateServerOrderTotal(items, couponCode) {
 
   let subtotal = 0;
   for (const item of items) {
-    const product = productsMap.get(item.id);
+    const itemId = item.id || item.productId;
+    let product = itemId ? productsMap.get(itemId) : null;
+    if (!product && (item.slug || item.name)) {
+      product = products.find(p => (item.slug && p.slug === item.slug) || (item.name && p.name === item.name));
+    }
     if (!product) {
-      throw new Error(`Product not found or unavailable in store: ${item.id}`);
+      throw new Error(`Product not found or unavailable in store: ${itemId || item.name || 'unknown'}`);
     }
 
     let unitPrice = Number(product.salePrice ?? product.price ?? 0);
