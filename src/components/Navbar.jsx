@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useShop } from '../context/ShopContext';
-import { searchProducts } from '../services/productService';
 import { optimizeImage } from '../utils/imageUtils';
 import './Navbar.css';
 
@@ -54,6 +53,7 @@ export default function Navbar() {
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
+        const { searchProducts } = await import('../services/productService');
         const results = await searchProducts(searchQuery, 6);
         setSearchResults(results);
       } catch (err) {

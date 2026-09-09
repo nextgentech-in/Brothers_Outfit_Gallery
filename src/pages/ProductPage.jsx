@@ -28,8 +28,27 @@ export default function ProductPage() {
     window.scrollTo(0, 0);
     let isCurrent = true;
 
+    // Check cache synchronously on slug change to avoid displaying previous product
+    let cachedProd = null;
+    try {
+      const raw = sessionStorage.getItem('bo_products_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed?.data)) {
+          cachedProd = parsed.data.find(p => p.slug === slug) || null;
+        }
+      }
+    } catch {}
+
+    if (cachedProd) {
+      setProduct(cachedProd);
+      setLoading(false);
+    } else {
+      setProduct(null);
+      setLoading(true);
+    }
+
     const fetchProduct = async () => {
-      if (!product) setLoading(true);
       try {
         const prod = await getProductBySlug(slug);
         if (isCurrent && prod) {

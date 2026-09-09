@@ -198,6 +198,10 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
     touchStartX.current = null;
   };
 
+  // Actual rating display logic
+  const productRating = Number(product.rating || product.avgRating || 0);
+  const reviewCount = Number(product.reviewsCount || product.reviewCount || (Array.isArray(product.reviews) ? product.reviews.length : 0));
+
   return (
     <div className={`product-card ${isOutOfStock ? 'product-card--oos' : ''}`}>
       {/* Image with multiple photos scroll option */}
@@ -282,20 +286,28 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
             </button>
 
             {/* Pagination Dots */}
-            <div className="card-img-dots">
+            <div className="card-img-dots" role="tablist" aria-label="Product photos">
               {imagesList.map((_, i) => (
-                <span
+                <button
                   key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === activeImgIdx}
+                  aria-label={`View photo ${i + 1} of ${imagesList.length}`}
                   className={`card-img-dot ${i === activeImgIdx ? 'active' : ''}`}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     setActiveImgIdx(i);
                   }}
-                  title={`Photo ${i + 1}`}
                 />
               ))}
             </div>
+
+            {/* Screen-reader live update for slide changes */}
+            <span className="sr-only" aria-live="polite" aria-atomic="true">
+              Showing photo {activeImgIdx + 1} of {imagesList.length}
+            </span>
 
             {/* Photo Counter */}
             <span className="card-img-counter">
@@ -310,7 +322,11 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
       <div className="product-card__info">
         <div className="product-card__meta-row">
           <span className="product-card__category">{product.category || "Men's Collection"}</span>
-          <span className="product-card__rating">★ 4.8</span>
+          {productRating > 0 && (
+            <span className="product-card__rating">
+              ★ {productRating.toFixed(1)}{reviewCount > 0 ? ` (${reviewCount})` : ''}
+            </span>
+          )}
         </div>
 
         <Link to={`/product/${product.slug}`} className="product-card__name">

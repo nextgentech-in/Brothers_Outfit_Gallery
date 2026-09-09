@@ -53,7 +53,14 @@ export default function PhotoGallery({ images }) {
                 <span>{img.alt}</span>
               </div>
             ) : (
-              <img src={img.url} alt={img.alt} loading="lazy" />
+              <img
+                src={img.url}
+                alt={img.alt}
+                width={img.width || 1280}
+                height={img.height || (img.url?.includes('store-real-1') ? 741 : 960)}
+                loading="lazy"
+                decoding="async"
+              />
             )}
             <div className="photo-gallery-zoom">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -54,7 +54,7 @@ export default function ProductInfo({ product }) {
     return product.variants?.find(v => v.isDefaultPrice) || null;
   }, [product.variants]);
 
-  const [selectedSize, setSelectedSize] = useState(defaultFrontVariant?.size || null);
+  const [selectedSize, setSelectedSize] = useState(() => defaultFrontVariant?.size || null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -62,19 +62,27 @@ export default function ProductInfo({ product }) {
   const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
 
+  // Sync state if product changes without unmounting
   useEffect(() => {
-    if (defaultFrontVariant?.size && !selectedSize) {
-      setSelectedSize(defaultFrontVariant.size);
-    }
-  }, [defaultFrontVariant, selectedSize]);
+    setSelectedSize(defaultFrontVariant?.size || null);
+    setSelectedColor(product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black');
+  }, [product.id, defaultFrontVariant?.size]);
 
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
 
-  // Read variants if present, else fallback
-  const productColors = product.colors?.length > 0 ? product.colors.map(c => c.name || c) : [];
-  const productSizes = product.variants?.length > 0 ? [...new Set(product.variants.map(v => v.size))] : (product.sizes || []);
-  const productTotalStock = product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10)||0), 0) : (product.stock || 0);
+  // Read variants if present, else fallback - memoized to prevent unstable object references in effects/memos
+  const productColors = useMemo(() => {
+    return product.colors?.length > 0 ? product.colors.map(c => c.name || c) : [];
+  }, [product.colors]);
+
+  const productSizes = useMemo(() => {
+    return product.variants?.length > 0 ? [...new Set(product.variants.map(v => v.size))] : (product.sizes || []);
+  }, [product.variants, product.sizes]);
+
+  const productTotalStock = useMemo(() => {
+    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10)||0), 0) : (product.stock || 0);
+  }, [product.variants, product.stock]);
 
   // Dynamic size-wise pricing matching selected size
   const matchedVariant = useMemo(() => {
@@ -109,8 +117,11 @@ export default function ProductInfo({ product }) {
   const currentDiscount = (activeMrp > activeSale && activeMrp > 0) ? Math.round(((activeMrp - activeSale) / activeMrp) * 100) : 0;
   const hasDiscount = currentDiscount > 0;
 
+  const productRating = Number(product.rating || product.avgRating || 0);
+  const reviewCount = Number(product.reviewsCount || product.reviewCount || (Array.isArray(product.reviews) ? product.reviews.length : 0));
+
   const {
-    name, rating = 4.8, offer_enabled, offer_end_at, description, shortDescription
+    name, offer_enabled, offer_end_at, description, shortDescription
   } = product;
 
   // Stock status for selected size or whole product
@@ -133,6 +144,8 @@ export default function ProductInfo({ product }) {
     // Only require mandatory size selection if item is Clothing/Apparel and has size options
     if (isClothing && productSizes.length > 0 && !selectedSize) {
       setSizeError(true);
+      const sizeEl = document.querySelector('.product-selector-group');
+      sizeEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(() => setSizeError(false), 3500);
       return;
     }
@@ -152,6 +165,8 @@ export default function ProductInfo({ product }) {
   const handleBuyNow = () => {
     if (isClothing && productSizes.length > 0 && !selectedSize) {
       setSizeError(true);
+      const sizeEl = document.querySelector('.product-selector-group');
+      sizeEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(() => setSizeError(false), 3500);
       return;
     }
@@ -206,13 +221,30 @@ export default function ProductInfo({ product }) {
         )}
       </div>
 
-      <div className="product-rating" onClick={() => window.location.hash = 'reviews'}>
-        <span className="stars">
-          ★★★★★
-        </span>
-        <span className="rating-value">{rating}</span>
-        <span className="review-count">(124 Reviews)</span>
-      </div>
+      {productRating > 0 ? (
+        <div 
+          className="product-rating" 
+          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }} 
+          role="button" 
+          tabIndex={0} 
+          aria-label={`${productRating.toFixed(1)} stars out of 5 from ${reviewCount} reviews`}
+        >
+          <span className="stars">
+            {'★'.repeat(Math.round(productRating))}{'☆'.repeat(5 - Math.round(productRating))}
+          </span>
+          <span className="rating-value">{productRating.toFixed(1)}</span>
+          {reviewCount > 0 && <span className="review-count">({reviewCount} {reviewCount === 1 ? 'Review' : 'Reviews'})</span>}
+        </div>
+      ) : (
+        <div 
+          className="product-rating product-rating--empty" 
+          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }} 
+          role="button" 
+          tabIndex={0}
+        >
+          <span className="rating-empty-link">★ Be the first to review this product</span>
+        </div>
+      )}
 
       <div className="product-pricing">
         {hasDiscount ? (
@@ -487,6 +519,40 @@ export default function ProductInfo({ product }) {
           </div>
         </details>
       </div>
+
+      {/* Mobile Sticky Bottom Purchase Bar */}
+      <aside className="product-sticky-bar" aria-label="Mobile Quick Purchase Bar">
+        <div className="product-sticky-bar__inner">
+          <div className="product-sticky-bar__info">
+            <span className="product-sticky-bar__price">
+              ₹{activeSale.toLocaleString('en-IN')}
+            </span>
+            {selectedSize && (
+              <span className="product-sticky-bar__size">
+                Size: {selectedSize}
+              </span>
+            )}
+          </div>
+          <div className="product-sticky-bar__actions">
+            <button
+              type="button"
+              className={`product-sticky-bar__btn product-sticky-bar__btn--cart ${added ? 'added' : ''}`}
+              onClick={handleAddToCart}
+              disabled={outOfStock}
+            >
+              {added ? 'ADDED ✓' : 'ADD TO CART'}
+            </button>
+            <button
+              type="button"
+              className="product-sticky-bar__btn product-sticky-bar__btn--buy"
+              onClick={handleBuyNow}
+              disabled={outOfStock}
+            >
+              BUY NOW
+            </button>
+          </div>
+        </div>
+      </aside>
 
       {/* Interactive Online Size & Volume Guide Modal */}
       <SizeGuideModal 

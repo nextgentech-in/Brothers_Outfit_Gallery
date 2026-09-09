@@ -97,15 +97,24 @@ export default function ProductGallery({ images }) {
         
         {/* Mobile Swipe Indicators (Dots) */}
         {images.length > 1 && (
-          <div className="product-gallery-dots">
-            {images.map((_, idx) => (
-              <span 
-                key={idx}
-                className={`dot ${idx === currentIndex ? 'active' : ''}`}
-                onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="product-gallery-dots" role="tablist" aria-label="Product gallery images">
+              {images.map((_, idx) => (
+                <button 
+                  key={idx}
+                  type="button"
+                  role="tab"
+                  aria-selected={idx === currentIndex}
+                  aria-label={`View image ${idx + 1} of ${images.length}`}
+                  className={`dot ${idx === currentIndex ? 'active' : ''}`}
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+                />
+              ))}
+            </div>
+            <span className="sr-only" aria-live="polite" aria-atomic="true">
+              Showing image {currentIndex + 1} of {images.length}
+            </span>
+          </>
         )}
       </div>
 

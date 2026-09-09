@@ -11,7 +11,6 @@ import {
   getRedirectResult,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -27,6 +26,7 @@ export function AuthProvider({ children }) {
   // Fetch or create profile logic asynchronously
   const fetchUserProfile = async (uid, authUser) => {
     try {
+      const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
       const docRef = doc(db, 'users', uid);
       const docSnap = await getDoc(docRef);
       let isAdmin = false;
@@ -117,6 +117,7 @@ export function AuthProvider({ children }) {
 
   // Create or update a profile document in Firestore natively
   async function updateFirestoreProfile(uid, data) {
+    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
     const docRef = doc(db, 'users', uid);
     await setDoc(docRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
     await fetchUserProfile(uid, currentUser);

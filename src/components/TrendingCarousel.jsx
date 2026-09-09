@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getTrendingProducts } from '../services/productService';
 import trendingItems from '../data/trendingData';
 import './TrendingCarousel.css';
 
@@ -17,7 +16,8 @@ export default function TrendingCarousel({ trendingConfig }) {
 
   useEffect(() => {
     let isMounted = true;
-    getTrendingProducts(16)
+    import('../services/productService')
+      .then(({ getTrendingProducts }) => getTrendingProducts(16))
       .then(items => {
         if (isMounted) {
           setProducts(items || []);

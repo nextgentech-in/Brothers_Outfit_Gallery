@@ -71,16 +71,16 @@ export default function ShopPage() {
     const urlSearch = searchParams.get('search');
     const urlSort = searchParams.get('sort');
 
-    if (urlCategory && urlCategory !== category) {
-      setCategory(urlCategory);
+    if (urlCategory) {
+      setCategory(prev => prev !== urlCategory ? urlCategory : prev);
     }
-    if (urlSearch && urlSearch !== search) {
-      setSearch(urlSearch);
+    if (urlSearch) {
+      setSearch(prev => prev !== urlSearch ? urlSearch : prev);
     }
-    if (urlSort && urlSort !== sortBy) {
-      setSortBy(urlSort);
+    if (urlSort) {
+      setSortBy(prev => prev !== urlSort ? urlSort : prev);
     }
-  }, [searchParams]);
+  }, [searchParams, setCategory, setSearch, setSortBy]);
 
   // Debounce search input
   useEffect(() => {

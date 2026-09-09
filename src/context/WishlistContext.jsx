@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { getWishlist, addToWishlist, removeFromWishlist } from '../services/userService';
 
 const WishlistContext = createContext();
 
@@ -21,7 +20,8 @@ export const WishlistProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     if (currentUser?.uid) {
-      getWishlist(currentUser.uid)
+      import('../services/userService')
+        .then(({ getWishlist }) => getWishlist(currentUser.uid))
         .then(remoteItems => {
           if (!isMounted || !remoteItems) return;
           setWishlistItems(prev => {
@@ -62,6 +62,7 @@ export const WishlistProvider = ({ children }) => {
       setWishlistItems(prev => prev.filter(item => (item.id !== product.id && item.productId !== product.id)));
       if (currentUser?.uid) {
         try {
+          const { removeFromWishlist } = await import('../services/userService');
           await removeFromWishlist(currentUser.uid, product.id);
         } catch (err) {
           console.warn('Failed to remove from remote wishlist:', err);
@@ -85,6 +86,7 @@ export const WishlistProvider = ({ children }) => {
 
       if (currentUser?.uid) {
         try {
+          const { addToWishlist } = await import('../services/userService');
           await addToWishlist(currentUser.uid, itemToSave);
         } catch (err) {
           console.warn('Failed to add to remote wishlist:', err);
@@ -98,6 +100,7 @@ export const WishlistProvider = ({ children }) => {
     setWishlistItems(prev => prev.filter(item => (item.id !== productId && item.productId !== productId)));
     if (currentUser?.uid) {
       try {
+        const { removeFromWishlist } = await import('../services/userService');
         await removeFromWishlist(currentUser.uid, productId);
       } catch (err) {
         console.warn('Failed to remove from remote wishlist:', err);

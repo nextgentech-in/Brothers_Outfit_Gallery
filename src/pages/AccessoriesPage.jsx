@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { fetchAllActiveProducts } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import fallbackProducts from '../data/productsData';
@@ -27,11 +26,8 @@ export default function AccessoriesPage() {
     const fetchAccessoryProducts = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-
-        let firestoreItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        firestoreItems = firestoreItems.filter(p => p.active !== false);
+        const rawItems = await fetchAllActiveProducts();
+        const firestoreItems = rawItems.filter(p => p.active !== false);
 
         // Combine Firestore items with local fallback dataset
         const combinedMap = new Map();

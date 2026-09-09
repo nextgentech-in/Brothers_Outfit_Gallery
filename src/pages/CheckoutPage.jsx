@@ -125,6 +125,7 @@ export default function CheckoutPage() {
   }, []);
 
   const [placeSuggestions, setPlaceSuggestions] = useState([]);
+  const [searchingPlace, setSearchingPlace] = useState(false);
 
 
   // Auto-verify Delhivery pincode serviceability & auto-fill city/state

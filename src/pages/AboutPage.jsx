@@ -36,32 +36,44 @@ export default function AboutPage() {
     { 
       url: "/images/store-real-1.jpeg", 
       alt: "Brothers Outfit Gallery Storefront & Main Entrance", 
-      caption: "Our Official Storefront - Welcome to Brothers Outfit Gallery" 
+      caption: "Our Official Storefront - Welcome to Brothers Outfit Gallery",
+      width: 1280,
+      height: 741
     },
     { 
       url: "/images/store-real-2.jpeg", 
       alt: "Brothers Outfit Gallery Interior Collection Display", 
-      caption: "Spacious Interior & Contemporary Styles" 
+      caption: "Spacious Interior & Contemporary Styles",
+      width: 1280,
+      height: 960
     },
     { 
       url: "/images/store-real-3.jpeg", 
       alt: "Brothers Outfit Gallery Casuals & Designer Shirts Rack", 
-      caption: "Pure Cotton Casuals & Designer Shirts Collection" 
+      caption: "Pure Cotton Casuals & Designer Shirts Collection",
+      width: 1280,
+      height: 960
     },
     { 
       url: "/images/store-real-4.jpeg", 
       alt: "Brothers Outfit Gallery Premium T-Shirts & Smart Formals", 
-      caption: "High-Density Graphic Tees & Formal Shirts" 
+      caption: "High-Density Graphic Tees & Formal Shirts",
+      width: 1280,
+      height: 960
     },
     { 
       url: "/images/store-real-5.jpeg", 
       alt: "Brothers Outfit Gallery Denims, Jeans & Trousers Area", 
-      caption: "Curated Denims, Cargoes & Comfort-Fit Trousers" 
+      caption: "Curated Denims, Cargoes & Comfort-Fit Trousers",
+      width: 1280,
+      height: 960
     },
     { 
       url: "/images/store-real-6.jpeg", 
       alt: "Brothers Outfit Gallery Customer Care & Styling Counter", 
-      caption: "Friendly Service & Personal Styling Consultation" 
+      caption: "Friendly Service & Personal Styling Consultation",
+      width: 1280,
+      height: 960
     }
   ];
 
@@ -86,19 +98,47 @@ export default function AboutPage() {
           {/* Hero Photos Strip Preview */}
           <div className="about-hero-collage">
             <div className="hero-collage-item primary">
-              <img src="/images/store-real-1.jpeg" alt="Brothers Outfit Gallery Front" />
+              <img
+                src="/images/store-real-1.jpeg"
+                alt="Brothers Outfit Gallery Front"
+                width="1280"
+                height="741"
+                loading="lazy"
+                decoding="async"
+              />
               <div className="collage-label">Main Entrance</div>
             </div>
             <div className="hero-collage-item">
-              <img src="/images/store-real-2.jpeg" alt="Men's Wear Display" />
+              <img
+                src="/images/store-real-2.jpeg"
+                alt="Men's Wear Display"
+                width="1280"
+                height="960"
+                loading="lazy"
+                decoding="async"
+              />
               <div className="collage-label">New Arrivals</div>
             </div>
             <div className="hero-collage-item">
-              <img src="/images/store-real-3.jpeg" alt="Designer Shirts Rack" />
+              <img
+                src="/images/store-real-3.jpeg"
+                alt="Designer Shirts Rack"
+                width="1280"
+                height="960"
+                loading="lazy"
+                decoding="async"
+              />
               <div className="collage-label">Apparel Racks</div>
             </div>
             <div className="hero-collage-item">
-              <img src="/images/store-real-4.jpeg" alt="Casual & Streetwear Collection" />
+              <img
+                src="/images/store-real-4.jpeg"
+                alt="Casual & Streetwear Collection"
+                width="1280"
+                height="960"
+                loading="lazy"
+                decoding="async"
+              />
               <div className="collage-label">Signature Styles</div>
             </div>
           </div>

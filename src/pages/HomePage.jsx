@@ -5,8 +5,6 @@ import Hero from '../components/Hero';
 import TrendingCarousel from '../components/TrendingCarousel';
 import SaleProductCard from '../components/SaleProductCard';
 import ProductCard from '../components/ProductCard';
-import { getSaleProducts, getNewArrivals, getShopProducts } from '../services/productService';
-import { getHomepageConfig } from '../services/adminService';
 import TrustBar from '../components/TrustBar';
 import './HomePage.css';
 
@@ -54,6 +52,15 @@ export default function HomePage() {
     const fetchHomeData = async () => {
       try {
         setLoading(true);
+        // Dynamically load catalog and config modules so initial bundle doesn't block on Firestore
+        const [
+          { getSaleProducts, getNewArrivals, getShopProducts },
+          { getHomepageConfig }
+        ] = await Promise.all([
+          import('../services/productService'),
+          import('../services/configService')
+        ]);
+
         // Fetch concurrently
         const [saleRes, newRes, shopRes, configRes] = await Promise.all([
           getSaleProducts(4),
@@ -176,7 +183,15 @@ export default function HomePage() {
           <div className="home-container">
             <div className="about-grid">
               <div className="about-img-wrap">
-                <img src="/images/store-real-1.jpeg" alt="Brothers Outfit - Himatnagar Flagship Store" className="about-img" />
+                <img
+                  src="/images/store-real-1.jpeg"
+                  alt="Brothers Outfit - Himatnagar Flagship Store"
+                  className="about-img"
+                  width="1280"
+                  height="741"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <div className="about-content">
                 <h2>About Brother's Outfit Gallery</h2>
