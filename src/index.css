@@ -52,6 +52,8 @@
     --navbar-inner-height: 60px;
     --total-header-height: 88px;
   }
+}
+
 /* Accessibility Screen Reader Only Utility */
 .sr-only {
   position: absolute !important;
