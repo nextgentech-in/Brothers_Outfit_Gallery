@@ -184,8 +184,8 @@ export default function HomePage() {
             <div className="about-grid">
               <div className="about-img-wrap">
                 <img
-                  src="/images/store-real-2.jpeg"
-                  alt="Brothers Outfit Gallery - Store Collection & Interior"
+                  src="/images/unnamed.jpg"
+                  alt="Brothers Outfit Gallery - Himatnagar Store"
                   className="about-img"
                   width="1280"
                   height="960"
