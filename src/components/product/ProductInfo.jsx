@@ -559,6 +559,7 @@ export default function ProductInfo({ product }) {
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
         category={product.categoryId || product.category || 'Shirts'}
+        customSizeGuide={product.sizeGuide}
         onSelectSize={(size) => setSelectedSize(size)}
       />
 

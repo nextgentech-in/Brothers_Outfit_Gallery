@@ -107,7 +107,7 @@ const SIZE_CHARTS = {
   }
 };
 
-export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', onSelectSize }) {
+export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', onSelectSize, customSizeGuide }) {
   // Determine tab strictly based on product category
   const detectCategoryTab = (cat) => {
     const c = (cat || '').toLowerCase();
@@ -290,51 +290,97 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
               </div>
 
               {/* Data Table */}
-              <div className="size-table-container">
-                <table className="size-guide-table">
-                  <thead>
-                    <tr>
-                      {currentChart.columns.map((col, idx) => (
-                        <th key={idx}>{col}</th>
+              {customSizeGuide?.enabled && customSizeGuide?.columns?.length > 0 ? (
+                <div className="size-table-container">
+                  <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#111' }}>
+                      📋 Item Specific Size Chart
+                    </span>
+                    <span style={{ fontSize: '0.75rem', background: '#eef2ff', color: '#4338ca', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
+                      Verified Dimensions
+                    </span>
+                  </div>
+                  <table className="size-guide-table">
+                    <thead>
+                      <tr>
+                        {customSizeGuide.columns.map((col, idx) => (
+                          <th key={idx}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customSizeGuide.rows.map((row, rIdx) => (
+                        <tr 
+                          key={rIdx}
+                          style={{ cursor: onSelectSize && row[0] ? 'pointer' : 'default' }}
+                          onClick={() => {
+                            if (onSelectSize && row[0]) {
+                              onSelectSize(row[0]);
+                              onClose();
+                            }
+                          }}
+                          title={onSelectSize && row[0] ? `Select size ${row[0]}` : ''}
+                        >
+                          {row.map((cell, cIdx) => (
+                            <td key={cIdx}>
+                              {cIdx === 0 ? <strong>{cell}</strong> : cell}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeTab === 'footwear' ? (
-                      currentChart.data.map((row) => (
-                        <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
-                          <td><strong>{row.size}</strong></td>
-                          <td>{row.us}</td>
-                          <td>{row.eu}</td>
-                          <td>{row.lengthCm} cm</td>
-                          <td>{row.lengthIn} in</td>
-                        </tr>
-                      ))
-                    ) : activeTab === 'jeans' ? (
-                      currentChart.data.map((row) => (
-                        <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
-                          <td><strong>{row.size}</strong></td>
-                          <td>{unit === 'in' ? `${row.waistIn}"` : `${row.waistCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.hipIn}"` : `${row.hipCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.inseamIn}"` : `${row.inseamCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.thighIn}"` : `${row.thighCm} cm`}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      currentChart.data.map((row) => (
-                        <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
-                          <td><strong>{row.size}</strong></td>
-                          <td>{unit === 'in' ? `${row.chestIn}"` : `${row.chestCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.shoulderIn}"` : `${row.shoulderCm} cm`}</td>
-                          <td>{unit === 'in' ? `${row.sleeveIn}"` : `${row.sleeveCm} cm`}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                  <p style={{ marginTop: '8px', fontSize: '0.75rem', color: '#6b7280' }}>
+                    * Tip: Click on any row to automatically select that size.
+                  </p>
+                </div>
+              ) : (
+                <div className="size-table-container">
+                  <table className="size-guide-table">
+                    <thead>
+                      <tr>
+                        {currentChart.columns.map((col, idx) => (
+                          <th key={idx}>{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeTab === 'footwear' ? (
+                        currentChart.data.map((row) => (
+                          <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
+                            <td><strong>{row.size}</strong></td>
+                            <td>{row.us}</td>
+                            <td>{row.eu}</td>
+                            <td>{row.lengthCm} cm</td>
+                            <td>{row.lengthIn} in</td>
+                          </tr>
+                        ))
+                      ) : activeTab === 'jeans' ? (
+                        currentChart.data.map((row) => (
+                          <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
+                            <td><strong>{row.size}</strong></td>
+                            <td>{unit === 'in' ? `${row.waistIn}"` : `${row.waistCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.hipIn}"` : `${row.hipCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.inseamIn}"` : `${row.inseamCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.thighIn}"` : `${row.thighCm} cm`}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        currentChart.data.map((row) => (
+                          <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
+                            <td><strong>{row.size}</strong></td>
+                            <td>{unit === 'in' ? `${row.chestIn}"` : `${row.chestCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.shoulderIn}"` : `${row.shoulderCm} cm`}</td>
+                            <td>{unit === 'in' ? `${row.sleeveIn}"` : `${row.sleeveCm} cm`}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {/* How to Measure Section */}
               <div className="how-to-measure-section">

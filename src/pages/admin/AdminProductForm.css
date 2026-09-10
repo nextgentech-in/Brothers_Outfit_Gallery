@@ -1,10 +1,16 @@
 .admin-product-form-container {
   padding-bottom: 80px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .admin-form-actions-top {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .admin-alert-error {
@@ -17,37 +23,63 @@
   border: 1px solid #fecaca;
   font-size: 14px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  word-break: break-word;
 }
 
 .admin-form-grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 28px;
   align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.admin-form-main {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.admin-form-sidebar {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-form-section {
   background: #ffffff;
   border-radius: 12px;
-  padding: 28px;
+  padding: 26px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   border: 1px solid #e7e5e4;
   margin-bottom: 24px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .admin-form-section h3 {
-  margin: 0 0 24px 0;
+  margin: 0 0 20px 0;
   font-size: 15px;
   font-weight: 800;
   color: #1c1917;
   border-bottom: 1px solid #f5f5f4;
-  padding-bottom: 16px;
+  padding-bottom: 14px;
   letter-spacing: 0.5px;
+  word-break: break-word;
 }
 
 .admin-form-group {
   margin-bottom: 20px;
-  flex: 1;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-form-group label {
@@ -62,7 +94,8 @@
 .admin-form-group select,
 .admin-form-group textarea {
   width: 100%;
-  padding: 12px 16px;
+  max-width: 100%;
+  padding: 12px 14px;
   border: 1px solid #e7e5e4;
   border-radius: 8px;
   font-size: 14px;
@@ -72,6 +105,7 @@
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 .admin-form-group input:focus,
 .admin-form-group select:focus,
@@ -81,9 +115,11 @@
 }
 
 .admin-form-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
-  flex-wrap: wrap;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Pricing Overrides */
@@ -617,7 +653,7 @@
 /* ==========================================================================
    Mobile Single Window & No Horizontal Sliding Layout
    ========================================================================== */
-@media (max-width: 1024px) {
+@media (max-width: 1180px) {
   .admin-product-form-container {
     width: 100% !important;
     max-width: 100% !important;
@@ -736,3 +772,305 @@
   }
 }
 
+/* ==========================================================================
+   Size Guide Builder Styles
+   ========================================================================== */
+.sg-builder-wrap {
+  margin-top: 16px;
+}
+
+.sg-template-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sg-load-template-btn {
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  background: #0f172a !important;
+  color: #fff !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.sg-template-hint {
+  font-size: 12.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Size Guide Table */
+.sg-table-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.sg-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 500px;
+}
+
+.sg-th {
+  background: #f1f5f9;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sg-th-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.sg-col-name-input {
+  flex: 1;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-radius: 4px;
+  outline: none;
+  min-width: 80px;
+  transition: border-color 0.15s ease;
+}
+
+.sg-col-name-input:hover,
+.sg-col-name-input:focus {
+  border-color: #cbd5e1;
+  background: #fff;
+}
+
+.sg-remove-col-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.sg-remove-col-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.sg-th-actions {
+  text-align: center;
+  font-size: 11px;
+  padding: 8px 6px;
+}
+
+.sg-td {
+  padding: 2px;
+  border: 1px solid #e2e8f0;
+}
+
+.sg-cell-input {
+  width: 100%;
+  border: 1px solid transparent;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #1c1917;
+  background: transparent;
+  outline: none;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.sg-cell-input:hover,
+.sg-cell-input:focus {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.sg-cell-input::placeholder {
+  color: #cbd5e1;
+  font-style: italic;
+}
+
+.sg-td-actions {
+  text-align: center;
+  width: 50px;
+  padding: 4px;
+}
+
+.sg-remove-row-btn {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.sg-remove-row-btn:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.sg-row:hover {
+  background: #f8fafc;
+}
+
+/* Controls Bar */
+.sg-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.sg-add-row-btn {
+  padding: 8px 16px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sg-add-row-btn:hover:not(:disabled) {
+  background: #dcfce7;
+  border-color: #4ade80;
+}
+
+.sg-add-row-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sg-add-col-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 250px;
+}
+
+.sg-add-col-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  background: #fff;
+  transition: border-color 0.15s ease;
+}
+
+.sg-add-col-input:focus {
+  border-color: #94a3b8;
+}
+
+.sg-add-col-btn {
+  padding: 8px 14px;
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.sg-add-col-btn:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+}
+
+/* Info Banner */
+.sg-info-banner {
+  padding: 12px 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+/* Empty State */
+.sg-empty-state {
+  padding: 32px;
+  text-align: center;
+  background: #fafaf9;
+  border-radius: 8px;
+  border: 1px dashed #d6d3d1;
+  color: #78716c;
+  font-size: 13.5px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+/* Size Guide Builder Mobile Responsive */
+@media (max-width: 1180px) {
+  .sg-template-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .sg-load-template-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sg-controls-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sg-add-row-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .sg-add-col-group {
+    min-width: 100%;
+  }
+
+  .sg-add-col-input {
+    flex: 1;
+  }
+}

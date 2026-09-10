@@ -73,6 +73,127 @@ const STANDARD_COLORS = [
   { name: 'Custom (Type specific name)', hex: '#cccccc' }
 ];
 
+// Prebuilt size guide templates per category
+const SIZE_GUIDE_TEMPLATES = {
+  'Shirts': {
+    columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
+    rows: [
+      ['S', '', '', '', ''],
+      ['M', '', '', '', ''],
+      ['L', '', '', '', ''],
+      ['XL', '', '', '', ''],
+      ['XXL', '', '', '', ''],
+    ]
+  },
+  'T-Shirts': {
+    columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
+    rows: [
+      ['S', '', '', '', ''],
+      ['M', '', '', '', ''],
+      ['L', '', '', '', ''],
+      ['XL', '', '', '', ''],
+      ['XXL', '', '', '', ''],
+      ['3XL', '', '', '', ''],
+    ]
+  },
+  'Jeans': {
+    columns: ['Size', 'Waist (in)', 'Hip (in)', 'Inseam (in)', 'Length (in)', 'Thigh (in)'],
+    rows: [
+      ['28', '', '', '', '', ''],
+      ['30', '', '', '', '', ''],
+      ['32', '', '', '', '', ''],
+      ['34', '', '', '', '', ''],
+      ['36', '', '', '', '', ''],
+      ['38', '', '', '', '', ''],
+    ]
+  },
+  'Trousers': {
+    columns: ['Size', 'Waist (in)', 'Hip (in)', 'Inseam (in)', 'Length (in)'],
+    rows: [
+      ['28', '', '', '', ''],
+      ['30', '', '', '', ''],
+      ['32', '', '', '', ''],
+      ['34', '', '', '', ''],
+      ['36', '', '', '', ''],
+      ['38', '', '', '', ''],
+    ]
+  },
+  'Shorts': {
+    columns: ['Size', 'Waist (in)', 'Hip (in)', 'Length (in)', 'Thigh (in)'],
+    rows: [
+      ['28', '', '', '', ''],
+      ['30', '', '', '', ''],
+      ['32', '', '', '', ''],
+      ['34', '', '', '', ''],
+      ['36', '', '', '', ''],
+    ]
+  },
+  'Jackets': {
+    columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
+    rows: [
+      ['S', '', '', '', ''],
+      ['M', '', '', '', ''],
+      ['L', '', '', '', ''],
+      ['XL', '', '', '', ''],
+      ['XXL', '', '', '', ''],
+      ['3XL', '', '', '', ''],
+    ]
+  },
+  'Hoodies': {
+    columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
+    rows: [
+      ['S', '', '', '', ''],
+      ['M', '', '', '', ''],
+      ['L', '', '', '', ''],
+      ['XL', '', '', '', ''],
+      ['XXL', '', '', '', ''],
+      ['3XL', '', '', '', ''],
+    ]
+  },
+  'Ethnic Wear': {
+    columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
+    rows: [
+      ['M', '', '', '', ''],
+      ['L', '', '', '', ''],
+      ['XL', '', '', '', ''],
+      ['XXL', '', '', '', ''],
+      ['36', '', '', '', ''],
+      ['38', '', '', '', ''],
+      ['40', '', '', '', ''],
+      ['42', '', '', '', ''],
+    ]
+  },
+  'Slippers': {
+    columns: ['UK / IND Size', 'US Size', 'EU Size', 'Foot Length (cm)'],
+    rows: [
+      ['6', '', '', ''],
+      ['7', '', '', ''],
+      ['8', '', '', ''],
+      ['9', '', '', ''],
+      ['10', '', '', ''],
+      ['11', '', '', ''],
+    ]
+  },
+  'Belts': {
+    columns: ['Trouser Waist', 'Recommended Belt Size', 'Adjustment Range'],
+    rows: [
+      ['28"-30"', '', ''],
+      ['32"-34"', '', ''],
+      ['36"-38"', '', ''],
+      ['40"-42"', '', ''],
+    ]
+  },
+  'DEFAULT': {
+    columns: ['Size', 'Measurement 1', 'Measurement 2'],
+    rows: [
+      ['S', '', ''],
+      ['M', '', ''],
+      ['L', '', ''],
+      ['XL', '', ''],
+    ]
+  }
+};
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export default function AdminProductForm() {
@@ -105,6 +226,7 @@ export default function AdminProductForm() {
     isTrending: false,
     subCategory: '',
     gsl: '',
+    sizeGuide: { enabled: false, columns: [], rows: [] },
   });
 
   // Ephemeral States
@@ -122,6 +244,9 @@ export default function AdminProductForm() {
   const [bulkStockToApply, setBulkStockToApply] = useState(10);
   const [bulkPriceToApply, setBulkPriceToApply] = useState('');
   const [applyToAllColors, setApplyToAllColors] = useState(false);
+
+  // Size Guide Builder States
+  const [newColumnName, setNewColumnName] = useState('');
 
   // Image Upload States
   const [existingImages, setExistingImages] = useState([]);
@@ -155,6 +280,7 @@ export default function AdminProductForm() {
             variants: loadedVariants,
             colors: data.colors || [],
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
+            sizeGuide: data.sizeGuide || { enabled: false, columns: [], rows: [] },
           });
 
           // Map legacy string images to object schema or use existing objects
@@ -400,6 +526,88 @@ export default function AdminProductForm() {
         price: newPrice || prev.price
       };
     });
+  };
+
+  // -------------------------------------------------------------
+  // SIZE GUIDE BUILDER HANDLERS
+  // -------------------------------------------------------------
+
+  const handleToggleSizeGuide = (checked) => {
+    setFormData(prev => ({
+      ...prev,
+      sizeGuide: { ...prev.sizeGuide, enabled: checked }
+    }));
+  };
+
+  const handleLoadSizeGuideTemplate = () => {
+    const template = SIZE_GUIDE_TEMPLATES[formData.categoryId] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
+    setFormData(prev => ({
+      ...prev,
+      sizeGuide: {
+        enabled: true,
+        columns: [...template.columns],
+        rows: template.rows.map(r => [...r])
+      }
+    }));
+    showToast(`Loaded ${formData.categoryId} size guide template`, 'success');
+  };
+
+  const handleSizeGuideCellChange = (rowIdx, colIdx, value) => {
+    setFormData(prev => {
+      const newRows = prev.sizeGuide.rows.map((r, ri) =>
+        ri === rowIdx ? r.map((c, ci) => ci === colIdx ? value : c) : [...r]
+      );
+      return { ...prev, sizeGuide: { ...prev.sizeGuide, rows: newRows } };
+    });
+  };
+
+  const handleSizeGuideColumnNameChange = (colIdx, value) => {
+    setFormData(prev => {
+      const newCols = prev.sizeGuide.columns.map((c, i) => i === colIdx ? value : c);
+      return { ...prev, sizeGuide: { ...prev.sizeGuide, columns: newCols } };
+    });
+  };
+
+  const handleAddSizeGuideRow = () => {
+    setFormData(prev => {
+      const colCount = prev.sizeGuide.columns.length || 2;
+      const newRow = Array(colCount).fill('');
+      return { ...prev, sizeGuide: { ...prev.sizeGuide, rows: [...prev.sizeGuide.rows, newRow] } };
+    });
+  };
+
+  const handleRemoveSizeGuideRow = (rowIdx) => {
+    setFormData(prev => ({
+      ...prev,
+      sizeGuide: { ...prev.sizeGuide, rows: prev.sizeGuide.rows.filter((_, i) => i !== rowIdx) }
+    }));
+  };
+
+  const handleAddSizeGuideColumn = () => {
+    if (!newColumnName.trim()) {
+      showToast('Please enter a column name', 'warning');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      sizeGuide: {
+        ...prev.sizeGuide,
+        columns: [...prev.sizeGuide.columns, newColumnName.trim()],
+        rows: prev.sizeGuide.rows.map(r => [...r, ''])
+      }
+    }));
+    setNewColumnName('');
+  };
+
+  const handleRemoveSizeGuideColumn = (colIdx) => {
+    setFormData(prev => ({
+      ...prev,
+      sizeGuide: {
+        ...prev.sizeGuide,
+        columns: prev.sizeGuide.columns.filter((_, i) => i !== colIdx),
+        rows: prev.sizeGuide.rows.map(r => r.filter((_, i) => i !== colIdx))
+      }
+    }));
   };
 
   // -------------------------------------------------------------
@@ -1254,6 +1462,156 @@ export default function AdminProductForm() {
               <div style={{ padding: '32px', textAlign: 'center', background: '#fafaf9', borderRadius: '8px', border: '1px dashed #d6d3d1', color: '#78716c' }}>
                 <p style={{ margin: '0 0 10px', fontSize: '14px', fontWeight: 600 }}>No sizes added yet for this product.</p>
                 <p style={{ margin: 0, fontSize: '12.5px' }}>Click any preset size chip above or click <strong>"1-Click Batch Add"</strong> to instantly initialize all sizes with stock.</p>
+              </div>
+            )}
+          </section>
+
+          {/* Custom Size Guide Builder */}
+          <section className="admin-form-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
+              <div>
+                <h3 style={{ margin: 0, paddingBottom: 0, border: 'none' }}>📐 Custom Size Guide</h3>
+                <p className="admin-helper-text" style={{ margin: '4px 0 0' }}>
+                  Attach a product-specific size chart table. Load a template or build your own.
+                </p>
+              </div>
+              <label className="admin-checkbox-param" style={{ background: formData.sizeGuide?.enabled ? '#f0fdf4' : '#f8fafc', padding: '10px 16px', borderRadius: '8px', border: formData.sizeGuide?.enabled ? '1px solid #86efac' : '1px solid #e2e8f0' }}>
+                <input
+                  type="checkbox"
+                  checked={!!formData.sizeGuide?.enabled}
+                  onChange={(e) => handleToggleSizeGuide(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#16a34a' }}
+                />
+                <span style={{ fontWeight: 700, color: formData.sizeGuide?.enabled ? '#166534' : '#64748b', fontSize: '13px' }}>
+                  {formData.sizeGuide?.enabled ? '✓ Custom Guide Enabled' : 'Enable Custom Guide'}
+                </span>
+              </label>
+            </div>
+
+            {formData.sizeGuide?.enabled && (
+              <div className="sg-builder-wrap">
+                {/* Load Template Button */}
+                <div className="sg-template-bar">
+                  <button
+                    type="button"
+                    className="admin-btn-secondary sg-load-template-btn"
+                    onClick={handleLoadSizeGuideTemplate}
+                  >
+                    📋 Load {formData.categoryId} Template
+                  </button>
+                  <span className="sg-template-hint">
+                    Loads prebuilt columns &amp; rows for {formData.categoryId}. You can customize after loading.
+                  </span>
+                </div>
+
+                {/* Size Guide Table */}
+                {formData.sizeGuide.columns.length > 0 ? (
+                  <div className="sg-table-scroll-wrapper">
+                    <table className="sg-table">
+                      <thead>
+                        <tr>
+                          {formData.sizeGuide.columns.map((col, colIdx) => (
+                            <th key={colIdx} className="sg-th">
+                              <div className="sg-th-inner">
+                                <input
+                                  type="text"
+                                  value={col}
+                                  onChange={(e) => handleSizeGuideColumnNameChange(colIdx, e.target.value)}
+                                  className="sg-col-name-input"
+                                  title="Edit column name"
+                                />
+                                {formData.sizeGuide.columns.length > 1 && (
+                                  <button
+                                    type="button"
+                                    className="sg-remove-col-btn"
+                                    onClick={() => handleRemoveSizeGuideColumn(colIdx)}
+                                    title="Remove column"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </th>
+                          ))}
+                          <th className="sg-th sg-th-actions" style={{ width: '50px' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.sizeGuide.rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className="sg-row">
+                            {row.map((cell, colIdx) => (
+                              <td key={colIdx} className="sg-td">
+                                <input
+                                  type="text"
+                                  value={cell}
+                                  onChange={(e) => handleSizeGuideCellChange(rowIdx, colIdx, e.target.value)}
+                                  className="sg-cell-input"
+                                  placeholder={colIdx === 0 ? 'Size' : 'Value'}
+                                />
+                              </td>
+                            ))}
+                            <td className="sg-td sg-td-actions">
+                              <button
+                                type="button"
+                                className="sg-remove-row-btn"
+                                onClick={() => handleRemoveSizeGuideRow(rowIdx)}
+                                title="Remove row"
+                              >
+                                🗑
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="sg-empty-state">
+                    No columns yet. Click "Load Template" above or add columns manually below.
+                  </div>
+                )}
+
+                {/* Add Row / Add Column Controls */}
+                <div className="sg-controls-bar">
+                  <button
+                    type="button"
+                    className="sg-add-row-btn"
+                    onClick={handleAddSizeGuideRow}
+                    disabled={formData.sizeGuide.columns.length === 0}
+                  >
+                    ＋ Add Row
+                  </button>
+
+                  <div className="sg-add-col-group">
+                    <input
+                      type="text"
+                      placeholder="New column name (e.g. Arm Hole)"
+                      value={newColumnName}
+                      onChange={(e) => setNewColumnName(e.target.value)}
+                      className="sg-add-col-input"
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSizeGuideColumn(); } }}
+                    />
+                    <button
+                      type="button"
+                      className="sg-add-col-btn"
+                      onClick={handleAddSizeGuideColumn}
+                    >
+                      ＋ Add Column
+                    </button>
+                  </div>
+                </div>
+
+                {formData.sizeGuide.rows.length > 0 && formData.sizeGuide.columns.length > 0 && (
+                  <div className="sg-info-banner">
+                    📊 {formData.sizeGuide.rows.length} row{formData.sizeGuide.rows.length !== 1 ? 's' : ''} × {formData.sizeGuide.columns.length} column{formData.sizeGuide.columns.length !== 1 ? 's' : ''} — This custom chart will be shown to customers instead of the default size guide.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!formData.sizeGuide?.enabled && (
+              <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '13px', marginTop: '8px' }}>
+                💡 When disabled, the default built-in size guide for <strong>{formData.categoryId}</strong> will be shown to customers.
               </div>
             )}
           </section>
