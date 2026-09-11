@@ -193,6 +193,20 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
     return null;
   }, [measurementInput, activeTab, unit, fitPreference]);
 
+  // Normalize custom size guide rows to support both Firestore map schema ({ cells: [...] }) and legacy 2D arrays
+  const customRows = useMemo(() => {
+    if (!customSizeGuide?.enabled || !Array.isArray(customSizeGuide?.rows)) return [];
+    return customSizeGuide.rows.map(row => {
+      if (Array.isArray(row)) return row;
+      if (row && typeof row === 'object' && Array.isArray(row.cells)) return row.cells;
+      if (row && typeof row === 'object') {
+        const cols = customSizeGuide.columns || [];
+        return cols.map((col, idx) => row[idx] ?? row[col] ?? '');
+      }
+      return [];
+    });
+  }, [customSizeGuide]);
+
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
@@ -290,7 +304,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
               </div>
 
               {/* Data Table */}
-              {customSizeGuide?.enabled && customSizeGuide?.columns?.length > 0 ? (
+              {customSizeGuide?.enabled && customSizeGuide?.columns?.length > 0 && customRows.length > 0 ? (
                 <div className="size-table-container">
                   <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#111' }}>
@@ -309,7 +323,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                       </tr>
                     </thead>
                     <tbody>
-                      {customSizeGuide.rows.map((row, rIdx) => (
+                      {customRows.map((row, rIdx) => (
                         <tr 
                           key={rIdx}
                           style={{ cursor: onSelectSize && row[0] ? 'pointer' : 'default' }}

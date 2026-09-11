@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { createProduct, updateProduct, getAdminProductById, deleteProductImage, generateProductId } from '../../services/adminService';
+import { 
+  createProduct, 
+  updateProduct, 
+  getAdminProductById, 
+  deleteProductImage, 
+  generateProductId,
+  sanitizeSizeGuideForFirestore,
+  normalizeSizeGuideFromFirestore
+} from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminProductForm.css';
 
@@ -280,7 +288,7 @@ export default function AdminProductForm() {
             variants: loadedVariants,
             colors: data.colors || [],
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
-            sizeGuide: data.sizeGuide || { enabled: false, columns: [], rows: [] },
+            sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
           });
 
           // Map legacy string images to object schema or use existing objects
@@ -831,6 +839,7 @@ export default function AdminProductForm() {
 
       const payload = {
         ...formData,
+        sizeGuide: sanitizeSizeGuideForFirestore(formData.sizeGuide),
         mrp: mrp,
         salePrice: finalFrontPrice,
         price: finalFrontPrice,

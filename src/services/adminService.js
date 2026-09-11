@@ -27,19 +27,72 @@ export const generateProductId = () => {
   return doc(collection(db, PRODUCTS)).id;
 };
 
+// Sanitize sizeGuide for Firestore to prevent "Nested arrays are not supported" errors
+export const sanitizeSizeGuideForFirestore = (sizeGuide) => {
+  if (!sizeGuide) return { enabled: false, columns: [], rows: [] };
+  return {
+    enabled: Boolean(sizeGuide.enabled),
+    columns: Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [],
+    rows: Array.isArray(sizeGuide.rows)
+      ? sizeGuide.rows.map(row => {
+          if (Array.isArray(row)) {
+            return { cells: row.map(c => (c !== undefined && c !== null ? String(c) : '')) };
+          }
+          if (row && typeof row === 'object' && Array.isArray(row.cells)) {
+            return { cells: row.cells.map(c => (c !== undefined && c !== null ? String(c) : '')) };
+          }
+          return { cells: [] };
+        })
+      : []
+  };
+};
+
+// Normalize sizeGuide from Firestore back into standard 2D array format for UI components
+export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
+  if (!sizeGuide) return { enabled: false, columns: [], rows: [] };
+  const columns = Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [];
+  const rows = Array.isArray(sizeGuide.rows)
+    ? sizeGuide.rows.map(row => {
+        if (Array.isArray(row)) return row;
+        if (row && typeof row === 'object' && Array.isArray(row.cells)) return row.cells;
+        if (row && typeof row === 'object') {
+          return columns.map((col, idx) => row[idx] ?? row[col] ?? '');
+        }
+        return [];
+      })
+    : [];
+  return {
+    enabled: Boolean(sizeGuide.enabled),
+    columns,
+    rows
+  };
+};
+
 // Admin fetching all products without active filters
 export const getAdminProducts = async () => {
     // Pagination or complex queries can be added here
   const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snapshot.docs.map(d => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      ...(data.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide) } : {})
+    };
+  });
 };
 
 export const getAdminProductById = async (id) => {
     const docRef = doc(db, PRODUCTS, id);
     const docSnap = await getDoc(docRef);
     if (!docSnap.exists()) return null;
-    return { id: docSnap.id, ...docSnap.data() };
+    const data = docSnap.data();
+    return {
+      id: docSnap.id,
+      ...data,
+      ...(data.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide) } : {})
+    };
 }
 
 // Create new product 
@@ -47,6 +100,7 @@ export const createProduct = async (productData, preGeneratedId = null) => {
   const newRef = preGeneratedId ? doc(db, PRODUCTS, preGeneratedId) : doc(collection(db, PRODUCTS));
   const payload = {
     ...productData,
+    ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -60,6 +114,7 @@ export const updateProduct = async (id, productData) => {
   const docRef = doc(db, PRODUCTS, id);
   const payload = {
     ...productData,
+    ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
     updatedAt: serverTimestamp(),
   };
   await updateDoc(docRef, payload);
