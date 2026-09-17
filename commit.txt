@@ -1,4 +1,5 @@
-feat: add Apparel Spray subcategory under Perfumes
+fix: remove whitespace in product cards by switching to object-fit cover
 
-- ShopPage.jsx: added Apparel Spray to Perfumes filter subcategories
-- AdminProductForm.jsx: added Apparel Spray to Perfumes product type options
+- ProductCard.css: changed object-fit from contain to cover with
+  object-position top center so product images fill the card frame
+  without any white gaps, while keeping the model face/top visible
