@@ -29,9 +29,10 @@ export const generateProductId = () => {
 
 // Sanitize sizeGuide for Firestore to prevent "Nested arrays are not supported" errors
 export const sanitizeSizeGuideForFirestore = (sizeGuide) => {
-  if (!sizeGuide) return { enabled: false, columns: [], rows: [] };
+  if (!sizeGuide) return { enabled: false, unit: 'in', columns: [], rows: [] };
   return {
     enabled: Boolean(sizeGuide.enabled),
+    unit: sizeGuide.unit === 'cm' ? 'cm' : 'in',
     columns: Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [],
     rows: Array.isArray(sizeGuide.rows)
       ? sizeGuide.rows.map(row => {
@@ -49,7 +50,7 @@ export const sanitizeSizeGuideForFirestore = (sizeGuide) => {
 
 // Normalize sizeGuide from Firestore back into standard 2D array format for UI components
 export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
-  if (!sizeGuide) return { enabled: false, columns: [], rows: [] };
+  if (!sizeGuide) return { enabled: false, unit: 'in', columns: [], rows: [] };
   const columns = Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [];
   const rows = Array.isArray(sizeGuide.rows)
     ? sizeGuide.rows.map(row => {
@@ -63,6 +64,7 @@ export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
     : [];
   return {
     enabled: Boolean(sizeGuide.enabled),
+    unit: sizeGuide.unit === 'cm' ? 'cm' : 'in',
     columns,
     rows
   };

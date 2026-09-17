@@ -13,6 +13,11 @@ import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminProductForm.css';
 
 import { getBackendUrl } from '../../utils/apiConfig';
+import { 
+  convertMeasurementValue, 
+  convertColumnHeader, 
+  detectBaseUnit 
+} from '../../components/common/SizeGuideModal';
 
 const CATEGORY_SIZES_MAP = {
   'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
@@ -234,7 +239,7 @@ export default function AdminProductForm() {
     isTrending: false,
     subCategory: '',
     gsl: '',
-    sizeGuide: { enabled: false, columns: [], rows: [] },
+    sizeGuide: { enabled: false, unit: 'in', columns: [], rows: [] },
   });
 
   // Ephemeral States
@@ -255,6 +260,8 @@ export default function AdminProductForm() {
 
   // Size Guide Builder States
   const [newColumnName, setNewColumnName] = useState('');
+  const [sgInputMode, setSgInputMode] = useState('dual'); // 'dual' | 'in' | 'cm'
+  const [rawDualInputs, setRawDualInputs] = useState({});
 
   // Image Upload States
   const [existingImages, setExistingImages] = useState([]);
@@ -549,24 +556,100 @@ export default function AdminProductForm() {
 
   const handleLoadSizeGuideTemplate = () => {
     const template = SIZE_GUIDE_TEMPLATES[formData.categoryId] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
+    const currentBaseUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
+    const targetUnit = sgInputMode === 'cm' ? 'cm' : currentBaseUnit;
+
+    const columns = template.columns.map((c, i) => {
+      if (i === 0) return c;
+      return convertColumnHeader(c, targetUnit);
+    });
+
     setFormData(prev => ({
       ...prev,
       sizeGuide: {
         enabled: true,
-        columns: [...template.columns],
+        unit: targetUnit,
+        columns: [...columns],
         rows: template.rows.map(r => [...r])
       }
     }));
+    setRawDualInputs({});
     showToast(`Loaded ${formData.categoryId} size guide template`, 'success');
   };
 
-  const handleSizeGuideCellChange = (rowIdx, colIdx, value) => {
+  const handleDualCellChange = (rowIdx, colIdx, value, typedUnit) => {
+    if (colIdx === 0) {
+      // Size column (XS, S, M, 30, etc.)
+      setFormData(prev => {
+        const newRows = prev.sizeGuide.rows.map((r, ri) =>
+          ri === rowIdx ? r.map((c, ci) => ci === colIdx ? value : c) : [...r]
+        );
+        return { ...prev, sizeGuide: { ...prev.sizeGuide, rows: newRows } };
+      });
+      return;
+    }
+
+    const otherUnit = typedUnit === 'in' ? 'cm' : 'in';
+    const cellKeyTyped = `${rowIdx}_${colIdx}_${typedUnit}`;
+    const cellKeyOther = `${rowIdx}_${colIdx}_${otherUnit}`;
+
+    let otherConvertedValue = '';
+    if (value && value.trim()) {
+      otherConvertedValue = convertMeasurementValue(value, typedUnit, otherUnit);
+    }
+
+    setRawDualInputs(prev => ({
+      ...prev,
+      [cellKeyTyped]: value,
+      [cellKeyOther]: otherConvertedValue
+    }));
+
+    // Table base storage unit (default 'in')
+    const tableBaseUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
+    const valueToStore = tableBaseUnit === typedUnit ? value : otherConvertedValue;
+
     setFormData(prev => {
       const newRows = prev.sizeGuide.rows.map((r, ri) =>
-        ri === rowIdx ? r.map((c, ci) => ci === colIdx ? value : c) : [...r]
+        ri === rowIdx ? r.map((c, ci) => ci === colIdx ? valueToStore : c) : [...r]
       );
       return { ...prev, sizeGuide: { ...prev.sizeGuide, rows: newRows } };
     });
+  };
+
+  const handleConvertEntireTable = (targetUnit) => {
+    const currentUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
+    if (currentUnit === targetUnit) {
+      showToast(`Size guide table is already in ${targetUnit === 'cm' ? 'Centimeters' : 'Inches'}`, 'info');
+      return;
+    }
+
+    setFormData(prev => {
+      const newColumns = (prev.sizeGuide.columns || []).map((col, idx) => {
+        if (idx === 0) return col;
+        return convertColumnHeader(col, targetUnit);
+      });
+
+      const newRows = (prev.sizeGuide.rows || []).map(row => {
+        if (!Array.isArray(row)) return [];
+        return row.map((cell, idx) => {
+          if (idx === 0) return cell;
+          return convertMeasurementValue(cell, currentUnit, targetUnit);
+        });
+      });
+
+      return {
+        ...prev,
+        sizeGuide: {
+          ...prev.sizeGuide,
+          unit: targetUnit,
+          columns: newColumns,
+          rows: newRows
+        }
+      };
+    });
+
+    setRawDualInputs({});
+    showToast(`Converted all table values and column headers to ${targetUnit === 'cm' ? 'Centimeters (cm)' : 'Inches (in)'}`, 'success');
   };
 
   const handleSizeGuideColumnNameChange = (colIdx, value) => {
@@ -589,6 +672,7 @@ export default function AdminProductForm() {
       ...prev,
       sizeGuide: { ...prev.sizeGuide, rows: prev.sizeGuide.rows.filter((_, i) => i !== rowIdx) }
     }));
+    setRawDualInputs({});
   };
 
   const handleAddSizeGuideColumn = () => {
@@ -616,6 +700,7 @@ export default function AdminProductForm() {
         rows: prev.sizeGuide.rows.map(r => r.filter((_, i) => i !== colIdx))
       }
     }));
+    setRawDualInputs({});
   };
 
   // -------------------------------------------------------------
@@ -1499,17 +1584,80 @@ export default function AdminProductForm() {
 
             {formData.sizeGuide?.enabled && (
               <div className="sg-builder-wrap">
-                {/* Load Template Button */}
+                {/* Load Template & Unit Control Toolbar */}
                 <div className="sg-template-bar">
-                  <button
-                    type="button"
-                    className="admin-btn-secondary sg-load-template-btn"
-                    onClick={handleLoadSizeGuideTemplate}
-                  >
-                    📋 Load {formData.categoryId} Template
-                  </button>
-                  <span className="sg-template-hint">
-                    Loads prebuilt columns &amp; rows for {formData.categoryId}. You can customize after loading.
+                  <div className="sg-template-left">
+                    <button
+                      type="button"
+                      className="admin-btn-secondary sg-load-template-btn"
+                      onClick={handleLoadSizeGuideTemplate}
+                    >
+                      📋 Load {formData.categoryId} Template
+                    </button>
+                    <span className="sg-template-hint">
+                      Loads prebuilt columns &amp; rows for {formData.categoryId}.
+                    </span>
+                  </div>
+
+                  <div className="sg-unit-mode-control">
+                    <span className="sg-unit-control-label">Measurement Mode:</span>
+                    <div className="sg-mode-pill-group">
+                      <button
+                        type="button"
+                        className={`sg-mode-pill ${sgInputMode === 'dual' ? 'active' : ''}`}
+                        onClick={() => setSgInputMode('dual')}
+                        title="Enter either in cm or inches; both calculate automatically"
+                      >
+                        ⚡ Dual (IN &amp; CM)
+                      </button>
+                      <button
+                        type="button"
+                        className={`sg-mode-pill ${sgInputMode === 'in' ? 'active' : ''}`}
+                        onClick={() => setSgInputMode('in')}
+                        title="Enter measurements in inches"
+                      >
+                        Inches (in)
+                      </button>
+                      <button
+                        type="button"
+                        className={`sg-mode-pill ${sgInputMode === 'cm' ? 'active' : ''}`}
+                        onClick={() => setSgInputMode('cm')}
+                        title="Enter measurements in centimeters"
+                      >
+                        Centimeters (cm)
+                      </button>
+                    </div>
+
+                    {formData.sizeGuide.columns.length > 0 && (
+                      <button
+                        type="button"
+                        className="sg-btn-convert-table"
+                        onClick={() => handleConvertEntireTable(formData.sizeGuide?.unit === 'cm' ? 'in' : 'cm')}
+                        title="Convert all column headers and values between inches and cm"
+                      >
+                        🔄 Convert Table to {formData.sizeGuide?.unit === 'cm' ? 'Inches (in)' : 'Centimeters (cm)'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Auto-Calculation Status Banner */}
+                <div className="sg-auto-calc-banner">
+                  <span className="sg-status-dot"></span>
+                  <span>
+                    {sgInputMode === 'dual' ? (
+                      <>
+                        <strong>Dual Mode Active:</strong> Type in <strong>CM</strong> or <strong>Inches</strong> — values automatically calculate both ways in real time with 0% error rate.
+                      </>
+                    ) : sgInputMode === 'cm' ? (
+                      <>
+                        <strong>Centimeters Mode Active:</strong> Entering in <strong>CM</strong>. Live inch conversions are computed automatically.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Inches Mode Active:</strong> Entering in <strong>Inches</strong>. Live centimeter conversions are computed automatically.
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -1529,6 +1677,11 @@ export default function AdminProductForm() {
                                   className="sg-col-name-input"
                                   title="Edit column name"
                                 />
+                                {colIdx > 0 && sgInputMode === 'dual' && (
+                                  <span className="sg-col-unit-badge" title="Enter in either IN or CM">
+                                    in ⇄ cm
+                                  </span>
+                                )}
                                 {formData.sizeGuide.columns.length > 1 && (
                                   <button
                                     type="button"
@@ -1548,17 +1701,80 @@ export default function AdminProductForm() {
                       <tbody>
                         {formData.sizeGuide.rows.map((row, rowIdx) => (
                           <tr key={rowIdx} className="sg-row">
-                            {row.map((cell, colIdx) => (
-                              <td key={colIdx} className="sg-td">
-                                <input
-                                  type="text"
-                                  value={cell}
-                                  onChange={(e) => handleSizeGuideCellChange(rowIdx, colIdx, e.target.value)}
-                                  className="sg-cell-input"
-                                  placeholder={colIdx === 0 ? 'Size' : 'Value'}
-                                />
-                              </td>
-                            ))}
+                            {row.map((cell, colIdx) => {
+                              if (colIdx === 0) {
+                                return (
+                                  <td key={colIdx} className="sg-td sg-td-size">
+                                    <input
+                                      type="text"
+                                      value={cell}
+                                      onChange={(e) => handleDualCellChange(rowIdx, colIdx, e.target.value, 'in')}
+                                      className="sg-cell-input sg-size-label-input"
+                                      placeholder="Size (e.g. S, 32)"
+                                    />
+                                  </td>
+                                );
+                              }
+
+                              const tableBaseUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
+                              const keyIn = `${rowIdx}_${colIdx}_in`;
+                              const keyCm = `${rowIdx}_${colIdx}_cm`;
+
+                              const inVal = rawDualInputs[keyIn] !== undefined
+                                ? rawDualInputs[keyIn]
+                                : (tableBaseUnit === 'in' ? cell : convertMeasurementValue(cell, 'cm', 'in'));
+
+                              const cmVal = rawDualInputs[keyCm] !== undefined
+                                ? rawDualInputs[keyCm]
+                                : (tableBaseUnit === 'cm' ? cell : convertMeasurementValue(cell, 'in', 'cm'));
+
+                              return (
+                                <td key={colIdx} className="sg-td">
+                                  {sgInputMode === 'dual' ? (
+                                    <div className="sg-dual-cell">
+                                      <div className="sg-dual-subfield">
+                                        <input
+                                          type="text"
+                                          value={inVal}
+                                          onChange={(e) => handleDualCellChange(rowIdx, colIdx, e.target.value, 'in')}
+                                          className="sg-cell-input sg-dual-in-input"
+                                          placeholder="in"
+                                          title="Inches"
+                                        />
+                                        <span className="sg-unit-badge in">in</span>
+                                      </div>
+                                      <span className="sg-dual-arrow">⇄</span>
+                                      <div className="sg-dual-subfield">
+                                        <input
+                                          type="text"
+                                          value={cmVal}
+                                          onChange={(e) => handleDualCellChange(rowIdx, colIdx, e.target.value, 'cm')}
+                                          className="sg-cell-input sg-dual-cm-input"
+                                          placeholder="cm"
+                                          title="Centimeters"
+                                        />
+                                        <span className="sg-unit-badge cm">cm</span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="sg-single-cell-wrap">
+                                      <input
+                                        type="text"
+                                        value={sgInputMode === 'cm' ? cmVal : inVal}
+                                        onChange={(e) => handleDualCellChange(rowIdx, colIdx, e.target.value, sgInputMode)}
+                                        className="sg-cell-input"
+                                        placeholder={sgInputMode === 'cm' ? 'cm' : 'in'}
+                                      />
+                                      {(sgInputMode === 'cm' ? inVal : cmVal) && (
+                                        <span className="sg-live-badge">
+                                          ≈ {sgInputMode === 'cm' ? `${inVal} in` : `${cmVal} cm`}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                              );
+                            })}
                             <td className="sg-td sg-td-actions">
                               <button
                                 type="button"

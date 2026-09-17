@@ -782,12 +782,20 @@
 .sg-template-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
   padding: 14px 18px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.sg-template-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -809,6 +817,96 @@
   font-size: 12.5px;
   color: #64748b;
   font-weight: 500;
+}
+
+.sg-unit-mode-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sg-unit-control-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.sg-mode-pill-group {
+  display: inline-flex;
+  background: #e2e8f0;
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.sg-mode-pill {
+  background: transparent;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sg-mode-pill.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sg-btn-convert-table {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.sg-btn-convert-table:hover {
+  background: #1e293b;
+}
+
+/* Auto-Calculation Status Banner */
+.sg-auto-calc-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  color: #166534;
+}
+
+.sg-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  flex-shrink: 0;
+}
+
+.sg-col-unit-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  white-space: nowrap;
 }
 
 /* Size Guide Table */
@@ -892,7 +990,94 @@
 }
 
 .sg-td {
+  padding: 4px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.sg-td-size {
+  width: 110px;
+  min-width: 90px;
+}
+
+.sg-size-label-input {
+  font-weight: 800 !important;
+  text-align: center;
+  color: #0f172a !important;
+}
+
+/* Dual Cell Layout */
+.sg-dual-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px;
+  min-width: 165px;
+}
+
+.sg-dual-subfield {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sg-dual-subfield .sg-cell-input {
+  width: 100%;
+  padding: 6px 24px 6px 8px;
+  font-size: 12.5px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #ffffff;
+  text-align: center;
+  color: #0f172a;
+}
+
+.sg-dual-subfield .sg-cell-input:focus {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 1px #0f172a;
+}
+
+.sg-unit-badge {
+  position: absolute;
+  right: 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.sg-dual-arrow {
+  color: #94a3b8;
+  font-size: 12px;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+/* Single Cell Wrap */
+.sg-single-cell-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+}
+
+.sg-single-cell-wrap .sg-cell-input {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.sg-live-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  background: #f1f5f9;
+  padding: 3px 6px;
+  border-radius: 4px;
   border: 1px solid #e2e8f0;
 }
 
@@ -1048,12 +1233,41 @@
   .sg-template-bar {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
+  }
+
+  .sg-template-left {
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
   }
 
   .sg-load-template-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .sg-unit-mode-control {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .sg-mode-pill-group {
+    width: 100%;
+    display: flex;
+  }
+
+  .sg-mode-pill {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 11px;
+  }
+
+  .sg-btn-convert-table {
+    width: 100%;
+    text-align: center;
   }
 
   .sg-controls-bar {
