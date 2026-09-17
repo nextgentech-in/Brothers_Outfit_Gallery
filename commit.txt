@@ -1,4 +1,3 @@
-fix: remove all fallback dummy products and fix cart local storage sync
+style: restore edge-to-edge product card presentation without white letterboxing
 
-- AccessoriesPage.jsx: removed fallbackProducts dummy dataset import so only real active Firestore products added by admin are displayed
-- CartContext.jsx: automatically filter out legacy test/dummy cart items and continuously sync cart state (add, remove, clear) to localStorage so stale items never resurrect on reload
+- ProductCard.css, SaleProductCard.css, TrendingCarousel.css, WishlistPage.css: styled product images with object-fit: cover and center-top 20% focal positioning to fill 100% of the frame with zero letterbox white space, matching top fashion brands (Zara/Myntra/ASOS)
