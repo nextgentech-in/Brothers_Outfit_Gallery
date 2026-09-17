@@ -678,22 +678,21 @@
 
   .navbar__inner {
     padding: 0 10px;
-    height: 58px;
+    height: 62px;
     box-sizing: border-box;
     width: 100%;
     max-width: 100vw;
   }
 
   .navbar__logo {
-    flex: 0 1 auto;
-    min-width: 0;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
   }
 
   .navbar__logo-svg {
-    height: 38px;
-    max-width: 165px;
+    height: 46px;
+    max-width: none;
     width: auto;
   }
 
@@ -734,12 +733,12 @@
 
   .navbar__inner {
     padding: 0 6px;
-    height: 54px;
+    height: 60px;
   }
 
   .navbar__logo-svg {
-    height: 32px;
-    max-width: 135px;
+    height: 46px;
+    max-width: 185px;
     width: auto;
   }
 
