@@ -13,15 +13,38 @@ function formatVariantValue(val, fallback = 'Standard') {
   return String(val);
 }
 
+// Helper to detect and prune legacy/dummy items from old development sessions
+function isLegacyDummyItem(item) {
+  if (!item || !item.id) return true;
+  if (typeof item.id === 'number' || (typeof item.id === 'string' && /^\d+$/.test(item.id))) return true;
+  if (item.name === 'Shirt' && (!item.slug || item.slug === 'shirt' || item.image?.includes('placehold'))) return true;
+  return false;
+}
+
 export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState(() => {
     try {
       const persisted = localStorage.getItem('brothers_cart');
-      return persisted ? JSON.parse(persisted) : [];
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(item => !isLegacyDummyItem(item));
+        }
+      }
+      return [];
     } catch (e) {
       return [];
     }
   });
+
+  // Ensure cart changes (add, remove, update qty, clear) are continuously synced to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('brothers_cart', JSON.stringify(cartItems));
+    } catch (e) {
+      console.warn('Failed to sync cart to localStorage:', e);
+    }
+  }, [cartItems]);
 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [cartToast, setCartToast] = useState(null);

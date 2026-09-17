@@ -1,5 +1,4 @@
-fix: eliminate image side cropping and upgrade to HD resolution rendering
+fix: remove all fallback dummy products and fix cart local storage sync
 
-- ProductCard.css, SaleProductCard.css, TrendingCarousel.css, WishlistPage.css: switch to object-fit: contain on seamless white background so wide/square images like perfume boxes and garments are never cut off from sides
-- imageUtils.js: upgraded optimization to 800px width with quality 88 and perceptual compression for crisp Retina sharpness
-- ProductCard.jsx, SaleProductCard.jsx, WishlistPage.jsx, TrendingCarousel.jsx: request 800px HD resolution
+- AccessoriesPage.jsx: removed fallbackProducts dummy dataset import so only real active Firestore products added by admin are displayed
+- CartContext.jsx: automatically filter out legacy test/dummy cart items and continuously sync cart state (add, remove, clear) to localStorage so stale items never resurrect on reload

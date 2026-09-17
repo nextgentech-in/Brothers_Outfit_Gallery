@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { fetchAllActiveProducts } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
-import fallbackProducts from '../data/productsData';
 import './AccessoriesPage.css';
 
 const ACCESSORY_CATEGORIES = [
@@ -29,19 +28,9 @@ export default function AccessoriesPage() {
         const rawItems = await fetchAllActiveProducts();
         const firestoreItems = rawItems.filter(p => p.active !== false);
 
-        // Combine Firestore items with local fallback dataset
-        const combinedMap = new Map();
-        [...firestoreItems, ...fallbackProducts].forEach(p => {
-          if (!combinedMap.has(p.id)) {
-            combinedMap.set(p.id, p);
-          }
-        });
-
-        const allItems = Array.from(combinedMap.values());
-
         // Filter only items whose category belongs to Accessories
-        const accessoryKeywords = ['accessori', 'watch', 'belt', 'sunglass', 'wallet', 'cap', 'hat', 'perfume', 'bag', 'fragrance'];
-        const filteredAccessories = allItems.filter(p => {
+        const accessoryKeywords = ['accessori', 'watch', 'belt', 'sunglass', 'wallet', 'cap', 'hat', 'perfume', 'bag', 'fragrance', 'apparel spray'];
+        const filteredAccessories = firestoreItems.filter(p => {
           const cat = (p.categoryId || p.category || '').toLowerCase();
           const name = (p.name || '').toLowerCase();
           return accessoryKeywords.some(k => cat.includes(k) || name.includes(k));
@@ -49,14 +38,8 @@ export default function AccessoriesPage() {
 
         setProducts(filteredAccessories);
       } catch (err) {
-        console.warn('Firestore fetch error, falling back to local dataset:', err);
-        const accessoryKeywords = ['accessori', 'watch', 'belt', 'sunglass', 'wallet', 'cap', 'hat', 'perfume', 'bag', 'fragrance'];
-        const localFiltered = fallbackProducts.filter(p => {
-          const cat = (p.category || '').toLowerCase();
-          const name = (p.name || '').toLowerCase();
-          return accessoryKeywords.some(k => cat.includes(k) || name.includes(k));
-        });
-        setProducts(localFiltered);
+        console.warn('Firestore fetch error in AccessoriesPage:', err);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
