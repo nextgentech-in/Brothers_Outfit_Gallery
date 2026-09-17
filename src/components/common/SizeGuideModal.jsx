@@ -1,6 +1,78 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import HowToMeasureDiagram from './HowToMeasureDiagram';
 import './SizeGuideModal.css';
+
+// Cleanly convert any custom size guide value (single number, decimals, ranges, or labels)
+export const convertMeasurementValue = (val, fromUnit, toUnit) => {
+  if (val === null || val === undefined) return '';
+  const str = String(val).trim();
+  if (!str) return '';
+  if (fromUnit === toUnit) return str;
+
+  // Handle range format e.g. "38-40", "38 - 40", "38 to 40"
+  const rangeMatch = str.match(/^([\d.]+)\s*(?:-|to)\s*([\d.]+)(.*)$/i);
+  if (rangeMatch) {
+    const num1 = parseFloat(rangeMatch[1]);
+    const num2 = parseFloat(rangeMatch[2]);
+    if (!isNaN(num1) && !isNaN(num2)) {
+      const conv1 = fromUnit === 'in' && toUnit === 'cm' ? num1 * 2.54 : num1 / 2.54;
+      const conv2 = fromUnit === 'in' && toUnit === 'cm' ? num2 * 2.54 : num2 / 2.54;
+      const r1 = Math.round(conv1 * 10) / 10;
+      const r2 = Math.round(conv2 * 10) / 10;
+      return `${r1} - ${r2}`;
+    }
+  }
+
+  // Handle single number e.g. "38", "38.5", "38\"", "38 in", "96.5 cm"
+  const singleMatch = str.match(/^([\d.]+)/);
+  if (singleMatch) {
+    const num = parseFloat(singleMatch[1]);
+    if (!isNaN(num)) {
+      const converted = fromUnit === 'in' && toUnit === 'cm' ? num * 2.54 : num / 2.54;
+      const rounded = Math.round(converted * 10) / 10;
+      return String(rounded);
+    }
+  }
+
+  // Non-numeric text (e.g. "S", "M", "Free", "-"): preserve as is
+  return str;
+};
+
+// Convert column header unit label dynamically (e.g. Chest (in) -> Chest (cm))
+export const convertColumnHeader = (colName, activeUnit) => {
+  if (!colName || typeof colName !== 'string') return '';
+  const trimmed = colName.trim();
+  // Don't modify Size / Tag name columns
+  if (/^(?:size|tag|uk|us|eu)/i.test(trimmed)) return trimmed;
+
+  if (activeUnit === 'cm') {
+    if (/\(in(?:ches)?\)/i.test(trimmed)) {
+      return trimmed.replace(/\(in(?:ches)?\)/i, '(cm)');
+    }
+    if (!/\(cm\)/i.test(trimmed)) {
+      return `${trimmed} (cm)`;
+    }
+  } else if (activeUnit === 'in') {
+    if (/\(cm\)/i.test(trimmed)) {
+      return trimmed.replace(/\(cm\)/i, '(in)');
+    }
+    if (!/\(in\)/i.test(trimmed)) {
+      return `${trimmed} (in)`;
+    }
+  }
+  return trimmed;
+};
+
+// Detect base unit of the custom size guide table
+export const detectBaseUnit = (columns = [], customSizeGuide = {}) => {
+  if (customSizeGuide?.unit && (customSizeGuide.unit === 'cm' || customSizeGuide.unit === 'in')) {
+    return customSizeGuide.unit;
+  }
+  const hasCmInHeaders = Array.isArray(columns) && columns.some(c => typeof c === 'string' && /\(cm\)/i.test(c));
+  if (hasCmInHeaders) return 'cm';
+  return 'in'; // Standard default in Indian menswear
+};
 
 // Master sizing data for all categories
 const SIZE_CHARTS = {
@@ -207,6 +279,31 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
     });
   }, [customSizeGuide]);
 
+  // Detect base unit of custom size guide (default is inches)
+  const customBaseUnit = useMemo(() => {
+    return detectBaseUnit(customSizeGuide?.columns || [], customSizeGuide);
+  }, [customSizeGuide]);
+
+  // Display columns with converted unit headers
+  const displayCustomColumns = useMemo(() => {
+    if (!customSizeGuide?.columns || !Array.isArray(customSizeGuide.columns)) return [];
+    return customSizeGuide.columns.map((col, idx) => {
+      if (idx === 0) return col;
+      return convertColumnHeader(col, unit);
+    });
+  }, [customSizeGuide?.columns, unit]);
+
+  // Display rows with auto-calculated values (error rate 0)
+  const displayCustomRows = useMemo(() => {
+    return customRows.map(row => {
+      if (!Array.isArray(row)) return [];
+      return row.map((cell, idx) => {
+        if (idx === 0) return cell; // Size label e.g. "S", "M", "38"
+        return convertMeasurementValue(cell, customBaseUnit, unit);
+      });
+    });
+  }, [customRows, customBaseUnit, unit]);
+
   if (!isOpen) return null;
   if (typeof document === 'undefined') return null;
 
@@ -306,24 +403,26 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
               {/* Data Table */}
               {customSizeGuide?.enabled && customSizeGuide?.columns?.length > 0 && customRows.length > 0 ? (
                 <div className="size-table-container">
-                  <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#111' }}>
-                      📋 Item Specific Size Chart
-                    </span>
-                    <span style={{ fontSize: '0.75rem', background: '#eef2ff', color: '#4338ca', padding: '3px 10px', borderRadius: '12px', fontWeight: 600 }}>
-                      Verified Dimensions
-                    </span>
+                  <div className="custom-size-guide-header-row">
+                    <div className="custom-size-guide-title-pill">
+                      <span className="custom-table-badge">📋 Item Specific Size Chart</span>
+                      <span className="custom-verified-pill">Verified Dimensions</span>
+                    </div>
+                    <div className="custom-auto-calc-indicator">
+                      <span className="auto-calc-dot"></span>
+                      Auto-calculated in <strong>{unit === 'cm' ? 'Centimeters (cm)' : 'Inches (in)'}</strong>
+                    </div>
                   </div>
                   <table className="size-guide-table">
                     <thead>
                       <tr>
-                        {customSizeGuide.columns.map((col, idx) => (
+                        {displayCustomColumns.map((col, idx) => (
                           <th key={idx}>{col}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {customRows.map((row, rIdx) => (
+                      {displayCustomRows.map((row, rIdx) => (
                         <tr 
                           key={rIdx}
                           style={{ cursor: onSelectSize && row[0] ? 'pointer' : 'default' }}
@@ -337,7 +436,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                         >
                           {row.map((cell, cIdx) => (
                             <td key={cIdx}>
-                              {cIdx === 0 ? <strong>{cell}</strong> : cell}
+                              {cIdx === 0 ? <strong>{cell}</strong> : (cell ? `${cell} ${unit}` : '-')}
                             </td>
                           ))}
                         </tr>
@@ -396,36 +495,38 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
                 </div>
               )}
 
-              {/* How to Measure Section */}
+              {/* How to Measure Section with High-Quality Vector Technical Diagram */}
               <div className="how-to-measure-section">
-                <h4 className="how-to-measure-title">📏 How to Measure Yourself Accurately</h4>
+                <HowToMeasureDiagram category={category || activeTab} />
+
+                <h4 className="how-to-measure-title" style={{ marginTop: '20px' }}>📏 Measurement Guidelines</h4>
                 <div className="measure-grid">
                   <div className="measure-card">
                     <span className="measure-num">1</span>
                     <div>
                       <strong>Chest:</strong>
-                      <p>Wrap the tape measure around the fullest part of your chest, right beneath the armpits. Keep the tape straight and snug without pulling tight.</p>
+                      <p>Wrap the tape measure horizontally around the fullest part of your chest, right beneath the armpits. Keep the tape level and comfortably snug.</p>
                     </div>
                   </div>
                   <div className="measure-card">
                     <span className="measure-num">2</span>
                     <div>
-                      <strong>Waist:</strong>
-                      <p>Measure around your natural waistline, where your trousers or jeans comfortably sit. Keep one finger between your body and the tape.</p>
+                      <strong>Front Length:</strong>
+                      <p>Measure straight down from the highest point of the shoulder near the collar seam to the bottom hem of the garment.</p>
                     </div>
                   </div>
                   <div className="measure-card">
                     <span className="measure-num">3</span>
                     <div>
-                      <strong>Shoulder:</strong>
-                      <p>Measure across the back from the tip of one shoulder bone straight to the tip of the other.</p>
+                      <strong>Shoulder (Back):</strong>
+                      <p>Measure across the back yoke from the edge of the left shoulder point straight to the edge of the right shoulder point.</p>
                     </div>
                   </div>
                   <div className="measure-card">
                     <span className="measure-num">4</span>
                     <div>
-                      <strong>Length:</strong>
-                      <p>Measure from the highest point of your shoulder seam near the collar down to the bottom hem of the garment.</p>
+                      <strong>Sleeve Length:</strong>
+                      <p>Measure from the top shoulder seam point following the outer sleeve down to the end of the cuff.</p>
                     </div>
                   </div>
                 </div>

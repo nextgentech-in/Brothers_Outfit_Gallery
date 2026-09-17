@@ -337,6 +337,76 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Custom Size Guide Header Bar */
+.custom-size-guide-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.custom-size-guide-title-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.custom-table-badge {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.custom-verified-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.custom-auto-calc-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.auto-calc-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  display: inline-block;
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.7;
+  }
+}
+
 .size-guide-table {
   width: 100%;
   border-collapse: collapse;
@@ -402,12 +472,97 @@
   padding: 8px;
 }
 
-/* How to Measure */
+/* How to Measure Section */
 .how-to-measure-section {
   background: #fafafa;
   border: 1px solid #e5e5e5;
   border-radius: 12px;
   padding: 18px 20px;
+}
+
+/* High-Quality Vector How to Measure Technical Diagram */
+.how-to-measure-diagram-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.htm-diagram-header {
+  margin-bottom: 18px;
+}
+
+.htm-diagram-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #000000;
+  text-transform: uppercase;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.htm-diagram-title::after {
+  content: "—";
+  font-weight: 400;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.htm-diagram-rule {
+  width: 100%;
+  height: 1px;
+  background: #e5e5e5;
+}
+
+.htm-figures-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 40px;
+  padding: 10px 0;
+  flex-wrap: wrap;
+}
+
+.htm-figure-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 240px;
+  max-width: 340px;
+}
+
+.htm-svg-wrap {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.htm-garment-svg {
+  width: 100%;
+  height: auto;
+  max-height: 290px;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.03));
+}
+
+.htm-figure-caption {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #404040;
+  text-transform: uppercase;
 }
 
 .how-to-measure-title {
@@ -672,6 +827,31 @@
   .fit-input-field input,
   .fit-input-field select {
     width: 120px;
+  }
+
+  /* Custom size guide & diagram responsive layout */
+  .custom-size-guide-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .how-to-measure-diagram-container {
+    padding: 14px 12px;
+  }
+
+  .htm-figures-row {
+    gap: 20px;
+  }
+
+  .htm-figure-card {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  .htm-svg-wrap {
+    max-width: 240px;
   }
 
   .size-guide-footer {
