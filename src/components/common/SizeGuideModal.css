@@ -472,21 +472,13 @@
   padding: 8px;
 }
 
-/* How to Measure Section */
-.how-to-measure-section {
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 18px 20px;
-}
-
 /* High-Quality Vector How to Measure Technical Diagram */
 .how-to-measure-diagram-container {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 20px 24px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .htm-diagram-header {
@@ -563,56 +555,6 @@
   letter-spacing: 0.12em;
   color: #404040;
   text-transform: uppercase;
-}
-
-.how-to-measure-title {
-  margin: 0 0 14px;
-  font-size: 14px;
-  font-weight: 800;
-  color: #171717;
-}
-
-.measure-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
-}
-
-.measure-card {
-  display: flex;
-  gap: 10px;
-  background: #ffffff;
-  border: 1px solid #e5e5e5;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.measure-num {
-  width: 24px;
-  height: 24px;
-  background: #0f172a;
-  color: #ffffff;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.measure-card strong {
-  display: block;
-  font-size: 13px;
-  color: #0f172a;
-  margin-bottom: 2px;
-}
-
-.measure-card p {
-  margin: 0;
-  font-size: 12px;
-  color: #525252;
-  line-height: 1.4;
 }
 
 /* Perfumes Guide */

@@ -496,41 +496,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
               )}
 
               {/* How to Measure Section with High-Quality Vector Technical Diagram */}
-              <div className="how-to-measure-section">
-                <HowToMeasureDiagram category={category || activeTab} />
-
-                <h4 className="how-to-measure-title" style={{ marginTop: '20px' }}>📏 Measurement Guidelines</h4>
-                <div className="measure-grid">
-                  <div className="measure-card">
-                    <span className="measure-num">1</span>
-                    <div>
-                      <strong>Chest:</strong>
-                      <p>Wrap the tape measure horizontally around the fullest part of your chest, right beneath the armpits. Keep the tape level and comfortably snug.</p>
-                    </div>
-                  </div>
-                  <div className="measure-card">
-                    <span className="measure-num">2</span>
-                    <div>
-                      <strong>Front Length:</strong>
-                      <p>Measure straight down from the highest point of the shoulder near the collar seam to the bottom hem of the garment.</p>
-                    </div>
-                  </div>
-                  <div className="measure-card">
-                    <span className="measure-num">3</span>
-                    <div>
-                      <strong>Shoulder (Back):</strong>
-                      <p>Measure across the back yoke from the edge of the left shoulder point straight to the edge of the right shoulder point.</p>
-                    </div>
-                  </div>
-                  <div className="measure-card">
-                    <span className="measure-num">4</span>
-                    <div>
-                      <strong>Sleeve Length:</strong>
-                      <p>Measure from the top shoulder seam point following the outer sleeve down to the end of the cuff.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <HowToMeasureDiagram category={category || activeTab} />
             </>
           )}
 
