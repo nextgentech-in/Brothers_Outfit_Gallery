@@ -321,13 +321,14 @@
 
 @media (max-width: 480px) {
   .product-grid {
-    gap: 12px;
+    gap: 10px;
   }
   .trust-grid {
     grid-template-columns: 1fr;
   }
   .review-card {
-    padding: 32px 24px;
+    padding: 22px 18px;
+    border-radius: 12px;
   }
 }
 

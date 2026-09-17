@@ -301,4 +301,9 @@
   .auth-modal-title {
     font-size: 14px;
   }
+
+  .auth-modal-input {
+    font-size: 16px; /* Prevents iOS auto-zoom on input focus */
+    padding: 8px 10px;
+  }
 }

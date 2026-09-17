@@ -333,6 +333,7 @@
   padding: 12px 14px;
   border: 1px solid var(--color-stone, #D9D3C7);
   font-family: var(--font-body);
+  font-size: 16px; /* Prevents iOS auto-zoom on input focus */
   border-radius: var(--radius-sm, 4px);
   background: #ffffff;
   color: var(--color-charcoal, #111111);
@@ -456,7 +457,7 @@
     border-top: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.08);
     padding: 10px 16px;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 
   .product-sticky-bar__inner {
@@ -496,8 +497,8 @@
 
   .product-sticky-bar__btn {
     flex: 1;
-    height: 42px;
-    font-size: 11.5px;
+    height: 44px; /* Standard 44px touch target */
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.6px;
     text-transform: uppercase;

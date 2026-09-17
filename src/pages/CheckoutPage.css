@@ -9,6 +9,12 @@
   padding: 110px 20px 60px;
 }
 
+@media (max-width: 768px) {
+  .checkout-page-container {
+    padding: calc(var(--total-header-height, 88px) + 16px) 14px 40px;
+  }
+}
+
 .checkout-header {
   text-align: center;
   margin-bottom: 48px;
@@ -83,10 +89,10 @@
 
 .checkout-form-group input {
   width: 100%;
-  padding: 12px;
+  padding: 12px 14px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 16px; /* Prevents iOS auto-zoom on input focus */
   box-sizing: border-box;
 }
 
@@ -150,22 +156,11 @@
 
 @media (max-width: 600px) {
   .checkout-address-section {
-    padding: 20px 16px;
+    padding: 18px 14px;
   }
-  .checkout-form-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-}
-
-@media (max-width: 380px) {
   .checkout-form-row {
     grid-template-columns: 1fr;
     gap: 12px;
-  }
-  .checkout-verify-btn {
-    padding: 0 10px;
-    font-size: 11px;
   }
 }
 

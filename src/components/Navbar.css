@@ -724,6 +724,54 @@
     height: 22px;
     font-size: 10px;
   }
+
+  /* Mobile Search Overlay Optimizations */
+  .search-overlay__inner {
+    padding: 14px 16px;
+  }
+
+  .search-overlay__input {
+    font-size: 16px; /* Prevents iOS auto-zoom on input focus */
+  }
+
+  .search-results-dropdown {
+    max-height: 60vh;
+    margin-top: 8px;
+    border-radius: 8px;
+  }
+
+  .search-result-item {
+    padding: 8px 12px;
+    gap: 10px;
+  }
+
+  .search-result-thumb {
+    width: 40px;
+    height: 50px;
+  }
+
+  .search-result-name {
+    font-size: 12.5px;
+  }
+
+  .search-result-price {
+    font-size: 13px;
+  }
+
+  /* Mobile Menu Drawer Touch Polish */
+  .mobile-menu {
+    width: min(320px, 85vw);
+  }
+
+  .mobile-menu__inner {
+    padding: 18px 18px 40px;
+  }
+
+  .mobile-menu__link {
+    min-height: 44px; /* Standard 44px mobile touch target */
+    display: flex;
+    align-items: center;
+  }
 }
 
 @media (max-width: 360px) {
@@ -762,6 +810,10 @@
     width: 20px;
     height: 20px;
     font-size: 9px;
+  }
+
+  .search-overlay__inner {
+    padding: 10px 12px;
   }
 }
 
