@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { optimizeImage } from '../utils/imageUtils';
 import trendingItems from '../data/trendingData';
 import './TrendingCarousel.css';
 
@@ -101,7 +102,7 @@ export default function TrendingCarousel({ trendingConfig }) {
               )}
               <div className="trending__card-image-wrap">
                 <img
-                  src={item.image}
+                  src={optimizeImage(item.image, 800)}
                   alt={item.title}
                   className="trending__card-image"
                   loading="lazy"

@@ -100,7 +100,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
       <div className="sale-card__image-wrap">
         <Link to={`/product/${product.slug}`} style={{ display: 'block', width: '100%', height: '100%' }}>
           <img
-            src={optimizeImage(product.image || product.thumbnailUrl, 400)}
+            src={optimizeImage(product.image || product.thumbnailUrl, 800)}
             alt={product.name}
             className="sale-card__image"
             loading="lazy"

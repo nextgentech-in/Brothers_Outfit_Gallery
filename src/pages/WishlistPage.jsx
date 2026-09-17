@@ -101,7 +101,7 @@ export default function WishlistPage() {
                   {/* Thumbnail */}
                   <Link to={`/product/${item.slug}`} className="wishlist-card-img-link">
                     <img
-                      src={optimizeImage(item.image, 400)}
+                      src={optimizeImage(item.image, 800)}
                       alt={item.name}
                       className="wishlist-card-img"
                       loading="lazy"

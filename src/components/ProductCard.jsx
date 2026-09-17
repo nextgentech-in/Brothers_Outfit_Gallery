@@ -212,7 +212,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
       >
         <Link to={`/product/${product.slug}`} className="product-card__image-link">
           <img
-            src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 400)}
+            src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 800)}
             alt={`${product.name} - View ${activeImgIdx + 1}`}
             className="product-card__image"
             loading="lazy"

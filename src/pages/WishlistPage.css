@@ -206,21 +206,26 @@
 
 .wishlist-card-img-link {
   position: relative;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   aspect-ratio: 3 / 4;
-  background: #f8fafc;
+  background: #ffffff;
   overflow: hidden;
 }
 
 .wishlist-card-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
+  background: #ffffff;
+  image-rendering: -webkit-optimize-contrast;
   transition: transform 0.4s ease;
 }
 
 .wishlist-card:hover .wishlist-card-img {
-  transform: scale(1.04);
+  transform: scale(1.03);
 }
 
 .wishlist-card-badge {

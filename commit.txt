@@ -1,5 +1,5 @@
-fix: remove whitespace in product cards by switching to object-fit cover
+fix: eliminate image side cropping and upgrade to HD resolution rendering
 
-- ProductCard.css: changed object-fit from contain to cover with
-  object-position top center so product images fill the card frame
-  without any white gaps, while keeping the model face/top visible
+- ProductCard.css, SaleProductCard.css, TrendingCarousel.css, WishlistPage.css: switch to object-fit: contain on seamless white background so wide/square images like perfume boxes and garments are never cut off from sides
+- imageUtils.js: upgraded optimization to 800px width with quality 88 and perceptual compression for crisp Retina sharpness
+- ProductCard.jsx, SaleProductCard.jsx, WishlistPage.jsx, TrendingCarousel.jsx: request 800px HD resolution
