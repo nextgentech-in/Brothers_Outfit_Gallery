@@ -19,7 +19,7 @@ const SUB_CATEGORIES = {
   'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
   'Ethnic Wear': ['All', 'Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
+  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
   'Caps': ['All', 'Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
   'Sunglasses': ['All', 'Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
   'Accessories': ['All', 'Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],

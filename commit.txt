@@ -1,0 +1,4 @@
+feat: add Apparel Spray subcategory under Perfumes
+
+- ShopPage.jsx: added Apparel Spray to Perfumes filter subcategories
+- AdminProductForm.jsx: added Apparel Spray to Perfumes product type options

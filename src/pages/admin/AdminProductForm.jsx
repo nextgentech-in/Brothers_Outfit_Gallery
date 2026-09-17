@@ -46,7 +46,7 @@ const SUB_CATEGORY_MAP = {
   'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
   'Ethnic Wear': ['Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
+  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
   'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
   'Watches': ['Analog', 'Digital', 'Smart Watch', 'Chronograph', 'Dress Watch'],
   'Belts': ['Leather', 'Canvas', 'Reversible', 'Auto-Lock', 'Braided'],
