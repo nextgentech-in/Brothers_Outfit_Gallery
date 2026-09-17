@@ -15,8 +15,7 @@ import './AdminProductForm.css';
 import { getBackendUrl } from '../../utils/apiConfig';
 import { 
   convertMeasurementValue, 
-  convertColumnHeader, 
-  detectBaseUnit 
+  convertColumnHeader 
 } from '../../components/common/SizeGuideModal';
 
 const CATEGORY_SIZES_MAP = {

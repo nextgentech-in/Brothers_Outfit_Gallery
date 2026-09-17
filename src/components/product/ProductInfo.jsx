@@ -62,19 +62,19 @@ export default function ProductInfo({ product }) {
   const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
 
-  // Sync state if product changes without unmounting
-  useEffect(() => {
-    setSelectedSize(defaultFrontVariant?.size || null);
-    setSelectedColor(product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black');
-  }, [product.id, defaultFrontVariant?.size]);
-
-  // Determine if item is Clothing (where size selection is mandatory) vs Accessories
-  const isClothing = isClothingProduct(product);
-
   // Read variants if present, else fallback - memoized to prevent unstable object references in effects/memos
   const productColors = useMemo(() => {
     return product.colors?.length > 0 ? product.colors.map(c => c.name || c) : [];
   }, [product.colors]);
+
+  // Sync state if product changes without unmounting
+  useEffect(() => {
+    setSelectedSize(defaultFrontVariant?.size || null);
+    setSelectedColor(productColors.length > 0 ? productColors[0] : 'Black');
+  }, [product.id, defaultFrontVariant?.size, productColors]);
+
+  // Determine if item is Clothing (where size selection is mandatory) vs Accessories
+  const isClothing = isClothingProduct(product);
 
   const productSizes = useMemo(() => {
     return product.variants?.length > 0 ? [...new Set(product.variants.map(v => v.size))] : (product.sizes || []);

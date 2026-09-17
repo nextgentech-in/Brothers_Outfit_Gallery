@@ -360,6 +360,10 @@ export default function AboutPage() {
                 src="/images/store-map-photo.jpg" 
                 alt="Brothers Outfit Gallery Location Map" 
                 className="location-map-photo"
+                loading="lazy"
+                decoding="async"
+                width="800"
+                height="500"
               />
               <div className="map-photo-overlay-card">
                 <div className="map-pin-pulse-icon">📍</div>

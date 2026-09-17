@@ -844,7 +844,7 @@ export default function AdminHomepage() {
                   {nonTrending.slice(0, 30).map(p => {
                     const img = p.images?.[0]?.url || (typeof p.images?.[0] === 'string' ? p.images[0] : null) || p.thumbnailUrl || p.image || '/images/hero.png';
                     const price = p.salePrice || p.price || 0;
-                    const mrp = p.mrp || p.compareAtPrice || 0;
+                    const _mrp = p.mrp || p.compareAtPrice || 0;
                     return (
                       <div
                         key={p.id}
