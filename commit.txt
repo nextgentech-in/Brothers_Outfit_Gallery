@@ -1,3 +1,4 @@
-style: restore edge-to-edge product card presentation without white letterboxing
+fix: resolve Google sign-in auth/internal-error by configuring complete CSP and auth fallback
 
-- ProductCard.css, SaleProductCard.css, TrendingCarousel.css, WishlistPage.css: styled product images with object-fit: cover and center-top 20% focal positioning to fill 100% of the frame with zero letterbox white space, matching top fashion brands (Zara/Myntra/ASOS)
+- vercel.json: added Google accounts/APIs/FirebaseApp domains to frame-src, script-src, connect-src, and form-action to prevent browser CSP blocking Google OAuth popup and redirect handshakes
+- AuthContext.jsx: configured select_account prompt on GoogleAuthProvider and added graceful redirect fallback

@@ -99,6 +99,7 @@ export function AuthProvider({ children }) {
   async function loginWithGoogle() {
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       if (result && result.user) {
         setCurrentUser(result.user);
@@ -106,9 +107,11 @@ export function AuthProvider({ children }) {
       }
       return result;
     } catch (error) {
-      if (error.code === 'auth/popup-blocked') {
-        console.warn("Popup blocked by browser, falling back to redirect...");
+      console.warn("Google signInWithPopup error code:", error.code, error.message);
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+        console.warn("Falling back to signInWithRedirect...");
         const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
         return await signInWithRedirect(auth, provider);
       }
       throw error;
