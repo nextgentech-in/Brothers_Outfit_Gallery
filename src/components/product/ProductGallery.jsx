@@ -13,7 +13,18 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
   const extractUrl = (img) => (typeof img === 'object' && img !== null && img.url) ? img.url : (typeof img === 'string' ? img : '');
   const extractColor = (img) => (typeof img === 'object' && img !== null && img.color) ? String(img.color).trim() : '';
 
-  // Filter images linked specifically to the selected color
+  const isGeneralImage = (img) => {
+    const c = extractColor(img).toLowerCase();
+    return !c || c === 'all' || c === 'general' || c === 'all colors' || c === 'standard' || c === 'default';
+  };
+
+  const isColorMatch = (img, targetColor) => {
+    if (!targetColor) return false;
+    const c = extractColor(img).toLowerCase();
+    return c === String(targetColor).trim().toLowerCase();
+  };
+
+  // Filter images linked specifically to the selected color, always preserving general images
   const displayImages = useMemo(() => {
     if (!images || images.length === 0) return [];
 
@@ -21,26 +32,20 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     const validImages = images.filter(img => extractUrl(img));
     if (validImages.length === 0) return [];
 
-    // Check if any images in the set are explicitly tagged with a color
-    const hasColorTaggedImages = validImages.some(img => {
-      const c = extractColor(img);
-      return c && c.toLowerCase() !== 'all' && c.toLowerCase() !== 'general' && c.toLowerCase() !== 'standard';
-    });
+    // Check if any images in the set are explicitly tagged with a specific color
+    const hasSpecificColorImages = validImages.some(img => !isGeneralImage(img));
 
-    if (hasColorTaggedImages && selectedColor) {
+    if (hasSpecificColorImages && selectedColor) {
       const target = String(selectedColor).trim().toLowerCase();
-      const colorMatched = validImages.filter(img => {
-        const c = extractColor(img).toLowerCase();
-        return c === target;
-      });
+      const colorMatched = validImages.filter(img => isColorMatch(img, target));
+      const generalImages = validImages.filter(img => isGeneralImage(img));
 
-      // If specific color images found, also include general/all images if any
+      // If specific color images found, show them first followed by all general/overview images
       if (colorMatched.length > 0) {
-        const generalImages = validImages.filter(img => {
-          const c = extractColor(img).toLowerCase();
-          return c === 'all' || c === 'general';
-        });
         return [...colorMatched, ...generalImages];
+      } else if (generalImages.length > 0) {
+        // If this specific color has no unique photos yet, show all general photos
+        return generalImages;
       }
     }
 
@@ -55,13 +60,10 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
   // Legacy fallback: if images are not color-tagged, jump to corresponding index when color index changes
   useEffect(() => {
     if (!images || images.length === 0) return;
-    const hasColorTaggedImages = images.some(img => {
-      const c = extractColor(img);
-      return c && c.toLowerCase() !== 'all' && c.toLowerCase() !== 'general';
-    });
+    const hasSpecificColorImages = images.some(img => !isGeneralImage(img));
 
-    // Only use sequential math if no color tagging was explicitly defined
-    if (!hasColorTaggedImages && selectedColorIndex != null && totalColors && totalColors > 0) {
+    // Only use sequential math if no specific color tagging was explicitly defined
+    if (!hasSpecificColorImages && selectedColorIndex != null && totalColors && totalColors > 0) {
       const imagesPerColor = images.length / totalColors;
       const targetIndex = Math.min(Math.floor(selectedColorIndex * imagesPerColor), images.length - 1);
       setCurrentIndex(targetIndex);
@@ -184,10 +186,19 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
           </>
         )}
 
-        {/* Color Badge Indicator on image if active color has multiple images */}
-        {selectedColor && displayImages.length > 0 && (
+        {/* Color Badge Indicator on image */}
+        {displayImages.length > 0 && (
           <div className="gallery-color-indicator">
-            <span className="gallery-color-indicator-text">{selectedColor}</span>
+            <span className="gallery-color-indicator-text">
+              {(() => {
+                const currentImg = displayImages[safeCurrentIndex];
+                const imgCol = extractColor(currentImg);
+                if (imgCol && !isGeneralImage(currentImg)) {
+                  return imgCol;
+                }
+                return selectedColor ? `${selectedColor} • Overview` : 'Overview';
+              })()}
+            </span>
             {displayImages.length > 1 && (
               <span className="gallery-color-count-pill">{safeCurrentIndex + 1}/{displayImages.length}</span>
             )}
