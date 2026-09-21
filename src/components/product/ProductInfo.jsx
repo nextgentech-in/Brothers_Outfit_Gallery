@@ -41,7 +41,7 @@ function MiniCountdown({ targetDate }) {
   );
 }
 
-export default function ProductInfo({ product }) {
+export default function ProductInfo({ product, onColorChange }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { isInWishlist, toggleWishlist } = useWishlist() || {};
@@ -276,23 +276,23 @@ export default function ProductInfo({ product }) {
           <h3 className="selector-title">Color <span className="selector-val">{selectedColor}</span></h3>
           <div className="color-swatches">
              {product.colors && product.colors[0]?.hex ? (
-                product.colors.map(col => (
+                product.colors.map((col, idx) => (
                  <button 
                    key={col.name} 
                    className={`color-circle ${selectedColor === col.name ? 'selected' : ''}`}
                    style={{ backgroundColor: col.hex }}
-                   onClick={() => setSelectedColor(col.name)}
+                   onClick={() => { setSelectedColor(col.name); onColorChange?.(idx); }}
                    title={col.name}
                    aria-label={`Select color ${col.name}`}
                  ></button>
                 ))
              ) : (
-                productColors.map(col => (
+                productColors.map((col, idx) => (
                  <button 
                    key={col} 
                    className={`color-circle ${selectedColor === col ? 'selected' : ''}`}
                    style={{ backgroundColor: col.toLowerCase() }}
-                   onClick={() => setSelectedColor(col)}
+                   onClick={() => { setSelectedColor(col); onColorChange?.(idx); }}
                    title={col}
                    aria-label={`Select color ${col}`}
                  ></button>

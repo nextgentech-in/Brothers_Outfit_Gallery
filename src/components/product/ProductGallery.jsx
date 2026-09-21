@@ -1,13 +1,23 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
 import { optimizeImage } from '../../utils/imageUtils';
 import './ProductGallery.css';
 
-export default function ProductGallery({ images }) {
+export default function ProductGallery({ images, selectedColorIndex, totalColors }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef(null);
+
+  // When a color is selected, jump to the corresponding image
+  useEffect(() => {
+    if (selectedColorIndex == null || !totalColors || totalColors <= 0 || !images || images.length === 0) return;
+    // Calculate which image index corresponds to this color
+    // Images are ordered sequentially per color (e.g. 14 images / 6 colors = ~2.3 images per color)
+    const imagesPerColor = images.length / totalColors;
+    const targetIndex = Math.min(Math.floor(selectedColorIndex * imagesPerColor), images.length - 1);
+    setCurrentIndex(targetIndex);
+  }, [selectedColorIndex, totalColors, images]);
   
   if (!images || images.length === 0) return <div className="product-gallery-empty">No Images Available</div>;
 

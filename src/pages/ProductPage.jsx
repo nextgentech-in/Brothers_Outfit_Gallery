@@ -22,6 +22,7 @@ export default function ProductPage() {
     return null;
   });
   const [loading, setLoading] = useState(() => !product);
+  const [selectedColorIndex, setSelectedColorIndex] = useState(0);
 
   // Fetch product from Firebase (SWR background refresh)
   useEffect(() => {
@@ -47,6 +48,8 @@ export default function ProductPage() {
       setProduct(null);
       setLoading(true);
     }
+
+    setSelectedColorIndex(0);
 
     const fetchProduct = async () => {
       try {
@@ -98,6 +101,13 @@ export default function ProductPage() {
     : [product.thumbnailUrl || product.image || '/images/hero.png'];
   const allImages = rawImages.filter(Boolean);
 
+  // Count actual displayable colors for gallery-color mapping
+  const productColors = product.colors?.filter(c => {
+    const name = c.name || c;
+    return name !== 'Standard' && name !== 'Default';
+  }) || [];
+  const totalColors = productColors.length;
+
   return (
     <div className="product-page-wrapper">
       <div className="product-page-container">
@@ -122,11 +132,18 @@ export default function ProductPage() {
 
         <div className="product-main-grid">
           <div className="product-gallery-section">
-            <ProductGallery images={allImages} />
+            <ProductGallery 
+              images={allImages} 
+              selectedColorIndex={selectedColorIndex}
+              totalColors={totalColors}
+            />
           </div>
           
           <div className="product-info-section">
-            <ProductInfo product={product} />
+            <ProductInfo 
+              product={product} 
+              onColorChange={(colorIndex) => setSelectedColorIndex(colorIndex)}
+            />
           </div>
         </div>
 
