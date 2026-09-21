@@ -2,18 +2,19 @@
   display: flex;
   gap: 20px;
   width: 100%;
-  height: 620px;
-  max-height: calc(100vh - 160px);
+  height: 640px;
+  max-height: calc(100vh - 140px);
 }
 
 .product-gallery-thumbnails {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 80px;
+  gap: 10px;
+  width: 84px;
   flex-shrink: 0;
   overflow-y: auto;
   scrollbar-width: none;
+  padding-right: 2px;
 }
 
 .product-gallery-thumbnails::-webkit-scrollbar {
@@ -23,7 +24,7 @@
 .thumbnail-btn {
   width: 100%;
   aspect-ratio: 3 / 4;
-  background: #ffffff;
+  background: #f8f6f0;
   border: 1.5px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
   padding: 0;
@@ -56,7 +57,7 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 8px;
   touch-action: pan-y;
   background: #f0ede8;
   width: 100%;
@@ -68,12 +69,12 @@
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(4px);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   color: #111827;
   font-size: 24px;
   font-weight: 700;
@@ -82,7 +83,7 @@
   justify-content: center;
   cursor: pointer;
   z-index: 15;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   transition: all 0.2s ease;
   line-height: 1;
 }
@@ -93,22 +94,56 @@
 }
 
 .gallery-nav-prev {
-  left: 12px;
+  left: 14px;
 }
 
 .gallery-nav-next {
-  right: 12px;
+  right: 14px;
 }
 
 .product-gallery-dots {
   display: none;
 }
 
+/* Color Indicator Badge on Image */
+.gallery-color-indicator {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(17, 24, 39, 0.75);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.gallery-color-indicator-text {
+  text-transform: capitalize;
+}
+
+.gallery-color-count-pill {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+/* Mobile & Tablet Snitch-like Full Bleed Layout */
 @media (max-width: 1024px) {
   .product-gallery-wrapper {
-    flex-direction: column;
-    gap: 12px;
+    flex-direction: column-reverse;
+    gap: 10px;
     height: auto;
+    max-height: none;
     width: 100%;
   }
   
@@ -118,7 +153,7 @@
     width: 100%;
     overflow-x: auto;
     gap: 8px;
-    padding: 2px 0 6px;
+    padding: 6px 16px;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
@@ -129,8 +164,8 @@
   }
 
   .thumbnail-btn {
-    width: 60px;
-    height: 75px;
+    width: 64px;
+    height: 80px;
     aspect-ratio: 3/4;
     flex-shrink: 0;
     border-radius: 6px;
@@ -141,28 +176,29 @@
     padding: 0;
   }
 
+  /* Snitch-style full bleed main image on mobile */
   .product-gallery-main {
     width: 100%;
     height: auto;
     aspect-ratio: 3 / 4;
     background: #f0ede8;
-    border-radius: 8px;
+    border-radius: 0;
     position: relative;
     overflow: hidden;
   }
 
   .gallery-nav-arrow {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     font-size: 20px;
   }
 
   .gallery-nav-prev {
-    left: 8px;
+    left: 10px;
   }
 
   .gallery-nav-next {
-    right: 8px;
+    right: 10px;
   }
 
   .product-gallery-dots {
@@ -179,9 +215,9 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(0, 0, 0, 0.28);
     cursor: pointer;
-    transition: background 0.3s, transform 0.3s;
+    transition: all 0.25s ease;
     border: none;
     padding: 0;
     display: inline-block;
@@ -194,7 +230,9 @@
 
   .dot.active {
     background: #111827;
-    transform: scale(1.3);
+    width: 18px;
+    border-radius: 4px;
   }
 }
+
 

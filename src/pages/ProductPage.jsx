@@ -22,6 +22,10 @@ export default function ProductPage() {
     return null;
   });
   const [loading, setLoading] = useState(() => !product);
+  const [selectedColor, setSelectedColor] = useState(() => {
+    const firstCol = product?.colors?.[0];
+    return firstCol ? (firstCol.name || firstCol) : 'Black';
+  });
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
 
   // Fetch product from Firebase (SWR background refresh)
@@ -44,6 +48,8 @@ export default function ProductPage() {
     if (cachedProd) {
       setProduct(cachedProd);
       setLoading(false);
+      const firstCol = cachedProd?.colors?.[0];
+      setSelectedColor(firstCol ? (firstCol.name || firstCol) : 'Black');
     } else {
       setProduct(null);
       setLoading(true);
@@ -56,6 +62,8 @@ export default function ProductPage() {
         const prod = await getProductBySlug(slug);
         if (isCurrent && prod) {
           setProduct(prod);
+          const firstCol = prod?.colors?.[0];
+          setSelectedColor(firstCol ? (firstCol.name || firstCol) : 'Black');
         }
       } catch (error) {
         console.error("Error fetching product:", error);
@@ -134,6 +142,7 @@ export default function ProductPage() {
           <div className="product-gallery-section">
             <ProductGallery 
               images={allImages} 
+              selectedColor={selectedColor}
               selectedColorIndex={selectedColorIndex}
               totalColors={totalColors}
             />
@@ -142,7 +151,10 @@ export default function ProductPage() {
           <div className="product-info-section">
             <ProductInfo 
               product={product} 
-              onColorChange={(colorIndex) => setSelectedColorIndex(colorIndex)}
+              onColorChange={(colorName, colorIndex) => {
+                if (colorName) setSelectedColor(colorName);
+                if (colorIndex !== undefined) setSelectedColorIndex(colorIndex);
+              }}
             />
           </div>
         </div>

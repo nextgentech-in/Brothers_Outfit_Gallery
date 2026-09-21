@@ -69,8 +69,10 @@ export default function ProductInfo({ product, onColorChange }) {
 
   // Sync state if product changes without unmounting
   useEffect(() => {
+    const defaultCol = productColors.length > 0 ? productColors[0] : (product.colors?.[0]?.name || product.colors?.[0] || 'Black');
     setSelectedSize(defaultFrontVariant?.size || null);
-    setSelectedColor(productColors.length > 0 ? productColors[0] : 'Black');
+    setSelectedColor(defaultCol);
+    onColorChange?.(defaultCol, 0);
   }, [product.id, defaultFrontVariant?.size, productColors]);
 
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
@@ -281,7 +283,7 @@ export default function ProductInfo({ product, onColorChange }) {
                    key={col.name} 
                    className={`color-circle ${selectedColor === col.name ? 'selected' : ''}`}
                    style={{ backgroundColor: col.hex }}
-                   onClick={() => { setSelectedColor(col.name); onColorChange?.(idx); }}
+                   onClick={() => { setSelectedColor(col.name); onColorChange?.(col.name, idx); }}
                    title={col.name}
                    aria-label={`Select color ${col.name}`}
                  ></button>
@@ -292,7 +294,7 @@ export default function ProductInfo({ product, onColorChange }) {
                    key={col} 
                    className={`color-circle ${selectedColor === col ? 'selected' : ''}`}
                    style={{ backgroundColor: col.toLowerCase() }}
-                   onClick={() => { setSelectedColor(col); onColorChange?.(idx); }}
+                   onClick={() => { setSelectedColor(col); onColorChange?.(col, idx); }}
                    title={col}
                    aria-label={`Select color ${col}`}
                  ></button>

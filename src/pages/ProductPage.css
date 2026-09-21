@@ -108,32 +108,50 @@
 /* Responsive Rules */
 @media (max-width: 1024px) {
   .product-page-container {
-    padding: calc(var(--total-header-height, 96px) + 30px) 20px 60px;
+    padding: calc(var(--total-header-height, 96px) + 20px) 16px 60px;
   }
   .product-main-grid {
     grid-template-columns: 1fr;
-    gap: 28px;
+    gap: 24px;
   }
 }
 
+/* Mobile: Snitch-Style Edge-To-Edge Gallery (0 space on left & right) */
 @media (max-width: 768px) {
   .product-page-container {
-    padding: calc(var(--total-header-height, 88px) + 26px) 16px 90px;
+    padding: calc(var(--total-header-height, 88px) + 10px) 0 90px;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
+
   .product-breadcrumbs {
     font-size: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
+    padding: 0 16px;
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 4px;
   }
+
   .product-breadcrumbs::-webkit-scrollbar {
     display: none;
   }
+
   .product-main-grid {
-    gap: 20px;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .product-gallery-section {
+    width: 100vw;
+    margin: 0;
+    padding: 0;
+  }
+
+  .product-info-section {
+    padding: 20px 16px 0;
   }
 }
 

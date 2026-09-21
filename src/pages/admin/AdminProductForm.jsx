@@ -259,13 +259,15 @@ export default function AdminProductForm() {
 
   // Size Guide Builder States
   const [newColumnName, setNewColumnName] = useState('');
+  const [selectedSgTemplate, setSelectedSgTemplate] = useState('Shirts');
   const [sgInputMode, setSgInputMode] = useState('dual'); // 'dual' | 'in' | 'cm'
   const [rawDualInputs, setRawDualInputs] = useState({});
 
-  // Image Upload States
+  // Image Upload & Color-Linking States
   const [existingImages, setExistingImages] = useState([]);
   const [pendingImages, setPendingImages] = useState([]);
   const [imagesToDelete, setImagesToDelete] = useState([]);
+  const [uploadTargetColor, setUploadTargetColor] = useState('');
 
   useEffect(() => {
     if (isEdit) {
@@ -297,13 +299,22 @@ export default function AdminProductForm() {
             sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
           });
 
-          // Map legacy string images to object schema or use existing objects
+          if (data.categoryId) {
+            setSelectedSgTemplate(data.categoryId);
+          }
+
+          // Map legacy string images to object schema or use existing objects, preserving linked color
           if (data.images && data.images.length > 0) {
             const mappedImages = data.images.map((img, idx) => {
               if (typeof img === 'string') {
-                return { url: img, publicId: null, isPrimary: data.thumbnailUrl === img || idx === 0 };
+                return { url: img, publicId: null, isPrimary: data.thumbnailUrl === img || idx === 0, color: '' };
               }
-              return { url: img.url, publicId: img.publicId || img.path, isPrimary: img.isPrimary || (idx === 0 && !data.images?.some(i => i.isPrimary)) };
+              return { 
+                url: img.url, 
+                publicId: img.publicId || img.path, 
+                isPrimary: img.isPrimary || (idx === 0 && !data.images?.some(i => i.isPrimary)),
+                color: img.color || ''
+              };
             });
             setExistingImages(mappedImages);
           }
@@ -553,8 +564,9 @@ export default function AdminProductForm() {
     }));
   };
 
-  const handleLoadSizeGuideTemplate = () => {
-    const template = SIZE_GUIDE_TEMPLATES[formData.categoryId] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
+  const handleLoadSizeGuideTemplate = (templateKey = null) => {
+    const keyToUse = templateKey || selectedSgTemplate || formData.categoryId || 'Shirts';
+    const template = SIZE_GUIDE_TEMPLATES[keyToUse] || SIZE_GUIDE_TEMPLATES['Shirts'] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
     const currentBaseUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
     const targetUnit = sgInputMode === 'cm' ? 'cm' : currentBaseUnit;
 
@@ -573,7 +585,7 @@ export default function AdminProductForm() {
       }
     }));
     setRawDualInputs({});
-    showToast(`Loaded ${formData.categoryId} size guide template`, 'success');
+    showToast(`Loaded ${keyToUse} size guide preset template`, 'success');
   };
 
   const handleDualCellChange = (rowIdx, colIdx, value, typedUnit) => {
@@ -703,7 +715,7 @@ export default function AdminProductForm() {
   };
 
   // -------------------------------------------------------------
-  // IMAGE HANDLING LOGIC
+  // IMAGE HANDLING & COLOR LINKING LOGIC
   // -------------------------------------------------------------
 
   const onSelectFiles = (e) => {
@@ -725,7 +737,6 @@ export default function AdminProductForm() {
 
       // Duplicate prevention: check if a file with same name and size exists
       const isPendingDup = pendingImages.some(p => p.name === file.name && p.size === file.size);
-      // We can't perfectly check existing Images via name/size as they might be URLs, but we check pending
       if (isPendingDup) {
         return; // silently skip exact duplicate from being re-added
       }
@@ -735,7 +746,8 @@ export default function AdminProductForm() {
         preview: URL.createObjectURL(file), // create local preview
         name: file.name,
         size: file.size,
-        isPrimary: false
+        isPrimary: false,
+        color: uploadTargetColor || ''
       });
     });
 
@@ -753,6 +765,20 @@ export default function AdminProductForm() {
 
     // Reset input so the same files can be selected again later
     e.target.value = '';
+  };
+
+  const handleImageColorChange = (type, index, newColor) => {
+    if (type === 'existing') {
+      setExistingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor } : img));
+    } else {
+      setPendingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor } : img));
+    }
+  };
+
+  const handleBulkTagAllImages = (targetColor) => {
+    setExistingImages(prev => prev.map(img => ({ ...img, color: targetColor })));
+    setPendingImages(prev => prev.map(img => ({ ...img, color: targetColor })));
+    showToast(`Tagged all product images with color "${targetColor || 'All Colors'}"`, 'success');
   };
 
   const removePendingImage = (index) => {
@@ -846,18 +872,18 @@ export default function AdminProductForm() {
           const item = pendingImages[i];
           const uniqueFileName = `${Date.now()}-${item.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
-          const formData = new FormData();
-          formData.append("file", item.file);
-          formData.append("publicKey", import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY);
-          formData.append("signature", signature);
-          formData.append("expire", expire);
-          formData.append("token", token);
-          formData.append("fileName", uniqueFileName);
-          formData.append("folder", `products/${finalProductId}/`);
+          const formDataToUpload = new FormData();
+          formDataToUpload.append("file", item.file);
+          formDataToUpload.append("publicKey", import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY);
+          formDataToUpload.append("signature", signature);
+          formDataToUpload.append("expire", expire);
+          formDataToUpload.append("token", token);
+          formDataToUpload.append("fileName", uniqueFileName);
+          formDataToUpload.append("folder", `products/${finalProductId}/`);
 
           const uploadRes = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
             method: "POST",
-            body: formData
+            body: formDataToUpload
           });
 
           if (!uploadRes.ok) {
@@ -874,12 +900,13 @@ export default function AdminProductForm() {
             url: uploadData.url,
             publicId: uploadData.fileId,
             alt: formData.name + ' - ' + (i + 1),
-            isPrimary: item.isPrimary
+            isPrimary: item.isPrimary,
+            color: item.color || ''
           });
         }
       }
 
-      // 3. Combine images and fix sort ordering
+      // 3. Combine images and fix sort ordering with color tags preserved
       let combinedImages = [...existingImages, ...newlyUploaded];
 
       // Auto-assign primary if missing somehow
@@ -887,7 +914,14 @@ export default function AdminProductForm() {
         combinedImages[0].isPrimary = true;
       }
 
-      combinedImages = combinedImages.map((img, idx) => ({ ...img, sortOrder: idx }));
+      combinedImages = combinedImages.map((img, idx) => ({
+        url: img.url,
+        publicId: img.publicId || null,
+        isPrimary: !!img.isPrimary,
+        color: img.color || '',
+        alt: img.alt || `${formData.name} - ${idx + 1}`,
+        sortOrder: idx
+      }));
 
       const primaryImg = combinedImages.find(img => img.isPrimary) || combinedImages[0];
       const thumbnailUrl = primaryImg ? primaryImg.url : '';
@@ -1125,31 +1159,114 @@ export default function AdminProductForm() {
             )}
           </section>
 
-          {/* Professional Image Upload Section */}
+          {/* Professional Image Upload & Color Linking Section */}
           <section className="admin-form-section">
-            <h3>Product Images <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#666' }}>(Max 10MB per image)</span></h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, paddingBottom: 0, border: 'none' }}>
+                  📸 Product Images &amp; Color Linking <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#666' }}>(Max 10MB per image)</span>
+                </h3>
+                <p className="admin-helper-text" style={{ margin: '4px 0 0' }}>
+                  Link images to specific colors (multiple images allowed per color, like different angles/poses). Customers will see corresponding photos when selecting colors!
+                </p>
+              </div>
+            </div>
 
-            <div className="admin-image-upload-wrapper">
-              <label className="admin-btn-secondary admin-upload-trigger">
-                + UPLOAD IMAGES
-                <input
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/png,image/webp,image/avif"
-                  onChange={onSelectFiles}
-                  style={{ display: 'none' }}
-                />
-              </label>
-              <p className="admin-helper-text">Accepts JPG, PNG, WEBP, AVIF. Validation runs instantly.</p>
+            {/* Upload Controls & Color Presets Toolbar */}
+            <div className="admin-image-upload-wrapper" style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+                
+                {/* Left: Upload Button & Target Color */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <label className="admin-btn-secondary admin-upload-trigger" style={{ background: '#0f172a', color: '#ffffff', cursor: 'pointer', margin: 0 }}>
+                    + UPLOAD IMAGES
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      onChange={onSelectFiles}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+
+                  {formData.colors.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569' }}>Tag new uploads as:</span>
+                      <select
+                        value={uploadTargetColor}
+                        onChange={(e) => setUploadTargetColor(e.target.value)}
+                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: 700, background: '#ffffff' }}
+                      >
+                        <option value="">All Colors (General)</option>
+                        {formData.colors.map(c => (
+                          <option key={c.name} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Quick Bulk Tag All */}
+                {formData.colors.length > 0 && (existingImages.length > 0 || pendingImages.length > 0) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Bulk tag ALL images to:</span>
+                    <select
+                      id="bulkColorSelect"
+                      defaultValue=""
+                      style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', background: '#ffffff' }}
+                    >
+                      <option value="">All Colors (General)</option>
+                      {formData.colors.map(c => (
+                        <option key={c.name} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById('bulkColorSelect');
+                        handleBulkTagAllImages(el ? el.value : '');
+                      }}
+                      style={{ padding: '6px 12px', background: '#e2e8f0', color: '#1e293b', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="admin-helper-text" style={{ marginTop: '8px', marginBottom: 0 }}>
+                💡 Tip: Upload multiple images per color (e.g. front view, back view, zoom detail for Beige, Black, etc.).
+              </p>
             </div>
 
             <div className="admin-images-grid">
               {/* Existing Images */}
               {existingImages.map((img, idx) => (
                 <div key={'existing-' + idx} className={`admin-image-card ${img.isPrimary ? 'is-primary' : ''}`}>
-                  <img src={img.url} alt="Stored Product Preview" className="admin-image-thumb" />
+                  <div style={{ position: 'relative' }}>
+                    <img src={img.url} alt="Stored Product Preview" className="admin-image-thumb" />
+                    {img.color && (
+                      <span className="admin-image-color-badge" style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '10.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '12px', backdropFilter: 'blur(4px)' }}>
+                        🎨 {img.color}
+                      </span>
+                    )}
+                  </div>
                   <div className="admin-image-meta">
                     <div className="admin-image-status">Active Store Image</div>
+
+                    {/* Color Tag Dropdown */}
+                    <div style={{ margin: '6px 0 10px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>Linked Color:</label>
+                      <select
+                        value={img.color || ''}
+                        onChange={(e) => handleImageColorChange('existing', idx, e.target.value)}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '11.5px', fontWeight: 600, background: '#ffffff', width: '100%' }}
+                      >
+                        <option value="">All Colors (General)</option>
+                        {formData.colors.map(c => (
+                          <option key={c.name} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
                     <div className="admin-image-actions">
                       {!img.isPrimary && (
@@ -1165,10 +1282,32 @@ export default function AdminProductForm() {
               {/* Pending Images */}
               {pendingImages.map((fileObj, idx) => (
                 <div key={'pending-' + idx} className={`admin-image-card pending-card ${fileObj.isPrimary ? 'is-primary' : ''}`}>
-                  <img src={fileObj.preview} alt="Upload Preview" className="admin-image-thumb" />
+                  <div style={{ position: 'relative' }}>
+                    <img src={fileObj.preview} alt="Upload Preview" className="admin-image-thumb" />
+                    {fileObj.color && (
+                      <span className="admin-image-color-badge" style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: '10.5px', fontWeight: 700, padding: '2px 7px', borderRadius: '12px', backdropFilter: 'blur(4px)' }}>
+                        🎨 {fileObj.color}
+                      </span>
+                    )}
+                  </div>
                   <div className="admin-image-meta">
                     <strong>{fileObj.name}</strong>
                     <div className="admin-image-size">Size: {formatSize(fileObj.size)} ✅</div>
+
+                    {/* Color Tag Dropdown */}
+                    <div style={{ margin: '6px 0 10px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>Linked Color:</label>
+                      <select
+                        value={fileObj.color || ''}
+                        onChange={(e) => handleImageColorChange('pending', idx, e.target.value)}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '11.5px', fontWeight: 600, background: '#ffffff', width: '100%' }}
+                      >
+                        <option value="">All Colors (General)</option>
+                        {formData.colors.map(c => (
+                          <option key={c.name} value={c.name}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
                     <div className="admin-image-actions">
                       {!fileObj.isPrimary && (
@@ -1183,8 +1322,8 @@ export default function AdminProductForm() {
             </div>
 
             {existingImages.length === 0 && pendingImages.length === 0 && (
-              <div style={{ padding: '20px', textAlign: 'center', background: '#f5f5f4', borderRadius: '8px', color: '#78716c' }}>
-                No images selected yet. Please upload at least one image.
+              <div style={{ padding: '24px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                No images selected yet. Please click <strong>+ UPLOAD IMAGES</strong> above to add photos.
               </div>
             )}
           </section>
@@ -1583,19 +1722,34 @@ export default function AdminProductForm() {
 
             {formData.sizeGuide?.enabled && (
               <div className="sg-builder-wrap">
-                {/* Load Template & Unit Control Toolbar */}
+                {/* Load Preset Template & Unit Control Toolbar */}
                 <div className="sg-template-bar">
-                  <div className="sg-template-left">
+                  <div className="sg-template-left" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#334155' }}>Preset Template:</span>
+                    <select
+                      value={selectedSgTemplate}
+                      onChange={(e) => setSelectedSgTemplate(e.target.value)}
+                      style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', fontWeight: 700, background: '#ffffff' }}
+                    >
+                      <option value="Shirts">Shirts</option>
+                      <option value="T-Shirts">T-Shirts</option>
+                      <option value="Jeans">Jeans</option>
+                      <option value="Trousers">Trousers</option>
+                      <option value="Shorts">Shorts</option>
+                      <option value="Jackets">Jackets</option>
+                      <option value="Hoodies">Hoodies</option>
+                      <option value="Ethnic Wear">Ethnic Wear</option>
+                      <option value="Slippers">Slippers / Footwear</option>
+                      <option value="Belts">Belts</option>
+                    </select>
                     <button
                       type="button"
                       className="admin-btn-secondary sg-load-template-btn"
-                      onClick={handleLoadSizeGuideTemplate}
+                      onClick={() => handleLoadSizeGuideTemplate(selectedSgTemplate)}
+                      style={{ margin: 0, padding: '6px 14px', background: '#0f172a', color: '#fff', fontSize: '12.5px', fontWeight: 700 }}
                     >
-                      📋 Load {formData.categoryId} Template
+                      📋 Load Preset Size Guide
                     </button>
-                    <span className="sg-template-hint">
-                      Loads prebuilt columns &amp; rows for {formData.categoryId}.
-                    </span>
                   </div>
 
                   <div className="sg-unit-mode-control">

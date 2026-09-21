@@ -191,7 +191,12 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
     return 'shirts';
   };
 
-  const activeTab = detectCategoryTab(category);
+  const [activeTab, setActiveTab] = useState(() => detectCategoryTab(category));
+
+  // Sync activeTab when category prop changes
+  useEffect(() => {
+    setActiveTab(detectCategoryTab(category));
+  }, [category]);
 
   const [unit, setUnit] = useState('in'); // 'in' or 'cm'
   const [measurementInput, setMeasurementInput] = useState('');
@@ -319,6 +324,38 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
               {currentChart.title}
             </h2>
             <p className="size-guide-subtitle">{currentChart.subtitle}</p>
+
+            {/* Category Presets Switcher */}
+            <div className="size-guide-cat-tabs" style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '8px 0 2px', scrollbarWidth: 'none' }}>
+              {[
+                { key: 'shirts', label: '👕 Shirts & Tees' },
+                { key: 'jeans', label: '👖 Jeans & Trousers' },
+                { key: 'jackets', label: '🧥 Jackets & Hoodies' },
+                { key: 'footwear', label: '🩴 Footwear' },
+                { key: 'perfumes', label: '🧴 Perfumes' },
+                { key: 'accessories', label: '🧣 Belts & Wallets' }
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    border: activeTab === tab.key ? '1px solid #111827' : '1px solid #e2e8f0',
+                    background: activeTab === tab.key ? '#111827' : '#ffffff',
+                    color: activeTab === tab.key ? '#ffffff' : '#64748b',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
           <button className="size-guide-close-btn" onClick={onClose} aria-label="Close size guide">
             ✕
