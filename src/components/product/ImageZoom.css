@@ -1,33 +1,40 @@
 .image-zoom-container {
   position: relative;
   width: 100%;
-  height: auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   cursor: zoom-in;
   background: transparent;
-  display: block;
-  border-radius: 8px;
+  border-radius: inherit;
 }
 
 .image-zoom-base {
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
   display: block;
-  border-radius: 8px;
+  border-radius: inherit;
+  image-rendering: -webkit-optimize-contrast;
+  transition: opacity 0.2s ease;
 }
 
 .image-zoom-lens {
   position: absolute;
-  width: 300px;
-  height: 300px;
+  width: 280px;
+  height: 280px;
   pointer-events: none;
   transform: translate(-50%, -50%);
   background-repeat: no-repeat;
-  /* Assuming the original high-res image is ~2.5x larger than the displayed box for zoom scale */
   background-size: 250%; 
   border-radius: 50%;
-  border: 1px solid rgba(0,0,0,0.1);
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
   z-index: 10;
   transition: opacity 0.15s ease-out;
 }
@@ -36,7 +43,8 @@
   position: absolute;
   bottom: 16px;
   right: 16px;
-  background: rgba(255,255,255,0.9);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
   padding: 6px 12px;
   border-radius: 4px;
   font-family: var(--font-body);
@@ -46,12 +54,21 @@
   text-transform: uppercase;
   letter-spacing: 1px;
   pointer-events: none;
-  opacity: 0.8;
+  opacity: 0.85;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* Strip zoom logic completely off smaller views maintaining basic image rendering gracefully */
+/* Strip zoom logic completely off smaller views and reposition hint */
 @media (max-width: 1024px) {
   .image-zoom-lens {
     display: none !important;
+  }
+  .image-zoom-hint {
+    top: 10px;
+    right: 10px;
+    bottom: auto;
+    font-size: 10px;
+    padding: 4px 8px;
+    opacity: 0.75;
   }
 }

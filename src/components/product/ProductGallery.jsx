@@ -57,7 +57,7 @@ export default function ProductGallery({ images }) {
               onClick={() => setCurrentIndex(idx)}
               aria-label={`View image ${idx + 1}`}
             >
-              <img loading="lazy" decoding="async" src={optimizeImage(thumbUrl, 160)} alt={`Thumbnail ${idx + 1}`} />
+              <img loading="lazy" decoding="async" src={optimizeImage(thumbUrl, 240)} alt={`Thumbnail ${idx + 1}`} />
             </button>
           )
         })}
@@ -70,7 +70,10 @@ export default function ProductGallery({ images }) {
         onTouchEnd={handleTouchEnd}
       >
         <ImageZoom 
-          src={optimizeImage(currentImage, typeof window !== 'undefined' && window.innerWidth < 768 ? 720 : 1000)} 
+          src={optimizeImage(currentImage, {
+            width: typeof window !== 'undefined' && window.innerWidth < 768 ? 1200 : 1600,
+            quality: 92
+          })} 
           alt={`Product view ${currentIndex + 1}`} 
           onClick={() => setLightboxOpen(true)}
         />
@@ -121,7 +124,7 @@ export default function ProductGallery({ images }) {
       {/* Lightbox Modal */}
       {lightboxOpen && (
         <ImageLightbox 
-          images={images.map(img => optimizeImage(extractUrl(img), 1400))} 
+          images={images.map(img => optimizeImage(extractUrl(img), { width: 1800, quality: 95 }))} 
           currentIndex={currentIndex}
           onClose={() => setLightboxOpen(false)}
           onNavigate={handleNavigate}

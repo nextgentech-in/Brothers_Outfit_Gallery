@@ -55,6 +55,11 @@
   align-items: start;
 }
 
+.product-gallery-section {
+  min-width: 0;
+  width: 100%;
+}
+
 /* Error States */
 .product-not-found {
   min-height: 60vh;

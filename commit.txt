@@ -1,4 +1,5 @@
-fix: resolve Google sign-in auth/internal-error by configuring complete CSP and auth fallback
+fix: ensure full mobile product image visibility and upgrade to HD quality
 
-- vercel.json: added Google accounts/APIs/FirebaseApp domains to frame-src, script-src, connect-src, and form-action to prevent browser CSP blocking Google OAuth popup and redirect handshakes
-- AuthContext.jsx: configured select_account prompt on GoogleAuthProvider and added graceful redirect fallback
+- ProductGallery.css, ImageZoom.css: styled product gallery with object-fit contain, aspect-ratio 3/4, and max-height constraints to guarantee full visibility without cropping on mobile
+- ProductGallery.jsx: upgraded mobile image request resolution to 1200px at 92% quality and retina thumbnails
+- ProductPage.css: added min-width 0 to prevent grid overflow
