@@ -115,26 +115,51 @@
   margin-left: 8px;
 }
 
-.color-swatches {
+.color-buttons {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
-.color-circle {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--color-stone, #D9D3C7);
+.color-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1.5px solid var(--color-stone, #D9D3C7);
+  color: var(--color-charcoal, #111111);
+  padding: 8px 16px;
+  min-height: 40px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  padding: 0;
-  position: relative;
-  transition: transform 0.2s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.color-circle:hover {
-  transform: scale(1.1);
+.color-btn:hover {
+  border-color: var(--color-charcoal, #111111);
+  background: #fafafa;
 }
-.color-circle.selected {
-  border: 2px solid var(--color-charcoal, #111111);
-  box-shadow: 0 0 0 2px #fff inset;
+.color-btn.selected {
+  background: var(--color-charcoal, #111111);
+  border-color: var(--color-charcoal, #111111);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.color-btn-all-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.color-btn-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  display: inline-block;
+  flex-shrink: 0;
+}
+.color-btn.selected .color-btn-dot {
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .size-header {

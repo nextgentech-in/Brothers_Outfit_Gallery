@@ -80,7 +80,6 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
   const isOutOfStock = product.stock === 0;
-  const lowStock = product.stock > 0 && product.stock <= 5;
   
   const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
@@ -387,13 +386,6 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
             ₹{displayPrice.toLocaleString('en-IN')}
           </span>
         </div>
-
-        {/* Stock */}
-        {lowStock && (
-          <span className="product-card__stock product-card__stock--low">
-            Only {product.stock} left in stock
-          </span>
-        )}
 
         {/* Buttons Row: Add to Cart & Buy Now */}
         <div className="product-card__btn-group">

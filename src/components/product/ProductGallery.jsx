@@ -24,7 +24,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     return c === String(targetColor).trim().toLowerCase();
   };
 
-  // Filter images linked specifically to the selected color, always preserving general images
+  // Filter images linked specifically to the selected color or show all for 'All'
   const displayImages = useMemo(() => {
     if (!images || images.length === 0) return [];
 
@@ -32,21 +32,23 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     const validImages = images.filter(img => extractUrl(img));
     if (validImages.length === 0) return [];
 
-    // Check if any images in the set are explicitly tagged with a specific color
-    const hasSpecificColorImages = validImages.some(img => !isGeneralImage(img));
+    // If 'All' is selected, show all images (general + color images)
+    if (!selectedColor || selectedColor.toLowerCase() === 'all' || selectedColor.toLowerCase() === 'all colors') {
+      return validImages;
+    }
 
-    if (hasSpecificColorImages && selectedColor) {
-      const target = String(selectedColor).trim().toLowerCase();
-      const colorMatched = validImages.filter(img => isColorMatch(img, target));
-      const generalImages = validImages.filter(img => isGeneralImage(img));
+    const target = String(selectedColor).trim().toLowerCase();
+    const colorMatched = validImages.filter(img => isColorMatch(img, target));
 
-      // If specific color images found, show them first followed by all general/overview images
-      if (colorMatched.length > 0) {
-        return [...colorMatched, ...generalImages];
-      } else if (generalImages.length > 0) {
-        // If this specific color has no unique photos yet, show all general photos
-        return generalImages;
-      }
+    // When a specific color is chosen, show strictly that color's images
+    if (colorMatched.length > 0) {
+      return colorMatched;
+    }
+
+    // Fallback if no images found for this specific color: show general images or all
+    const generalImages = validImages.filter(img => isGeneralImage(img));
+    if (generalImages.length > 0) {
+      return generalImages;
     }
 
     return validImages;
@@ -196,7 +198,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
                 if (imgCol && !isGeneralImage(currentImg)) {
                   return imgCol;
                 }
-                return selectedColor ? `${selectedColor} • Overview` : 'Overview';
+                return (!selectedColor || selectedColor === 'All') ? 'All Images' : selectedColor;
               })()}
             </span>
             {displayImages.length > 1 && (

@@ -18,7 +18,6 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
   const isOutOfStock = product.stock === 0;
-  const lowStock = product.stock > 0 && product.stock <= 5;
   const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const hasMultipleSizes = availableSizes.length > 1;
@@ -181,10 +180,6 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
             </button>
           ))}
         </div>
-
-        {lowStock && (
-          <span className="sale-card__stock-warning">Only {product.stock} left in stock</span>
-        )}
 
         <div className="sale-card__btn-group">
           <button

@@ -48,12 +48,44 @@ export default function ProductInfo({ product, onColorChange }) {
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const [sizeError, setSizeError] = useState(false);
 
-  const initialColor = product.colors && product.colors.length > 0 ? (product.colors[0].name || product.colors[0]) : 'Black';
-  const [selectedColor, setSelectedColor] = useState(initialColor);
   const defaultFrontVariant = useMemo(() => {
     return product.variants?.find(v => v.isDefaultPrice) || null;
   }, [product.variants]);
 
+  // Read variants/colors if present, else fallback - memoized
+  const productColors = useMemo(() => {
+    return product.colors?.length > 0 ? product.colors.map(c => c.name || c) : [];
+  }, [product.colors]);
+
+  // Extract all distinct colors available across colors and image tagging
+  const availableColors = useMemo(() => {
+    const list = [];
+    if (product.colors && product.colors.length > 0) {
+      product.colors.forEach(c => {
+        const name = typeof c === 'object' ? c.name : c;
+        const hex = typeof c === 'object' ? c.hex : null;
+        if (name && !list.some(item => item.name.toLowerCase() === name.toLowerCase())) {
+          list.push({ name, hex });
+        }
+      });
+    }
+    if (product.images && Array.isArray(product.images)) {
+      product.images.forEach(img => {
+        if (typeof img === 'object' && img?.color) {
+          const colName = String(img.color).trim();
+          const lower = colName.toLowerCase();
+          if (colName && lower !== 'all' && lower !== 'general' && lower !== 'all colors' && lower !== 'standard' && lower !== 'default') {
+            if (!list.some(item => item.name.toLowerCase() === lower)) {
+              list.push({ name: colName, hex: null });
+            }
+          }
+        }
+      });
+    }
+    return list;
+  }, [product.colors, product.images]);
+
+  const [selectedColor, setSelectedColor] = useState('All');
   const [selectedSize, setSelectedSize] = useState(() => defaultFrontVariant?.size || null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -62,18 +94,12 @@ export default function ProductInfo({ product, onColorChange }) {
   const [deliveryPincode, setDeliveryPincode] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState(null);
 
-  // Read variants if present, else fallback - memoized to prevent unstable object references in effects/memos
-  const productColors = useMemo(() => {
-    return product.colors?.length > 0 ? product.colors.map(c => c.name || c) : [];
-  }, [product.colors]);
-
   // Sync state if product changes without unmounting
   useEffect(() => {
-    const defaultCol = productColors.length > 0 ? productColors[0] : (product.colors?.[0]?.name || product.colors?.[0] || 'Black');
     setSelectedSize(defaultFrontVariant?.size || null);
-    setSelectedColor(defaultCol);
-    onColorChange?.(defaultCol, 0);
-  }, [product.id, defaultFrontVariant?.size, productColors]);
+    setSelectedColor('All');
+    onColorChange?.('All', -1);
+  }, [product.id, defaultFrontVariant?.size]);
 
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
@@ -91,10 +117,14 @@ export default function ProductInfo({ product, onColorChange }) {
     if (!product.variants || product.variants.length === 0) return null;
     const targetSize = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : null);
     if (!targetSize) return null;
+    const effectiveColor = (selectedColor && selectedColor !== 'All')
+      ? selectedColor
+      : (availableColors[0]?.name || productColors[0] || null);
+
     return product.variants.find(v =>
-      v.size === targetSize && (!v.color || v.color === selectedColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === targetSize && (!v.color || v.color === effectiveColor || v.color === 'Standard' || v.color === 'Default')
     ) || product.variants.find(v => v.size === targetSize);
-  }, [product.variants, selectedSize, selectedColor, productSizes, defaultFrontVariant]);
+  }, [product.variants, selectedSize, selectedColor, productSizes, defaultFrontVariant, availableColors, productColors]);
 
   const defaultFrontPrice = (defaultFrontVariant?.price !== undefined && defaultFrontVariant?.price !== '' && !isNaN(Number(defaultFrontVariant?.price)))
     ? Number(defaultFrontVariant.price)
@@ -153,14 +183,16 @@ export default function ProductInfo({ product, onColorChange }) {
     }
 
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
-    addToCart(product, sizeToUse, selectedColor, quantity, activeSale);
+    const colorToUse = (selectedColor && selectedColor !== 'All') ? selectedColor : (availableColors[0]?.name || productColors[0] || 'Default');
+    addToCart(product, sizeToUse, colorToUse, quantity, activeSale);
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
   };
 
   const executeBuyNow = () => {
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
-    buyNowDirect(product, sizeToUse, selectedColor, quantity, activeSale);
+    const colorToUse = (selectedColor && selectedColor !== 'All') ? selectedColor : (availableColors[0]?.name || productColors[0] || 'Default');
+    buyNowDirect(product, sizeToUse, colorToUse, quantity, activeSale);
     navigate('/checkout');
   };
 
@@ -272,34 +304,39 @@ export default function ProductInfo({ product, onColorChange }) {
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
 
-      {/* Color Selection: Only show if product has multiple real colors defined */}
-      {productColors.length > 0 && !productColors.every(c => c === 'Standard' || c === 'Default') && (
+      {/* Color Selection: Show buttons if colors exist */}
+      {availableColors.length > 0 && !availableColors.every(c => c.name === 'Standard' || c.name === 'Default') && (
         <div className="product-selector-group">
-          <h3 className="selector-title">Color <span className="selector-val">{selectedColor}</span></h3>
-          <div className="color-swatches">
-             {product.colors && product.colors[0]?.hex ? (
-                product.colors.map((col, idx) => (
-                 <button 
-                   key={col.name} 
-                   className={`color-circle ${selectedColor === col.name ? 'selected' : ''}`}
-                   style={{ backgroundColor: col.hex }}
-                   onClick={() => { setSelectedColor(col.name); onColorChange?.(col.name, idx); }}
-                   title={col.name}
-                   aria-label={`Select color ${col.name}`}
-                 ></button>
-                ))
-             ) : (
-                productColors.map((col, idx) => (
-                 <button 
-                   key={col} 
-                   className={`color-circle ${selectedColor === col ? 'selected' : ''}`}
-                   style={{ backgroundColor: col.toLowerCase() }}
-                   onClick={() => { setSelectedColor(col); onColorChange?.(col, idx); }}
-                   title={col}
-                   aria-label={`Select color ${col}`}
-                 ></button>
-                ))
-             )}
+          <div className="color-selector-header">
+            <h3 className="selector-title">
+              Color: <span className="selector-val">{selectedColor === 'All' ? 'All Colors' : selectedColor}</span>
+            </h3>
+          </div>
+          <div className="color-buttons">
+            <button
+              type="button"
+              className={`color-btn ${selectedColor === 'All' ? 'selected' : ''}`}
+              onClick={() => { setSelectedColor('All'); onColorChange?.('All', -1); }}
+              aria-label="View all colors"
+            >
+              <span className="color-btn-all-icon">⊞</span>
+              <span>All</span>
+            </button>
+            {availableColors.map((col, idx) => (
+              <button
+                key={col.name || idx}
+                type="button"
+                className={`color-btn ${selectedColor === col.name ? 'selected' : ''}`}
+                onClick={() => { setSelectedColor(col.name); onColorChange?.(col.name, idx); }}
+                aria-label={`Select color ${col.name}`}
+              >
+                <span
+                  className="color-btn-dot"
+                  style={{ backgroundColor: col.hex || col.name.toLowerCase() }}
+                />
+                <span>{col.name}</span>
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -373,8 +410,6 @@ export default function ProductInfo({ product, onColorChange }) {
       <div className="product-stock-status">
         {outOfStock ? (
           <span className="stock-out">Out of Stock</span>
-        ) : stock <= 5 ? (
-          <span className="stock-low">Only {stock} left in stock - Order soon</span>
         ) : (
           <span className="stock-in">✓ In Stock • Ready to Dispatch</span>
         )}
