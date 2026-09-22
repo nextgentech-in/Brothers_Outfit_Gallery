@@ -822,45 +822,84 @@ app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], require
   }
 });
 
-// ─── Razorpay: Create Order (Server-Recalculated & Rate-Limited) ─────────────
-app.post(['/api/razorpay/create-order', '/razorpay/create-order'], requireAuth, async (req, res) => {
-  if (!checkSensitiveRateLimit(req, res, 15)) return;
+// ─── Razorpay: Create Order (Standard Endpoint & Cart Calculation) ──────────
+app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/razorpay/create-order'], async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 25)) return;
 
-  const { items, couponCode } = req.body;
-  let serverCalc;
+  const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
 
-  try {
-    serverCalc = await calculateServerOrderTotal(items, couponCode);
-  } catch (calcErr) {
-    console.error('Server order total calculation error:', calcErr);
-    return res.status(400).json({ error: calcErr.message || 'Error computing order total.' });
+  if (!keyId || !keySecret) {
+    console.error('FATAL: Razorpay API keys are not configured in environment variables.');
+    return res.status(500).json({
+      error: 'Payment gateway configuration error: Razorpay credentials missing.'
+    });
+  }
+
+  const { amount, currency = 'INR', receipt, items, couponCode } = req.body;
+  let amountInPaise = 0;
+
+  // Case 1: Items array supplied (Calculate authoritative total server-side)
+  if (items && Array.isArray(items) && items.length > 0) {
+    try {
+      const serverCalc = await calculateServerOrderTotal(items, couponCode);
+      amountInPaise = Math.round(serverCalc.finalTotal * 100);
+    } catch (calcErr) {
+      console.error('Server order total calculation error:', calcErr);
+      return res.status(400).json({ error: calcErr.message || 'Error computing order total.' });
+    }
+  } else if (amount !== undefined && amount !== null && !isNaN(Number(amount))) {
+    // Case 2: Direct amount supplied (in paise, as per Razorpay Standard Checkout spec)
+    amountInPaise = Math.round(Number(amount));
+  } else {
+    return res.status(400).json({
+      error: 'Please specify an amount (in paise, min 100) or provide an items array.'
+    });
+  }
+
+  // Razorpay requires minimum 100 paise (₹1.00)
+  if (amountInPaise < 100) {
+    return res.status(400).json({
+      error: 'Invalid amount. Minimum amount must be at least 100 paise (₹1.00).'
+    });
   }
 
   try {
     const rzp = getRazorpayClient();
+    const orderReceipt = receipt || `rcpt_${Date.now().toString().slice(-8)}`;
     const order = await rzp.orders.create({
-      amount: Math.round(serverCalc.finalTotal * 100), // rupees → paise
-      currency: 'INR',
-      receipt: `rcpt_${Date.now().toString().slice(-8)}`,
+      amount: amountInPaise,
+      currency: currency || 'INR',
+      receipt: String(orderReceipt).slice(0, 40),
     });
-    res.json({
+
+    return res.json({
+      order_id: order.id,
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      verifiedTotal: serverCalc.finalTotal,
-      key: (process.env.RAZORPAY_KEY_ID || '').trim(),
+      key: keyId
     });
   } catch (error) {
     console.error('Razorpay create-order error:', error);
-    res.status(500).json({ error: error.message || 'Payment initiation failed on gateway.' });
+    if (error.statusCode === 401 || (error.error && error.error.code === 'BAD_REQUEST_ERROR' && String(error.error.description).toLowerCase().includes('auth'))) {
+      return res.status(401).json({ error: 'Razorpay authentication failed. Please verify your API keys.' });
+    }
+    return res.status(500).json({ error: error.message || error.error?.description || 'Payment gateway order creation failed.' });
   }
 });
 
-// ─── Razorpay: Verify Payment Signature (Timing-Safe Comparison) ────────────
-app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+// ─── Razorpay: Verify Payment Signature (HMAC-SHA256 Timing-Safe Comparison) ──
+app.post(['/api/verify-payment', '/verify-payment', '/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
+  const razorpay_order_id = req.body.razorpay_order_id || req.body.order_id;
+  const razorpay_payment_id = req.body.razorpay_payment_id || req.body.payment_id;
+  const razorpay_signature = req.body.razorpay_signature || req.body.signature;
+
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return res.status(400).json({ success: false, error: 'Missing payment signature verification parameters.' });
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required parameters: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required.'
+    });
   }
 
   const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
@@ -868,27 +907,40 @@ app.post(['/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
     console.error('FATAL: RAZORPAY_KEY_SECRET is not configured on the server.');
     return res.status(500).json({
       success: false,
-      error: 'Server payment configuration error: Payment gateway credentials missing.'
+      error: 'Server payment configuration error: RAZORPAY_KEY_SECRET is missing.'
     });
   }
 
   try {
+    // Standard Razorpay signature format: HMAC-SHA256(order_id + "|" + payment_id, secret)
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+    const expectedSignature = crypto.createHmac('sha256', secret).update(body).digest('hex');
 
-    const expectedBuf = Buffer.from(expected, 'utf-8');
-    const receivedBuf = Buffer.from(razorpay_signature, 'utf-8');
+    const expectedBuf = Buffer.from(expectedSignature, 'utf-8');
+    const receivedBuf = Buffer.from(String(razorpay_signature), 'utf-8');
 
     // Constant-time comparison protects against side-channel timing attacks
     if (expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
-      res.json({ success: true, paymentId: razorpay_payment_id });
+      return res.json({
+        success: true,
+        message: 'Payment verified successfully.',
+        order_id: razorpay_order_id,
+        payment_id: razorpay_payment_id,
+        paymentId: razorpay_payment_id
+      });
     } else {
-      console.warn('Razorpay signature mismatch: potential signature tampering attempt.');
-      res.status(400).json({ success: false, error: 'Signature mismatch — payment verification failed.' });
+      console.warn('Razorpay signature mismatch: potential tampering attempt.');
+      return res.status(400).json({
+        success: false,
+        error: 'Signature mismatch: payment verification failed.'
+      });
     }
   } catch (err) {
     console.error('Razorpay verification error:', err);
-    res.status(400).json({ success: false, error: 'Payment signature verification failed.' });
+    return res.status(500).json({
+      success: false,
+      error: 'Payment signature verification failed: ' + err.message
+    });
   }
 });
 

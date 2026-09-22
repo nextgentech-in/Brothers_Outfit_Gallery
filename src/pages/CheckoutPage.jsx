@@ -377,7 +377,7 @@ export default function CheckoutPage() {
       }
 
       // 1. Create order on backend with authoritative server calculation
-      const res = await fetch(`${backendUrl}/api/razorpay/create-order`, {
+      const res = await fetch(`${backendUrl}/api/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -407,12 +407,12 @@ export default function CheckoutPage() {
 
       // 2. Configure Razorpay modal options
       const options = {
-        key: orderData.key || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_TYFhwSwlmko7Oj',
+        key: orderData.key || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_Tf2wIetbCsCYeR',
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
         name: 'Brothers Outfit Gallery',
         description: `Order Payment (${cartItems.length} items)`,
-        order_id: orderData.orderId,
+        order_id: orderData.order_id || orderData.orderId,
         prefill: {
           name: shippingAddress.fullName || '',
           email: (shippingAddress.email || currentUser?.email || '').toLowerCase().trim(),
