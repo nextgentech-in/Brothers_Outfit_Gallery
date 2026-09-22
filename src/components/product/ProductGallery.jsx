@@ -188,24 +188,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
           </>
         )}
 
-        {/* Color Badge Indicator on image */}
-        {displayImages.length > 0 && (
-          <div className="gallery-color-indicator">
-            <span className="gallery-color-indicator-text">
-              {(() => {
-                const currentImg = displayImages[safeCurrentIndex];
-                const imgCol = extractColor(currentImg);
-                if (imgCol && !isGeneralImage(currentImg)) {
-                  return imgCol;
-                }
-                return (!selectedColor || selectedColor === 'All') ? 'All Images' : selectedColor;
-              })()}
-            </span>
-            {displayImages.length > 1 && (
-              <span className="gallery-color-count-pill">{safeCurrentIndex + 1}/{displayImages.length}</span>
-            )}
-          </div>
-        )}
+
       </div>
 
       {/* Lightbox Modal */}
