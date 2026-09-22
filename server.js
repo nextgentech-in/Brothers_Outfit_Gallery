@@ -381,6 +381,20 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   );
 
   if (!realSmsSent) {
+    // In development mode, do not block order placement if SMS provider is pending KYC/verification
+    if (process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_OTP === 'true') {
+      console.log(`[DEV OTP ACTIVE] Live SMS delivery unavailable (${lastGatewayError || 'unconfigured'}).`);
+      console.log(`[DEV OTP ACTIVE] Use test OTP: ${generatedOtp} for +91 ${cleanPhone}`);
+      return res.json({
+        success: true,
+        message: `OTP generated for +91 ${cleanPhone}. (Dev Test Code: ${generatedOtp})`,
+        phone: cleanPhone,
+        expiresIn: 300,
+        realSmsSent: false,
+        devOtp: generatedOtp
+      });
+    }
+
     if (!hasConfiguredGateway) {
       return res.status(503).json({
         error: 'SMS service is not configured yet. Please add FAST2SMS_API_KEY in .env to deliver real SMS to mobile numbers.'

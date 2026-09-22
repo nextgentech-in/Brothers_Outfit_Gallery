@@ -17,6 +17,7 @@ export default function PhoneOtpModal({
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [error, setError] = useState('');
+  const [devHint, setDevHint] = useState('');
   const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
@@ -33,6 +34,7 @@ export default function PhoneOtpModal({
     if (isOpen && cleanPhone) {
       setDigits(['', '', '', '', '', '']);
       setError('');
+      setDevHint('');
       handleSendOtp();
     }
   }, [isOpen, cleanPhone]);
@@ -73,9 +75,13 @@ export default function PhoneOtpModal({
     try {
       setSendingOtp(true);
       setError('');
+      setDevHint('');
       setCanResend(false);
       setCountdown(30);
       const res = await sendPhoneOtp(cleanPhone);
+      if (res?.devOtp) {
+        setDevHint(`Test Mode Active: Your OTP is ${res.devOtp}`);
+      }
     } catch (err) {
       setError(err.message || 'Failed to send OTP to this number. Please check connection.');
       setCanResend(true);
@@ -219,6 +225,23 @@ export default function PhoneOtpModal({
         </div>
 
         {error && <div className="phone-otp-error">{error}</div>}
+        {devHint && (
+          <div
+            style={{
+              background: '#eef2ff',
+              border: '1px solid #c7d2fe',
+              color: '#3730a3',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              fontSize: '13px',
+              fontWeight: 500,
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}
+          >
+            💡 {devHint}
+          </div>
+        )}
 
         {/* 6-box input */}
         <div className="phone-otp-boxes" onPaste={handlePaste}>
