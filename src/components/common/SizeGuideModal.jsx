@@ -95,6 +95,21 @@ const SIZE_CHARTS = {
     ],
     fitTip: '💡 For an Oversized / Drop-Shoulder aesthetic, order one size up. For a tailored slim look, order your standard size.'
   },
+  kurta: {
+    title: 'Kurta & Ethnic Wear',
+    subtitle: 'Standard Indian chest, length, shoulder & sleeve measurements for Kurtas',
+    icon: '🥻',
+    columns: ['Size', 'Chest', 'Length', 'Shoulder', 'Sleeve'],
+    data: [
+      { size: '36 (S)', chestIn: 38, chestCm: 96.5, lengthIn: 40, lengthCm: 101.6, shoulderIn: 17, shoulderCm: 43.2, sleeveIn: 24, sleeveCm: 61.0 },
+      { size: '38 (M)', chestIn: 40, chestCm: 101.6, lengthIn: 42, lengthCm: 106.7, shoulderIn: 17.5, shoulderCm: 44.5, sleeveIn: 24.5, sleeveCm: 62.2 },
+      { size: '40 (L)', chestIn: 42, chestCm: 106.7, lengthIn: 44, lengthCm: 111.8, shoulderIn: 18, shoulderCm: 45.7, sleeveIn: 25, sleeveCm: 63.5 },
+      { size: '42 (XL)', chestIn: 44, chestCm: 111.8, lengthIn: 45, lengthCm: 114.3, shoulderIn: 18.5, shoulderCm: 47.0, sleeveIn: 25.5, sleeveCm: 64.8 },
+      { size: '44 (XXL)', chestIn: 46, chestCm: 116.8, lengthIn: 46, lengthCm: 116.8, shoulderIn: 19, shoulderCm: 48.3, sleeveIn: 26, sleeveCm: 66.0 },
+      { size: '46 (3XL)', chestIn: 48, chestCm: 121.9, lengthIn: 46, lengthCm: 116.8, shoulderIn: 19.5, shoulderCm: 49.5, sleeveIn: 26, sleeveCm: 66.0 },
+    ],
+    fitTip: '💡 For Kurtas, order 2-4 inches larger than your bare chest measurement for comfortable drape and movement.'
+  },
   jeans: {
     title: 'Jeans & Trousers',
     subtitle: 'Waist and length measurements across standard Indian sizes',
@@ -183,6 +198,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
   // Determine tab strictly based on product category
   const detectCategoryTab = (cat) => {
     const c = (cat || '').toLowerCase();
+    if (c.includes('kurta') || c.includes('ethnic')) return 'kurta';
     if (c.includes('perfume') || c.includes('fragrance')) return 'perfumes';
     if (c.includes('jean') || c.includes('trouser') || c.includes('pant') || c.includes('short')) return 'jeans';
     if (c.includes('jacket') || c.includes('hoodie')) return 'jackets';
@@ -329,6 +345,7 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
             <div className="size-guide-cat-tabs" style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '8px 0 2px', scrollbarWidth: 'none' }}>
               {[
                 { key: 'shirts', label: '👕 Shirts & Tees' },
+                { key: 'kurta', label: '🥻 Kurta & Ethnic' },
                 { key: 'jeans', label: '👖 Jeans & Trousers' },
                 { key: 'jackets', label: '🧥 Jackets & Hoodies' },
                 { key: 'footwear', label: '🩴 Footwear' },

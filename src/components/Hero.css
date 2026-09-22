@@ -87,6 +87,10 @@
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -1px;
+  text-transform: uppercase;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   color: #fff;
   margin: 0 0 24px;
   opacity: 0;

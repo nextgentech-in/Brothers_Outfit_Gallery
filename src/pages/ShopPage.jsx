@@ -7,9 +7,10 @@ import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+const CATEGORIES = ['All', 'Kurta', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
 
 const SUB_CATEGORIES = {
+  'Kurta': ['All', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
   'T-Shirts': ['All', 'Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley'],
   'Shirts': ['All', 'Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
   'Jeans': ['All', 'Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
@@ -17,7 +18,7 @@ const SUB_CATEGORIES = {
   'Shorts': ['All', 'Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
   'Jackets': ['All', 'Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
   'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
-  'Ethnic Wear': ['All', 'Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
+  'Ethnic Wear': ['All', 'Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
   'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
   'Caps': ['All', 'Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
@@ -159,6 +160,10 @@ export default function ShopPage() {
       result = result.filter(p => {
         const pCat = String(p.category || '').toLowerCase().trim();
         const pCatId = String(p.categoryId || '').toLowerCase().trim();
+        const pSub = String(p.subCategory || '').toLowerCase().trim();
+        if (catLower === 'kurta') {
+          return pCat === 'kurta' || pCatId === 'kurta' || pSub.includes('kurta') || (pCat.includes('ethnic') && pSub.includes('kurta'));
+        }
         return pCat === catLower || pCatId === catLower;
       });
     }

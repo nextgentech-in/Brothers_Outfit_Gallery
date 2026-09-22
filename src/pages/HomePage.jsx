@@ -13,32 +13,51 @@ export default function HomePage() {
   const [newArrivals, setNewArrivals] = useState([]);
   const [shopProducts, setShopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [homepageConfig, setHomepageConfig] = useState({
-    showHero: true,
-    showTrending: true,
-    showSaleSection: true,
-    showNewArrivals: true,
-    showShopCollection: true,
-    showAboutPreview: true,
-    showTrustBadges: true,
-    showReviews: true,
-    trending: {
-      label: 'CURATED FOR YOU',
-      title: 'Trending Now',
-      subtitle: "Discover the styles defining men's fashion right now."
-    },
-    hero: {
-      bannerImage: '/images/hero.png',
-      mobileBannerImage: '',
-      eyebrow: 'NEW SEASON 2026',
-      heading: 'Define Your\nEveryday Style',
-      description: "Premium men's clothing designed for confidence, comfort and effortless style.",
-      saleButtonText: 'Season Sale — Up to 50% Off',
-      saleButtonLink: '/sale',
-      primaryButtonText: 'Explore Catalog',
-      primaryButtonLink: '/shop',
-      overlayOpacity: 0.55
-    }
+  const [homepageConfig, setHomepageConfig] = useState(() => {
+    const fallback = {
+      showHero: true,
+      showTrending: true,
+      showSaleSection: true,
+      showNewArrivals: true,
+      showShopCollection: true,
+      showAboutPreview: true,
+      showTrustBadges: true,
+      showReviews: true,
+      trending: {
+        label: 'CURATED FOR YOU',
+        title: 'Trending Now',
+        subtitle: "Discover the styles defining men's fashion right now."
+      },
+      hero: {
+        bannerImage: '/images/hero.png',
+        mobileBannerImage: '',
+        eyebrow: 'NEW SEASON 2026',
+        heading: 'DEFINE YOUR\nEVERYDAY STYLE',
+        description: "Premium men's clothing designed for confidence, comfort and effortless style.",
+        saleButtonText: 'Season Sale — Up to 50% Off',
+        saleButtonLink: '/sale',
+        primaryButtonText: 'Explore Catalog',
+        primaryButtonLink: '/shop',
+        overlayOpacity: 0.55
+      }
+    };
+    try {
+      const raw = localStorage.getItem('bo_homepage_config');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.data) {
+          return {
+            ...fallback,
+            ...parsed.data,
+            hero: {
+              ...fallback.hero,
+              ...(parsed.data.hero || {})
+            }
+          };
+        }
+      }
+    } catch {}
+    return fallback;
   });
   const { addToCart } = useCart();
 

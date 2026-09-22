@@ -19,6 +19,7 @@ import {
 } from '../../components/common/SizeGuideModal';
 
 const CATEGORY_SIZES_MAP = {
+  'Kurta': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
   'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
   'T-Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
   'Jeans': ['28', '30', '32', '34', '36', '38', '40', '42'],
@@ -37,6 +38,7 @@ const CATEGORY_SIZES_MAP = {
 };
 
 const SUB_CATEGORY_MAP = {
+  'Kurta': ['Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
   'T-Shirts': ['Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley'],
   'Shirts': ['Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
   'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
@@ -44,7 +46,7 @@ const SUB_CATEGORY_MAP = {
   'Shorts': ['Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
   'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
   'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
-  'Ethnic Wear': ['Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
+  'Ethnic Wear': ['Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
   'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
   'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
   'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
@@ -55,6 +57,7 @@ const SUB_CATEGORY_MAP = {
 };
 
 const COMMON_BATCH_SIZES = {
+  'Kurta': ['36', '38', '40', '42', '44', '46'],
   'Perfumes': ['30ml', '50ml', '100ml'],
   'Jeans': ['30', '32', '34', '36', '38'],
   'Trousers': ['30', '32', '34', '36', '38'],
@@ -160,6 +163,21 @@ const SIZE_GUIDE_TEMPLATES = {
       ['XL', '', '', '', ''],
       ['XXL', '', '', '', ''],
       ['3XL', '', '', '', ''],
+    ]
+  },
+  'Kurta': {
+    columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
+    rows: [
+      ['36', '38', '40', '17', '24'],
+      ['38', '40', '42', '17.5', '24.5'],
+      ['40', '42', '44', '18', '25'],
+      ['42', '44', '45', '18.5', '25.5'],
+      ['44', '46', '46', '19', '26'],
+      ['46', '48', '46', '19.5', '26'],
+      ['M', '40', '42', '17.5', '24.5'],
+      ['L', '42', '44', '18', '25'],
+      ['XL', '44', '45', '18.5', '25.5'],
+      ['XXL', '46', '46', '19', '26'],
     ]
   },
   'Ethnic Wear': {
@@ -1084,6 +1102,7 @@ export default function AdminProductForm() {
               <div className="admin-form-group">
                 <label>Category</label>
                 <select name="categoryId" value={formData.categoryId} onChange={handleChange}>
+                  <option value="Kurta">Kurta</option>
                   <option value="Shirts">Shirts</option>
                   <option value="T-Shirts">T-Shirts</option>
                   <option value="Jeans">Jeans</option>
@@ -1731,6 +1750,7 @@ export default function AdminProductForm() {
                       onChange={(e) => setSelectedSgTemplate(e.target.value)}
                       style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', fontWeight: 700, background: '#ffffff' }}
                     >
+                      <option value="Kurta">Kurta</option>
                       <option value="Shirts">Shirts</option>
                       <option value="T-Shirts">T-Shirts</option>
                       <option value="Jeans">Jeans</option>
