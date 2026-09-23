@@ -66,8 +66,7 @@ export default function CheckoutPage() {
     verifiedPhone && currentPhoneDigits && verifiedPhone === currentPhoneDigits
   );
 
-  // Payment is exclusively through Razorpay (online only)
-  const paymentMethod = 'razorpay';
+  const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
 
   // Pricing math: Free delivery for orders >= ₹1000, else ₹70
   const discount = cartSubtotal >= 2500 ? 250 : 0;
@@ -337,6 +336,38 @@ export default function CheckoutPage() {
     setError(null);
 
     const backendUrl = getBackendUrl();
+
+    if (paymentMethod === 'cod') {
+      // Cash on Delivery flow
+      try {
+        const { orderId: newOrderId } = await createSecureOrder('cod', finalPhone);
+
+        // Save delivery info to user profile
+        if (currentUser && updateFirestoreProfile) {
+          updateFirestoreProfile(currentUser.uid, {
+            fullName: shippingAddress.fullName,
+            phone: finalPhone,
+            phoneVerified: true,
+            address: {
+              line1: shippingAddress.addressLine,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              pincode: shippingAddress.pincode
+            }
+          }).catch(() => {});
+        }
+
+        try {
+          localStorage.setItem('last_placed_order', newOrderId);
+        } catch { }
+        clearCart();
+        navigate(`/order-confirmation/${newOrderId}`);
+      } catch (err) {
+        setError(`Failed to place COD order: ${err.message}`);
+        setLoading(false);
+      }
+      return;
+    }
 
 
 
@@ -710,14 +741,35 @@ export default function CheckoutPage() {
 
 
 
-          <h3 style={{ marginTop: '32px' }}>2. Payment</h3>
+          <h3 style={{ marginTop: '32px' }}>2. Select Payment Method</h3>
           <div className="payment-options">
-            <div className="payment-option active" style={{ cursor: 'default' }}>
+            <label className={`payment-option ${paymentMethod === 'razorpay' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="razorpay"
+                checked={paymentMethod === 'razorpay'}
+                onChange={() => setPaymentMethod('razorpay')}
+              />
               <div>
-                <strong>💳 Secure Online Payment</strong>
+                <strong>💳 Online Payment (Razorpay)</strong>
                 <p>Pay securely via UPI, Google Pay, PhonePe, Cards, or Net Banking.</p>
               </div>
-            </div>
+            </label>
+
+            <label className={`payment-option ${paymentMethod === 'cod' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="cod"
+                checked={paymentMethod === 'cod'}
+                onChange={() => setPaymentMethod('cod')}
+              />
+              <div>
+                <strong>💵 Cash on Delivery (COD)</strong>
+                <p>Pay cash when your order is delivered to your doorstep.</p>
+              </div>
+            </label>
           </div>
         </div>
 
@@ -834,7 +886,7 @@ export default function CheckoutPage() {
             disabled={loading}
             className="btn-pay-now"
           >
-            {loading ? 'Processing...' : `Pay ₹${finalTotal.toLocaleString('en-IN')} Securely`}
+            {loading ? 'Processing...' : (paymentMethod === 'razorpay' ? `Pay ₹${finalTotal.toLocaleString('en-IN')} Securely` : `Place Order (Cash on Delivery) • ₹${finalTotal.toLocaleString('en-IN')}`)}
           </button>
         </div>
       </form>
@@ -853,7 +905,7 @@ export default function CheckoutPage() {
         onClose={() => setPhoneOtpModalOpen(false)}
         onSuccess={handlePhoneVerified}
         title={otpTriggerSource === 'inline' ? "Verify Phone Number" : "Verify Phone to Complete Order"}
-        submitText={otpTriggerSource === 'inline' ? "Verify Number" : `Verify & Pay ₹${finalTotal.toLocaleString('en-IN')}`}
+        submitText={otpTriggerSource === 'inline' ? "Verify Number" : (paymentMethod === 'razorpay' ? `Verify & Pay ₹${finalTotal.toLocaleString('en-IN')}` : 'Verify & Place Order (COD)')}
         onChangePhone={() => {
           setPhoneOtpModalOpen(false);
           const phoneInput = document.querySelector('input[name="phone"]');

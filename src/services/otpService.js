@@ -94,7 +94,7 @@ export async function sendPhoneOtp(phone) {
     } catch (_) {}
 
     if (firebaseErr.code === 'auth/internal-error' || (firebaseErr.message && firebaseErr.message.includes('internal-error'))) {
-      firebaseFailureReason = 'Firebase Phone Auth requires the Blaze Plan (Pay-as-you-go) enabled in Firebase Console, or this number added under "Phone numbers for testing".';
+      firebaseFailureReason = 'Firebase Phone Auth requires India (+91) enabled under "SMS region policy" and your domain added in "Authorized domains" in Firebase Console (or add this number under "Phone numbers for testing").';
     } else if (firebaseErr.code === 'auth/operation-not-allowed') {
       firebaseFailureReason = 'Phone Auth is not enabled in Firebase Console (Authentication > Sign-in method > Phone) or India (+91) is not allowed in SMS region policy.';
     } else if (firebaseErr.code === 'auth/too-many-requests') {
