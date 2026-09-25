@@ -29,6 +29,9 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeTracking, setActiveTracking] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [viewMode, setViewMode] = useState(() => {
+    return typeof window !== 'undefined' && window.innerWidth <= 768 ? 'cards' : 'table';
+  });
   const { showToast, showConfirm } = useAdminUI();
 
   // Cancellation reason modal state
@@ -228,7 +231,6 @@ export default function AdminOrders() {
       <div className="admin-header">
         <h1 className="admin-title">Orders Management</h1>
       </div>
-
       <div className="admin-orders-controls">
         <input 
           type="text" 
@@ -248,129 +250,140 @@ export default function AdminOrders() {
           <option value="Delivered">Delivered</option>
           <option value="Cancelled">Cancelled</option>
         </select>
+        <div className="admin-view-toggle">
+          <button 
+            type="button" 
+            className={`admin-view-tab ${viewMode === 'cards' ? 'active' : ''}`}
+            onClick={() => setViewMode('cards')}
+            title="Card View (best for mobile screens)"
+          >
+            📱 Cards
+          </button>
+          <button 
+            type="button" 
+            className={`admin-view-tab ${viewMode === 'table' ? 'active' : ''}`}
+            onClick={() => setViewMode('table')}
+            title="Table View"
+          >
+            📋 Table
+          </button>
+        </div>
       </div>
 
-      <div className="admin-table-container">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th style={{ width: '150px', minWidth: '140px' }}>ORDER ID</th>
-              <th style={{ minWidth: '130px', maxWidth: '160px' }}>CUSTOMER</th>
-              <th style={{ minWidth: '175px', maxWidth: '220px' }}>ITEMS & SIZES</th>
-              <th style={{ width: '75px', minWidth: '70px' }}>TOTAL</th>
-              <th style={{ width: '85px', minWidth: '80px' }}>PAYMENT</th>
-              <th style={{ width: '120px', minWidth: '115px' }}>STATUS</th>
-              <th style={{ width: '90px', minWidth: '85px' }}>DATE</th>
-              <th className="admin-controls-th">ADMIN CONTROLS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>Loading orders...</td></tr>
-            ) : filteredOrders.length === 0 ? (
-              <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>No orders match the current criteria.</td></tr>
-            ) : filteredOrders.map(o => (
-              <tr key={o.id}>
-                <td style={{ fontSize: '11.5px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+      {viewMode === 'cards' ? (
+        /* Mobile-Optimized Order Cards View */
+        <div className="admin-orders-card-list">
+          {loading ? (
+            <div className="admin-orders-loading">Loading orders...</div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="admin-orders-empty">No orders match the current criteria.</div>
+          ) : (
+            filteredOrders.map(o => (
+              <div key={o.id} className="admin-order-card">
+                {/* Header: ID, Date, Amount, Payment Badge */}
+                <div className="admin-order-card-header">
+                  <div className="admin-order-card-id-block">
                     <span 
+                      className="admin-order-card-id"
                       title={`Full Order ID: ${o.id} (Click to copy)`}
                       onClick={() => {
                         navigator.clipboard?.writeText(o.id);
-                      }}
-                      style={{ 
-                        background: '#f1f5f9', 
-                        padding: '4px 8px', 
-                        borderRadius: '6px', 
-                        fontWeight: '700', 
-                        color: '#0f172a',
-                        border: '1px solid #cbd5e1',
-                        cursor: 'pointer',
-                        letterSpacing: '0.3px',
-                        display: 'inline-block'
+                        showToast(`Copied Order ID #${formatDisplayOrderId(o.id)}`, 'info');
                       }}
                     >
                       #{formatDisplayOrderId(o.id)}
                     </span>
                     <button
                       type="button"
+                      className="admin-card-copy-btn"
                       title="Copy full Order ID"
                       onClick={() => {
                         navigator.clipboard?.writeText(o.id);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        fontSize: '11px',
-                        lineHeight: 1,
-                        opacity: 0.65
+                        showToast(`Copied Order ID #${formatDisplayOrderId(o.id)}`, 'info');
                       }}
                     >
                       📋
                     </button>
+                    <span className="admin-order-card-date">
+                      {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
+                    </span>
                   </div>
-                </td>
-                <td style={{ maxWidth: '160px' }}>
-                  <div style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.shippingAddress?.fullName}>
-                    {o.shippingAddress?.fullName || 'Guest Customer'}
+                  <div className="admin-order-card-price-badge">
+                    <strong className="admin-order-card-price">₹{o.totalAmount || o.finalTotal || 0}</strong>
+                    <span className={`admin-badge admin-badge--${o.paymentStatus === 'Paid' ? 'active' : 'neutral'}`}>
+                      {o.paymentStatus || 'Paid'}
+                    </span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.userEmail || o.shippingAddress?.phone}>
-                    {o.userEmail || o.shippingAddress?.phone}
+                </div>
+
+                {/* Customer Details */}
+                <div className="admin-order-card-customer">
+                  <div className="admin-order-customer-name">
+                    👤 {o.shippingAddress?.fullName || 'Guest Customer'}
                   </div>
-                </td>
-                <td>
-                  <div className="admin-items-preview-cell">
-                    {o.items?.map((item, idx) => {
-                      const itemImg = getItemImage(item);
-                      return (
-                        <div key={idx} className="admin-items-preview-item">
-                          <div 
-                            className="admin-item-thumb-box" 
-                            title="Click to view full image"
-                            onClick={() => setPreviewImageModal({ url: itemImg, name: item.name })}
-                          >
-                            <img
-                              src={itemImg}
-                              alt={item.name}
-                              className="admin-item-thumbnail"
-                              onError={(e) => { e.target.src = '/images/hero.png'; }}
-                            />
-                            <span className="admin-item-zoom-hint" title="Zoom image">🔍</span>
-                          </div>
-                          <div className="admin-item-details-box">
-                            <div className="admin-item-name-text" title={item.name}>
-                              {item.name}
-                            </div>
-                            <div className="admin-item-tags">
-                              {item.size && (
-                                <span className="admin-item-size-badge">
-                                  Size: <strong>{item.size}</strong>
-                                </span>
-                              )}
-                              {item.color && item.color !== 'Default' && item.color !== 'Standard' && (
-                                <span className="admin-item-color-badge">
-                                  {item.color}
-                                </span>
-                              )}
-                              <span className="admin-item-qty-tag">
-                                ×{item.quantity}
+                  <div className="admin-order-customer-contact">
+                    {o.shippingAddress?.phone && (
+                      <a href={`tel:${o.shippingAddress.phone}`} className="admin-order-customer-link">
+                        📞 {o.shippingAddress.phone}
+                      </a>
+                    )}
+                    {o.userEmail && (
+                      <span className="admin-order-customer-email" title={o.userEmail}>
+                        ✉️ {o.userEmail}
+                      </span>
+                    )}
+                  </div>
+                  {o.shippingAddress?.city && (
+                    <div className="admin-order-customer-location">
+                      📍 {o.shippingAddress.city}, {o.shippingAddress.state || ''} {o.shippingAddress.pincode ? `(${o.shippingAddress.pincode})` : ''}
+                    </div>
+                  )}
+                </div>
+
+                {/* Items Preview */}
+                <div className="admin-order-card-items">
+                  {o.items?.map((item, idx) => {
+                    const itemImg = getItemImage(item);
+                    return (
+                      <div key={idx} className="admin-card-item-row">
+                        <div 
+                          className="admin-item-thumb-box"
+                          title="Click to zoom image"
+                          onClick={() => setPreviewImageModal({ url: itemImg, name: item.name })}
+                        >
+                          <img 
+                            src={itemImg} 
+                            alt={item.name} 
+                            className="admin-item-thumbnail" 
+                            onError={(e) => { e.target.src = '/images/hero.png'; }}
+                          />
+                          <span className="admin-item-zoom-hint">🔍</span>
+                        </div>
+                        <div className="admin-card-item-info">
+                          <div className="admin-card-item-title" title={item.name}>{item.name}</div>
+                          <div className="admin-item-tags">
+                            {item.size && (
+                              <span className="admin-item-size-badge">
+                                Size: <strong>{item.size}</strong>
                               </span>
-                            </div>
+                            )}
+                            {item.color && item.color !== 'Default' && item.color !== 'Standard' && (
+                              <span className="admin-item-color-badge">{item.color}</span>
+                            )}
+                            <span className="admin-item-qty-tag">×{item.quantity}</span>
+                            {item.price && (
+                              <span className="admin-item-price-tag">₹{item.price}</span>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </td>
-                <td><strong>₹{o.totalAmount || o.finalTotal || 0}</strong></td>
-                <td>
-                  <span className={`admin-badge admin-badge--${o.paymentStatus === 'Paid' ? 'active' : 'neutral'}`}>
-                    {o.paymentStatus || 'Paid'}
-                  </span>
-                </td>
-                <td>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Order Status Selector */}
+                <div className="admin-order-card-status-row">
+                  <label className="admin-order-card-status-label">Order Status:</label>
                   <select 
                     value={o.status || 'Processing'} 
                     onChange={(e) => handleStatusChange(o.id, e.target.value)}
@@ -384,67 +397,268 @@ export default function AdminOrders() {
                     <option value="Delivered">Delivered</option>
                     <option value="Cancelled">Cancelled</option>
                   </select>
-                </td>
-                <td style={{fontSize: '11.5px', whiteSpace: 'nowrap', color: '#475569'}}>
-                  {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
-                </td>
-                <td className="admin-controls-td">
-                  <div className="admin-controls-box">
-                    {/* Option 1: Cancel Order */}
-                    {o.status !== 'Cancelled' ? (
-                      <button
-                        onClick={() => openCancelModal(o)}
-                        disabled={actionLoadingId === o.id}
-                        className="btn-cancel-admin"
-                      >
-                        {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel'}
-                      </button>
-                    ) : (
-                      <div className="admin-order-cancelled-indicator">
-                        <div className="admin-order-cancelled-title">✕ Cancelled</div>
-                        {o.cancellationReason && (
-                          <div className="admin-order-cancelled-reason" title={o.cancellationReason}>
-                            Reason: {o.cancellationReason}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                </div>
 
-                    {/* Option 2: Approve for Pickup */}
-                    {o.status === 'Cancelled' ? null : o.waybill ? (
-                      <div className="admin-order-pickup-scheduled">
-                        <span className="pickup-scheduled-title">✓ Pickup Scheduled</span>
-                        <span className="pickup-scheduled-awb">AWB: {o.waybill}</span>
-                        <button 
-                          onClick={() => handleOpenTracking(o.waybill)}
-                          className="btn-track-courier-mini"
+                {/* Admin Actions */}
+                <div className="admin-order-card-actions">
+                  {/* Option 1: Cancel Order */}
+                  {o.status !== 'Cancelled' ? (
+                    <button
+                      onClick={() => openCancelModal(o)}
+                      disabled={actionLoadingId === o.id}
+                      className="btn-cancel-admin"
+                    >
+                      {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel'}
+                    </button>
+                  ) : (
+                    <div className="admin-order-cancelled-indicator">
+                      <div className="admin-order-cancelled-title">✕ Cancelled</div>
+                      {o.cancellationReason && (
+                        <div className="admin-order-cancelled-reason" title={o.cancellationReason}>
+                          Reason: {o.cancellationReason}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Option 2: Approve for Pickup */}
+                  {o.status === 'Cancelled' ? null : o.waybill ? (
+                    <div className="admin-order-pickup-scheduled">
+                      <span className="pickup-scheduled-title">✓ Pickup Scheduled</span>
+                      <span className="pickup-scheduled-awb">AWB: {o.waybill}</span>
+                      <button 
+                        onClick={() => handleOpenTracking(o.waybill)}
+                        className="btn-track-courier-mini"
+                      >
+                        Track Courier ↗
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleApproveAndShip(o)}
+                      disabled={shippingOrderId === o.id}
+                      className="btn-approve-ship"
+                    >
+                      {shippingOrderId === o.id ? 'Manifesting...' : '🚚 Option 2: Approve'}
+                    </button>
+                  )}
+
+                  <button 
+                    onClick={() => setSelectedOrder(o)}
+                    className="admin-action-btn edit btn-view-order-details"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        /* Full Table View with smooth horizontal scroll and static controls on mobile */
+        <>
+          <div className="admin-table-scroll-hint">
+            ↔ Swipe sideways to view all columns & admin options
+          </div>
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '150px', minWidth: '140px' }}>ORDER ID</th>
+                  <th style={{ minWidth: '130px', maxWidth: '160px' }}>CUSTOMER</th>
+                  <th style={{ minWidth: '175px', maxWidth: '220px' }}>ITEMS & SIZES</th>
+                  <th style={{ width: '75px', minWidth: '70px' }}>TOTAL</th>
+                  <th style={{ width: '85px', minWidth: '80px' }}>PAYMENT</th>
+                  <th style={{ width: '120px', minWidth: '115px' }}>STATUS</th>
+                  <th style={{ width: '90px', minWidth: '85px' }}>DATE</th>
+                  <th className="admin-controls-th">ADMIN CONTROLS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>Loading orders...</td></tr>
+                ) : filteredOrders.length === 0 ? (
+                  <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>No orders match the current criteria.</td></tr>
+                ) : filteredOrders.map(o => (
+                  <tr key={o.id}>
+                    <td style={{ fontSize: '11.5px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <span 
+                          title={`Full Order ID: ${o.id} (Click to copy)`}
+                          onClick={() => {
+                            navigator.clipboard?.writeText(o.id);
+                            showToast(`Copied Order ID #${formatDisplayOrderId(o.id)}`, 'info');
+                          }}
+                          style={{ 
+                            background: '#f1f5f9', 
+                            padding: '4px 8px', 
+                            borderRadius: '6px', 
+                            fontWeight: '700', 
+                            color: '#0f172a',
+                            border: '1px solid #cbd5e1',
+                            cursor: 'pointer',
+                            letterSpacing: '0.3px',
+                            display: 'inline-block'
+                          }}
                         >
-                          Track Courier ↗
+                          #{formatDisplayOrderId(o.id)}
+                        </span>
+                        <button
+                          type="button"
+                          title="Copy full Order ID"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(o.id);
+                            showToast(`Copied Order ID #${formatDisplayOrderId(o.id)}`, 'info');
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            fontSize: '11px',
+                            lineHeight: 1,
+                            opacity: 0.65
+                          }}
+                        >
+                          📋
                         </button>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => handleApproveAndShip(o)}
-                        disabled={shippingOrderId === o.id}
-                        className="btn-approve-ship"
+                    </td>
+                    <td style={{ maxWidth: '160px' }}>
+                      <div style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.shippingAddress?.fullName}>
+                        {o.shippingAddress?.fullName || 'Guest Customer'}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.userEmail || o.shippingAddress?.phone}>
+                        {o.userEmail || o.shippingAddress?.phone}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="admin-items-preview-cell">
+                        {o.items?.map((item, idx) => {
+                          const itemImg = getItemImage(item);
+                          return (
+                            <div key={idx} className="admin-items-preview-item">
+                              <div 
+                                className="admin-item-thumb-box" 
+                                title="Click to view full image"
+                                onClick={() => setPreviewImageModal({ url: itemImg, name: item.name })}
+                              >
+                                <img 
+                                  src={itemImg} 
+                                  alt={item.name} 
+                                  className="admin-item-thumbnail" 
+                                  onError={(e) => { e.target.src = '/images/hero.png'; }}
+                                />
+                                <span className="admin-item-zoom-hint" title="Zoom image">🔍</span>
+                              </div>
+                              <div className="admin-item-details-box">
+                                <div className="admin-item-name-text" title={item.name}>
+                                  {item.name}
+                                </div>
+                                <div className="admin-item-tags">
+                                  {item.size && (
+                                    <span className="admin-item-size-badge">
+                                      Size: <strong>{item.size}</strong>
+                                    </span>
+                                  )}
+                                  {item.color && item.color !== 'Default' && item.color !== 'Standard' && (
+                                    <span className="admin-item-color-badge">
+                                      {item.color}
+                                    </span>
+                                  )}
+                                  <span className="admin-item-qty-tag">
+                                    ×{item.quantity}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td><strong>₹{o.totalAmount || o.finalTotal || 0}</strong></td>
+                    <td>
+                      <span className={`admin-badge admin-badge--${o.paymentStatus === 'Paid' ? 'active' : 'neutral'}`}>
+                        {o.paymentStatus || 'Paid'}
+                      </span>
+                    </td>
+                    <td>
+                      <select 
+                        value={o.status || 'Processing'} 
+                        onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                        className="admin-status-dropdown"
+                        style={{
+                          borderColor: o.status === 'Cancelled' ? '#f87171' : (o.status === 'Delivered' ? '#4ade80' : '#cbd5e1')
+                        }}
                       >
-                        {shippingOrderId === o.id ? 'Manifesting...' : '🚚 Option 2: Approve'}
-                      </button>
-                    )}
+                        <option value="Processing">Processing</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </td>
+                    <td style={{fontSize: '11.5px', whiteSpace: 'nowrap', color: '#475569'}}>
+                      {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
+                    </td>
+                    <td className="admin-controls-td">
+                      <div className="admin-controls-box">
+                        {/* Option 1: Cancel Order */}
+                        {o.status !== 'Cancelled' ? (
+                          <button
+                            onClick={() => openCancelModal(o)}
+                            disabled={actionLoadingId === o.id}
+                            className="btn-cancel-admin"
+                          >
+                            {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel'}
+                          </button>
+                        ) : (
+                          <div className="admin-order-cancelled-indicator">
+                            <div className="admin-order-cancelled-title">✕ Cancelled</div>
+                            {o.cancellationReason && (
+                              <div className="admin-order-cancelled-reason" title={o.cancellationReason}>
+                                Reason: {o.cancellationReason}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
-                    <button 
-                      onClick={() => setSelectedOrder(o)}
-                      className="admin-action-btn edit btn-view-order-details"
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                        {/* Option 2: Approve for Pickup */}
+                        {o.status === 'Cancelled' ? null : o.waybill ? (
+                          <div className="admin-order-pickup-scheduled">
+                            <span className="pickup-scheduled-title">✓ Pickup Scheduled</span>
+                            <span className="pickup-scheduled-awb">AWB: {o.waybill}</span>
+                            <button 
+                              onClick={() => handleOpenTracking(o.waybill)}
+                              className="btn-track-courier-mini"
+                            >
+                              Track Courier ↗
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleApproveAndShip(o)}
+                            disabled={shippingOrderId === o.id}
+                            className="btn-approve-ship"
+                          >
+                            {shippingOrderId === o.id ? 'Manifesting...' : '🚚 Option 2: Approve'}
+                          </button>
+                        )}
+
+                        <button 
+                          onClick={() => setSelectedOrder(o)}
+                          className="admin-action-btn edit btn-view-order-details"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Detailed Order Modal with Line Items and Sizes */}
       {selectedOrder && (

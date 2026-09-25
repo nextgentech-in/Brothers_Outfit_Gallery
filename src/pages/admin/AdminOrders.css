@@ -849,11 +849,286 @@
   background: #e2e8f0;
 }
 
+/* ═══════ View Mode Toggle ═══════ */
+.admin-view-toggle {
+  display: flex;
+  background: #f1f5f9;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  gap: 2px;
+  width: fit-content;
+}
+
+.admin-view-tab {
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-view-tab:hover {
+  color: #0f172a;
+}
+
+.admin-view-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Table scroll hint for mobile */
+.admin-table-scroll-hint {
+  display: none;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+/* ═══════ Mobile Orders Card Layout ═══════ */
+.admin-orders-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-order-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.admin-order-card:hover {
+  border-color: #cbd5e1;
+}
+
+.admin-order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-order-card-id-block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-order-card-id {
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 13px;
+  font-family: monospace;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+}
+
+.admin-card-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.admin-card-copy-btn:hover {
+  opacity: 1;
+}
+
+.admin-order-card-date {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.admin-order-card-price-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-order-card-price {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.admin-order-card-customer {
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #eef2f6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-order-customer-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.admin-order-customer-contact {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.admin-order-customer-link {
+  color: #0284c7;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.admin-order-customer-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.admin-order-customer-location {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.admin-order-card-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.admin-card-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #f1f5f9;
+}
+
+.admin-card-item-row:last-child {
+  border-bottom: none;
+}
+
+.admin-card-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-card-item-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-item-price-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+}
+
+.admin-order-card-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid #f1f5f9;
+  gap: 10px;
+}
+
+.admin-order-card-status-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.admin-order-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.admin-orders-loading,
+.admin-orders-empty {
+  text-align: center;
+  padding: 40px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 14px;
+}
+
 /* ═══════ Mobile Responsiveness ═══════ */
 @media (max-width: 900px) {
+  /* CRITICAL: Disable sticky controls on mobile so they never block or float over order info */
+  .admin-controls-th,
+  .admin-controls-td {
+    position: static !important;
+    right: auto !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+    width: auto !important;
+    min-width: 140px !important;
+  }
+
+  .admin-table-scroll-hint {
+    display: block;
+  }
+
   .admin-orders-controls {
     flex-direction: column;
     gap: 10px;
+  }
+
+  .admin-view-toggle {
+    width: 100%;
+  }
+
+  .admin-view-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 12px;
   }
 
   .admin-filter-select {
@@ -893,3 +1168,4 @@
     width: 96%;
   }
 }
+

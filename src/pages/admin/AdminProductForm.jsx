@@ -235,6 +235,7 @@ export default function AdminProductForm() {
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [productId] = useState(() => isEdit ? id : generateProductId());
 
   // Form State
   const [formData, setFormData] = useState({
@@ -852,7 +853,7 @@ export default function AdminProductForm() {
     setError(null);
 
     try {
-      const finalProductId = isEdit ? id : generateProductId();
+      const finalProductId = isEdit ? id : productId;
 
       // 1. Delete removed images from ImageKit
       for (const publicId of imagesToDelete) {
@@ -1040,9 +1041,35 @@ export default function AdminProductForm() {
             ← Back to Products
           </button>
           <h1 className="admin-title">{isEdit ? 'EDIT PRODUCT' : 'ADD NEW PRODUCT'}</h1>
-          <span className="admin-header-subtitle">
-            {isEdit ? `ID: ${id} • Edit pricing, inventory and photos` : 'Single-window product publishing with live inventory'}
-          </span>
+          <div className="admin-header-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <span 
+              title="Click to copy Unique Product ID"
+              onClick={() => {
+                navigator.clipboard?.writeText(productId);
+                showToast(`Copied Product ID: ${productId}`, 'info');
+              }}
+              style={{
+                background: '#f1f5f9',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '12px',
+                fontWeight: 700,
+                fontFamily: 'monospace',
+                color: '#0f172a',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>Unique ID: #{productId}</span>
+              <span style={{ fontSize: '11px', opacity: 0.7 }}>📋</span>
+            </span>
+            <span style={{ color: '#64748b', fontSize: '12px' }}>
+              {isEdit ? '• Edit pricing, inventory and photos' : '• Single-window product publishing with live inventory'}
+            </span>
+          </div>
         </div>
 
         {/* Top Quick Actions Bar (Immediate Access on Mobile & Desktop) */}
@@ -1092,12 +1119,48 @@ export default function AdminProductForm() {
             </div>
             <div className="admin-form-row">
               <div className="admin-form-group">
-                <label>Slug (URL Friendly)</label>
-                <input type="text" name="slug" value={formData.slug} onChange={handleChange} />
+                <label>Unique Product ID (System Assigned)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input 
+                    type="text" 
+                    value={productId} 
+                    readOnly 
+                    style={{ background: '#f8fafc', color: '#334155', fontFamily: 'monospace', fontWeight: 700, cursor: 'default' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(productId);
+                      showToast(`Copied Product ID: ${productId}`, 'info');
+                    }}
+                    title="Copy Unique Product ID"
+                    style={{
+                      padding: '8px 12px',
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span>📋</span>
+                    <span>Copy</span>
+                  </button>
+                </div>
               </div>
               <div className="admin-form-group">
-                <label>SKU (Base)</label>
-                <input type="text" name="sku" value={formData.sku} onChange={handleChange} />
+                <label>SKU (Stock Keeping Unit)</label>
+                <input type="text" name="sku" value={formData.sku} onChange={handleChange} placeholder="e.g. SHT-BLK-001" />
+              </div>
+              <div className="admin-form-group">
+                <label>Slug (URL Friendly)</label>
+                <input type="text" name="slug" value={formData.slug} onChange={handleChange} />
               </div>
               <div className="admin-form-group">
                 <label>Category</label>

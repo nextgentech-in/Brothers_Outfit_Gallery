@@ -10,7 +10,19 @@ export default function AdminProducts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); // 'all' | 'trending' | 'sale' | 'inactive'
   const [togglingId, setTogglingId] = useState(null);
+  const [previewImageModal, setPreviewImageModal] = useState(null);
   const { showToast, showConfirm } = useAdminUI();
+
+  const getProductImage = (p) => {
+    if (p.thumbnailUrl && typeof p.thumbnailUrl === 'string' && p.thumbnailUrl.trim()) return p.thumbnailUrl;
+    if (p.image && typeof p.image === 'string' && p.image.trim()) return p.image;
+    if (Array.isArray(p.images) && p.images.length > 0) {
+      const first = p.images[0];
+      if (typeof first === 'string' && first.trim()) return first;
+      if (first && typeof first.url === 'string' && first.url.trim()) return first.url;
+    }
+    return '/images/hero.png';
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -234,8 +246,70 @@ export default function AdminProducts() {
               return (
                 <tr key={p.id}>
                   <td>
-                    <div className="admin-table-product-name">{p.name || 'Unnamed'}</div>
-                    <div className="admin-table-sku">SKU: {p.sku || 'N/A'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div 
+                        className="admin-table-img-wrap"
+                        title="Click to view full image"
+                        onClick={() => setPreviewImageModal({ url: getProductImage(p), name: p.name || 'Product Image' })}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          minWidth: '48px',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        <img 
+                          src={getProductImage(p)} 
+                          alt={p.name} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => { e.target.src = '/images/hero.png'; }}
+                        />
+                      </div>
+                      <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div className="admin-table-product-name" style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>
+                          {p.name || 'Unnamed'}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span 
+                            title={`Unique Product ID: ${p.id} (Click to copy)`}
+                            onClick={() => {
+                              navigator.clipboard?.writeText(p.id);
+                              showToast(`Copied Product ID: ${p.id}`, 'info');
+                            }}
+                            style={{ 
+                              background: '#f1f5f9', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontSize: '11px', 
+                              fontFamily: 'monospace', 
+                              fontWeight: 700, 
+                              color: '#334155',
+                              border: '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                          >
+                            <span>ID: #{p.id ? (p.id.length > 10 ? `${p.id.slice(0, 8)}…` : p.id) : 'N/A'}</span>
+                            <span style={{ fontSize: '10px', opacity: 0.7 }}>📋</span>
+                          </span>
+                          {p.sku ? (
+                            <span className="admin-table-sku" style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
+                              SKU: {p.sku}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
                   </td>
                   <td>{p.category || p.categoryId || 'N/A'}</td>
                   <td className="admin-table-mrp">
@@ -296,6 +370,52 @@ export default function AdminProducts() {
           </tbody>
         </table>
       </div>
+
+      {previewImageModal && (
+        <div 
+          onClick={() => setPreviewImageModal(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999999,
+            padding: '20px'
+          }}
+        >
+          <div 
+            onClick={e => e.stopPropagation()} 
+            style={{ 
+              background: '#ffffff', 
+              padding: '16px', 
+              borderRadius: '12px', 
+              maxWidth: '480px', 
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{previewImageModal.name}</div>
+              <button 
+                onClick={() => setPreviewImageModal(null)}
+                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+            <img 
+              src={previewImageModal.url} 
+              alt={previewImageModal.name} 
+              style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }}
+              onError={(e) => { e.target.src = '/images/hero.png'; }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
