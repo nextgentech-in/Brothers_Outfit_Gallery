@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
 import './Profile.css';
@@ -284,7 +284,17 @@ export default function Profile() {
                           <div className="order-header-left">
                             <div className="order-id-line">
                               <span className="order-id-label">Order</span>
-                              <span className="order-id-badge" title={order.id}>#{order.id}</span>
+                              <span 
+                                className="order-id-badge" 
+                                title={`Order ID: ${order.id} (Click to copy)`}
+                                onClick={() => {
+                                  if (navigator.clipboard?.writeText) {
+                                    navigator.clipboard.writeText(order.id);
+                                  }
+                                }}
+                              >
+                                #{order.id}
+                              </span>
                             </div>
                             <span className="order-date-text">Placed on {formattedDate}</span>
                           </div>
@@ -357,14 +367,24 @@ export default function Profile() {
                           </div>
 
                           <div className="order-actions-wrap">
+                            {/* Track Order option - ALWAYS available for all orders */}
+                            <Link
+                              to={`/track-order/${order.id}`}
+                              className="btn-order-track"
+                              title="Track this order live"
+                            >
+                              🚚 Track Order
+                            </Link>
+
                             {order.waybill && (
                               <a
                                 href={order.trackingUrl || `https://www.delhivery.com/track/package/${order.waybill}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="btn-order-track"
+                                className="btn-order-delhivery"
+                                title="Official Delhivery Tracking"
                               >
-                                📦 Track Delhivery
+                                📦 Delhivery AWB
                               </a>
                             )}
 

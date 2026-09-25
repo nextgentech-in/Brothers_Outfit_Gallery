@@ -71,6 +71,16 @@ export default function AdminOrders() {
     return '/images/hero.png';
   }, [productsMap]);
 
+  const formatDisplayOrderId = (id) => {
+    if (!id) return '';
+    if (id.startsWith('ORD-')) {
+      const parts = id.split('-');
+      if (parts.length >= 2) return `${parts[0]}-${parts[1]}`;
+      return id.slice(0, 14);
+    }
+    return id.length > 12 ? `${id.slice(0, 10)}…` : id;
+  };
+
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     const data = await getAdminOrders();
@@ -244,7 +254,7 @@ export default function AdminOrders() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th style={{ width: '90px', minWidth: '85px' }}>ORDER ID</th>
+              <th style={{ width: '150px', minWidth: '140px' }}>ORDER ID</th>
               <th style={{ minWidth: '130px', maxWidth: '160px' }}>CUSTOMER</th>
               <th style={{ minWidth: '175px', maxWidth: '220px' }}>ITEMS & SIZES</th>
               <th style={{ width: '75px', minWidth: '70px' }}>TOTAL</th>
@@ -262,9 +272,45 @@ export default function AdminOrders() {
             ) : filteredOrders.map(o => (
               <tr key={o.id}>
                 <td style={{ fontSize: '11.5px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                  <span title={o.id} style={{ background: '#f1f5f9', padding: '3px 6px', borderRadius: '4px', fontWeight: '700', color: '#0f172a' }}>
-                    #{o.id ? (o.id.length > 8 ? `${o.id.slice(0, 8)}…` : o.id) : ''}
-                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <span 
+                      title={`Full Order ID: ${o.id} (Click to copy)`}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(o.id);
+                      }}
+                      style={{ 
+                        background: '#f1f5f9', 
+                        padding: '4px 8px', 
+                        borderRadius: '6px', 
+                        fontWeight: '700', 
+                        color: '#0f172a',
+                        border: '1px solid #cbd5e1',
+                        cursor: 'pointer',
+                        letterSpacing: '0.3px',
+                        display: 'inline-block'
+                      }}
+                    >
+                      #{formatDisplayOrderId(o.id)}
+                    </span>
+                    <button
+                      type="button"
+                      title="Copy full Order ID"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(o.id);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        fontSize: '11px',
+                        lineHeight: 1,
+                        opacity: 0.65
+                      }}
+                    >
+                      📋
+                    </button>
+                  </div>
                 </td>
                 <td style={{ maxWidth: '160px' }}>
                   <div style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.shippingAddress?.fullName}>
@@ -405,7 +451,9 @@ export default function AdminOrders() {
         <div className="tracking-modal-overlay" onClick={() => setSelectedOrder(null)}>
           <div className="order-details-modal-card" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>📋 Order Details #{selectedOrder.id}</h3>
+              <h3 style={{ color: '#ffffff', margin: 0, fontSize: '16px', fontWeight: '700' }}>
+                📋 Order Details #{selectedOrder.id}
+              </h3>
               <button className="close-btn" onClick={() => setSelectedOrder(null)}>✕</button>
             </div>
 
