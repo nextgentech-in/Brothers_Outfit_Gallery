@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
+import { fetchAllActiveProducts } from '../../services/productService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminOrders.css';
 
@@ -19,6 +20,8 @@ const ADMIN_CANCEL_REASONS = [
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
+  const [productsMap, setProductsMap] = useState(new Map());
+  const [previewImageModal, setPreviewImageModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [shippingOrderId, setShippingOrderId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -32,6 +35,41 @@ export default function AdminOrders() {
   const [cancelModal, setCancelModal] = useState({ open: false, order: null });
   const [cancelReason, setCancelReason] = useState('');
   const [cancelCustomReason, setCancelCustomReason] = useState('');
+
+  // Fetch product catalog to guarantee 100% image resolution for every order item
+  useEffect(() => {
+    let isMounted = true;
+    fetchAllActiveProducts().then(prods => {
+      if (!isMounted || !Array.isArray(prods)) return;
+      const map = new Map();
+      prods.forEach(p => {
+        if (p.id) map.set(p.id, p);
+        if (p.slug) map.set(p.slug.toLowerCase().trim(), p);
+        if (p.name) map.set(p.name.toLowerCase().trim(), p);
+      });
+      setProductsMap(map);
+    }).catch(err => {
+      console.warn('Could not preload product catalog in admin orders:', err);
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const getItemImage = useCallback((item) => {
+    if (item.image && typeof item.image === 'string' && item.image.trim()) return item.image;
+    if (item.thumbnailUrl && typeof item.thumbnailUrl === 'string' && item.thumbnailUrl.trim()) return item.thumbnailUrl;
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      const first = item.images[0];
+      const url = typeof first === 'string' ? first : first?.url;
+      if (url) return url;
+    }
+    // Catalog lookup fallback by product ID, slug, or name
+    const lookupKey = item.productId || item.id || (item.slug && item.slug.toLowerCase().trim()) || (item.name && item.name.toLowerCase().trim());
+    if (lookupKey && productsMap.has(lookupKey)) {
+      const p = productsMap.get(lookupKey);
+      return p.thumbnailUrl || p.image || (p.images && p.images[0]?.url) || (p.images && p.images[0]) || '/images/hero.png';
+    }
+    return '/images/hero.png';
+  }, [productsMap]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -232,13 +270,46 @@ export default function AdminOrders() {
                 </td>
                 <td>
                   <div className="admin-items-preview-cell">
-                    {o.items?.map((item, idx) => (
-                      <div key={idx} className="admin-items-preview-item">
-                        <span style={{ fontWeight: '600', color: '#0f172a' }}>{item.name}</span>
-                        {item.size && <span className="admin-item-size-badge">Size: {item.size}</span>}
-                        <span style={{ color: '#64748b', fontSize: '11px' }}> (×{item.quantity})</span>
-                      </div>
-                    ))}
+                    {o.items?.map((item, idx) => {
+                      const itemImg = getItemImage(item);
+                      return (
+                        <div key={idx} className="admin-items-preview-item">
+                          <div 
+                            className="admin-item-thumb-box" 
+                            title="Click to view full image"
+                            onClick={() => setPreviewImageModal({ url: itemImg, name: item.name })}
+                          >
+                            <img
+                              src={itemImg}
+                              alt={item.name}
+                              className="admin-item-thumbnail"
+                              onError={(e) => { e.target.src = '/images/hero.png'; }}
+                            />
+                            <span className="admin-item-zoom-hint" title="Zoom image">🔍</span>
+                          </div>
+                          <div className="admin-item-details-box">
+                            <div className="admin-item-name-text" title={item.name}>
+                              {item.name}
+                            </div>
+                            <div className="admin-item-tags">
+                              {item.size && (
+                                <span className="admin-item-size-badge">
+                                  Size: <strong>{item.size}</strong>
+                                </span>
+                              )}
+                              {item.color && item.color !== 'Default' && item.color !== 'Standard' && (
+                                <span className="admin-item-color-badge">
+                                  {item.color}
+                                </span>
+                              )}
+                              <span className="admin-item-qty-tag">
+                                ×{item.quantity}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </td>
                 <td><strong>₹{o.totalAmount || o.finalTotal || 0}</strong></td>
@@ -428,9 +499,12 @@ export default function AdminOrders() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <img
-                              src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'}
+                              src={getItemImage(item)}
                               alt={item.name}
-                              style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px', background: '#f1f5f9' }}
+                              style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', background: '#f1f5f9', cursor: 'pointer', border: '1px solid #e2e8f0' }}
+                              onClick={() => setPreviewImageModal({ url: getItemImage(item), name: item.name })}
+                              title="Click to view full image"
+                              onError={(e) => { e.target.src = '/images/hero.png'; }}
                             />
                             <span style={{ fontWeight: '600', color: '#0f172a' }}>{item.name}</span>
                           </div>
@@ -638,6 +712,30 @@ export default function AdminOrders() {
                   Confirm Cancellation
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Quick Image Preview Lightbox */}
+      {previewImageModal && typeof document !== 'undefined' && createPortal(
+        <div className="tracking-modal-overlay" onClick={() => setPreviewImageModal(null)}>
+          <div className="admin-image-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>🖼️ {previewImageModal.name || 'Product Image Preview'}</h3>
+              <button className="close-btn" onClick={() => setPreviewImageModal(null)}>✕</button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#0f172a' }}>
+              <img
+                src={previewImageModal.url}
+                alt={previewImageModal.name}
+                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}
+                onError={(e) => { e.target.src = '/images/hero.png'; }}
+              />
+              <p style={{ marginTop: '12px', color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>
+                {previewImageModal.name}
+              </p>
             </div>
           </div>
         </div>,

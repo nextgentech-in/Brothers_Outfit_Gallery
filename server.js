@@ -1068,6 +1068,108 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
   }
 });
 
+// ─── Public Customer Order Tracking API ──────────────────────────────────────
+app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
+
+  const rawQuery = String(req.body?.query || req.body?.orderId || '').trim();
+  if (!rawQuery) {
+    return res.status(400).json({ error: 'Please enter an Order ID, Mobile Number, or Waybill tracking number.' });
+  }
+
+  try {
+    const db = getTrustedFirestore();
+    const ordersCol = db.collection('orders');
+    const matchedMap = new Map();
+
+    // 1. Direct match by exact document ID
+    try {
+      const directDoc = await ordersCol.doc(rawQuery).get();
+      if (directDoc.exists) {
+        matchedMap.set(directDoc.id, { id: directDoc.id, ...directDoc.data() });
+      }
+    } catch {}
+
+    // 2. Search by Phone number (clean 10 digits)
+    const cleanPhone = rawQuery.replace(/\D/g, '').slice(-10);
+    if (matchedMap.size === 0 && cleanPhone.length === 10) {
+      try {
+        const snapPhone = await ordersCol.where('shippingAddress.phone', '==', cleanPhone).limit(5).get();
+        snapPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch {}
+
+      if (matchedMap.size === 0) {
+        try {
+          const snapUserPhone = await ordersCol.where('userPhone', '==', cleanPhone).limit(5).get();
+          snapUserPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
+        } catch {}
+      }
+    }
+
+    // 3. Search by Delhivery Waybill / AWB
+    if (matchedMap.size === 0) {
+      try {
+        const snapWaybill = await ordersCol.where('waybill', '==', rawQuery).limit(2).get();
+        snapWaybill.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch {}
+    }
+
+    // 4. Substring / Prefix match for short Order IDs (e.g. 311019e6)
+    if (matchedMap.size === 0 && rawQuery.length >= 6) {
+      try {
+        const allRecent = await ordersCol.orderBy('createdAt', 'desc').limit(40).get();
+        allRecent.forEach(d => {
+          if (d.id.toLowerCase().includes(rawQuery.toLowerCase())) {
+            matchedMap.set(d.id, { id: d.id, ...d.data() });
+          }
+        });
+      } catch {}
+    }
+
+    const matchedOrders = Array.from(matchedMap.values());
+    if (matchedOrders.length === 0) {
+      return res.status(404).json({
+        error: `No order found matching "${rawQuery}". Please check your Order ID or phone number.`
+      });
+    }
+
+    // Sanitize before returning to customer
+    const sanitized = matchedOrders.map(order => ({
+      id: order.id,
+      status: order.status || 'Processing',
+      waybill: order.waybill || null,
+      courier: order.courier || 'Delhivery Express',
+      trackingUrl: order.trackingUrl || (order.waybill ? `https://www.delhivery.com/track/package/${order.waybill}` : null),
+      createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : order.createdAt,
+      shippedAt: order.shippedAt?.toDate ? order.shippedAt.toDate().toISOString() : order.shippedAt || null,
+      totalAmount: order.totalAmount || order.finalTotal || 0,
+      paymentMethod: order.paymentMethod || 'Online',
+      paymentStatus: order.paymentStatus || 'Paid',
+      pickupAgentStatus: order.pickupAgentStatus || null,
+      shippingAddress: {
+        fullName: order.shippingAddress?.fullName || 'Valued Customer',
+        city: order.shippingAddress?.city || '',
+        state: order.shippingAddress?.state || '',
+        pincode: order.shippingAddress?.pincode || '',
+        phone: order.shippingAddress?.phone ? `${order.shippingAddress.phone.slice(0, 3)}****${order.shippingAddress.phone.slice(-3)}` : ''
+      },
+      items: (order.items || []).map(item => ({
+        name: item.name,
+        size: item.size || item.selectedSize || 'One Size',
+        color: item.color || item.selectedColor || 'Default',
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+        image: item.image || item.thumbnailUrl || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'
+      }))
+    }));
+
+    res.json({ success: true, orders: sanitized });
+  } catch (error) {
+    console.error('Track order error:', error);
+    res.status(500).json({ error: 'Unable to track order. Please try again.' });
+  }
+});
+
 // ─── Delhivery One: OAuth Token Cache ─────────────────────────────────────
 // ─── Delhivery One: Auth Token Helper ─────────────────────────────────────
 let cachedDelhiveryToken = null;
