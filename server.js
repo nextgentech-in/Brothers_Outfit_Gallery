@@ -1264,6 +1264,8 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requi
     // Unique Delhivery Waybill / AWB
     const waybill = `DLH${Date.now()}${Math.floor(100 + Math.random() * 900)}`;
 
+    const warehouseName = (process.env.DELHIVERY_WAREHOUSE_NAME || 'Brothers Outfit Warehouse').trim();
+
     const payload = {
       shipments: [
         {
@@ -1276,18 +1278,17 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requi
           order: orderId,
           payment_mode: paymentMethod?.toLowerCase().includes('cash') ? 'COD' : 'Prepaid',
           cod_amount: paymentMethod?.toLowerCase().includes('cash') ? String(totalAmount) : '0',
-          waybill: waybill,
           products_desc: items ? items.map(i => i.name).join(', ') : 'Apparel',
           total_amount: String(totalAmount),
           seller_name: 'Brothers Outfit Gallery'
         }
       ],
       pickup_location: {
-        name: 'Brothers Outfit Warehouse'
+        name: warehouseName
       }
     };
 
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (apiKey) {
       headers['Authorization'] = `Token ${apiKey}`;
     } else if (token) {
@@ -1295,26 +1296,31 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requi
       if (cmsClient) headers['Client-CMS'] = cmsClient;
     }
 
+    const formParams = new URLSearchParams();
+    formParams.append('format', 'json');
+    formParams.append('data', JSON.stringify(payload));
+
     try {
       const response = await fetch('https://track.delhivery.com/api/cmu/create.json', {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload)
+        body: formParams.toString()
       });
-      if (response.ok) {
-        const apiData = await response.json();
-        console.log('Delhivery API shipment creation response:', apiData);
-        if (apiData.packages && apiData.packages[0] && apiData.packages[0].waybill) {
-          return res.json({
-            success: true,
-            waybill: apiData.packages[0].waybill,
-            courier: 'Delhivery Express',
-            status: 'Manifested',
-            estimatedDelivery: '3-5 Days',
-            trackingUrl: `https://www.delhivery.com/track/package/${apiData.packages[0].waybill}`,
-            createdAt: new Date().toISOString()
-          });
-        }
+      const apiData = await response.json().catch(() => ({}));
+      console.log('Delhivery API shipment creation response:', apiData);
+      if (apiData.packages && apiData.packages[0] && apiData.packages[0].waybill) {
+        return res.json({
+          success: true,
+          waybill: apiData.packages[0].waybill,
+          courier: 'Delhivery Express',
+          status: 'Manifested',
+          estimatedDelivery: '3-5 Days',
+          trackingUrl: `https://www.delhivery.com/track/package/${apiData.packages[0].waybill}`,
+          createdAt: new Date().toISOString()
+        });
+      }
+      if (apiData.rmk) {
+        console.warn('Delhivery API remark:', apiData.rmk);
       }
     } catch (apiErr) {
       console.warn('Delhivery live API call warning:', apiErr.message);
