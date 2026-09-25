@@ -244,14 +244,14 @@ export default function AdminOrders() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>ORDER ID</th>
-              <th>CUSTOMER</th>
-              <th>ITEMS & SIZES</th>
-              <th>TOTAL</th>
-              <th>PAYMENT</th>
-              <th>STATUS</th>
-              <th>DATE</th>
-              <th style={{ minWidth: '190px' }}>ADMIN CONTROLS (2 OPTIONS)</th>
+              <th style={{ width: '90px', minWidth: '85px' }}>ORDER ID</th>
+              <th style={{ minWidth: '130px', maxWidth: '160px' }}>CUSTOMER</th>
+              <th style={{ minWidth: '175px', maxWidth: '220px' }}>ITEMS & SIZES</th>
+              <th style={{ width: '75px', minWidth: '70px' }}>TOTAL</th>
+              <th style={{ width: '85px', minWidth: '80px' }}>PAYMENT</th>
+              <th style={{ width: '120px', minWidth: '115px' }}>STATUS</th>
+              <th style={{ width: '90px', minWidth: '85px' }}>DATE</th>
+              <th className="admin-controls-th">ADMIN CONTROLS</th>
             </tr>
           </thead>
           <tbody>
@@ -261,12 +261,18 @@ export default function AdminOrders() {
               <tr><td colSpan="8" style={{textAlign: 'center', padding: '40px'}}>No orders match the current criteria.</td></tr>
             ) : filteredOrders.map(o => (
               <tr key={o.id}>
-                <td>
-                  <strong>#{o.id}</strong>
+                <td style={{ fontSize: '11.5px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                  <span title={o.id} style={{ background: '#f1f5f9', padding: '3px 6px', borderRadius: '4px', fontWeight: '700', color: '#0f172a' }}>
+                    #{o.id ? (o.id.length > 8 ? `${o.id.slice(0, 8)}…` : o.id) : ''}
+                  </span>
                 </td>
-                <td>
-                  <div style={{ fontWeight: '600' }}>{o.shippingAddress?.fullName || 'Guest Customer'}</div>
-                  <div style={{ fontSize: '11.5px', color: '#64748b' }}>{o.userEmail || o.shippingAddress?.phone}</div>
+                <td style={{ maxWidth: '160px' }}>
+                  <div style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.shippingAddress?.fullName}>
+                    {o.shippingAddress?.fullName || 'Guest Customer'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.userEmail || o.shippingAddress?.phone}>
+                    {o.userEmail || o.shippingAddress?.phone}
+                  </div>
                 </td>
                 <td>
                   <div className="admin-items-preview-cell">
@@ -333,39 +339,25 @@ export default function AdminOrders() {
                     <option value="Cancelled">Cancelled</option>
                   </select>
                 </td>
-                <td style={{fontSize: '12px', whiteSpace: 'nowrap'}}>
+                <td style={{fontSize: '11.5px', whiteSpace: 'nowrap', color: '#475569'}}>
                   {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
                 </td>
-                <td>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <td className="admin-controls-td">
+                  <div className="admin-controls-box">
                     {/* Option 1: Cancel Order */}
                     {o.status !== 'Cancelled' ? (
                       <button
                         onClick={() => openCancelModal(o)}
                         disabled={actionLoadingId === o.id}
                         className="btn-cancel-admin"
-                        style={{
-                          background: '#fef2f2',
-                          color: '#dc2626',
-                          border: '1px solid #fca5a5',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          fontSize: '11.5px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px'
-                        }}
                       >
-                        {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel Order'}
+                        {actionLoadingId === o.id ? 'Cancelling...' : '✕ Option 1: Cancel'}
                       </button>
                     ) : (
-                      <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: '700' }}>
-                        <div>❌ Cancelled</div>
+                      <div className="admin-order-cancelled-indicator">
+                        <div className="admin-order-cancelled-title">✕ Cancelled</div>
                         {o.cancellationReason && (
-                          <div style={{ fontSize: '10px', color: '#b91c1c', fontWeight: '600', marginTop: '2px', fontStyle: 'italic' }}>
+                          <div className="admin-order-cancelled-reason" title={o.cancellationReason}>
                             Reason: {o.cancellationReason}
                           </div>
                         )}
@@ -374,19 +366,12 @@ export default function AdminOrders() {
 
                     {/* Option 2: Approve for Pickup */}
                     {o.status === 'Cancelled' ? null : o.waybill ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: '#f0fdf4', padding: '6px 8px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: '800' }}>
-                          ✓ Pickup Scheduled
-                        </span>
-                        <span style={{ fontSize: '10.5px', color: '#166534' }}>
-                          AWB: {o.waybill}
-                        </span>
-                        <span style={{ fontSize: '10px', color: '#16a34a' }}>
-                          📢 Delivery Agent Notified
-                        </span>
+                      <div className="admin-order-pickup-scheduled">
+                        <span className="pickup-scheduled-title">✓ Pickup Scheduled</span>
+                        <span className="pickup-scheduled-awb">AWB: {o.waybill}</span>
                         <button 
                           onClick={() => handleOpenTracking(o.waybill)}
-                          style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '3px 8px', borderRadius: '4px', fontSize: '10.5px', cursor: 'pointer', fontWeight: '700', marginTop: '2px' }}
+                          className="btn-track-courier-mini"
                         >
                           Track Courier ↗
                         </button>
@@ -396,30 +381,14 @@ export default function AdminOrders() {
                         onClick={() => handleApproveAndShip(o)}
                         disabled={shippingOrderId === o.id}
                         className="btn-approve-ship"
-                        style={{
-                          background: '#16a34a',
-                          color: '#ffffff',
-                          border: 'none',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          fontSize: '11.5px',
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          boxShadow: '0 2px 4px rgba(22, 163, 74, 0.25)'
-                        }}
                       >
-                        {shippingOrderId === o.id ? 'Manifesting...' : '🚚 Option 2: Approve for Pickup'}
+                        {shippingOrderId === o.id ? 'Manifesting...' : '🚚 Option 2: Approve'}
                       </button>
                     )}
 
                     <button 
                       onClick={() => setSelectedOrder(o)}
-                      className="admin-action-btn edit"
-                      style={{ padding: '4px 8px', fontSize: '11px', fontWeight: '600', textAlign: 'center' }}
+                      className="admin-action-btn edit btn-view-order-details"
                     >
                       View Details
                     </button>
