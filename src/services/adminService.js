@@ -233,6 +233,63 @@ export const updateProductVariantStock = async (productId, variants, totalStock)
   });
 };
 
+export const restoreOrderStock = async (items = []) => {
+  if (!Array.isArray(items) || items.length === 0) return;
+  for (const item of items) {
+    try {
+      const prodId = item.productId || item.id;
+      if (!prodId) continue;
+      const productRef = doc(db, PRODUCTS, prodId);
+      const productSnap = await getDoc(productRef);
+      if (!productSnap.exists()) continue;
+
+      const prodData = productSnap.data();
+      const variants = Array.isArray(prodData.variants) ? [...prodData.variants] : [];
+      const orderedQty = item.quantity || 1;
+      const orderedSize = item.size || item.selectedSize || null;
+      const orderedColor = item.color || item.selectedColor || null;
+
+      if (variants.length > 0 && orderedSize) {
+        const cleanSize = String(orderedSize).trim().toLowerCase();
+        const cleanColor = orderedColor ? String(orderedColor).trim().toLowerCase() : null;
+
+        let matchIdx = variants.findIndex(v => {
+          const vSize = String(v.size || '').trim().toLowerCase();
+          if (vSize !== cleanSize) return false;
+          if (!cleanColor) return true;
+          const vCol = String(v.color || '').trim().toLowerCase();
+          return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+        });
+        if (matchIdx < 0) {
+          matchIdx = variants.findIndex(v => String(v.size || '').trim().toLowerCase() === cleanSize);
+        }
+
+        if (matchIdx >= 0) {
+          const currentStock = parseInt(variants[matchIdx].stock, 10) || 0;
+          variants[matchIdx] = {
+            ...variants[matchIdx],
+            stock: currentStock + orderedQty
+          };
+          const newTotalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+          await updateDoc(productRef, {
+            variants,
+            stock: newTotalStock,
+            updatedAt: serverTimestamp()
+          });
+        }
+      } else {
+        const currentStock = parseInt(prodData.stock, 10) || 0;
+        await updateDoc(productRef, {
+          stock: currentStock + orderedQty,
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.warn('Error restoring stock for item:', err);
+    }
+  }
+};
+
 // ─── ADMIN: COUPONS ───────────────────────────────────────────────────────────
 export const getAdminCoupons = async () => {
   try {

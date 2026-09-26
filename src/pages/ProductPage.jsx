@@ -159,7 +159,7 @@ export default function ProductPage() {
           </div>
         </div>
 
-        <RelatedProducts currentProductId={product.id} category={product.category || product.categoryId} />
+        <RelatedProducts currentProductId={product.id} category={product.category || product.categoryId} currentProductSlug={product.slug} />
 
         <ReviewsModule product={product} />
       </div>

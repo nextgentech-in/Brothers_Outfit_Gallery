@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
+import { getAdminOrders, updateOrderStatus, updateOrderShipment, restoreOrderStock } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import { fetchAllActiveProducts } from '../../services/productService';
 import { useAdminUI } from '../../context/AdminUIContext';
@@ -194,6 +194,10 @@ export default function AdminOrders() {
         await cancelDelhiveryShipment(order.waybill, finalReason);
       }
 
+      if (order.items && order.items.length > 0) {
+        await restoreOrderStock(order.items);
+      }
+
       await updateOrderStatus(order.id, 'Cancelled', {
         cancellationReason: finalReason,
         cancelledBy: 'Admin',
@@ -228,8 +232,17 @@ export default function AdminOrders() {
 
   return (
     <div className="admin-orders-page">
-      <div className="admin-header">
-        <h1 className="admin-title">Orders Management</h1>
+      <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+        <h1 className="admin-title" style={{ margin: 0 }}>Orders Management</h1>
+        <a 
+          href="https://one.delhivery.com/home" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="admin-delhivery-portal-btn"
+          title="Open Official Delhivery One Logistics Portal"
+        >
+          <span style={{ fontSize: '15px' }}>🚚</span> Open Official Delhivery Portal ↗
+        </a>
       </div>
       <div className="admin-orders-controls">
         <input 
@@ -887,7 +900,7 @@ export default function AdminOrders() {
 
               <div className="modal-footer-actions">
                 <a 
-                  href={activeTracking.trackingUrl} 
+                  href="https://one.delhivery.com/home" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="btn-external-track"

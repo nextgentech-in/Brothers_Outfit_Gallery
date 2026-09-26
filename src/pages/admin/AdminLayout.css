@@ -157,6 +157,20 @@
   color: #7dd3fc;
 }
 
+.admin-sidebar__external {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+  font-weight: 600;
+  margin-top: 12px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  font-size: 13px;
+}
+
+.admin-sidebar__external:hover {
+  background: rgba(74, 222, 128, 0.16);
+  color: #86efac;
+}
+
 .admin-main {
   flex: 1 1 auto;
   min-width: 0;

@@ -722,9 +722,15 @@ async function calculateServerOrderTotal(items, couponCode) {
     const targetColor = item.color || item.selectedColor || null;
 
     if (product.variants && product.variants.length > 0 && targetSize) {
-      matchedVariant = product.variants.find(v =>
-        v.size === targetSize && (!targetColor || v.color === targetColor || v.color === 'Standard' || v.color === 'Default')
-      ) || product.variants.find(v => v.size === targetSize);
+      const cleanSize = String(targetSize).trim().toLowerCase();
+      const cleanColor = targetColor ? String(targetColor).trim().toLowerCase() : null;
+      matchedVariant = product.variants.find(v => {
+        const vSize = String(v.size || '').trim().toLowerCase();
+        if (vSize !== cleanSize) return false;
+        if (!cleanColor) return true;
+        const vCol = String(v.color || '').trim().toLowerCase();
+        return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+      }) || product.variants.find(v => String(v.size || '').trim().toLowerCase() === cleanSize);
       if (!matchedVariant) {
         throw new Error(`The selected size is no longer available for ${product.name || 'this item'}.`);
       }
@@ -1060,6 +1066,73 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       read: false,
       createdAt: FieldValue.serverTimestamp()
     });
+
+    // ─── Stock Decrement (runs in background, non-blocking) ───────────
+    // For each ordered item, decrement the matching variant stock (by size + color)
+    // and the product-level total stock in Firestore.
+    (async () => {
+      try {
+        for (const item of calculation.items) {
+          const productRef = db.collection('products').doc(item.productId);
+          const productSnap = await productRef.get();
+          if (!productSnap.exists) continue;
+
+          const productData = productSnap.data();
+          const variants = Array.isArray(productData.variants) ? [...productData.variants] : [];
+          const orderedQty = item.quantity || 1;
+          const orderedSize = item.size || item.selectedSize || null;
+          const orderedColor = item.color || item.selectedColor || null;
+
+          if (variants.length > 0 && orderedSize) {
+            const cleanSize = String(orderedSize).trim().toLowerCase();
+            const cleanColor = orderedColor ? String(orderedColor).trim().toLowerCase() : null;
+
+            // Find matching variant by size + color
+            let matchIdx = variants.findIndex(v => {
+              const vSize = String(v.size || '').trim().toLowerCase();
+              if (vSize !== cleanSize) return false;
+              if (!cleanColor) return true;
+              const vCol = String(v.color || '').trim().toLowerCase();
+              return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+            });
+            // Fallback: match by size only
+            if (matchIdx < 0) {
+              matchIdx = variants.findIndex(v => String(v.size || '').trim().toLowerCase() === cleanSize);
+            }
+
+            if (matchIdx >= 0) {
+              const currentStock = parseInt(variants[matchIdx].stock, 10) || 0;
+              variants[matchIdx] = {
+                ...variants[matchIdx],
+                stock: Math.max(0, currentStock - orderedQty)
+              };
+
+              // Recalculate total product stock from all variants
+              const newTotalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+
+              await productRef.update({
+                variants: variants,
+                stock: newTotalStock,
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            }
+          } else {
+            // No variants — decrement product-level stock directly
+            const currentStock = parseInt(productData.stock, 10) || 0;
+            if (currentStock > 0) {
+              await productRef.update({
+                stock: Math.max(0, currentStock - orderedQty),
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            }
+          }
+        }
+        // Invalidate server product cache so next request reflects new stock
+        productCatalogCache = { products: null, expiresAt: 0 };
+      } catch (stockErr) {
+        console.warn('Background stock decrement warning (order still valid):', stockErr.message);
+      }
+    })();
 
     res.status(201).json({ success: true, orderId, totalAmount: calculation.finalTotal });
   } catch (error) {

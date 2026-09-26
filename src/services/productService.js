@@ -229,7 +229,14 @@ export const getProductBySlug = async (slug) => {
 export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4) => {
   try {
     const rawList = await fetchAllActiveProducts();
-    let all = rawList.filter(p => p.active !== false && p.id !== excludeProductId);
+    const excludeStr = excludeProductId ? String(excludeProductId).trim().toLowerCase() : null;
+    let all = rawList.filter(p => {
+      if (p.active === false) return false;
+      if (!excludeStr) return true;
+      const pid = String(p.id || '').trim().toLowerCase();
+      const pslug = String(p.slug || '').trim().toLowerCase();
+      return pid !== excludeStr && pslug !== excludeStr;
+    });
 
     if (!categoryOrId) return all.slice(0, qty);
 
