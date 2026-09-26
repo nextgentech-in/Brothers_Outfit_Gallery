@@ -98,6 +98,14 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
   return inFlightFetch;
 };
 
+export const isProductInStock = (product) => {
+  if (!product) return false;
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    return product.variants.some(v => (parseInt(v.stock, 10) || 0) > 0);
+  }
+  return (parseInt(product.stock, 10) || 0) > 0;
+};
+
 /**
  * Fast search helper querying full active catalog for instant suggestion dropdowns
  */
@@ -106,7 +114,7 @@ export const searchProducts = async (searchQuery, maxResults = 8) => {
   const rawList = await fetchAllActiveProducts();
   const q = searchQuery.toLowerCase().trim();
   const matched = rawList.filter(p => {
-    if (p.active === false) return false;
+    if (p.active === false || !isProductInStock(p)) return false;
     const name = (p.name || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
     const subCategory = (p.subCategory || '').toLowerCase();
@@ -118,7 +126,7 @@ export const searchProducts = async (searchQuery, maxResults = 8) => {
 
 export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12) => {
   const rawList = await fetchAllActiveProducts();
-  let products = rawList.filter(p => p.active !== false);
+  let products = rawList.filter(p => p.active !== false && isProductInStock(p));
 
   // 1. Filter Category
   if (category && category !== 'All') {
@@ -160,7 +168,7 @@ export const getShopProducts = async (category = 'All', sortBy = 'newest', _last
 
 export const getNewArrivals = async (qty = 4) => {
   const rawList = await fetchAllActiveProducts();
-  let products = rawList.filter(p => p.active !== false);
+  let products = rawList.filter(p => p.active !== false && isProductInStock(p));
 
   const tenDaysAgo = new Date();
   tenDaysAgo.setDate(tenDaysAgo.getDate() - 15);
@@ -184,7 +192,7 @@ export const getSaleProducts = async (qty = 4) => {
 
   // Filter locally
   const saleList = rawList.filter(p => {
-    if (!p.active || !p.offerEnabled) return false;
+    if (!p.active || !p.offerEnabled || !isProductInStock(p)) return false;
 
     const end = p.offerEndAt ? (p.offerEndAt.toDate ? p.offerEndAt.toDate() : new Date(p.offerEndAt)) : null;
     const start = p.offerStartAt ? (p.offerStartAt.toDate ? p.offerStartAt.toDate() : new Date(p.offerStartAt)) : null;
@@ -200,7 +208,7 @@ export const getSaleProducts = async (qty = 4) => {
 
 export const getTrendingProducts = async (qty = 12) => {
   const rawList = await fetchAllActiveProducts();
-  const trending = rawList.filter(p => p.active !== false && (p.isTrending === true || p.trending === true));
+  const trending = rawList.filter(p => p.active !== false && isProductInStock(p) && (p.isTrending === true || p.trending === true));
   return trending.slice(0, qty);
 };
 
@@ -231,7 +239,7 @@ export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4
     const rawList = await fetchAllActiveProducts();
     const excludeStr = excludeProductId ? String(excludeProductId).trim().toLowerCase() : null;
     let all = rawList.filter(p => {
-      if (p.active === false) return false;
+      if (p.active === false || !isProductInStock(p)) return false;
       if (!excludeStr) return true;
       const pid = String(p.id || '').trim().toLowerCase();
       const pslug = String(p.slug || '').trim().toLowerCase();

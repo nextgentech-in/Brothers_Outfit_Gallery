@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchAllActiveProducts } from '../services/productService';
+import { fetchAllActiveProducts, isProductInStock } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import './AccessoriesPage.css';
@@ -26,7 +26,7 @@ export default function AccessoriesPage() {
       setLoading(true);
       try {
         const rawItems = await fetchAllActiveProducts();
-        const firestoreItems = rawItems.filter(p => p.active !== false);
+        const firestoreItems = rawItems.filter(p => p.active !== false && isProductInStock(p));
 
         // Filter only items whose category belongs to Accessories
         const accessoryKeywords = ['accessori', 'watch', 'belt', 'sunglass', 'wallet', 'cap', 'hat', 'perfume', 'bag', 'fragrance', 'apparel spray'];

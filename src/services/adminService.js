@@ -97,30 +97,101 @@ export const getAdminProductById = async (id) => {
     };
 }
 
+// Auto-detect duplicate product names and slugs, automatically appending suffix like (2), (3) and -2, -3
+export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = null) => {
+  try {
+    const products = await getAdminProducts();
+    const otherProducts = products.filter(p => !excludeId || p.id !== excludeId);
+
+    // 1. Ensure unique Name
+    let finalName = String(name || '').trim();
+    if (finalName) {
+      const baseName = finalName.replace(/\s*\(\d+\)$/, '').trim();
+      const existingNames = new Set(
+        otherProducts.map(p => String(p.name || '').trim().toLowerCase())
+      );
+
+      if (existingNames.has(finalName.toLowerCase())) {
+        let counter = 2;
+        while (existingNames.has(`${baseName} (${counter})`.toLowerCase())) {
+          counter++;
+        }
+        finalName = `${baseName} (${counter})`;
+      }
+    }
+
+    // 2. Ensure unique Slug
+    let baseSlug = String(slug || '').trim().toLowerCase();
+    if (!baseSlug && finalName) {
+      baseSlug = finalName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    } else if (baseSlug) {
+      baseSlug = baseSlug.replace(/-\d+$/, '');
+    }
+    let finalSlug = baseSlug;
+    if (finalSlug) {
+      const existingSlugs = new Set(
+        otherProducts.map(p => String(p.slug || '').trim().toLowerCase())
+      );
+
+      if (existingSlugs.has(finalSlug.toLowerCase())) {
+        let counter = 2;
+        while (existingSlugs.has(`${baseSlug}-${counter}`.toLowerCase())) {
+          counter++;
+        }
+        finalSlug = `${baseSlug}-${counter}`;
+      }
+    }
+
+    return { name: finalName, slug: finalSlug };
+  } catch (err) {
+    console.warn('ensureUniqueProductNameAndSlug check fallback:', err);
+    return { name, slug };
+  }
+};
+
 // Create new product 
 export const createProduct = async (productData, preGeneratedId = null) => {
+  const { name: uniqueName, slug: uniqueSlug } = await ensureUniqueProductNameAndSlug(
+    productData.name,
+    productData.slug,
+    preGeneratedId
+  );
+
   const newRef = preGeneratedId ? doc(db, PRODUCTS, preGeneratedId) : doc(collection(db, PRODUCTS));
   const payload = {
     ...productData,
+    name: uniqueName || productData.name,
+    slug: uniqueSlug || productData.slug,
     ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
   await setDoc(newRef, payload);
   invalidateProductCache();
-  return newRef.id;
+  return { id: newRef.id, name: uniqueName, slug: uniqueSlug };
 };
 
 // Update product
 export const updateProduct = async (id, productData) => {
+  let uniqueName = productData.name;
+  let uniqueSlug = productData.slug;
+  if (productData.name || productData.slug) {
+    const unique = await ensureUniqueProductNameAndSlug(productData.name, productData.slug, id);
+    uniqueName = unique.name;
+    uniqueSlug = unique.slug;
+  }
+
   const docRef = doc(db, PRODUCTS, id);
   const payload = {
     ...productData,
+    ...(uniqueName ? { name: uniqueName } : {}),
+    ...(uniqueSlug ? { slug: uniqueSlug } : {}),
     ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
     updatedAt: serverTimestamp(),
   };
   await updateDoc(docRef, payload);
   invalidateProductCache();
+  return { id, name: uniqueName, slug: uniqueSlug };
 };
 
 // Deactivate product

@@ -991,10 +991,17 @@ export default function AdminProductForm() {
       };
 
       // 4. Save to firestore
+      let result;
       if (isEdit) {
-        await updateProduct(id, payload);
+        result = await updateProduct(id, payload);
       } else {
-        await createProduct(payload, finalProductId); // Passing explicit ID
+        result = await createProduct(payload, finalProductId); // Passing explicit ID
+      }
+
+      if (result && result.name && result.name !== formData.name) {
+        showToast(`Duplicate name detected. Automatically saved as "${result.name}"`, 'info');
+      } else {
+        showToast(`Product ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
       }
       navigate('/admin/products');
     } catch (err) {

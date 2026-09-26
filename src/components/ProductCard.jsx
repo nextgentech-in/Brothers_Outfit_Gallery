@@ -79,9 +79,14 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   const [selectedSize, setSelectedSize] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
-  const isOutOfStock = product.stock === 0;
+  const totalStock = product.variants?.length > 0
+    ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0)
+    : (parseInt(product.stock, 10) || 0);
+  const isOutOfStock = totalStock <= 0;
   
-  const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
+  const availableSizes = product.variants?.length > 0
+    ? [...new Set(product.variants.filter(v => (parseInt(v.stock, 10) || 0) > 0).map(v => v.size))]
+    : (totalStock > 0 ? (product.sizes || []) : []);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const hasMultipleSizes = availableSizes.length > 1;
   const needsSizeSelection = hasMultipleSizes && !selectedSize;

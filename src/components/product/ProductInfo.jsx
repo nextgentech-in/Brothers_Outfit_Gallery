@@ -112,6 +112,50 @@ export default function ProductInfo({ product, onColorChange }) {
     return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10)||0), 0) : (product.stock || 0);
   }, [product.variants, product.stock]);
 
+  // Available colors that have stock > 0
+  const inStockColors = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return availableColors;
+    return availableColors.filter(col => {
+      const colName = String(col.name || '').trim().toLowerCase();
+      const colVariants = product.variants.filter(v => {
+        const vCol = String(v.color || '').trim().toLowerCase();
+        return vCol === colName || vCol === 'standard' || vCol === 'default';
+      });
+      return colVariants.length === 0 || colVariants.some(v => (parseInt(v.stock, 10) || 0) > 0);
+    });
+  }, [availableColors, product.variants]);
+
+  // Only display sizes on front that currently have inventory > 0
+  const visibleSizes = useMemo(() => {
+    if (!productSizes || productSizes.length === 0) return [];
+    if (!product.variants || product.variants.length === 0) {
+      return productTotalStock > 0 ? productSizes : [];
+    }
+    return productSizes.filter(size => {
+      const cleanSize = String(size).trim().toLowerCase();
+      let matchingVariants = product.variants.filter(v => String(v.size || '').trim().toLowerCase() === cleanSize);
+      if (selectedColor && selectedColor !== 'All') {
+        const selColLower = String(selectedColor).trim().toLowerCase();
+        const colorSpecific = matchingVariants.filter(v => {
+          const vCol = String(v.color || '').trim().toLowerCase();
+          return vCol === selColLower || vCol === 'standard' || vCol === 'default';
+        });
+        if (colorSpecific.length > 0) {
+          matchingVariants = colorSpecific;
+        }
+      }
+      return matchingVariants.some(v => (parseInt(v.stock, 10) || 0) > 0);
+    });
+  }, [productSizes, product.variants, selectedColor, productTotalStock]);
+
+  useEffect(() => {
+    if (visibleSizes.length > 0 && (!selectedSize || !visibleSizes.includes(selectedSize))) {
+      setSelectedSize(visibleSizes[0]);
+    } else if (visibleSizes.length === 0 && selectedSize) {
+      setSelectedSize(null);
+    }
+  }, [visibleSizes, selectedSize]);
+
   // Dynamic size-wise pricing matching selected size
   const matchedVariant = useMemo(() => {
     if (!product.variants || product.variants.length === 0) return null;
@@ -158,7 +202,7 @@ export default function ProductInfo({ product, onColorChange }) {
 
   // Stock status for selected size or whole product
   const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : productTotalStock;
-  const outOfStock = productSizes.length > 0 && selectedSize ? activeVariantStock === 0 : productTotalStock === 0;
+  const outOfStock = productSizes.length > 0 ? (visibleSizes.length === 0 || (selectedSize && activeVariantStock <= 0)) : productTotalStock <= 0;
   const stock = selectedSize && matchedVariant ? activeVariantStock : productTotalStock;
   
   const { addToCart, buyNowDirect } = useCart();
@@ -304,8 +348,8 @@ export default function ProductInfo({ product, onColorChange }) {
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
 
-      {/* Color Selection: Show buttons if colors exist */}
-      {availableColors.length > 0 && !availableColors.every(c => c.name === 'Standard' || c.name === 'Default') && (
+      {/* Color Selection: Show buttons if in-stock colors exist */}
+      {inStockColors.length > 0 && !inStockColors.every(c => c.name === 'Standard' || c.name === 'Default') && (
         <div className="product-selector-group">
           <div className="color-selector-header">
             <h3 className="selector-title">
@@ -322,7 +366,7 @@ export default function ProductInfo({ product, onColorChange }) {
               <span className="color-btn-all-icon">⊞</span>
               <span>All</span>
             </button>
-            {availableColors.map((col, idx) => (
+            {inStockColors.map((col, idx) => (
               <button
                 key={col.name || idx}
                 type="button"
@@ -371,24 +415,13 @@ export default function ProductInfo({ product, onColorChange }) {
           </div>
         )}
 
-        {productSizes.length > 0 ? (
+        {visibleSizes.length > 0 ? (
           <div className="size-buttons" style={sizeError ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '8px', padding: '4px' } : {}}>
-            {productSizes.map(size => {
-              // Read active stock distinct to color+size from variants matrix!
-              let variantStock = null;
-              if (product.variants?.length > 0) {
-                const matchedVariant = product.variants.find(v => 
-                  (v.color === selectedColor || !v.color || v.color === 'Standard' || v.color === 'Default') && v.size === size
-                ) || product.variants.find(v => v.size === size);
-                variantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : 0;
-              }
-              const isSizeOos = variantStock !== null ? variantStock === 0 : outOfStock;
-
+            {visibleSizes.map(size => {
               return (
                 <button 
                   key={size} 
-                  className={`size-btn ${selectedSize === size ? 'selected' : ''} ${isSizeOos ? 'disabled' : ''}`}
-                  disabled={isSizeOos}
+                  className={`size-btn ${selectedSize === size ? 'selected' : ''}`}
                   onClick={() => {
                     setSelectedSize(size);
                     setSizeError(false);
@@ -396,8 +429,12 @@ export default function ProductInfo({ product, onColorChange }) {
                 >
                   {size}
                 </button>
-              )
+              );
             })}
+          </div>
+        ) : productSizes.length > 0 ? (
+          <div className="size-out-of-stock-msg" style={{ fontSize: '13px', fontWeight: '600', color: '#dc2626', padding: '10px 14px', background: '#fef2f2', borderRadius: '6px', border: '1px solid #fee2e2' }}>
+            {selectedColor !== 'All' ? `Currently out of stock in ${selectedColor}. Please select another color.` : 'All sizes currently sold out.'}
           </div>
         ) : (
           <div className="one-size-badge" style={{ fontSize: '13px', fontWeight: '700', color: '#4b5563', padding: '8px 12px', background: '#f3f4f6', borderRadius: '4px', display: 'inline-block' }}>
