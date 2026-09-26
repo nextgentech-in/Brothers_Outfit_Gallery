@@ -192,117 +192,33 @@ export default function HowToMeasureDiagram({ category = 'shirts' }) {
 
         </div>
       ) : (
-        /* ───────── Bottomwear / Jeans / Trousers Diagram ───────── */
+        /* ───────── Bottomwear / Jeans / Trousers — High-Quality Diagram Photos ───────── */
         <div className="htm-figures-row">
-          
-          {/* TROUSERS FRONT */}
+
+          {/* PANTS FRONT PHOTO */}
           <div className="htm-figure-card">
-            <div className="htm-svg-wrap">
-              <svg 
-                viewBox="0 0 280 320" 
-                className="htm-garment-svg" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* Outline: Trousers Front */}
-                <g stroke="#1a1a1a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  {/* Waistband */}
-                  <path d="M 80 40 L 200 40 L 202 56 L 78 56 Z" fill="#ffffff" />
-                  <circle cx="140" cy="48" r="2.5" fill="#1a1a1a" />
-                  {/* Belt Loops */}
-                  <line x1="94" y1="40" x2="94" y2="56" strokeWidth="1.8" />
-                  <line x1="186" y1="40" x2="186" y2="56" strokeWidth="1.8" />
-
-                  {/* Fly */}
-                  <path d="M 140 56 L 140 106 Q 146 112 152 112" stroke="#1a1a1a" strokeWidth="1.2" />
-
-                  {/* Curved Front Pockets */}
-                  <path d="M 80 56 Q 96 66 98 90" stroke="#1a1a1a" strokeWidth="1.2" />
-                  <path d="M 200 56 Q 184 66 182 90" stroke="#1a1a1a" strokeWidth="1.2" />
-
-                  {/* Legs Outline */}
-                  <path d="M 78 56 Q 72 120 74 270 L 126 270 L 138 122 L 142 122 L 154 270 L 206 270 Q 208 120 202 56 Z" />
-
-                  {/* Hem Cuffs */}
-                  <line x1="74" y1="264" x2="126" y2="264" stroke="#94a3b8" strokeWidth="1" />
-                  <line x1="154" y1="264" x2="206" y2="264" stroke="#94a3b8" strokeWidth="1" />
-                </g>
-
-                {/* Measurement Lines: Front */}
-                <g stroke="#E07A5F" strokeWidth="1.5" strokeDasharray="4 3">
-                  {/* 1. Waist */}
-                  <line x1="78" y1="34" x2="202" y2="34" markerStart="url(#htm-arrow-start)" markerEnd="url(#htm-arrow-end)" />
-                  {/* 2. Thigh */}
-                  <line x1="74" y1="135" x2="138" y2="135" markerStart="url(#htm-arrow-start)" markerEnd="url(#htm-arrow-end)" />
-                  {/* 3. Inseam */}
-                  <line x1="140" y1="126" x2="126" y2="270" markerStart="url(#htm-arrow-start)" markerEnd="url(#htm-arrow-end)" />
-                  {/* 4. Length */}
-                  <line x1="64" y1="40" x2="64" y2="270" markerStart="url(#htm-arrow-start)" markerEnd="url(#htm-arrow-end)" />
-                </g>
-
-                {/* Labels: Front */}
-                <g transform="translate(125, 26)">
-                  <rect x="-2" y="-11" width="38" height="14" fill="#ffffff" fillOpacity="0.9" rx="3" />
-                  <text x="0" y="0" fill="#E07A5F" fontSize="10" fontFamily="sans-serif" fontWeight="700">Waist</text>
-                </g>
-                <g transform="translate(90, 128)">
-                  <rect x="-2" y="-11" width="36" height="14" fill="#ffffff" fillOpacity="0.9" rx="3" />
-                  <text x="0" y="0" fill="#E07A5F" fontSize="9.5" fontFamily="sans-serif" fontWeight="600">Thigh</text>
-                </g>
-                <g transform="translate(142, 200)">
-                  <rect x="-2" y="-11" width="44" height="14" fill="#ffffff" fillOpacity="0.9" rx="3" />
-                  <text x="0" y="0" fill="#E07A5F" fontSize="9.5" fontFamily="sans-serif" fontWeight="600">Inseam</text>
-                </g>
-                <g transform="translate(24, 155)">
-                  <rect x="-2" y="-11" width="42" height="14" fill="#ffffff" fillOpacity="0.9" rx="3" />
-                  <text x="0" y="0" fill="#E07A5F" fontSize="9.5" fontFamily="sans-serif" fontWeight="600">Length</text>
-                </g>
-              </svg>
+            <div className="htm-img-wrap">
+              <img
+                src="/images/size-guide/pants-front.png"
+                alt="Jeans measurement diagram – front view showing Waist and Inseam"
+                className="htm-garment-photo"
+                loading="lazy"
+                draggable="false"
+              />
             </div>
             <span className="htm-figure-caption">FRONT</span>
           </div>
 
-          {/* TROUSERS BACK */}
+          {/* PANTS BACK PHOTO */}
           <div className="htm-figure-card">
-            <div className="htm-svg-wrap">
-              <svg 
-                viewBox="0 0 280 320" 
-                className="htm-garment-svg" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                {/* Outline: Trousers Back */}
-                <g stroke="#1a1a1a" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  {/* Waistband */}
-                  <path d="M 80 40 L 200 40 L 202 56 L 78 56 Z" fill="#ffffff" />
-                  {/* Belt Loops */}
-                  <line x1="94" y1="40" x2="94" y2="56" strokeWidth="1.8" />
-                  <line x1="140" y1="40" x2="140" y2="56" strokeWidth="1.8" />
-                  <line x1="186" y1="40" x2="186" y2="56" strokeWidth="1.8" />
-
-                  {/* Back Yoke V-Seam */}
-                  <path d="M 78 72 L 140 84 L 202 72" stroke="#1a1a1a" strokeWidth="1.2" />
-
-                  {/* Back Patch Pockets */}
-                  <path d="M 94 92 L 126 92 L 124 126 L 110 136 L 96 126 Z" stroke="#1a1a1a" strokeWidth="1.2" />
-                  <path d="M 154 92 L 186 92 L 184 126 L 170 136 L 156 126 Z" stroke="#1a1a1a" strokeWidth="1.2" />
-
-                  {/* Legs Outline */}
-                  <path d="M 78 56 Q 72 120 74 270 L 126 270 L 138 126 L 142 126 L 154 270 L 206 270 Q 208 120 202 56 Z" />
-                </g>
-
-                {/* Measurement Lines: Back */}
-                <g stroke="#E07A5F" strokeWidth="1.5" strokeDasharray="4 3">
-                  {/* Hip Line across widest point */}
-                  <line x1="74" y1="108" x2="206" y2="108" markerStart="url(#htm-arrow-start)" markerEnd="url(#htm-arrow-end)" />
-                </g>
-
-                {/* Labels: Back */}
-                <g transform="translate(132, 102)">
-                  <rect x="-4" y="-11" width="30" height="14" fill="#ffffff" fillOpacity="0.9" rx="3" />
-                  <text x="0" y="0" fill="#E07A5F" fontSize="10" fontFamily="sans-serif" fontWeight="700">Hip</text>
-                </g>
-              </svg>
+            <div className="htm-img-wrap">
+              <img
+                src="/images/size-guide/pants-back.png"
+                alt="Jeans measurement diagram – back view showing Hip and Outseam"
+                className="htm-garment-photo"
+                loading="lazy"
+                draggable="false"
+              />
             </div>
             <span className="htm-figure-caption">BACK</span>
           </div>
