@@ -80,6 +80,7 @@ export default function Profile() {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelCustomReason, setCancelCustomReason] = useState('');
   const [orderFeedback, setOrderFeedback] = useState(null);
+  const [copiedOrderId, setCopiedOrderId] = useState(null);
 
   const openCancelModal = (order) => {
     setCancelModal({ open: true, order });
@@ -279,32 +280,41 @@ export default function Profile() {
 
                     return (
                       <div key={order.id} className="order-card">
-                        {/* Order Header */}
+                        {/* Order Header: 2 Structured Rows to prevent any overlap on mobile */}
                         <div className="order-card-header">
-                          <div className="order-header-left">
+                          <div className="order-card-header-top">
                             <div className="order-id-line">
                               <span className="order-id-label">Order</span>
-                              <span 
+                              <button 
+                                type="button"
                                 className="order-id-badge" 
-                                title={`Order ID: ${order.id} (Click to copy)`}
+                                title={`Full Order ID: ${order.id} (Click to copy)`}
                                 onClick={() => {
                                   if (navigator.clipboard?.writeText) {
                                     navigator.clipboard.writeText(order.id);
+                                    setCopiedOrderId(order.id);
+                                    setTimeout(() => setCopiedOrderId(null), 2000);
                                   }
                                 }}
                               >
-                                #{order.id}
-                              </span>
+                                <span className="order-id-text">
+                                  #{order.id.length > 18 ? `${order.id.substring(0, 14)}...` : order.id}
+                                </span>
+                                <span className="order-copy-icon" aria-label="Copy order id">
+                                  {copiedOrderId === order.id ? '✓ Copied' : '📋'}
+                                </span>
+                              </button>
                             </div>
-                            <span className="order-date-text">Placed on {formattedDate}</span>
-                          </div>
 
-                          <div className="order-header-right">
                             <span className={`order-status-pill ${statusClass}`}>
                               {order.status || 'Processing'}
                             </span>
+                          </div>
+
+                          <div className="order-card-header-sub">
+                            <span className="order-date-text">Placed on {formattedDate}</span>
                             <div className="order-total-price">
-                              ₹{order.totalAmount || order.finalTotal || 0}
+                              ₹{(order.totalAmount || order.finalTotal || 0).toLocaleString('en-IN')}
                             </div>
                           </div>
                         </div>
@@ -339,7 +349,7 @@ export default function Profile() {
                                 </div>
                               </div>
                               <div className="order-item-amount">
-                                ₹{(item.price || 0) * (item.quantity || 1)}
+                                ₹{((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}
                               </div>
                             </div>
                           ))}
@@ -362,12 +372,32 @@ export default function Profile() {
                         {/* Order Actions Footer */}
                         <div className="order-card-footer">
                           <div className="order-payment-desc">
-                            Payment: <strong>{order.paymentMethod === 'cod' || order.paymentMethod?.toLowerCase().includes('cash') ? 'Cash on Delivery' : (order.paymentMethod || 'Online')}</strong>
+                            <span className="payment-label">Payment:</span>
+                            <strong className="payment-method-val">
+                              {order.paymentMethod === 'cod' || order.paymentMethod?.toLowerCase().includes('cash') ? 'Cash on Delivery' : (order.paymentMethod || 'Online')}
+                            </strong>
                             {order.paymentStatus && <span className="status-tag">({order.paymentStatus})</span>}
                           </div>
 
+                          {isCancelled && (
+                            <div className="order-cancelled-banner">
+                              <div className="cancelled-banner-header">
+                                <span className="cancelled-banner-badge">✕ Order Cancelled</span>
+                                {order.cancelledBy && (
+                                  <span className="cancelled-by-text">
+                                    By: {order.cancelledBy === 'Admin' ? 'Store' : 'You'}
+                                  </span>
+                                )}
+                              </div>
+                              {order.cancellationReason && (
+                                <div className="order-cancel-reason-text">
+                                  Reason: {order.cancellationReason}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div className="order-actions-wrap">
-                            {/* Track Order option - ALWAYS available for all orders */}
                             <Link
                               to={`/track-order/${order.id}`}
                               className="btn-order-track"
@@ -396,22 +426,6 @@ export default function Profile() {
                               >
                                 {cancellingId === order.id ? 'Cancelling...' : 'Cancel Order'}
                               </button>
-                            )}
-
-                            {isCancelled && (
-                              <div className="order-cancelled-tag">
-                                <div>Order Cancelled</div>
-                                {order.cancellationReason && (
-                                  <div className="order-cancel-reason-text">
-                                    Reason: {order.cancellationReason}
-                                  </div>
-                                )}
-                                {order.cancelledBy && (
-                                  <div className="order-cancel-by-text">
-                                    By: {order.cancelledBy === 'Admin' ? 'Store' : 'You'}
-                                  </div>
-                                )}
-                              </div>
                             )}
                           </div>
                         </div>
