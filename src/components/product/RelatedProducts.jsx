@@ -4,7 +4,7 @@ import { useCart } from '../../context/CartContext';
 import ProductCard from '../ProductCard';
 import { getRelatedProducts } from '../../services/productService';
 
-export default function RelatedProducts({ currentProductId, category }) {
+export default function RelatedProducts({ currentProductId, category, currentProductSlug }) {
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
@@ -19,8 +19,15 @@ export default function RelatedProducts({ currentProductId, category }) {
     const fetchRelated = async () => {
       setLoading(true);
       try {
-        const data = await getRelatedProducts(category, currentProductId, 4);
-        setRelated(data);
+        const data = await getRelatedProducts(category, currentProductId, 6);
+        // Extra safety: filter out current product by ID, productId, and slug
+        const filtered = (data || []).filter(p => {
+          if (!p) return false;
+          if (currentProductId && (String(p.id || '').trim().toLowerCase() === String(currentProductId).trim().toLowerCase() || String(p.productId || '').trim().toLowerCase() === String(currentProductId).trim().toLowerCase())) return false;
+          if (currentProductSlug && String(p.slug || '').trim().toLowerCase() === String(currentProductSlug).trim().toLowerCase()) return false;
+          return true;
+        }).slice(0, 4);
+        setRelated(filtered);
       } catch (err) {
         console.error("Error fetching recommended products:", err);
       } finally {
@@ -28,7 +35,7 @@ export default function RelatedProducts({ currentProductId, category }) {
       }
     };
     fetchRelated();
-  }, [category, currentProductId]);
+  }, [category, currentProductId, currentProductSlug]);
 
   if (loading || !related || related.length === 0) return null;
 

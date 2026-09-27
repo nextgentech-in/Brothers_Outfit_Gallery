@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
-import { getShopProducts } from '../services/productService';
+import { getShopProducts, isProductInStock } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import './ShopPage.css';
@@ -152,7 +152,7 @@ export default function ShopPage() {
 
   // Comprehensive catalog filtering for category, search, price ranges, sizes, colors, and sorting
   const filtered = useMemo(() => {
-    let result = [...products];
+    let result = products.filter(p => isProductInStock(p));
 
     // Category Filter
     if (category && category !== 'All') {

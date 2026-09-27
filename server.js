@@ -722,9 +722,15 @@ async function calculateServerOrderTotal(items, couponCode) {
     const targetColor = item.color || item.selectedColor || null;
 
     if (product.variants && product.variants.length > 0 && targetSize) {
-      matchedVariant = product.variants.find(v =>
-        v.size === targetSize && (!targetColor || v.color === targetColor || v.color === 'Standard' || v.color === 'Default')
-      ) || product.variants.find(v => v.size === targetSize);
+      const cleanSize = String(targetSize).trim().toLowerCase();
+      const cleanColor = targetColor ? String(targetColor).trim().toLowerCase() : null;
+      matchedVariant = product.variants.find(v => {
+        const vSize = String(v.size || '').trim().toLowerCase();
+        if (vSize !== cleanSize) return false;
+        if (!cleanColor) return true;
+        const vCol = String(v.color || '').trim().toLowerCase();
+        return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+      }) || product.variants.find(v => String(v.size || '').trim().toLowerCase() === cleanSize);
       if (!matchedVariant) {
         throw new Error(`The selected size is no longer available for ${product.name || 'this item'}.`);
       }
@@ -1061,10 +1067,179 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       createdAt: FieldValue.serverTimestamp()
     });
 
+    // ─── Stock Decrement (runs in background, non-blocking) ───────────
+    // For each ordered item, decrement the matching variant stock (by size + color)
+    // and the product-level total stock in Firestore.
+    (async () => {
+      try {
+        for (const item of calculation.items) {
+          const productRef = db.collection('products').doc(item.productId);
+          const productSnap = await productRef.get();
+          if (!productSnap.exists) continue;
+
+          const productData = productSnap.data();
+          const variants = Array.isArray(productData.variants) ? [...productData.variants] : [];
+          const orderedQty = item.quantity || 1;
+          const orderedSize = item.size || item.selectedSize || null;
+          const orderedColor = item.color || item.selectedColor || null;
+
+          if (variants.length > 0 && orderedSize) {
+            const cleanSize = String(orderedSize).trim().toLowerCase();
+            const cleanColor = orderedColor ? String(orderedColor).trim().toLowerCase() : null;
+
+            // Find matching variant by size + color
+            let matchIdx = variants.findIndex(v => {
+              const vSize = String(v.size || '').trim().toLowerCase();
+              if (vSize !== cleanSize) return false;
+              if (!cleanColor) return true;
+              const vCol = String(v.color || '').trim().toLowerCase();
+              return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+            });
+            // Fallback: match by size only
+            if (matchIdx < 0) {
+              matchIdx = variants.findIndex(v => String(v.size || '').trim().toLowerCase() === cleanSize);
+            }
+
+            if (matchIdx >= 0) {
+              const currentStock = parseInt(variants[matchIdx].stock, 10) || 0;
+              variants[matchIdx] = {
+                ...variants[matchIdx],
+                stock: Math.max(0, currentStock - orderedQty)
+              };
+
+              // Recalculate total product stock from all variants
+              const newTotalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock, 10) || 0), 0);
+
+              await productRef.update({
+                variants: variants,
+                stock: newTotalStock,
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            }
+          } else {
+            // No variants — decrement product-level stock directly
+            const currentStock = parseInt(productData.stock, 10) || 0;
+            if (currentStock > 0) {
+              await productRef.update({
+                stock: Math.max(0, currentStock - orderedQty),
+                updatedAt: FieldValue.serverTimestamp()
+              });
+            }
+          }
+        }
+        // Invalidate server product cache so next request reflects new stock
+        productCatalogCache = { products: null, expiresAt: 0 };
+      } catch (stockErr) {
+        console.warn('Background stock decrement warning (order still valid):', stockErr.message);
+      }
+    })();
+
     res.status(201).json({ success: true, orderId, totalAmount: calculation.finalTotal });
   } catch (error) {
     console.error('Secure order creation failed:', error.message);
     res.status(400).json({ error: error.message || 'Unable to create order.' });
+  }
+});
+
+// ─── Public Customer Order Tracking API ──────────────────────────────────────
+app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
+
+  const rawQuery = String(req.body?.query || req.body?.orderId || '').trim();
+  if (!rawQuery) {
+    return res.status(400).json({ error: 'Please enter an Order ID, Mobile Number, or Waybill tracking number.' });
+  }
+
+  try {
+    const db = getTrustedFirestore();
+    const ordersCol = db.collection('orders');
+    const matchedMap = new Map();
+
+    // 1. Direct match by exact document ID
+    try {
+      const directDoc = await ordersCol.doc(rawQuery).get();
+      if (directDoc.exists) {
+        matchedMap.set(directDoc.id, { id: directDoc.id, ...directDoc.data() });
+      }
+    } catch {}
+
+    // 2. Search by Phone number (clean 10 digits)
+    const cleanPhone = rawQuery.replace(/\D/g, '').slice(-10);
+    if (matchedMap.size === 0 && cleanPhone.length === 10) {
+      try {
+        const snapPhone = await ordersCol.where('shippingAddress.phone', '==', cleanPhone).limit(5).get();
+        snapPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch {}
+
+      if (matchedMap.size === 0) {
+        try {
+          const snapUserPhone = await ordersCol.where('userPhone', '==', cleanPhone).limit(5).get();
+          snapUserPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
+        } catch {}
+      }
+    }
+
+    // 3. Search by Delhivery Waybill / AWB
+    if (matchedMap.size === 0) {
+      try {
+        const snapWaybill = await ordersCol.where('waybill', '==', rawQuery).limit(2).get();
+        snapWaybill.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch {}
+    }
+
+    // 4. Substring / Prefix match for short Order IDs (e.g. 311019e6)
+    if (matchedMap.size === 0 && rawQuery.length >= 6) {
+      try {
+        const allRecent = await ordersCol.orderBy('createdAt', 'desc').limit(40).get();
+        allRecent.forEach(d => {
+          if (d.id.toLowerCase().includes(rawQuery.toLowerCase())) {
+            matchedMap.set(d.id, { id: d.id, ...d.data() });
+          }
+        });
+      } catch {}
+    }
+
+    const matchedOrders = Array.from(matchedMap.values());
+    if (matchedOrders.length === 0) {
+      return res.status(404).json({
+        error: `No order found matching "${rawQuery}". Please check your Order ID or phone number.`
+      });
+    }
+
+    // Sanitize before returning to customer
+    const sanitized = matchedOrders.map(order => ({
+      id: order.id,
+      status: order.status || 'Processing',
+      waybill: order.waybill || null,
+      courier: order.courier || 'Delhivery Express',
+      trackingUrl: order.trackingUrl || (order.waybill ? `https://www.delhivery.com/track/package/${order.waybill}` : null),
+      createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : order.createdAt,
+      shippedAt: order.shippedAt?.toDate ? order.shippedAt.toDate().toISOString() : order.shippedAt || null,
+      totalAmount: order.totalAmount || order.finalTotal || 0,
+      paymentMethod: order.paymentMethod || 'Online',
+      paymentStatus: order.paymentStatus || 'Paid',
+      pickupAgentStatus: order.pickupAgentStatus || null,
+      shippingAddress: {
+        fullName: order.shippingAddress?.fullName || 'Valued Customer',
+        city: order.shippingAddress?.city || '',
+        state: order.shippingAddress?.state || '',
+        pincode: order.shippingAddress?.pincode || '',
+        phone: order.shippingAddress?.phone ? `${order.shippingAddress.phone.slice(0, 3)}****${order.shippingAddress.phone.slice(-3)}` : ''
+      },
+      items: (order.items || []).map(item => ({
+        name: item.name,
+        size: item.size || item.selectedSize || 'One Size',
+        color: item.color || item.selectedColor || 'Default',
+        quantity: item.quantity || 1,
+        price: item.price || 0,
+        image: item.image || item.thumbnailUrl || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'
+      }))
+    }));
+
+    res.json({ success: true, orders: sanitized });
+  } catch (error) {
+    console.error('Track order error:', error);
+    res.status(500).json({ error: 'Unable to track order. Please try again.' });
   }
 });
 
@@ -1264,6 +1439,8 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requi
     // Unique Delhivery Waybill / AWB
     const waybill = `DLH${Date.now()}${Math.floor(100 + Math.random() * 900)}`;
 
+    const warehouseName = (process.env.DELHIVERY_WAREHOUSE_NAME || 'Brothers Outfit Warehouse').trim();
+
     const payload = {
       shipments: [
         {
@@ -1276,18 +1453,17 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requi
           order: orderId,
           payment_mode: paymentMethod?.toLowerCase().includes('cash') ? 'COD' : 'Prepaid',
           cod_amount: paymentMethod?.toLowerCase().includes('cash') ? String(totalAmount) : '0',
-          waybill: waybill,
           products_desc: items ? items.map(i => i.name).join(', ') : 'Apparel',
           total_amount: String(totalAmount),
           seller_name: 'Brothers Outfit Gallery'
         }
       ],
       pickup_location: {
-        name: 'Brothers Outfit Warehouse'
+        name: warehouseName
       }
     };
 
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
     if (apiKey) {
       headers['Authorization'] = `Token ${apiKey}`;
     } else if (token) {
@@ -1295,26 +1471,31 @@ app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requi
       if (cmsClient) headers['Client-CMS'] = cmsClient;
     }
 
+    const formParams = new URLSearchParams();
+    formParams.append('format', 'json');
+    formParams.append('data', JSON.stringify(payload));
+
     try {
       const response = await fetch('https://track.delhivery.com/api/cmu/create.json', {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload)
+        body: formParams.toString()
       });
-      if (response.ok) {
-        const apiData = await response.json();
-        console.log('Delhivery API shipment creation response:', apiData);
-        if (apiData.packages && apiData.packages[0] && apiData.packages[0].waybill) {
-          return res.json({
-            success: true,
-            waybill: apiData.packages[0].waybill,
-            courier: 'Delhivery Express',
-            status: 'Manifested',
-            estimatedDelivery: '3-5 Days',
-            trackingUrl: `https://www.delhivery.com/track/package/${apiData.packages[0].waybill}`,
-            createdAt: new Date().toISOString()
-          });
-        }
+      const apiData = await response.json().catch(() => ({}));
+      console.log('Delhivery API shipment creation response:', apiData);
+      if (apiData.packages && apiData.packages[0] && apiData.packages[0].waybill) {
+        return res.json({
+          success: true,
+          waybill: apiData.packages[0].waybill,
+          courier: 'Delhivery Express',
+          status: 'Manifested',
+          estimatedDelivery: '3-5 Days',
+          trackingUrl: `https://www.delhivery.com/track/package/${apiData.packages[0].waybill}`,
+          createdAt: new Date().toISOString()
+        });
+      }
+      if (apiData.rmk) {
+        console.warn('Delhivery API remark:', apiData.rmk);
       }
     } catch (apiErr) {
       console.warn('Delhivery live API call warning:', apiErr.message);

@@ -160,6 +160,16 @@ export default function AdminLayout() {
                 </Link>
               );
             })}
+
+            {/* External: Delhivery Admin Portal */}
+            <a
+              href="https://one.delhivery.com/home"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="admin-sidebar__link admin-sidebar__external"
+            >
+              🚚 Delhivery Portal ↗
+            </a>
           </nav>
         </aside>
 

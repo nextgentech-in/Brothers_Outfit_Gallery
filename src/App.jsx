@@ -55,6 +55,7 @@ const ShippingPolicyPage = lazyWithRetry(() => import('./pages/ShippingPolicyPag
 const ReturnsPolicyPage = lazyWithRetry(() => import('./pages/ReturnsPolicyPage'));
 const PrivacyPolicyPage = lazyWithRetry(() => import('./pages/PrivacyPolicyPage'));
 const TermsPage = lazyWithRetry(() => import('./pages/TermsPage'));
+const TrackOrderPage = lazyWithRetry(() => import('./pages/TrackOrderPage'));
 
 // Auth Pages (Lazy)
 const Login = lazyWithRetry(() => import('./pages/Login'));
@@ -342,6 +343,8 @@ function AppContent() {
             <Route path="/wishlist" element={<WishlistPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmationPage />} />
+            <Route path="/track-order" element={<TrackOrderPage />} />
+            <Route path="/track-order/:orderId" element={<TrackOrderPage />} />
 
             {/* Policy & Legal Routes */}
             <Route path="/shipping" element={<ShippingPolicyPage />} />

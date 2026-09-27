@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
 import { validateCoupon } from '../services/couponService';
+import { invalidateProductCache } from '../services/productService';
 import { getBackendUrl } from '../utils/apiConfig';
 import { getProductDisplayName } from '../utils/productUtils';
 import AuthModal from '../components/auth/AuthModal';
@@ -361,6 +362,7 @@ export default function CheckoutPage() {
         try {
           localStorage.setItem('last_placed_order', newOrderId);
         } catch { }
+        invalidateProductCache();
         clearCart();
         navigate(`/order-confirmation/${newOrderId}`);
       } catch (err) {
@@ -465,6 +467,7 @@ export default function CheckoutPage() {
               localStorage.setItem('last_placed_order', newOrderId);
             } catch { }
 
+            invalidateProductCache();
             clearCart();
             navigate(`/order-confirmation/${newOrderId}`);
           } catch (err) {
