@@ -5,6 +5,7 @@ import ProductGallery from '../components/product/ProductGallery';
 import ProductInfo from '../components/product/ProductInfo';
 import ReviewsModule from '../components/product/ReviewsModule';
 import RelatedProducts from '../components/product/RelatedProducts';
+import { getProductDisplayName } from '../utils/productUtils';
 import './ProductPage.css';
 
 export default function ProductPage() {
@@ -133,8 +134,8 @@ export default function ProductPage() {
             </>
           )}
           <span className="breadcrumb-separator">/</span>
-          <span className="breadcrumb-current" title={product.title || product.name}>
-            {product.title || product.name}
+          <span className="breadcrumb-current" title={getProductDisplayName(product.title || product.name)}>
+            {getProductDisplayName(product.title || product.name)}
           </span>
         </nav>
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
-import { isClothingProduct } from '../../utils/productUtils';
+import { getProductDisplayName, isClothingProduct } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
 import SizeGuideModal from '../common/SizeGuideModal';
 import AuthModal from '../auth/AuthModal';
@@ -153,8 +153,9 @@ export default function ProductInfo({ product, onColorChange }) {
   const reviewCount = Number(product.reviewsCount || product.reviewCount || (Array.isArray(product.reviews) ? product.reviews.length : 0));
 
   const {
-    name, offer_enabled, offer_end_at, description, shortDescription
+    name: productName, offer_enabled, offer_end_at, description, shortDescription
   } = product;
+  const name = getProductDisplayName(productName);
 
   // Stock status for selected size or whole product
   const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : productTotalStock;

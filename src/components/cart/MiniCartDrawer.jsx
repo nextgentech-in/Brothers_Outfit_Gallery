@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useFocusTrap } from '../../utils/a11yUtils';
 import { optimizeImage } from '../../utils/imageUtils';
+import { getProductDisplayName } from '../../utils/productUtils';
 import './MiniCartDrawer.css';
 
 export default function MiniCartDrawer() {
@@ -118,7 +119,7 @@ export default function MiniCartDrawer() {
                   >
                     <img 
                       src={optimizeImage(item.image, 160)} 
-                      alt={item.name} 
+                      alt={getProductDisplayName(item.name)}
                       className="mini-cart-item-img"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
@@ -134,13 +135,13 @@ export default function MiniCartDrawer() {
                         onClick={closeCartDrawer}
                         className="mini-cart-item-name"
                       >
-                        {item.name}
+                        {getProductDisplayName(item.name)}
                       </Link>
                       <button 
                         type="button" 
                         className="mini-cart-item-remove"
                         onClick={() => removeFromCart(item.cartItemId)}
-                        aria-label={`Remove ${item.name} from cart`}
+                        aria-label={`Remove ${getProductDisplayName(item.name)} from cart`}
                         title="Remove item"
                       >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

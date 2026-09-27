@@ -11,6 +11,7 @@ import React from 'react';
 export default function HowToMeasureDiagram({ category = 'shirts' }) {
   const cat = (category || '').toLowerCase();
   const isBottomwear = cat.includes('jean') || cat.includes('trouser') || cat.includes('pant') || cat.includes('short');
+  const isKurta = cat.includes('kurta') || cat.includes('ethnic');
 
   return (
     <div className="how-to-measure-diagram-container">
@@ -19,7 +20,7 @@ export default function HowToMeasureDiagram({ category = 'shirts' }) {
         <div className="htm-diagram-rule" />
       </div>
 
-      {!isBottomwear ? (
+      {!isBottomwear && !isKurta ? (
         /* ───────── Tops / Shirts / T-Shirts / Jackets Diagram ───────── */
         <div className="htm-figures-row">
           
@@ -190,6 +191,54 @@ export default function HowToMeasureDiagram({ category = 'shirts' }) {
             <span className="htm-figure-caption">BACK</span>
           </div>
 
+        </div>
+      ) : isKurta ? (
+        <div className="htm-figures-row">
+          <div className="htm-figure-card">
+            <div className="htm-svg-wrap">
+              <svg viewBox="0 0 280 320" className="htm-garment-svg" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kurta front measurements: chest, body length, and sleeve">
+                <defs>
+                  <marker id="kurta-measure-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#c65d47" strokeWidth="1.5" />
+                  </marker>
+                </defs>
+                <path d="M92 42 L112 32 L168 32 L188 42 L226 70 L207 128 L190 119 L193 292 L87 292 L90 119 L73 128 L54 70 Z" fill="#fff" stroke="#18202c" strokeWidth="2.2" strokeLinejoin="round" />
+                <path d="M112 32 L122 55 L140 44 L158 55 L168 32 M140 44 L140 164" stroke="#18202c" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M91 250 L91 292 M189 250 L189 292" stroke="#64748b" strokeWidth="1.4" />
+                <circle cx="140" cy="68" r="2" fill="#c65d47" />
+                <circle cx="140" cy="88" r="2" fill="#c65d47" />
+                <circle cx="140" cy="108" r="2" fill="#c65d47" />
+                <line x1="79" y1="137" x2="201" y2="137" stroke="#c65d47" strokeWidth="1.6" strokeDasharray="4 3" markerStart="url(#kurta-measure-arrow)" markerEnd="url(#kurta-measure-arrow)" />
+                <line x1="205" y1="48" x2="205" y2="291" stroke="#c65d47" strokeWidth="1.6" strokeDasharray="4 3" markerStart="url(#kurta-measure-arrow)" markerEnd="url(#kurta-measure-arrow)" />
+                <line x1="218" y1="73" x2="235" y2="124" stroke="#c65d47" strokeWidth="1.6" strokeDasharray="4 3" markerStart="url(#kurta-measure-arrow)" markerEnd="url(#kurta-measure-arrow)" />
+                <g fill="#9f3f2d" fontFamily="sans-serif" fontSize="10" fontWeight="700">
+                  <text x="103" y="130">CHEST</text>
+                  <text x="207" y="180" transform="rotate(90 207 180)">KURTA LENGTH</text>
+                  <text x="210" y="68" transform="rotate(72 210 68)">SLEEVE</text>
+                </g>
+              </svg>
+            </div>
+            <span className="htm-figure-caption">FRONT — CHEST, LENGTH & SLEEVE</span>
+          </div>
+          <div className="htm-figure-card">
+            <div className="htm-svg-wrap">
+              <svg viewBox="0 0 280 320" className="htm-garment-svg" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kurta back measurements: shoulder and body length">
+                <defs>
+                  <marker id="kurta-back-measure-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#c65d47" strokeWidth="1.5" />
+                  </marker>
+                </defs>
+                <path d="M92 42 L112 32 L168 32 L188 42 L226 70 L207 128 L190 119 L193 292 L87 292 L90 119 L73 128 L54 70 Z" fill="#fff" stroke="#18202c" strokeWidth="2.2" strokeLinejoin="round" />
+                <path d="M112 32 Q140 47 168 32 M75 82 Q140 92 205 82 M91 250 L91 292 M189 250 L189 292" stroke="#64748b" strokeWidth="1.5" />
+                <path d="M93 56 L187 56 M207 48 L207 291" stroke="#c65d47" strokeWidth="1.6" strokeDasharray="4 3" markerStart="url(#kurta-back-measure-arrow)" markerEnd="url(#kurta-back-measure-arrow)" />
+                <g fill="#9f3f2d" fontFamily="sans-serif" fontSize="10" fontWeight="700">
+                  <text x="119" y="50">SHOULDER</text>
+                  <text x="209" y="176" transform="rotate(90 209 176)">BACK LENGTH</text>
+                </g>
+              </svg>
+            </div>
+            <span className="htm-figure-caption">BACK — SHOULDER & LENGTH</span>
+          </div>
         </div>
       ) : (
         /* ───────── Bottomwear / Jeans / Trousers Diagram ───────── */

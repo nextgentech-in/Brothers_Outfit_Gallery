@@ -247,17 +247,22 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
     const val = parseFloat(measurementInput);
     if (!val || isNaN(val) || val <= 0) return null;
 
-    if (activeTab === 'shirts' || activeTab === 'jackets') {
+    if (activeTab === 'shirts' || activeTab === 'jackets' || activeTab === 'kurta') {
       const chestInches = unit === 'cm' ? (val / 2.54) : val;
       let targetInches = chestInches;
-      if (fitPreference === 'slim') targetInches -= 1;
-      if (fitPreference === 'relaxed') targetInches += 2;
+      if (activeTab === 'kurta') targetInches += 3;
+      else {
+        if (fitPreference === 'slim') targetInches -= 1;
+        if (fitPreference === 'relaxed') targetInches += 2;
+      }
 
       const chart = SIZE_CHARTS[activeTab];
       const match = chart.data.find(row => row.chestIn >= targetInches) || chart.data[chart.data.length - 1];
       return {
         size: match.size,
-        text: `Based on your ${val} ${unit.toUpperCase()} chest measurement (${fitPreference} fit):`,
+        text: activeTab === 'kurta'
+          ? `Based on your ${val} ${unit.toUpperCase()} chest plus 3 in of kurta ease:`
+          : `Based on your ${val} ${unit.toUpperCase()} chest measurement (${fitPreference} fit):`,
         recommendedSize: match.size
       };
     }

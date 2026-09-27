@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { getHomepageConfig, saveHomepageConfig, getAdminProducts, toggleProductTrending } from '../../services/adminService';
 import { uploadImageToImageKit } from '../../utils/imageUtils';
+import { getShopProducts } from '../../services/productService';
+import { getHomepageCategoryItems } from '../../utils/productUtils';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminHomepage.css';
 
@@ -12,13 +14,15 @@ const PRESET_BANNERS = [
 ];
 
 export default function AdminHomepage() {
-  const [activeTab, setActiveTab] = useState('hero'); // 'hero' | 'trending' | 'sections'
+  const [activeTab, setActiveTab] = useState('hero'); // 'hero' | 'trending' | 'categories' | 'sections'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
   const { showToast } = useAdminUI();
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [uploadingCategoryId, setUploadingCategoryId] = useState(null);
 
   // Catalog products for Trending placement manager
   const [catalogProducts, setCatalogProducts] = useState([]);
@@ -27,6 +31,7 @@ export default function AdminHomepage() {
 
   const [config, setConfig] = useState({
     showHero: true,
+    showCategories: true,
     showTrending: true,
     showSaleSection: true,
     showNewArrivals: true,
@@ -34,6 +39,8 @@ export default function AdminHomepage() {
     showAboutPreview: true,
     showTrustBadges: true,
     showReviews: true,
+    categories: [],
+    categoriesConfigured: false,
     trending: {
       label: 'CURATED FOR YOU',
       title: 'TRENDING NOW',
@@ -59,26 +66,35 @@ export default function AdminHomepage() {
     async function load() {
       setLoading(true);
       try {
-        const [data, productsData] = await Promise.all([
+        const [data, productsData, shopData] = await Promise.all([
           getHomepageConfig(),
-          getAdminProducts().catch(() => [])
+          getAdminProducts().catch(() => []),
+          getShopProducts('All', 'featured', null, 8).catch(err => {
+            console.error('Failed to load storefront categories:', err);
+            return { products: [] };
+          })
         ]);
-        if (data && Object.keys(data).length > 0) {
-          setConfig(prev => ({
-            ...prev,
-            ...data,
-            hero: {
-              ...prev.hero,
-              ...(data.hero || {})
-            },
-            trending: {
-              label: 'CURATED FOR YOU',
-              title: 'TRENDING NOW',
-              subtitle: "Discover the styles defining men's fashion right now.",
-              ...(data.trending || {})
-            }
-          }));
-        }
+        const savedCategories = Array.isArray(data?.categories) ? data.categories : [];
+        const categoriesConfigured = data?.categoriesConfigured ?? savedCategories.length > 0;
+        const categories = categoriesConfigured || savedCategories.length > 0
+          ? getHomepageCategoryItems(shopData.products, savedCategories)
+          : getHomepageCategoryItems(shopData.products);
+        setConfig(prev => ({
+          ...prev,
+          ...(data || {}),
+          categories,
+          categoriesConfigured,
+          hero: {
+            ...prev.hero,
+            ...(data?.hero || {})
+          },
+          trending: {
+            label: 'CURATED FOR YOU',
+            title: 'TRENDING NOW',
+            subtitle: "Discover the styles defining men's fashion right now.",
+            ...(data?.trending || {})
+          }
+        }));
         setCatalogProducts(productsData || []);
       } catch (err) {
         console.error('Failed to load homepage config:', err);
@@ -137,6 +153,77 @@ export default function AdminHomepage() {
     setSaveStatus(null);
   };
 
+  const handleAddCategory = (e) => {
+    e.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    if (config.categories.some(category => category.name?.trim().toLowerCase() === name.toLowerCase())) {
+      showToast('That homepage category already exists.', 'warning');
+      return;
+    }
+
+    setConfig(prev => ({
+      ...prev,
+      categoriesConfigured: true,
+      categories: [...prev.categories, { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name, category: name, image: '' }]
+    }));
+    setNewCategoryName('');
+    setSaveStatus(null);
+  };
+
+  const handleCategoryChange = (categoryId, field, value) => {
+    setConfig(prev => ({
+      ...prev,
+      categoriesConfigured: true,
+      categories: prev.categories.map(category =>
+        category.id === categoryId
+          ? {
+            ...category,
+            [field]: value,
+            ...(field === 'name' && category.category === category.name ? { category: value } : {})
+          }
+          : category
+      )
+    }));
+    setSaveStatus(null);
+  };
+
+  const handleCategoryImageUpload = async (categoryId, e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file.', 'warning');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Image size exceeds 10MB. Please choose a smaller image.', 'error');
+      return;
+    }
+
+    setUploadingCategoryId(categoryId);
+    try {
+      const result = await uploadImageToImageKit(file, 'categories/');
+      if (!result?.url) throw new Error('The image upload did not return a URL.');
+      handleCategoryChange(categoryId, 'image', result.url);
+      showToast('Category image uploaded. Save homepage changes to publish it.', 'success');
+    } catch (err) {
+      console.error('Category image upload error:', err);
+      showToast(`Category image upload failed: ${err.message || 'Please try again.'}`, 'error');
+    } finally {
+      setUploadingCategoryId(null);
+    }
+  };
+
+  const handleRemoveCategory = (categoryId) => {
+    setConfig(prev => ({
+      ...prev,
+      categoriesConfigured: true,
+      categories: prev.categories.filter(category => category.id !== categoryId)
+    }));
+    setSaveStatus(null);
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -171,11 +258,34 @@ export default function AdminHomepage() {
   };
 
   const handleSave = async () => {
+    const invalidCategory = config.categories.find(category => !category.name?.trim() || !(category.category || category.name)?.trim());
+    if (invalidCategory) {
+      setActiveTab('categories');
+      setSaveStatus({ type: 'error', text: 'Each homepage category needs both a tile label and a product category.' });
+      return;
+    }
+    const categoryNames = config.categories.map(category => category.name.trim().toLowerCase());
+    if (new Set(categoryNames).size !== categoryNames.length) {
+      setActiveTab('categories');
+      setSaveStatus({ type: 'error', text: 'Homepage category tile labels must be unique.' });
+      return;
+    }
+    if (uploadingImage || uploadingCategoryId || saving) return;
+
+    const configToSave = {
+      ...config,
+      categories: config.categories.map(category => ({
+        ...category,
+        name: category.name.trim(),
+        category: (category.category || category.name).trim()
+      }))
+    };
     setSaving(true);
     setSaveStatus(null);
     try {
-      await saveHomepageConfig(config);
-      setSaveStatus({ type: 'success', text: '🎉 Homepage & Hero banner updated! Changes are live on the store in 0ms.' });
+      await saveHomepageConfig(configToSave);
+      setConfig(configToSave);
+      setSaveStatus({ type: 'success', text: 'Homepage settings saved successfully.' });
       setTimeout(() => setSaveStatus(null), 6000);
     } catch (err) {
       console.error('Error saving homepage config:', err);
@@ -203,6 +313,7 @@ export default function AdminHomepage() {
 
   const sections = [
     { key: 'showHero', title: 'Hero Banner Section', desc: 'Main full-width banner with headline and calls to action' },
+    { key: 'showCategories', title: 'Shop by Category Grid', desc: 'Image-led category links displayed below the hero banner' },
     { key: 'showTrending', title: 'Trending Now Carousel', desc: 'Infinite horizontal scrolling carousel of curated trends' },
     { key: 'showSaleSection', title: 'Limited Time Sale Banner', desc: 'Active sales products grid with live countdown timer' },
     { key: 'showNewArrivals', title: 'New Arrivals Grid', desc: 'Fresh arrivals catalog added in the last 15 days' },
@@ -228,7 +339,7 @@ export default function AdminHomepage() {
           <button 
             type="button" 
             onClick={handleSave} 
-            disabled={saving}
+            disabled={saving || uploadingImage || Boolean(uploadingCategoryId)}
             className="admin-btn-primary"
             style={{ padding: '10px 22px', fontSize: '13px', letterSpacing: '0.5px' }}
           >
@@ -247,61 +358,40 @@ export default function AdminHomepage() {
       </div>
 
       {/* Tabs */}
-      <div className="admin-tabs" style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '28px' }}>
+      <div className="admin-tabs" role="tablist" aria-label="Homepage manager sections">
         <button
+          role="tab"
+          aria-selected={activeTab === 'hero'}
           type="button"
           onClick={() => setActiveTab('hero')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'hero' ? '2px solid #0f172a' : '2px solid transparent',
-            color: activeTab === 'hero' ? '#0f172a' : '#64748b',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
+          className={`admin-homepage-tab${activeTab === 'hero' ? ' is-active' : ''}`}
         >
           🎨 Hero Banner & Content
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'trending'}
           type="button"
           onClick={() => setActiveTab('trending')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'trending' ? '2px solid #0f172a' : '2px solid transparent',
-            color: activeTab === 'trending' ? '#0f172a' : '#64748b',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
+          className={`admin-homepage-tab${activeTab === 'trending' ? ' is-active' : ''}`}
         >
           🔥 Trending Section ({catalogProducts.filter(p => p.isTrending === true).length})
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'categories'}
+          type="button"
+          onClick={() => setActiveTab('categories')}
+          className={`admin-homepage-tab${activeTab === 'categories' ? ' is-active' : ''}`}
+        >
+          🛍️ Categories ({config.categories.length})
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'sections'}
           type="button"
           onClick={() => setActiveTab('sections')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'sections' ? '2px solid #0f172a' : '2px solid transparent',
-            color: activeTab === 'sections' ? '#0f172a' : '#64748b',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
+          className={`admin-homepage-tab${activeTab === 'sections' ? ' is-active' : ''}`}
         >
           👁️ Section Visibility
         </button>
@@ -901,19 +991,99 @@ export default function AdminHomepage() {
         </div>
       )}
 
-      {/* TAB 2: SECTIONS VISIBILITY */}
+      {activeTab === 'categories' && (
+        <section className="homepage-category-editor" role="tabpanel">
+          <div className="homepage-category-editor__header">
+            <div>
+              <h2>Homepage Categories</h2>
+              <p>Add, edit, or replace the photos for category tiles shown on the storefront.</p>
+            </div>
+            <form className="homepage-category-add" onSubmit={handleAddCategory}>
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={e => setNewCategoryName(e.target.value)}
+                placeholder="Category name"
+                aria-label="New homepage category name"
+                maxLength={40}
+              />
+              <button type="submit" disabled={!newCategoryName.trim() || saving || Boolean(uploadingCategoryId)}>Add Category</button>
+            </form>
+          </div>
+
+          {config.categories.length === 0 ? (
+            <p className="homepage-category-empty">
+              No custom categories yet. Add one to replace the automatically selected category tiles on the storefront.
+            </p>
+          ) : (
+            <div className="homepage-category-list">
+              {config.categories.map(category => (
+                <article className="homepage-category-item" key={category.id}>
+                  <div className="homepage-category-image">
+                    {category.image
+                      ? <img src={category.image} alt={`${category.name} category preview`} />
+                      : <span>White-background image preview</span>}
+                  </div>
+                  <div className="homepage-category-fields">
+                    <label>
+                      Tile label
+                      <input
+                        type="text"
+                        value={category.name}
+                        onChange={e => handleCategoryChange(category.id, 'name', e.target.value)}
+                        maxLength={40}
+                        disabled={saving}
+                      />
+                    </label>
+                    <label>
+                      Product category
+                      <input
+                        type="text"
+                        value={category.category || category.name}
+                        onChange={e => handleCategoryChange(category.id, 'category', e.target.value)}
+                        maxLength={40}
+                        disabled={saving}
+                      />
+                    </label>
+                    <div className="homepage-category-actions">
+                      <label className="homepage-category-upload">
+                        {uploadingCategoryId === category.id ? 'Uploading photo…' : category.image ? 'Replace photo' : 'Upload photo'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          disabled={saving || Boolean(uploadingCategoryId)}
+                          onChange={e => handleCategoryImageUpload(category.id, e)}
+                        />
+                      </label>
+                      {category.image && (
+                        <button type="button" onClick={() => handleCategoryChange(category.id, 'image', '')} disabled={saving || Boolean(uploadingCategoryId)}>
+                          Remove photo
+                        </button>
+                      )}
+                      <button type="button" onClick={() => handleRemoveCategory(category.id)} disabled={saving || Boolean(uploadingCategoryId)}>
+                        Remove category
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* TAB: SECTIONS VISIBILITY */}
       {activeTab === 'sections' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
-            <button 
-              type="button" 
+        <div role="tabpanel">
+          <div className="homepage-sections-actions">
+            <button
+              type="button"
               onClick={handleEnableAll}
-              style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+              className="homepage-enable-all"
             >
               Enable All Sections
             </button>
           </div>
-
           <div className="homepage-sections-list">
             {sections.map(sec => (
               <div key={sec.key} className="section-toggle-card">
@@ -922,10 +1092,10 @@ export default function AdminHomepage() {
                   <p>{sec.desc}</p>
                 </div>
                 <label className="switch">
-                  <input 
-                    type="checkbox" 
-                    checked={config[sec.key] !== false} 
-                    onChange={() => handleToggle(sec.key)} 
+                  <input
+                    type="checkbox"
+                    checked={config[sec.key] !== false}
+                    onChange={() => handleToggle(sec.key)}
                   />
                   <span className="slider round"></span>
                 </label>
@@ -938,8 +1108,8 @@ export default function AdminHomepage() {
       {/* Bottom Save Action */}
       <div style={{ marginTop: '36px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
         <button 
-          onClick={handleSave} 
-          disabled={saving} 
+          onClick={handleSave}
+          disabled={saving || uploadingImage || Boolean(uploadingCategoryId)}
           className="admin-btn-primary"
           style={{ padding: '14px 36px', fontSize: '14px', letterSpacing: '1px' }}
         >

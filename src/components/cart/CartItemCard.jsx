@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { getProductDisplayName } from '../../utils/productUtils';
 import './CartItemCard.css';
 
 export default function CartItemCard({ item }) {
   const { updateQuantity, removeFromCart } = useCart();
+  const productName = getProductDisplayName(item.name);
   
   const handleQuantity = (delta) => {
     updateQuantity(item.cartItemId, item.quantity + delta);
@@ -12,13 +14,13 @@ export default function CartItemCard({ item }) {
   return (
     <div className="cart-item-card">
       <Link to={`/product/${item.slug}`} className="cart-item-image-link">
-        <img src={item.image} alt={item.name} className="cart-item-img" />
+        <img src={item.image} alt={productName} className="cart-item-img" />
       </Link>
       
       <div className="cart-item-details">
         <div className="cart-item-header">
           <Link to={`/product/${item.slug}`} className="cart-item-title">
-            {item.name}
+            {productName}
           </Link>
           <span className="cart-item-price">₹{item.price}</span>
         </div>

@@ -1,12 +1,14 @@
 import React from 'react';
 import { useCart } from '../../context/CartContext';
 import { optimizeImage } from '../../utils/imageUtils';
+import { getProductDisplayName } from '../../utils/productUtils';
 import './CartToast.css';
 
 export default function CartToast() {
   const { cartToast, hideToast, openCartDrawer } = useCart();
 
   if (!cartToast) return null;
+  const productName = getProductDisplayName(cartToast.name);
 
   return (
     <div className="cart-toast" role="status" aria-live="polite">
@@ -14,7 +16,7 @@ export default function CartToast() {
         {cartToast.image && (
           <img 
             src={optimizeImage(cartToast.image, 100)} 
-            alt={cartToast.name} 
+            alt={productName}
             className="cart-toast-thumb"
             onError={(e) => {
               e.currentTarget.onerror = null;
@@ -26,7 +28,7 @@ export default function CartToast() {
           <div className="cart-toast-badge">
             <span className="cart-toast-check">✓</span> ADDED TO BAG
           </div>
-          <span className="cart-toast-name">{cartToast.name}</span>
+          <span className="cart-toast-name">{productName}</span>
           <span className="cart-toast-variant">
             {cartToast.size && `Size: ${cartToast.size}`}
             {cartToast.color && cartToast.color !== 'Standard' && cartToast.color !== 'Default' ? ` • ${cartToast.color}` : ''}

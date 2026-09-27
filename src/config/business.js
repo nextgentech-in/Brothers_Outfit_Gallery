@@ -8,7 +8,7 @@ export const businessInfo = {
   googleMapsUrl: "https://maps.app.goo.gl/LdPv9pHvtFU8cj4E8",
   
   // Real business location details
-  address: "Pratham Square, Sahakari Jin Road, Himatnagar, Gujarat 383001",
+  address: "FF 57, Pratham Square, Sahakari Jin Rd, Anant Vihar Society, Himatnagar, Gujarat 383001",
   phone: "+91 84602 33020",
   email: "contact@brothersoutfit.com",
   coordinates: {
@@ -17,8 +17,8 @@ export const businessInfo = {
   },
   
   openingHours: [
-    { day: "Monday - Saturday", hours: "10:00 AM - 9:30 PM" },
-    { day: "Sunday", hours: "10:30 AM - 9:00 PM" }
+    { day: "Monday - Saturday", hours: "10:00 AM - 8:00 PM" },
+    { day: "Sunday", hours: "Closed" }
   ],
   
   // SEO variables

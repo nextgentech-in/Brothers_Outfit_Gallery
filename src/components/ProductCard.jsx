@@ -4,6 +4,7 @@ import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
+import { getProductDisplayName, getProductImages } from '../utils/productUtils';
 import AuthModal from './auth/AuthModal';
 import './ProductCard.css';
 
@@ -72,6 +73,7 @@ function useCountdown(endDateStr) {
 }
 
 function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
+  const productName = getProductDisplayName(product.name);
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -171,13 +173,18 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   };
 
   // Multiple photos support
-  const rawImages = (product.images && product.images.length > 0)
-    ? product.images
-    : [product.image || product.thumbnailUrl || '/images/hero.png'];
+  const rawImages = getProductImages(product);
 
-  const imagesList = rawImages.map(img => (typeof img === 'object' && img !== null && img.url) ? img.url : img).filter(Boolean);
+  const imagesList = rawImages
+    .map(img => (typeof img === 'object' && img !== null ? img.url || img.thumbnailUrl : img))
+    .filter(Boolean);
   const [activeImgIdx, setActiveImgIdx] = useState(0);
   const hasMultipleImages = imagesList.length > 1;
+  const visibleDotStart = Math.max(0, Math.min(activeImgIdx - 2, imagesList.length - 5));
+  const visibleImageIndices = Array.from(
+    { length: Math.min(5, imagesList.length) },
+    (_, index) => visibleDotStart + index
+  );
   const touchStartX = useRef(null);
 
   const handleTouchStart = (e) => {
@@ -212,7 +219,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         <Link to={`/product/${product.slug}`} className="product-card__image-link">
           <img
             src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 800)}
-            alt={`${product.name} - View ${activeImgIdx + 1}`}
+            alt={`${productName} - View ${activeImgIdx + 1}`}
             className="product-card__image"
             loading="lazy"
             onError={(e) => {
@@ -247,7 +254,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
             e.stopPropagation();
             if (toggleWishlist) toggleWishlist(product);
           }}
-          aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          aria-label={inWishlist ? `Remove ${productName} from wishlist` : `Add ${productName} to wishlist`}
           title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#c0392b" : "none"} stroke={inWishlist ? "#c0392b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -286,7 +293,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
 
             {/* Pagination Dots */}
             <div className="card-img-dots" role="tablist" aria-label="Product photos">
-              {imagesList.map((_, i) => (
+              {visibleImageIndices.map(i => (
                 <button
                   key={i}
                   type="button"
@@ -329,7 +336,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         </div>
 
         <Link to={`/product/${product.slug}`} className="product-card__name">
-          {product.name}
+          {productName}
         </Link>
 
         {/* Sizes */}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
+import { getProductDisplayName } from '../utils/productUtils';
 import './Profile.css';
 
 const CUSTOMER_CANCEL_REASONS = [
@@ -305,12 +306,12 @@ export default function Profile() {
                             <div key={idx} className="order-item-row">
                               <img
                                 src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'}
-                                alt={item.name}
+                                alt={getProductDisplayName(item.name)}
                                 className="order-item-img"
                               />
                               <div className="order-item-content">
-                                <div className="order-item-title" title={item.name}>
-                                  {item.name}
+                                <div className="order-item-title" title={getProductDisplayName(item.name)}>
+                                  {getProductDisplayName(item.name)}
                                 </div>
                                 <div className="order-item-meta-row">
                                   {item.size && (

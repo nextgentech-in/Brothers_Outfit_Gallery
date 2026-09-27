@@ -6,9 +6,11 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import AuthModal from './auth/AuthModal';
+import { getProductDisplayName } from '../utils/productUtils';
 import './SaleProductCard.css';
 
 export default function SaleProductCard({ product, onAddToCart, onOfferExpire }) {
+  const productName = getProductDisplayName(product.name);
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -100,7 +102,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
         <Link to={`/product/${product.slug}`} style={{ display: 'block', width: '100%', height: '100%' }}>
           <img
             src={optimizeImage(product.image || product.thumbnailUrl, 800)}
-            alt={product.name}
+            alt={productName}
             className="sale-card__image"
             loading="lazy"
             onError={(e) => {
@@ -128,7 +130,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
             e.stopPropagation();
             if (toggleWishlist) toggleWishlist(product);
           }}
-          aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          aria-label={inWishlist ? `Remove ${productName} from wishlist` : `Add ${productName} to wishlist`}
           title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#c0392b" : "none"} stroke={inWishlist ? "#c0392b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -140,7 +142,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
       {/* Card Info */}
       <div className="sale-card__info">
         <Link to={`/product/${product.slug}`} className="sale-card__name">
-          {product.name}
+          {productName}
         </Link>
         
         {/* Dynamic Countdown */}
@@ -211,4 +213,3 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     </div>
   );
 }
-

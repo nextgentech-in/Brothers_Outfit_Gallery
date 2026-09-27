@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { getProductDisplayName } from '../utils/productUtils';
 
 const CartContext = createContext();
 
@@ -120,7 +121,7 @@ export const CartProvider = ({ children }) => {
         cartItemId,
         id: product.id,
         productId: product.id,
-        name: product.name,
+        name: getProductDisplayName(product.name),
         image: product.image || product.thumbnailUrl,
         slug: product.slug,
         size: safeSize,
@@ -133,7 +134,7 @@ export const CartProvider = ({ children }) => {
 
     showToast({
       id: product.id,
-      name: product.name,
+      name: getProductDisplayName(product.name),
       image: product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
       size: safeSize,
       color: safeColor,
@@ -153,7 +154,7 @@ export const CartProvider = ({ children }) => {
       cartItemId: `${product.id}-${safeSize}-${safeColor}`,
       id: product.id,
       productId: product.id,
-      name: product.name,
+      name: getProductDisplayName(product.name),
       image: product.image || product.thumbnailUrl,
       slug: product.slug,
       size: safeSize,
@@ -234,4 +235,3 @@ export const CartProvider = ({ children }) => {
     </CartContext.Provider>
   );
 };
-

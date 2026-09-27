@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { optimizeImage } from '../utils/imageUtils';
+import { getProductDisplayName } from '../utils/productUtils';
 import './WishlistPage.css';
 
 export default function WishlistPage() {
@@ -81,6 +82,7 @@ export default function WishlistPage() {
             {wishlistItems.map((item) => {
               const hasDiscount = item.mrp && item.mrp > item.price;
               const discountPct = hasDiscount ? Math.round(((item.mrp - item.price) / item.mrp) * 100) : 0;
+              const productName = getProductDisplayName(item.name);
 
               return (
                 <div key={item.id} className="wishlist-card">
@@ -89,7 +91,7 @@ export default function WishlistPage() {
                     type="button"
                     className="wishlist-remove-btn"
                     onClick={() => removeFromWishlist(item.id)}
-                    aria-label={`Remove ${item.name} from wishlist`}
+                    aria-label={`Remove ${productName} from wishlist`}
                     title="Remove from wishlist"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -102,7 +104,7 @@ export default function WishlistPage() {
                   <Link to={`/product/${item.slug}`} className="wishlist-card-img-link">
                     <img
                       src={optimizeImage(item.image, 800)}
-                      alt={item.name}
+                      alt={productName}
                       className="wishlist-card-img"
                       loading="lazy"
                       onError={(e) => {
@@ -119,7 +121,7 @@ export default function WishlistPage() {
                   <div className="wishlist-card-info">
                     <span className="wishlist-card-category">{item.category || "Men's Collection"}</span>
                     <Link to={`/product/${item.slug}`} className="wishlist-card-title">
-                      {item.name}
+                      {productName}
                     </Link>
 
                     <div className="wishlist-card-price-row">

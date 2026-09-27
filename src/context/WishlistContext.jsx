@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { getProductDisplayName } from '../utils/productUtils';
 
 const WishlistContext = createContext();
 
@@ -72,7 +73,7 @@ export const WishlistProvider = ({ children }) => {
       const itemToSave = {
         id: product.id,
         productId: product.id,
-        name: product.name,
+        name: getProductDisplayName(product.name),
         slug: product.slug,
         price: product.price || product.salePrice || 0,
         mrp: product.mrp || product.compareAtPrice || 0,

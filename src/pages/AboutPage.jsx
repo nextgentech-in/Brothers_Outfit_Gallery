@@ -369,7 +369,7 @@ export default function AboutPage() {
                 <div className="map-pin-pulse-icon">📍</div>
                 <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
-                  <p>Pratham Square, Sahakari Jin Road, Himatnagar, Gujarat 383001</p>
+                  <p>{businessInfo.address}</p>
                   <span className="map-photo-link-badge">Open in Google Maps ↗</span>
                 </div>
               </div>

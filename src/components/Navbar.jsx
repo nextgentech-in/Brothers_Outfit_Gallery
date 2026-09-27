@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useShop } from '../context/ShopContext';
 import { optimizeImage } from '../utils/imageUtils';
+import { getProductDisplayName } from '../utils/productUtils';
 import './Navbar.css';
 
 const navLinks = [
@@ -372,7 +373,7 @@ export default function Navbar() {
                           {product.images && product.images[0] ? (
                             <img
                               src={optimizeImage(product.images[0], { width: 90, quality: 75 })}
-                              alt={product.name}
+                              alt={getProductDisplayName(product.name)}
                               loading="lazy"
                             />
                           ) : (
@@ -384,7 +385,7 @@ export default function Navbar() {
                           )}
                         </div>
                         <div className="search-result-info">
-                          <span className="search-result-name">{product.name}</span>
+                          <span className="search-result-name">{getProductDisplayName(product.name)}</span>
                           <span className="search-result-category">{product.category || 'Apparel'}</span>
                         </div>
                         <div className="search-result-pricing">

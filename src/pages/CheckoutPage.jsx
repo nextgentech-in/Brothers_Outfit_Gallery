@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
 import { validateCoupon } from '../services/couponService';
 import { getBackendUrl } from '../utils/apiConfig';
+import { getProductDisplayName } from '../utils/productUtils';
 import AuthModal from '../components/auth/AuthModal';
 import PhoneOtpModal from '../components/checkout/PhoneOtpModal';
 import './CheckoutPage.css';
@@ -779,9 +780,9 @@ export default function CheckoutPage() {
           <div className="checkout-items-list">
             {cartItems.map((item) => (
               <div key={item.cartItemId} className="checkout-item">
-                <img src={item.image} alt={item.name} className="checkout-item-thumb" />
+                <img src={item.image} alt={getProductDisplayName(item.name)} className="checkout-item-thumb" />
                 <div className="checkout-item-details">
-                  <strong>{item.name}</strong>
+                  <strong>{getProductDisplayName(item.name)}</strong>
                   <span>Size: {typeof item.size === 'object' && item.size !== null ? (item.size.name || item.size.size || 'One Size') : (item.size || 'One Size')} | Qty: {item.quantity}</span>
                   <span className="checkout-item-price">₹{item.price * item.quantity}</span>
                 </div>

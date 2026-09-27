@@ -323,14 +323,28 @@ export default function AdminProductForm() {
 
           // Map legacy string images to object schema or use existing objects, preserving linked color
           if (data.images && data.images.length > 0) {
+            const explicitPrimaryIndex = data.images.findIndex(
+              img => typeof img === 'object' && img?.isPrimary
+            );
+            const thumbnailIndex = data.images.findIndex(img =>
+              (typeof img === 'string' ? img : img?.url) === data.thumbnailUrl
+            );
+            const primaryIndex = explicitPrimaryIndex >= 0
+              ? explicitPrimaryIndex
+              : thumbnailIndex >= 0 ? thumbnailIndex : 0;
             const mappedImages = data.images.map((img, idx) => {
               if (typeof img === 'string') {
-                return { url: img, publicId: null, isPrimary: data.thumbnailUrl === img || idx === 0, color: '' };
+                return {
+                  url: img,
+                  publicId: null,
+                  isPrimary: idx === primaryIndex,
+                  color: ''
+                };
               }
               return { 
                 url: img.url, 
                 publicId: img.publicId || img.path, 
-                isPrimary: img.isPrimary || (idx === 0 && !data.images?.some(i => i.isPrimary)),
+                isPrimary: idx === primaryIndex,
                 color: img.color || ''
               };
             });
@@ -927,15 +941,12 @@ export default function AdminProductForm() {
       // 3. Combine images and fix sort ordering with color tags preserved
       let combinedImages = [...existingImages, ...newlyUploaded];
 
-      // Auto-assign primary if missing somehow
-      if (combinedImages.length > 0 && !combinedImages.some(img => img.isPrimary)) {
-        combinedImages[0].isPrimary = true;
-      }
+      const primaryImageIndex = Math.max(0, combinedImages.findIndex(img => img.isPrimary));
 
       combinedImages = combinedImages.map((img, idx) => ({
         url: img.url,
         publicId: img.publicId || null,
-        isPrimary: !!img.isPrimary,
+        isPrimary: idx === primaryImageIndex,
         color: img.color || '',
         alt: img.alt || `${formData.name} - ${idx + 1}`,
         sortOrder: idx
@@ -1289,10 +1300,10 @@ export default function AdminProductForm() {
 
                     <div className="admin-image-actions">
                       {!img.isPrimary && (
-                        <button onClick={() => setPrimaryImage('existing', idx)} className="btn-set-primary">Make Primary</button>
+                        <button type="button" onClick={() => setPrimaryImage('existing', idx)} className="btn-set-primary">Make Primary</button>
                       )}
                       {img.isPrimary && <span className="primary-label">PRIMARY</span>}
-                      <button onClick={() => removeExistingImage(idx)} className="btn-remove-image">Remove</button>
+                      <button type="button" onClick={() => removeExistingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
                   </div>
                 </div>
@@ -1330,10 +1341,10 @@ export default function AdminProductForm() {
 
                     <div className="admin-image-actions">
                       {!fileObj.isPrimary && (
-                        <button onClick={() => setPrimaryImage('pending', idx)} className="btn-set-primary">Make Primary</button>
+                        <button type="button" onClick={() => setPrimaryImage('pending', idx)} className="btn-set-primary">Make Primary</button>
                       )}
                       {fileObj.isPrimary && <span className="primary-label">PRIMARY</span>}
-                      <button onClick={() => removePendingImage(idx)} className="btn-remove-image">Remove</button>
+                      <button type="button" onClick={() => removePendingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
                   </div>
                 </div>
