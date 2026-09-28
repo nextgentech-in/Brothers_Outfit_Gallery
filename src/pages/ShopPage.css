@@ -210,12 +210,20 @@
 
 .shop-filters__options {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.shop-filters__options::-webkit-scrollbar {
+  display: none;
 }
 
 .shop-filters__chip {
-  padding: 5px 14px;
+  padding: 4px 12px;
   border: 1px solid var(--color-stone, #D9D3C7);
   border-radius: 20px;
   background: #ffffff;
@@ -226,6 +234,7 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .shop-filters__chip:hover {
@@ -378,6 +387,11 @@
 
   .shop-filters--open {
     max-height: 800px;
+  }
+
+  .shop-filters__options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
   }
 }
 

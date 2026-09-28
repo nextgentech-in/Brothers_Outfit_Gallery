@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct, getAvailableProductSizes } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
 import AuthModal from '../auth/AuthModal';
+import SizeGuideModal from '../common/SizeGuideModal';
 import './ProductInfo.css';
 
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
