@@ -98,9 +98,9 @@ export default function ShopPage() {
     setDisplayLimit(12);
   }, [category, subCategory, debouncedSearch, priceRange, selectedSizes, selectedColors, sortBy]);
 
-  // Fetch complete active catalog from Firestore/cache once
-  const fetchProducts = async () => {
-    setLoading(true);
+  // Fetch complete active catalog from Firestore/cache
+  const fetchProducts = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const result = await getShopProducts(
         'All',
@@ -114,15 +114,17 @@ export default function ShopPage() {
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (showLoading) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
-  // Initial load or restore position
+  // Initial load or restore position + SWR fresh inventory refresh
   useEffect(() => {
     if (products.length === 0) {
-      fetchProducts();
+      fetchProducts(true);
     } else {
       // Products already exist in context, restore scroll position smoothly
       const position = scrollPosition || 0;
@@ -132,6 +134,8 @@ export default function ShopPage() {
           behavior: 'instant'
         });
       });
+      // SWR background refresh to ensure newly out-of-stock sizes and products update smoothly
+      fetchProducts(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -152,7 +156,7 @@ export default function ShopPage() {
 
   // Comprehensive catalog filtering for category, search, price ranges, sizes, colors, and sorting
   const filtered = useMemo(() => {
-    let result = products.filter(p => isProductInStock(p));
+    let result = products.filter(p => p.active !== false && isProductInStock(p));
 
     // Category Filter
     if (category && category !== 'All') {
@@ -196,10 +200,10 @@ export default function ShopPage() {
       });
     }
 
-    // Multi-Size Filter
+    // Multi-Size Filter (matches against in-stock sizes only)
     if (selectedSizes && selectedSizes.length > 0) {
       result = result.filter(p => {
-        const pSizes = getProductSizes(p).map(s => s.toLowerCase());
+        const pSizes = getProductSizes(p, true).map(s => s.toLowerCase());
         return selectedSizes.some(sz => pSizes.includes(sz.toLowerCase()));
       });
     }

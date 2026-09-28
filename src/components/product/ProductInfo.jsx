@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
-import { getProductDisplayName, isClothingProduct } from '../../utils/productUtils';
+import { isClothingProduct, getAvailableProductSizes } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
-import SizeGuideModal from '../common/SizeGuideModal';
 import AuthModal from '../auth/AuthModal';
 import './ProductInfo.css';
 
@@ -109,7 +107,7 @@ export default function ProductInfo({ product, onColorChange }) {
   }, [product.variants, product.sizes]);
 
   const productTotalStock = useMemo(() => {
-    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10)||0), 0) : (product.stock || 0);
+    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0) : (product.stock || 0);
   }, [product.variants, product.stock]);
 
   // Available colors that have stock > 0
@@ -127,26 +125,8 @@ export default function ProductInfo({ product, onColorChange }) {
 
   // Only display sizes on front that currently have inventory > 0
   const visibleSizes = useMemo(() => {
-    if (!productSizes || productSizes.length === 0) return [];
-    if (!product.variants || product.variants.length === 0) {
-      return productTotalStock > 0 ? productSizes : [];
-    }
-    return productSizes.filter(size => {
-      const cleanSize = String(size).trim().toLowerCase();
-      let matchingVariants = product.variants.filter(v => String(v.size || '').trim().toLowerCase() === cleanSize);
-      if (selectedColor && selectedColor !== 'All') {
-        const selColLower = String(selectedColor).trim().toLowerCase();
-        const colorSpecific = matchingVariants.filter(v => {
-          const vCol = String(v.color || '').trim().toLowerCase();
-          return vCol === selColLower || vCol === 'standard' || vCol === 'default';
-        });
-        if (colorSpecific.length > 0) {
-          matchingVariants = colorSpecific;
-        }
-      }
-      return matchingVariants.some(v => (parseInt(v.stock, 10) || 0) > 0);
-    });
-  }, [productSizes, product.variants, selectedColor, productTotalStock]);
+    return getAvailableProductSizes(product, selectedColor);
+  }, [product, selectedColor]);
 
   useEffect(() => {
     if (visibleSizes.length > 0 && (!selectedSize || !visibleSizes.includes(selectedSize))) {
@@ -173,8 +153,8 @@ export default function ProductInfo({ product, onColorChange }) {
   const defaultFrontPrice = (defaultFrontVariant?.price !== undefined && defaultFrontVariant?.price !== '' && !isNaN(Number(defaultFrontVariant?.price)))
     ? Number(defaultFrontVariant.price)
     : (defaultFrontVariant?.salePrice !== undefined && defaultFrontVariant?.salePrice !== '' && !isNaN(Number(defaultFrontVariant?.salePrice))
-        ? Number(defaultFrontVariant.salePrice)
-        : null);
+      ? Number(defaultFrontVariant.salePrice)
+      : null);
 
   const baseMrp = product.mrp || product.compareAtPrice || 0;
   const baseSale = defaultFrontPrice !== null ? defaultFrontPrice : (product.salePrice || product.price || 0);
@@ -197,15 +177,15 @@ export default function ProductInfo({ product, onColorChange }) {
   const reviewCount = Number(product.reviewsCount || product.reviewCount || (Array.isArray(product.reviews) ? product.reviews.length : 0));
 
   const {
-    name: productName, offer_enabled, offer_end_at, description, shortDescription
+    name, offer_enabled, offer_end_at, description, shortDescription
   } = product;
-  const name = getProductDisplayName(productName);
 
   // Stock status for selected size or whole product
-  const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock, 10) : productTotalStock;
-  const outOfStock = productSizes.length > 0 ? (visibleSizes.length === 0 || (selectedSize && activeVariantStock <= 0)) : productTotalStock <= 0;
+  const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock ?? matchedVariant.quantity, 10) : productTotalStock;
+  const isEntirelySoldOut = productTotalStock <= 0 || product.inStock === false || product.active === false || (productSizes.length > 0 && visibleSizes.length === 0);
+  const outOfStock = isEntirelySoldOut || (selectedSize && activeVariantStock <= 0);
   const stock = selectedSize && matchedVariant ? activeVariantStock : productTotalStock;
-  
+
   const { addToCart, buyNowDirect } = useCart();
 
   const handleQuantity = (delta) => {
@@ -285,7 +265,7 @@ export default function ProductInfo({ product, onColorChange }) {
   return (
     <div className="product-info-wrapper">
       <h1 className="product-title">{name}</h1>
-      
+
       {/* Sub-Category & GSL Badges */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
         {product.subCategory && (
@@ -301,11 +281,11 @@ export default function ProductInfo({ product, onColorChange }) {
       </div>
 
       {productRating > 0 ? (
-        <div 
-          className="product-rating" 
-          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }} 
-          role="button" 
-          tabIndex={0} 
+        <div
+          className="product-rating"
+          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
+          role="button"
+          tabIndex={0}
           aria-label={`${productRating.toFixed(1)} stars out of 5 from ${reviewCount} reviews`}
         >
           <span className="stars">
@@ -315,10 +295,10 @@ export default function ProductInfo({ product, onColorChange }) {
           {reviewCount > 0 && <span className="review-count">({reviewCount} {reviewCount === 1 ? 'Review' : 'Reviews'})</span>}
         </div>
       ) : (
-        <div 
-          className="product-rating product-rating--empty" 
-          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }} 
-          role="button" 
+        <div
+          className="product-rating product-rating--empty"
+          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
+          role="button"
           tabIndex={0}
         >
           <span className="rating-empty-link">★ Be the first to review this product</span>
@@ -328,20 +308,20 @@ export default function ProductInfo({ product, onColorChange }) {
       <div className="product-pricing">
         {hasDiscount ? (
           <>
-            <div className="price-row-top" style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}}>
-              <span className="price-original" style={{color: '#9ca3af', textDecoration: 'line-through', fontSize: '14px'}}>
+            <div className="price-row-top" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span className="price-original" style={{ color: '#9ca3af', textDecoration: 'line-through', fontSize: '14px' }}>
                 ₹{activeMrp.toLocaleString('en-IN')}
               </span>
-              <span className="price-discount" style={{background: 'var(--color-accent-gold-light)', color: 'var(--color-accent-gold-text)', border: '1px solid #E4CE9F', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700'}}>
+              <span className="price-discount" style={{ background: 'var(--color-accent-gold-light)', color: 'var(--color-accent-gold-text)', border: '1px solid #E4CE9F', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
                 {currentDiscount}% OFF
               </span>
             </div>
-            <div className="price-current" style={{fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)'}}>
+            <div className="price-current" style={{ fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)' }}>
               ₹{activeSale.toLocaleString('en-IN')}
             </div>
           </>
         ) : (
-          <div className="price-current" style={{fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)'}}>
+          <div className="price-current" style={{ fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)' }}>
             ₹{activeSale.toLocaleString('en-IN')}
           </div>
         )}
@@ -394,9 +374,9 @@ export default function ProductInfo({ product, onColorChange }) {
               ? 'Select Volume (ml)'
               : (isClothing ? 'Select Size *' : 'Select Size')}
           </h3>
-          <button 
-            type="button" 
-            className="btn-size-guide" 
+          <button
+            type="button"
+            className="btn-size-guide"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -420,8 +400,8 @@ export default function ProductInfo({ product, onColorChange }) {
           <div className="size-buttons" style={sizeError ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '8px', padding: '4px' } : {}}>
             {visibleSizes.map(size => {
               return (
-                <button 
-                  key={size} 
+                <button
+                  key={size}
                   className={`size-btn ${selectedSize === size ? 'selected' : ''}`}
                   onClick={() => {
                     setSelectedSize(size);
@@ -447,7 +427,22 @@ export default function ProductInfo({ product, onColorChange }) {
 
       <div className="product-stock-status">
         {outOfStock ? (
-          <span className="stock-out">Out of Stock</span>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: '#fef2f2',
+            border: '1.5px solid #ef4444',
+            color: '#dc2626',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '800',
+            letterSpacing: '0.8px',
+            textTransform: 'uppercase'
+          }}>
+            <span>✕</span> OUT OF STOCK
+          </div>
         ) : (
           <span className="stock-in">✓ In Stock • Ready to Dispatch</span>
         )}
@@ -459,19 +454,22 @@ export default function ProductInfo({ product, onColorChange }) {
           <span>{outOfStock ? 0 : quantity}</span>
           <button onClick={() => handleQuantity(1)} disabled={quantity >= stock || outOfStock}>+</button>
         </div>
-        
-        <button 
-          className={`btn-add-to-cart ${added ? 'added' : ''}`} 
+
+        <button
+          className={`btn-add-to-cart ${added ? 'added' : ''}`}
           onClick={handleAddToCart}
           disabled={outOfStock}
+          style={outOfStock ? { background: '#94a3b8', borderColor: '#94a3b8', color: '#ffffff', cursor: 'not-allowed' } : {}}
         >
-          {added ? 'ADDED TO CART ✓' : 'ADD TO CART'}
+          {outOfStock ? 'OUT OF STOCK' : (added ? 'ADDED TO CART ✓' : 'ADD TO CART')}
         </button>
       </div>
 
-      <button className="btn-buy-now" onClick={handleBuyNow} disabled={outOfStock}>
-        BUY NOW
-      </button>
+      {!outOfStock && (
+        <button className="btn-buy-now" onClick={handleBuyNow} disabled={outOfStock}>
+          BUY NOW
+        </button>
+      )}
 
       {/* Wishlist Button on Product Page */}
       <button
@@ -526,12 +524,12 @@ export default function ProductInfo({ product, onColorChange }) {
       <div className="delivery-checker">
         <h4 className="checker-title">Check Delhivery Express Serviceability</h4>
         <form className="checker-form" onSubmit={handleDeliveryCheck}>
-          <input 
-            type="text" 
-            placeholder="Enter 6-digit Pincode" 
+          <input
+            type="text"
+            placeholder="Enter 6-digit Pincode"
             value={deliveryPincode}
             maxLength={6}
-            onChange={(e) => setDeliveryPincode(e.target.value.replace(/\D/g, '').slice(0,6))}
+            onChange={(e) => setDeliveryPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
           />
           <button type="submit" disabled={checkingDelivery}>
             {checkingDelivery ? 'CHECKING...' : 'CHECK'}
@@ -572,7 +570,7 @@ export default function ProductInfo({ product, onColorChange }) {
             {description || shortDescription || "No description provided."}
           </div>
         </details>
-        
+
         <details className="accordion-block">
           <summary>Product Details</summary>
           <div className="accordion-content">
@@ -586,7 +584,7 @@ export default function ProductInfo({ product, onColorChange }) {
             </ul>
           </div>
         </details>
-        
+
         <details className="accordion-block">
           <summary>Shipping & Exchange Policy</summary>
           <div className="accordion-content">
@@ -630,7 +628,7 @@ export default function ProductInfo({ product, onColorChange }) {
       </aside>
 
       {/* Interactive Online Size & Volume Guide Modal */}
-      <SizeGuideModal 
+      <SizeGuideModal
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
         category={product.categoryId || product.category || 'Shirts'}

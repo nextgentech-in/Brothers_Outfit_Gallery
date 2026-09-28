@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getUserOrders, cancelUserOrder } from '../services/orderService';
-import { getProductDisplayName } from '../utils/productUtils';
+import { getUserOrders, cancelUserOrder, requestUserOrderExchange } from '../services/orderService';
 import './Profile.css';
 
 const CUSTOMER_CANCEL_REASONS = [
@@ -13,6 +12,15 @@ const CUSTOMER_CANCEL_REASONS = [
   'Delivery too slow',
   'Want to change size/color',
   'Financial reasons',
+  'Other'
+];
+
+const CUSTOMER_EXCHANGE_REASONS = [
+  'Size too small (Need larger size)',
+  'Size too large (Need smaller size)',
+  'Defective / Damaged garment',
+  'Wrong item received',
+  'Color/pattern mismatch',
   'Other'
 ];
 
@@ -98,6 +106,72 @@ export default function Profile() {
     setCancelCustomReason('');
     if (typeof document !== 'undefined') {
       document.body.style.overflow = '';
+    }
+  };
+
+  const [exchangeModal, setExchangeModal] = useState({ open: false, order: null });
+  const [exchangeItem, setExchangeItem] = useState('');
+  const [exchangeReason, setExchangeReason] = useState('');
+  const [exchangeReplacementSize, setExchangeReplacementSize] = useState('');
+  const [exchangeCustomReason, setExchangeCustomReason] = useState('');
+  const [exchangeConfirmedVideo, setExchangeConfirmedVideo] = useState(false);
+  const [submittingExchange, setSubmittingExchange] = useState(false);
+
+  const openExchangeModal = (order) => {
+    setExchangeModal({ open: true, order });
+    const firstItem = order.items?.[0];
+    setExchangeItem(firstItem ? `${firstItem.name} (${firstItem.size || 'Size N/A'})` : 'All Items');
+    setExchangeReason('');
+    setExchangeReplacementSize('');
+    setExchangeCustomReason('');
+    setExchangeConfirmedVideo(false);
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+    }
+  };
+
+  const closeExchangeModal = () => {
+    setExchangeModal({ open: false, order: null });
+    setExchangeItem('');
+    setExchangeReason('');
+    setExchangeReplacementSize('');
+    setExchangeCustomReason('');
+    setExchangeConfirmedVideo(false);
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = '';
+    }
+  };
+
+  const handleConfirmExchange = async () => {
+    const order = exchangeModal.order;
+    if (!order) return;
+
+    const finalReason = exchangeReason === 'Other'
+      ? (exchangeCustomReason.trim() || 'Other')
+      : exchangeReason;
+
+    if (!finalReason || !exchangeConfirmedVideo) return;
+
+    setSubmittingExchange(true);
+    try {
+      await requestUserOrderExchange(order.id, {
+        reason: finalReason,
+        itemNames: exchangeItem,
+        replacementSize: exchangeReplacementSize,
+        notes: exchangeCustomReason
+      });
+      closeExchangeModal();
+      setOrderFeedback({
+        type: 'success',
+        text: `Exchange request recorded for Order #${order.id}. Please send your unboxing video to our WhatsApp concierge (+91 84602 33020).`
+      });
+      loadUserOrders();
+      setTimeout(() => setOrderFeedback(null), 8000);
+    } catch (err) {
+      setOrderFeedback({ type: 'error', text: `Failed to request exchange: ${err.message}` });
+      setTimeout(() => setOrderFeedback(null), 6000);
+    } finally {
+      setSubmittingExchange(false);
     }
   };
 
@@ -273,7 +347,16 @@ export default function Profile() {
                     const isCancelled = (order.status || '').toLowerCase() === 'cancelled';
                     const isShipped = (order.status || '').toLowerCase() === 'shipped';
                     const isDelivered = (order.status || '').toLowerCase() === 'delivered';
-                    const statusClass = isCancelled ? 'status-cancelled' : isDelivered ? 'status-delivered' : isShipped ? 'status-shipped' : 'status-processing';
+                    const isExchangeRequested = (order.status || '').toLowerCase().includes('exchange');
+                    const statusClass = isCancelled 
+                      ? 'status-cancelled' 
+                      : isExchangeRequested
+                      ? 'status-exchange'
+                      : isDelivered 
+                      ? 'status-delivered' 
+                      : isShipped 
+                      ? 'status-shipped' 
+                      : 'status-processing';
 
                     const formattedDate = order.createdAt?.toDate 
                       ? order.createdAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -326,12 +409,12 @@ export default function Profile() {
                             <div key={idx} className="order-item-row">
                               <img
                                 src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'}
-                                alt={getProductDisplayName(item.name)}
+                                alt={item.name}
                                 className="order-item-img"
                               />
                               <div className="order-item-content">
-                                <div className="order-item-title" title={getProductDisplayName(item.name)}>
-                                  {getProductDisplayName(item.name)}
+                                <div className="order-item-title" title={item.name}>
+                                  {item.name}
                                 </div>
                                 <div className="order-item-meta-row">
                                   {item.size && (
@@ -398,6 +481,30 @@ export default function Profile() {
                             </div>
                           )}
 
+                          {isExchangeRequested && (
+                            <div className="order-exchange-banner">
+                              <div className="exchange-banner-header">
+                                <span className="exchange-banner-badge">🔄 Exchange Requested</span>
+                                <span className="exchange-policy-badge">48-Hr Replacement</span>
+                              </div>
+                              <div className="exchange-banner-body">
+                                <div><strong>Item:</strong> {order.exchangeDetails?.itemNames || 'Item'}</div>
+                                <div><strong>Reason:</strong> {order.exchangeDetails?.reason || 'Exchange requested'}</div>
+                                {order.exchangeDetails?.replacementSize && (
+                                  <div><strong>Requested Size:</strong> {order.exchangeDetails.replacementSize}</div>
+                                )}
+                              </div>
+                              <a
+                                href={`https://wa.me/918460233020?text=${encodeURIComponent(`Hi Brother's Outfit Gallery team, I requested an exchange for Order #${order.id}. Item: ${order.exchangeDetails?.itemNames || ''}, Reason: ${order.exchangeDetails?.reason || ''}, Size: ${order.exchangeDetails?.replacementSize || ''}. Sharing my unboxing video proof here.`)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-exchange-wa"
+                              >
+                                💬 Send Unboxing Video on WhatsApp
+                              </a>
+                            </div>
+                          )}
+
                           <div className="order-actions-wrap">
                             <Link
                               to={`/track-order/${order.id}`}
@@ -417,6 +524,16 @@ export default function Profile() {
                               >
                                 📦 Delhivery AWB
                               </a>
+                            )}
+
+                            {isDelivered && !isExchangeRequested && (order.status || '').toLowerCase() !== 'exchanged' && (
+                              <button
+                                onClick={() => openExchangeModal(order)}
+                                className="btn-order-exchange"
+                                title="Request 48-Hour Size or Quality Exchange"
+                              >
+                                🔄 Request Exchange
+                              </button>
                             )}
 
                             {isProcessing && (
@@ -623,6 +740,109 @@ export default function Profile() {
                   disabled={!cancelReason || (cancelReason === 'Other' && !cancelCustomReason.trim())}
                 >
                   Confirm Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Customer Exchange Modal (Strict Exchange-Only Policy) */}
+      {exchangeModal.open && typeof document !== 'undefined' && createPortal(
+        <div className="cancel-overlay" onClick={closeExchangeModal}>
+          <div className="cancel-modal exchange-modal" onClick={e => e.stopPropagation()}>
+            <div className="cancel-modal-header">
+              <div>
+                <h3>Request Exchange • Order #{exchangeModal.order?.id}</h3>
+                <p className="exchange-modal-subtitle">48-Hour Replacement Window for Size / Defect</p>
+              </div>
+              <button className="cancel-modal-close" onClick={closeExchangeModal}>✕</button>
+            </div>
+            <div className="cancel-modal-body">
+              <div className="exchange-policy-notice">
+                ℹ️ <strong>Exchange-Only Policy:</strong> We do not offer cash refunds. Eligible orders can be exchanged for size or defective replacement. You will be asked to share your package unboxing video with our concierge.
+              </div>
+
+              {exchangeModal.order?.items && exchangeModal.order.items.length > 1 && (
+                <div className="exchange-item-picker">
+                  <label className="exchange-field-label">Select Item to Exchange:</label>
+                  <select 
+                    className="exchange-select"
+                    value={exchangeItem}
+                    onChange={(e) => setExchangeItem(e.target.value)}
+                  >
+                    {exchangeModal.order.items.map((it, i) => (
+                      <option key={i} value={`${it.name} (${it.size || 'Size N/A'})`}>
+                        {it.name} — Size: {it.size || 'N/A'} (₹{it.price})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <p className="cancel-modal-desc">Select Reason for Exchange:</p>
+              <div className="cancel-modal-options">
+                {CUSTOMER_EXCHANGE_REASONS.map(reason => (
+                  <label key={reason} className={`cancel-modal-option ${exchangeReason === reason ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="customerExchangeReason"
+                      value={reason}
+                      checked={exchangeReason === reason}
+                      onChange={(e) => setExchangeReason(e.target.value)}
+                    />
+                    <span>{reason}</span>
+                  </label>
+                ))}
+              </div>
+
+              {exchangeReason.includes('Size') && (
+                <div className="exchange-size-input-block">
+                  <label className="exchange-field-label">Requested Replacement Size:</label>
+                  <input
+                    type="text"
+                    className="exchange-text-input"
+                    placeholder="e.g. M, L, XL, XXL (or describe size needed)"
+                    value={exchangeReplacementSize}
+                    onChange={(e) => setExchangeReplacementSize(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              {exchangeReason === 'Other' && (
+                <textarea
+                  className="cancel-modal-textarea"
+                  placeholder="Please describe why you need an exchange..."
+                  value={exchangeCustomReason}
+                  onChange={(e) => setExchangeCustomReason(e.target.value)}
+                  rows={2}
+                />
+              )}
+
+              <div className="exchange-checkbox-row">
+                <input
+                  type="checkbox"
+                  id="confirmUnboxingVideo"
+                  checked={exchangeConfirmedVideo}
+                  onChange={(e) => setExchangeConfirmedVideo(e.target.checked)}
+                />
+                <label htmlFor="confirmUnboxingVideo">
+                  I confirm the garment is unwashed with original tags, and I will share my unboxing video proof on WhatsApp.
+                </label>
+              </div>
+
+              <div className="cancel-modal-actions">
+                <button className="cancel-modal-btn-ghost" onClick={closeExchangeModal} disabled={submittingExchange}>
+                  Cancel
+                </button>
+                <button
+                  className="cancel-modal-btn-primary"
+                  onClick={handleConfirmExchange}
+                  disabled={!exchangeReason || !exchangeConfirmedVideo || submittingExchange || (exchangeReason === 'Other' && !exchangeCustomReason.trim())}
+                >
+                  {submittingExchange ? 'Submitting...' : 'Submit Exchange Request'}
                 </button>
               </div>
             </div>

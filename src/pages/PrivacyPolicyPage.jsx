@@ -1,6 +1,5 @@
 import React from 'react';
 import './PolicyPages.css';
-import { businessInfo } from '../config/business';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -68,7 +67,7 @@ export default function PrivacyPolicyPage() {
             <div className="policy-contact-box">
               <p><strong>Contact our Data Protection Desk:</strong></p>
               <p>Brothers Outfit Gallery</p>
-              <p>📍 Store Address: {businessInfo.address}</p>
+              <p>📍 Store Address: Himatnagar, Gujarat, India</p>
               <p>✉️ Email: support@brothersoutfit.in</p>
               <p>📱 WhatsApp: +91 84602 33020</p>
             </div>

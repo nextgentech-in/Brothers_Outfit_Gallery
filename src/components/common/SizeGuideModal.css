@@ -334,7 +334,6 @@
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   margin-bottom: 24px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -410,12 +409,10 @@
 
 .size-guide-table {
   width: 100%;
-  min-width: 640px;
   border-collapse: collapse;
   font-size: 13px;
   text-align: left;
   background: #ffffff;
-  font-variant-numeric: tabular-nums;
 }
 
 .size-guide-table th {
@@ -434,11 +431,6 @@
   border-bottom: 1px solid #f1f5f9;
   color: #334155;
   white-space: nowrap;
-}
-
-.size-guide-table td:first-child {
-  color: #0f172a;
-  font-weight: 800;
 }
 
 .size-guide-table tr:nth-child(even) {
@@ -540,7 +532,7 @@
 
 .htm-svg-wrap {
   width: 100%;
-  max-width: 360px;
+  max-width: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -551,9 +543,8 @@
 .htm-garment-svg {
   width: 100%;
   height: auto;
-  max-height: 380px;
+  max-height: 290px;
   display: block;
-  shape-rendering: geometricPrecision;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.03));
 }
 

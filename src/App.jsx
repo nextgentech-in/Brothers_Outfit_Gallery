@@ -11,6 +11,7 @@ import { ShopProvider } from './context/ShopContext';
 import WhatsAppFloat from './components/WhatsAppFloat';
 import MiniCartDrawer from './components/cart/MiniCartDrawer';
 import CartToast from './components/cart/CartToast';
+import SoldOutModal from './components/cart/SoldOutModal';
 
 // Critical First-Paint Pages
 import HomePage from './pages/HomePage';
@@ -22,7 +23,7 @@ function lazyWithRetry(componentImport) {
       return await componentImport();
     } catch (error) {
       console.warn('Lazy chunk import failed, checking deployment state:', error);
-      const isChunkOrCssError = 
+      const isChunkOrCssError =
         error?.message?.includes('Unable to preload CSS') ||
         error?.message?.includes('Failed to fetch dynamically imported module') ||
         error?.message?.includes('Loading chunk') ||
@@ -33,7 +34,7 @@ function lazyWithRetry(componentImport) {
       if (isChunkOrCssError && (!lastReload || now - Number(lastReload) > 8000)) {
         sessionStorage.setItem('chunk_retry_reload', String(now));
         window.location.reload();
-        return new Promise(() => {});
+        return new Promise(() => { });
       }
       throw error;
     }
@@ -111,7 +112,7 @@ class ErrorBoundary extends Component {
   }
   static getDerivedStateFromError(error) {
     const msg = error?.message || (typeof error === 'string' ? error : '');
-    const isChunkError = 
+    const isChunkError =
       msg.includes('Unable to preload CSS') ||
       msg.includes('Failed to fetch dynamically imported module') ||
       msg.includes('Loading chunk') ||
@@ -351,11 +352,11 @@ function AppContent() {
             <Route path="/returns" element={<ReturnsPolicyPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsPage />} />
-            
+
             {/* Standard Auth Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            
+
             {/* Protected Logged-in specific routes */}
             <Route path="/profile" element={
               <ProtectedRoute>
@@ -367,7 +368,7 @@ function AppContent() {
                 <CompleteProfile />
               </ProtectedRoute>
             } />
-            
+
             <Route path="/product/:slug" element={<ProductPage />} />
           </Route>
 
@@ -395,6 +396,7 @@ function AppContent() {
       {!isAdmin && <Footer />}
       {!isAdmin && <MiniCartDrawer />}
       {!isAdmin && <CartToast />}
+      {!isAdmin && <SoldOutModal />}
       {!isAdmin && <WhatsAppFloat />}
     </>
   );

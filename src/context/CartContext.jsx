@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { getProductDisplayName } from '../utils/productUtils';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from './AuthContext';
+import { fetchAllActiveProducts } from '../services/productService';
 
 const CartContext = createContext();
 
@@ -23,6 +24,7 @@ function isLegacyDummyItem(item) {
 }
 
 export const CartProvider = ({ children }) => {
+  const { currentUser } = useAuth() || {};
   const [cartItems, setCartItems] = useState(() => {
     try {
       const persisted = localStorage.getItem('brothers_cart');
@@ -38,6 +40,111 @@ export const CartProvider = ({ children }) => {
     }
   });
 
+  // Sold-Out notification modal state
+  const [soldOutModalData, setSoldOutModalData] = useState(null);
+  const dismissSoldOutModal = () => setSoldOutModalData(null);
+
+  // Validate cart items against latest inventory in Firestore
+  const validateCartStock = useCallback(async () => {
+    const rawCart = cartItems.filter(item => !isLegacyDummyItem(item));
+    if (rawCart.length === 0) return;
+
+    try {
+      const allProducts = await fetchAllActiveProducts(true);
+      if (!allProducts || allProducts.length === 0) return;
+
+      const productMap = new Map();
+      allProducts.forEach(p => {
+        if (p.id) productMap.set(String(p.id).trim(), p);
+        if (p.slug) productMap.set(String(p.slug).trim().toLowerCase(), p);
+      });
+
+      const soldOutList = [];
+      const updatedCart = [];
+
+      for (const item of rawCart) {
+        const itemKey = item.productId || item.id;
+        const itemSlug = item.slug ? String(item.slug).trim().toLowerCase() : null;
+        const product = productMap.get(String(itemKey).trim()) || (itemSlug ? productMap.get(itemSlug) : null);
+
+        let isSoldOut = false;
+
+        if (!product) {
+          isSoldOut = true;
+        } else if (product.active === false || product.inStock === false) {
+          isSoldOut = true;
+        } else if (Array.isArray(product.variants) && product.variants.length > 0 && item.size) {
+          const cleanSize = String(item.size).trim().toLowerCase();
+          const cleanColor = item.color ? String(item.color).trim().toLowerCase() : null;
+
+          let v = product.variants.find(variant => {
+            const vSize = String(variant.size || '').trim().toLowerCase();
+            if (vSize !== cleanSize) return false;
+            if (!cleanColor) return true;
+            const vCol = String(variant.color || '').trim().toLowerCase();
+            return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+          }) || product.variants.find(variant => String(variant.size || '').trim().toLowerCase() === cleanSize);
+
+          const variantStock = v ? (parseInt(v.stock ?? v.quantity, 10) || 0) : 0;
+          if (!v || variantStock <= 0) {
+            isSoldOut = true;
+          }
+        } else {
+          const totalStock = parseInt(product.stock ?? product.quantity, 10) || 0;
+          if (totalStock <= 0) {
+            isSoldOut = true;
+          }
+        }
+
+        if (isSoldOut) {
+          soldOutList.push({
+            ...item,
+            name: product?.name || item.name || 'Item',
+            image: item.image || product?.thumbnailUrl || product?.image
+          });
+        } else {
+          updatedCart.push(item);
+        }
+      }
+
+      if (soldOutList.length > 0) {
+        setCartItems(updatedCart);
+        try {
+          localStorage.setItem('brothers_cart', JSON.stringify(updatedCart));
+        } catch {}
+        setSoldOutModalData({
+          message: "Your added product sold out explore other products",
+          items: soldOutList
+        });
+      }
+    } catch (err) {
+      console.warn('Error validating cart stock:', err);
+    }
+  }, [cartItems]);
+
+  // Track user login events to validate cart immediately when logging in
+  const prevUserRef = useRef(null);
+  useEffect(() => {
+    if (currentUser?.uid) {
+      if (prevUserRef.current !== currentUser.uid) {
+        prevUserRef.current = currentUser.uid;
+        // User logged in — validate their cart items!
+        validateCartStock();
+      }
+    } else {
+      prevUserRef.current = null;
+    }
+  }, [currentUser, validateCartStock]);
+
+  // Also validate on initial page load if cart has items
+  const initialValidatedRef = useRef(false);
+  useEffect(() => {
+    if (!initialValidatedRef.current && cartItems.length > 0) {
+      initialValidatedRef.current = true;
+      validateCartStock();
+    }
+  }, [cartItems.length, validateCartStock]);
+
   // Ensure cart changes (add, remove, update qty, clear) are continuously synced to localStorage
   useEffect(() => {
     try {
@@ -50,7 +157,10 @@ export const CartProvider = ({ children }) => {
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [cartToast, setCartToast] = useState(null);
 
-  const openCartDrawer = () => setIsCartDrawerOpen(true);
+  const openCartDrawer = () => {
+    setIsCartDrawerOpen(true);
+    validateCartStock();
+  };
   const closeCartDrawer = () => setIsCartDrawerOpen(false);
 
   const showToast = (item) => {
@@ -121,7 +231,7 @@ export const CartProvider = ({ children }) => {
         cartItemId,
         id: product.id,
         productId: product.id,
-        name: getProductDisplayName(product.name),
+        name: product.name,
         image: product.image || product.thumbnailUrl,
         slug: product.slug,
         size: safeSize,
@@ -134,7 +244,7 @@ export const CartProvider = ({ children }) => {
 
     showToast({
       id: product.id,
-      name: getProductDisplayName(product.name),
+      name: product.name,
       image: product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
       size: safeSize,
       color: safeColor,
@@ -154,7 +264,7 @@ export const CartProvider = ({ children }) => {
       cartItemId: `${product.id}-${safeSize}-${safeColor}`,
       id: product.id,
       productId: product.id,
-      name: getProductDisplayName(product.name),
+      name: product.name,
       image: product.image || product.thumbnailUrl,
       slug: product.slug,
       size: safeSize,
@@ -229,9 +339,13 @@ export const CartProvider = ({ children }) => {
       openCartDrawer,
       closeCartDrawer,
       cartToast,
-      hideToast
+      hideToast,
+      soldOutModalData,
+      dismissSoldOutModal,
+      validateCartStock
     }}>
       {children}
     </CartContext.Provider>
   );
 };
+

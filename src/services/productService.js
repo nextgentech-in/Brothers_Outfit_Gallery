@@ -3,7 +3,7 @@ import { db } from '../firebase/firebaseConfig';
 
 const PRODUCTS = 'products';
 const CATEGORIES = 'categories';
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes fresh cache
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds fresh cache
 
 // In-Memory & Session Storage Caching + Request Coalescing Layer
 let memoryCache = null;
@@ -53,6 +53,9 @@ export const invalidateProductCache = () => {
   inFlightFetch = null;
   try {
     sessionStorage.removeItem('bo_products_cache');
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('bo_products_updated'));
+    }
   } catch {}
 };
 
@@ -100,10 +103,27 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
 
 export const isProductInStock = (product) => {
   if (!product) return false;
-  if (Array.isArray(product.variants) && product.variants.length > 0) {
-    return product.variants.some(v => (parseInt(v.stock, 10) || 0) > 0);
+  if (product.active === false || product.inStock === false) return false;
+
+  // Check product-level stock or quantity field
+  const totalStock = parseInt(product.stock ?? product.quantity ?? product.qty, 10);
+  if (!isNaN(totalStock) && totalStock <= 0) {
+    return false;
   }
-  return (parseInt(product.stock, 10) || 0) > 0;
+
+  // If product has variants, at least one variant must have stock > 0, and total variant stock must be > 0
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const totalVarStock = product.variants.reduce((sum, v) => sum + (parseInt(v.stock ?? v.quantity ?? v.qty, 10) || 0), 0);
+    if (totalVarStock <= 0) return false;
+
+    const hasVariantInStock = product.variants.some(v => {
+      const vQty = parseInt(v.stock ?? v.quantity ?? v.qty, 10);
+      return !isNaN(vQty) && vQty > 0;
+    });
+    if (!hasVariantInStock) return false;
+  }
+
+  return true;
 };
 
 /**
@@ -124,8 +144,8 @@ export const searchProducts = async (searchQuery, maxResults = 8) => {
   return matched.slice(0, maxResults);
 };
 
-export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12) => {
-  const rawList = await fetchAllActiveProducts();
+export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12, forceRefresh = false) => {
+  const rawList = await fetchAllActiveProducts(forceRefresh);
   let products = rawList.filter(p => p.active !== false && isProductInStock(p));
 
   // 1. Filter Category
@@ -166,8 +186,8 @@ export const getShopProducts = async (category = 'All', sortBy = 'newest', _last
   };
 };
 
-export const getNewArrivals = async (qty = 4) => {
-  const rawList = await fetchAllActiveProducts();
+export const getNewArrivals = async (qty = 4, forceRefresh = false) => {
+  const rawList = await fetchAllActiveProducts(forceRefresh);
   let products = rawList.filter(p => p.active !== false && isProductInStock(p));
 
   const tenDaysAgo = new Date();

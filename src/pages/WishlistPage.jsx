@@ -1,26 +1,44 @@
-import React from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { optimizeImage } from '../utils/imageUtils';
-import { getProductDisplayName } from '../utils/productUtils';
+import { isClothingProduct, getAvailableProductSizes } from '../utils/productUtils';
 import './WishlistPage.css';
 
 export default function WishlistPage() {
   const { wishlistItems, removeFromWishlist, clearWishlist } = useWishlist();
   const { addToCart } = useCart();
   const navigate = useNavigate();
+  const [selectedSizes, setSelectedSizes] = useState({});
+
+  const handleSelectSize = (itemId, size) => {
+    setSelectedSizes(prev => ({ ...prev, [itemId]: size }));
+  };
 
   const handleMoveToCart = (product) => {
-    const size = product.sizes?.[0] || 'One Size';
-    addToCart(product, size, 'Standard', 1, product.price);
+    const isClothing = isClothingProduct(product);
+    const availableSizes = getAvailableProductSizes(product);
+    
+    let sizeToUse = selectedSizes[product.id];
+    if (!sizeToUse) {
+      if (availableSizes.length > 0) {
+        sizeToUse = availableSizes[0];
+      } else {
+        sizeToUse = product.sizes?.[0] || (isClothing ? 'M' : 'One Size');
+      }
+    }
+
+    addToCart(product, sizeToUse, 'Standard', 1, product.price);
     removeFromWishlist(product.id);
   };
 
   const handleMoveAllToCart = () => {
     wishlistItems.forEach(item => {
-      const size = item.sizes?.[0] || 'One Size';
-      addToCart(item, size, 'Standard', 1, item.price);
+      const isClothing = isClothingProduct(item);
+      const availableSizes = getAvailableProductSizes(item);
+      const sizeToUse = selectedSizes[item.id] || availableSizes[0] || item.sizes?.[0] || (isClothing ? 'M' : 'One Size');
+      addToCart(item, sizeToUse, 'Standard', 1, item.price);
     });
     clearWishlist();
     navigate('/cart');
@@ -82,7 +100,6 @@ export default function WishlistPage() {
             {wishlistItems.map((item) => {
               const hasDiscount = item.mrp && item.mrp > item.price;
               const discountPct = hasDiscount ? Math.round(((item.mrp - item.price) / item.mrp) * 100) : 0;
-              const productName = getProductDisplayName(item.name);
 
               return (
                 <div key={item.id} className="wishlist-card">
@@ -91,7 +108,7 @@ export default function WishlistPage() {
                     type="button"
                     className="wishlist-remove-btn"
                     onClick={() => removeFromWishlist(item.id)}
-                    aria-label={`Remove ${productName} from wishlist`}
+                    aria-label={`Remove ${item.name} from wishlist`}
                     title="Remove from wishlist"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -104,7 +121,7 @@ export default function WishlistPage() {
                   <Link to={`/product/${item.slug}`} className="wishlist-card-img-link">
                     <img
                       src={optimizeImage(item.image, 800)}
-                      alt={productName}
+                      alt={item.name}
                       className="wishlist-card-img"
                       loading="lazy"
                       onError={(e) => {
@@ -121,7 +138,7 @@ export default function WishlistPage() {
                   <div className="wishlist-card-info">
                     <span className="wishlist-card-category">{item.category || "Men's Collection"}</span>
                     <Link to={`/product/${item.slug}`} className="wishlist-card-title">
-                      {productName}
+                      {item.name}
                     </Link>
 
                     <div className="wishlist-card-price-row">
@@ -135,24 +152,42 @@ export default function WishlistPage() {
                       )}
                     </div>
 
-                    {/* Move to Cart / Options CTA */}
+                    {/* Size Selector for clothing items */}
+                    {isClothingProduct(item) && (() => {
+                      const availSizes = getAvailableProductSizes(item);
+                      if (availSizes.length > 1) {
+                        const currentChosen = selectedSizes[item.id] || availSizes[0];
+                        return (
+                          <div className="wishlist-size-picker">
+                            <span className="wishlist-size-label">Size:</span>
+                            <div className="wishlist-size-pills">
+                              {availSizes.map(sz => (
+                                <button
+                                  key={sz}
+                                  type="button"
+                                  className={`wishlist-size-pill ${currentChosen === sz ? 'active' : ''}`}
+                                  onClick={() => handleSelectSize(item.id, sz)}
+                                  title={`Select size ${sz}`}
+                                >
+                                  {sz}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Move to Cart CTA */}
                     <div className="wishlist-card-actions">
-                      {item.sizes && item.sizes.length > 1 ? (
-                        <Link
-                          to={`/product/${item.slug}`}
-                          className="wishlist-btn-options"
-                        >
-                          Choose Options
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          className="wishlist-btn-add"
-                          onClick={() => handleMoveToCart(item)}
-                        >
-                          Move to Cart
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="wishlist-btn-add"
+                        onClick={() => handleMoveToCart(item)}
+                      >
+                        Move to Cart
+                      </button>
                     </div>
                   </div>
                 </div>

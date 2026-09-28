@@ -11,10 +11,9 @@ export default function NewArrivalsPage() {
   const { addToCart } = useCart();
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
+    const loadData = async (force = true) => {
       try {
-        const data = await getNewArrivals(12);
+        const data = await getNewArrivals(12, force);
         setNewArrivals(data);
       } catch (err) {
         console.error("Error loading new arrivals:", err);
@@ -22,7 +21,11 @@ export default function NewArrivalsPage() {
         setLoading(false);
       }
     };
-    loadData();
+    loadData(true);
+
+    const handleUpdate = () => loadData(true);
+    window.addEventListener('bo_products_updated', handleUpdate);
+    return () => window.removeEventListener('bo_products_updated', handleUpdate);
   }, []);
   
   if (loading) {

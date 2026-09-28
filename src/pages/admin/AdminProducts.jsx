@@ -275,7 +275,7 @@ export default function AdminProducts() {
                       </div>
                       <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         <div className="admin-table-product-name" style={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>
-                          {p.name || 'Unnamed'}
+                          {(p.name || 'Unnamed').replace(/\s*\(\d+\)$/, '')}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span 

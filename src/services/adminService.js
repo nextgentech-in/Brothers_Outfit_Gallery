@@ -14,8 +14,8 @@ export const deleteProductImage = async (fileId) => {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
-       method: 'DELETE',
-       headers
+      method: 'DELETE',
+      headers
     });
   } catch (err) {
     console.error("ImageKit delete error:", err);
@@ -36,14 +36,14 @@ export const sanitizeSizeGuideForFirestore = (sizeGuide) => {
     columns: Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [],
     rows: Array.isArray(sizeGuide.rows)
       ? sizeGuide.rows.map(row => {
-          if (Array.isArray(row)) {
-            return { cells: row.map(c => (c !== undefined && c !== null ? String(c) : '')) };
-          }
-          if (row && typeof row === 'object' && Array.isArray(row.cells)) {
-            return { cells: row.cells.map(c => (c !== undefined && c !== null ? String(c) : '')) };
-          }
-          return { cells: [] };
-        })
+        if (Array.isArray(row)) {
+          return { cells: row.map(c => (c !== undefined && c !== null ? String(c) : '')) };
+        }
+        if (row && typeof row === 'object' && Array.isArray(row.cells)) {
+          return { cells: row.cells.map(c => (c !== undefined && c !== null ? String(c) : '')) };
+        }
+        return { cells: [] };
+      })
       : []
   };
 };
@@ -54,13 +54,13 @@ export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
   const columns = Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [];
   const rows = Array.isArray(sizeGuide.rows)
     ? sizeGuide.rows.map(row => {
-        if (Array.isArray(row)) return row;
-        if (row && typeof row === 'object' && Array.isArray(row.cells)) return row.cells;
-        if (row && typeof row === 'object') {
-          return columns.map((col, idx) => row[idx] ?? row[col] ?? '');
-        }
-        return [];
-      })
+      if (Array.isArray(row)) return row;
+      if (row && typeof row === 'object' && Array.isArray(row.cells)) return row.cells;
+      if (row && typeof row === 'object') {
+        return columns.map((col, idx) => row[idx] ?? row[col] ?? '');
+      }
+      return [];
+    })
     : [];
   return {
     enabled: Boolean(sizeGuide.enabled),
@@ -72,7 +72,7 @@ export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
 
 // Admin fetching all products without active filters
 export const getAdminProducts = async () => {
-    // Pagination or complex queries can be added here
+  // Pagination or complex queries can be added here
   const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(d => {
@@ -86,39 +86,25 @@ export const getAdminProducts = async () => {
 };
 
 export const getAdminProductById = async (id) => {
-    const docRef = doc(db, PRODUCTS, id);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) return null;
-    const data = docSnap.data();
-    return {
-      id: docSnap.id,
-      ...data,
-      ...(data.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide) } : {})
-    };
+  const docRef = doc(db, PRODUCTS, id);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) return null;
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    ...data,
+    ...(data.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide) } : {})
+  };
 }
 
-// Auto-detect duplicate product names and slugs, automatically appending suffix like (2), (3) and -2, -3
+// Auto-detect duplicate product names and slugs
 export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = null) => {
   try {
     const products = await getAdminProducts();
     const otherProducts = products.filter(p => !excludeId || p.id !== excludeId);
 
-    // 1. Ensure unique Name
+    // 1. Keep original Name (Don't append numbers)
     let finalName = String(name || '').trim();
-    if (finalName) {
-      const baseName = finalName.replace(/\s*\(\d+\)$/, '').trim();
-      const existingNames = new Set(
-        otherProducts.map(p => String(p.name || '').trim().toLowerCase())
-      );
-
-      if (existingNames.has(finalName.toLowerCase())) {
-        let counter = 2;
-        while (existingNames.has(`${baseName} (${counter})`.toLowerCase())) {
-          counter++;
-        }
-        finalName = `${baseName} (${counter})`;
-      }
-    }
 
     // 2. Ensure unique Slug
     let baseSlug = String(slug || '').trim().toLowerCase();
@@ -134,7 +120,7 @@ export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = nul
       );
 
       if (existingSlugs.has(finalSlug.toLowerCase())) {
-        let counter = 2;
+        let counter = 1;
         while (existingSlugs.has(`${baseSlug}-${counter}`.toLowerCase())) {
           counter++;
         }
@@ -217,36 +203,36 @@ export const deleteProduct = async (id) => {
 
 // Simple Stats Method
 export const getAdminStats = async (products) => {
-    const total = products.length;
-    let active = 0;
-    let activeSales = 0;
-    let outOfStock = 0;
-    let lowStock = 0;
+  const total = products.length;
+  let active = 0;
+  let activeSales = 0;
+  let outOfStock = 0;
+  let lowStock = 0;
 
-    const now = new Date();
+  const now = new Date();
 
-    products.forEach(p => {
-        if(p.active) active++;
-        if(p.offerEnabled) {
-            const start = p.offerStartAt ? new Date(p.offerStartAt) : null;
-            const end = p.offerEndAt ? new Date(p.offerEndAt) : null;
-            if((!start || start <= now) && (!end || end > now)) {
-                activeSales++;
-            }
-        }
-        if(p.stock === 0) outOfStock++;
-        else if (p.stock > 0 && p.stock <= 5) lowStock++;
-    });
-
-    let totalOrders = 0;
-    try {
-      const ordersSnap = await getDocs(collection(db, 'orders'));
-      totalOrders = ordersSnap.size;
-    } catch (e) {
-      console.log('No orders yet or security rule restriction:', e.message);
+  products.forEach(p => {
+    if (p.active) active++;
+    if (p.offerEnabled) {
+      const start = p.offerStartAt ? new Date(p.offerStartAt) : null;
+      const end = p.offerEndAt ? new Date(p.offerEndAt) : null;
+      if ((!start || start <= now) && (!end || end > now)) {
+        activeSales++;
+      }
     }
+    if (p.stock === 0) outOfStock++;
+    else if (p.stock > 0 && p.stock <= 5) lowStock++;
+  });
 
-    return { total, active, activeSales, outOfStock, lowStock, totalOrders }; 
+  let totalOrders = 0;
+  try {
+    const ordersSnap = await getDocs(collection(db, 'orders'));
+    totalOrders = ordersSnap.size;
+  } catch (e) {
+    console.log('No orders yet or security rule restriction:', e.message);
+  }
+
+  return { total, active, activeSales, outOfStock, lowStock, totalOrders };
 }
 
 // ─── ADMIN: ORDERS ────────────────────────────────────────────────────────────

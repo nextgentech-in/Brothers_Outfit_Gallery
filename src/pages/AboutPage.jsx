@@ -6,7 +6,7 @@ import TestimonialMarquee from '../components/TestimonialMarquee';
 import './AboutPage.css';
 
 export default function AboutPage() {
-  
+
   // Inject explicit LD+JSON structured data strictly aligned with known local business data
   useEffect(() => {
     const script = document.createElement('script');
@@ -33,44 +33,44 @@ export default function AboutPage() {
   }, []);
 
   const storeImages = [
-    { 
-      url: "/images/store-real-1.jpeg", 
-      alt: "Brothers Outfit Gallery Storefront & Main Entrance", 
+    {
+      url: "/images/store-real-1.jpeg",
+      alt: "Brothers Outfit Gallery Storefront & Main Entrance",
       caption: "Our Official Storefront - Welcome to Brothers Outfit Gallery",
       width: 1280,
       height: 741
     },
-    { 
-      url: "/images/store-real-2.jpeg", 
-      alt: "Brothers Outfit Gallery Interior Collection Display", 
+    {
+      url: "/images/store-real-2.jpeg",
+      alt: "Brothers Outfit Gallery Interior Collection Display",
       caption: "Spacious Interior & Contemporary Styles",
       width: 1280,
       height: 960
     },
-    { 
-      url: "/images/store-real-3.jpeg", 
-      alt: "Brothers Outfit Gallery Casuals & Designer Shirts Rack", 
+    {
+      url: "/images/store-real-3.jpeg",
+      alt: "Brothers Outfit Gallery Casuals & Designer Shirts Rack",
       caption: "Pure Cotton Casuals & Designer Shirts Collection",
       width: 1280,
       height: 960
     },
-    { 
-      url: "/images/store-real-4.jpeg", 
-      alt: "Brothers Outfit Gallery Premium T-Shirts & Smart Formals", 
+    {
+      url: "/images/store-real-4.jpeg",
+      alt: "Brothers Outfit Gallery Premium T-Shirts & Smart Formals",
       caption: "High-Density Graphic Tees & Formal Shirts",
       width: 1280,
       height: 960
     },
-    { 
-      url: "/images/store-real-5.jpeg", 
-      alt: "Brothers Outfit Gallery Denims, Jeans & Trousers Area", 
+    {
+      url: "/images/store-real-5.jpeg",
+      alt: "Brothers Outfit Gallery Denims, Jeans & Trousers Area",
       caption: "Curated Denims, Cargoes & Comfort-Fit Trousers",
       width: 1280,
       height: 960
     },
-    { 
-      url: "/images/store-real-6.jpeg", 
-      alt: "Brothers Outfit Gallery Customer Care & Styling Counter", 
+    {
+      url: "/images/store-real-6.jpeg",
+      alt: "Brothers Outfit Gallery Customer Care & Styling Counter",
       caption: "Friendly Service & Personal Styling Consultation",
       width: 1280,
       height: 960
@@ -182,7 +182,7 @@ export default function AboutPage() {
               <p>
                 Every piece in our catalog is handpicked for its fabric longevity, colorfastness, and tailored fit. Whether you walk into our Himatnagar gallery or shop conveniently online, we ensure you receive attentive customer service, honest sizing advice, and garments you'll be proud to wear.
               </p>
-              
+
               <div className="story-highlights-list">
                 <div className="story-highlight-card">
                   <span className="highlight-icon">🧵</span>
@@ -234,7 +234,7 @@ export default function AboutPage() {
               <p className="section-subtitle">Take a visual tour through our aisles, racks, and premium collections.</p>
             </div>
           </div>
-          
+
           <PhotoGallery images={storeImages} />
         </div>
       </section>
@@ -279,7 +279,7 @@ export default function AboutPage() {
             <h2 className="section-title">OUR STORE LOCATION</h2>
             <p className="section-subtitle">Conveniently located with easy parking and direct highway access.</p>
           </div>
-          
+
           <div className="location-grid">
             <div className="location-info-card">
               <div className="location-live-status">
@@ -291,7 +291,7 @@ export default function AboutPage() {
               <p>
                 Experience our full collections in person at our flagship destination. Our team is ready to help you find the perfect size, match coordinates, and elevate your wardrobe.
               </p>
-              
+
               <div className="location-contact-list">
                 <div className="contact-detail-row">
                   <span className="contact-icon">📍</span>
@@ -317,7 +317,7 @@ export default function AboutPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="location-hours-box">
                 <h4>Store Opening Hours</h4>
                 {businessInfo.openingHours.map((slot, i) => (
@@ -329,14 +329,14 @@ export default function AboutPage() {
               </div>
 
               <div className="location-buttons-wrap">
-                <a 
-                  href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`} 
+                <a
+                  href={`tel:${businessInfo.phone.replace(/[^0-9+]/g, '')}`}
                   className="btn-primary"
                   style={{ flex: '1 1 200px', textAlign: 'center', color: '#ffffff', backgroundColor: '#0f172a', textDecoration: 'none' }}
                 >
                   CALL STORE: {businessInfo.phone}
                 </a>
-                <a 
+                <a
                   href={businessInfo.googleMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -347,18 +347,18 @@ export default function AboutPage() {
                 </a>
               </div>
             </div>
-            
+
             {/* Store Map Visual Showcase with Google Maps Link */}
-            <a 
+            <a
               href={businessInfo.googleMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="location-map-photo-wrap"
               title="Open Brothers Outfit Gallery in Google Maps"
             >
-              <img 
-                src="/images/store-map-photo.jpg" 
-                alt="Brothers Outfit Gallery Location Map" 
+              <img
+                src="/images/store-map-photo.jpg"
+                alt="Brothers Outfit Gallery Location Map"
                 className="location-map-photo"
                 loading="lazy"
                 decoding="async"
@@ -369,12 +369,12 @@ export default function AboutPage() {
                 <div className="map-pin-pulse-icon">📍</div>
                 <div className="map-photo-details">
                   <strong>BROTHERS OUTFIT GALLERY</strong>
-                  <p>{businessInfo.address}</p>
+                  <p>FF 57, Pratham Square, Sahakari Jin Rd, Himatnagar, Gujarat 383001</p>
                   <span className="map-photo-link-badge">Open in Google Maps ↗</span>
                 </div>
               </div>
-            </a>
-          </div>
+            </a> 
+          </div>  
         </div>
       </section>
 
@@ -386,7 +386,7 @@ export default function AboutPage() {
             <h2 className="section-title">WHAT OUR CUSTOMERS SAY</h2>
             <p className="section-subtitle">Real experiences from customers of {businessInfo.name}.</p>
           </div>
-          
+
           <div className="reviews-trust-block">
             <div className="reviews-stars">★★★★★</div>
             <p className="reviews-rating">
@@ -408,7 +408,7 @@ export default function AboutPage() {
             <span className="section-eyebrow">HELP & DETAILS</span>
             <h2 className="section-title">FREQUENTLY ASKED QUESTIONS</h2>
           </div>
-          
+
           <div className="faq-list">
             <div className="faq-item">
               <h4>Where is {businessInfo.name} located?</h4>

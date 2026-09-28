@@ -328,3 +328,54 @@
   background: #2a2a2a;
   transform: translateY(-1px);
 }
+
+/* Quick Size Picker */
+.wishlist-size-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.wishlist-size-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #716C62;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wishlist-size-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wishlist-size-pill {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wishlist-size-pill:hover {
+  border-color: #111111;
+}
+
+.wishlist-size-pill.active {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
+}
+

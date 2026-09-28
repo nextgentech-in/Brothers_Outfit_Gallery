@@ -1,0 +1,475 @@
+/* ═══════════════════════════════════════════════════════════════
+   SHOP BY CATEGORY — Full-Image Card Grid
+   Large background images with small overlay text.
+   ═══════════════════════════════════════════════════════════════ */
+
+.sbc-section {
+  background: #ffffff;
+  padding: 72px 0 80px;
+  border-bottom: 1px solid rgba(217, 211, 199, 0.5);
+}
+
+.sbc-container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ── Heading ── */
+.sbc-heading {
+  margin-bottom: 28px;
+}
+
+.sbc-heading-eyebrow {
+  display: block;
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #6B665C;
+  margin-bottom: 4px;
+}
+
+.sbc-heading-title {
+  font-family: var(--font-heading, system-ui, sans-serif);
+  font-size: clamp(26px, 3.8vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--color-charcoal, #111111);
+  margin: 0;
+  line-height: 1.05;
+}
+
+.sbc-heading-line {
+  margin-top: 14px;
+  width: 100%;
+  height: 1.5px;
+  background: linear-gradient(90deg, var(--color-charcoal, #111111) 0%, var(--color-charcoal, #111111) 30%, rgba(217, 211, 199, 0.5) 100%);
+}
+
+/* ── Grid — 4 in One Row on Desktop with Flush Edges ── */
+.sbc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+
+/* ── Card — Compact Square Ratio (1:1) Reduced Size on Desktop ── */
+.sbc-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
+  overflow: hidden;
+  text-decoration: none;
+  color: #ffffff;
+  cursor: pointer;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sbc-card-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
+}
+
+.sbc-card:hover .sbc-card-bg {
+  transform: scale(1.08);
+}
+
+/* Gradient overlay — dark at bottom for text */
+.sbc-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top,
+      rgba(0, 0, 0, 0.75) 0%,
+      rgba(0, 0, 0, 0.25) 40%,
+      rgba(0, 0, 0, 0.05) 70%,
+      transparent 100%);
+  transition: background 0.3s ease;
+  z-index: 1;
+}
+
+.sbc-card:hover .sbc-card-overlay {
+  background: linear-gradient(to top,
+      rgba(0, 0, 0, 0.8) 0%,
+      rgba(0, 0, 0, 0.3) 45%,
+      rgba(0, 0, 0, 0.08) 70%,
+      transparent 100%);
+}
+
+/* Text info at bottom of card */
+.sbc-card-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 14px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sbc-card-name {
+  display: block;
+  font-family: var(--font-heading, system-ui, sans-serif);
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  line-height: 1.2;
+}
+
+.sbc-card-count {
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 0.3px;
+}
+
+/* Arrow icon — top-right on hover */
+.sbc-card-arrow {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.25s ease;
+}
+
+.sbc-card:hover .sbc-card-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Focus styles */
+.sbc-card:focus-visible {
+  outline: 2px solid var(--color-charcoal, #111111);
+  outline-offset: 2px;
+  z-index: 2;
+}
+
+/* ── Skeleton ── */
+.sbc-skeleton {
+  pointer-events: none;
+  background: #f0ece6;
+  border-radius: 0;
+}
+
+.sbc-skeleton-shimmer {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.sbc-skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: sbc-shimmer 1.4s infinite;
+}
+
+@keyframes sbc-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Shop All Footer ── */
+.sbc-footer {
+  text-align: center;
+  margin-top: 32px;
+}
+
+.sbc-shop-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 30px;
+  background: var(--color-charcoal, #111111);
+  color: #ffffff;
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid var(--color-charcoal, #111111);
+  border-radius: 0;
+  transition: all 0.25s ease;
+}
+
+.sbc-shop-all-btn:hover {
+  background: #2a2a2a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(17, 17, 17, 0.12);
+}
+
+.sbc-shop-all-btn:focus-visible {
+  outline: 2px solid var(--color-charcoal, #111111);
+  outline-offset: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE — EXACTLY 3 IN A ROW, NO GAP, 3:4 RATIO
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Large desktop (1280px+) — 4 columns, compact reduced size */
+@media (min-width: 1280px) {
+  .sbc-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+
+  .sbc-card {
+    aspect-ratio: 1 / 1;
+  }
+
+  .sbc-card-info {
+    padding: 10px 12px;
+  }
+
+  .sbc-card-name {
+    font-size: 12.5px;
+    letter-spacing: 0.8px;
+  }
+
+  .sbc-card-count {
+    font-size: 10px;
+  }
+}
+
+/* Desktop (1024–1279px) — 4 columns, compact reduced size */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sbc-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+  }
+
+  .sbc-card {
+    aspect-ratio: 1 / 1;
+  }
+
+  .sbc-card-info {
+    padding: 9px 11px;
+  }
+
+  .sbc-card-name {
+    font-size: 12px;
+    letter-spacing: 0.8px;
+  }
+
+  .sbc-card-count {
+    font-size: 9.5px;
+  }
+}
+
+/* Tablet (768–1023px) — 3 columns */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sbc-section {
+    padding: 48px 0 54px;
+  }
+
+  .sbc-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  .sbc-card {
+    aspect-ratio: 3 / 4;
+    border-radius: 0;
+  }
+
+  .sbc-card-info {
+    padding: 10px 12px;
+  }
+
+  .sbc-card-name {
+    font-size: 12.5px;
+  }
+
+  .sbc-card-count {
+    font-size: 10px;
+  }
+}
+
+/* Large mobile (481–767px) — 3 columns */
+@media (min-width: 481px) and (max-width: 767px) {
+  .sbc-section {
+    padding: 40px 0 46px;
+  }
+
+  .sbc-container {
+    padding: 0 14px;
+  }
+
+  .sbc-heading {
+    margin-bottom: 22px;
+  }
+
+  .sbc-heading-eyebrow {
+    font-size: 11.5px;
+  }
+
+  .sbc-heading-title {
+    font-size: 26px;
+  }
+
+  .sbc-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  .sbc-card {
+    aspect-ratio: 3 / 4;
+    border-radius: 0;
+  }
+
+  .sbc-card-info {
+    padding: 8px 10px;
+  }
+
+  .sbc-card-name {
+    font-size: 11px;
+    letter-spacing: 0.8px;
+  }
+
+  .sbc-card-count {
+    font-size: 9.5px;
+  }
+
+  .sbc-card-arrow {
+    display: none;
+  }
+
+  .sbc-footer {
+    margin-top: 24px;
+  }
+}
+
+/* Small mobile (≤480px) — 3 columns with 0 gap */
+@media (max-width: 480px) {
+  .sbc-section {
+    padding: 32px 0 40px;
+  }
+
+  .sbc-container {
+    padding: 0 10px;
+  }
+
+  .sbc-heading {
+    margin-bottom: 18px;
+  }
+
+  .sbc-heading-eyebrow {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+
+  .sbc-heading-title {
+    font-size: 22px;
+  }
+
+  .sbc-heading-line {
+    margin-top: 10px;
+  }
+
+  .sbc-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+
+  .sbc-card {
+    aspect-ratio: 3 / 4;
+    border-radius: 0;
+  }
+
+  .sbc-card-info {
+    padding: 6px 8px;
+  }
+
+  .sbc-card-name {
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .sbc-card-count {
+    font-size: 8.5px;
+  }
+
+  .sbc-card-arrow {
+    display: none;
+  }
+
+  .sbc-footer {
+    margin-top: 20px;
+  }
+
+  .sbc-shop-all-btn {
+    padding: 9px 20px;
+    font-size: 10px;
+  }
+
+  .sbc-skeleton {
+    border-radius: 0;
+  }
+}
+
+/* Ultra-small (≤320px) */
+@media (max-width: 320px) {
+  .sbc-heading-title {
+    font-size: 24px;
+  }
+
+  .sbc-card-name {
+    font-size: 9.5px;
+  }
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .sbc-card-bg {
+    transition: none;
+  }
+
+  .sbc-card-overlay {
+    transition: none;
+  }
+
+  .sbc-card-arrow {
+    transition: none;
+  }
+
+  .sbc-shop-all-btn {
+    transition: none;
+  }
+
+  .sbc-skeleton-shimmer::after {
+    animation: none;
+  }
+}

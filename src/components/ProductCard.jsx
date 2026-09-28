@@ -4,7 +4,7 @@ import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
-import { getProductDisplayName, getProductImages } from '../utils/productUtils';
+import { getAvailableProductSizes } from '../utils/productUtils';
 import AuthModal from './auth/AuthModal';
 import './ProductCard.css';
 
@@ -73,7 +73,6 @@ function useCountdown(endDateStr) {
 }
 
 function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
-  const productName = getProductDisplayName(product.name);
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -82,16 +81,23 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
   const totalStock = product.variants?.length > 0
-    ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0)
-    : (parseInt(product.stock, 10) || 0);
-  const isOutOfStock = totalStock <= 0;
+    ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock ?? v.quantity, 10) || 0), 0)
+    : (parseInt(product.stock ?? product.quantity, 10) || 0);
   
-  const availableSizes = product.variants?.length > 0
-    ? [...new Set(product.variants.filter(v => (parseInt(v.stock, 10) || 0) > 0).map(v => v.size))]
-    : (totalStock > 0 ? (product.sizes || []) : []);
+  // Strictly filter out discontinued and 0-stock sizes (matches ProductInfo)
+  const availableSizes = getAvailableProductSizes(product);
+
+  const isOutOfStock = totalStock <= 0 || product.inStock === false || product.active === false || (product.variants?.length > 0 && availableSizes.length === 0);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const hasMultipleSizes = availableSizes.length > 1;
   const needsSizeSelection = hasMultipleSizes && !selectedSize;
+
+  // Auto-sync selected size if available sizes change
+  useEffect(() => {
+    if (selectedSize && !availableSizes.includes(selectedSize)) {
+      setSelectedSize(availableSizes.length === 1 ? availableSizes[0] : null);
+    }
+  }, [availableSizes, selectedSize]);
 
   // Offer logic
   const offerActive = showOffer && isOfferActive(product);
@@ -177,19 +183,29 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
     executeBuyNow();
   };
 
-  // Multiple photos support
-  const rawImages = getProductImages(product);
+  // Multiple photos support with primary image guaranteed first
+  const rawImages = (product.images && product.images.length > 0)
+    ? [...product.images]
+    : [product.thumbnailUrl || product.image || '/images/hero.png'];
 
-  const imagesList = rawImages
-    .map(img => (typeof img === 'object' && img !== null ? img.url || img.thumbnailUrl : img))
-    .filter(Boolean);
+  const primaryTarget = product.thumbnailUrl || null;
+  rawImages.sort((a, b) => {
+    const aIsPrimary = Boolean(
+      (typeof a === 'object' && a !== null && a.isPrimary) ||
+      (primaryTarget && (a === primaryTarget || (typeof a === 'object' && a?.url === primaryTarget)))
+    );
+    const bIsPrimary = Boolean(
+      (typeof b === 'object' && b !== null && b.isPrimary) ||
+      (primaryTarget && (b === primaryTarget || (typeof b === 'object' && b?.url === primaryTarget)))
+    );
+    if (aIsPrimary && !bIsPrimary) return -1;
+    if (!aIsPrimary && bIsPrimary) return 1;
+    return 0;
+  });
+
+  const imagesList = rawImages.map(img => (typeof img === 'object' && img !== null && img.url) ? img.url : img).filter(Boolean);
   const [activeImgIdx, setActiveImgIdx] = useState(0);
   const hasMultipleImages = imagesList.length > 1;
-  const visibleDotStart = Math.max(0, Math.min(activeImgIdx - 2, imagesList.length - 5));
-  const visibleImageIndices = Array.from(
-    { length: Math.min(5, imagesList.length) },
-    (_, index) => visibleDotStart + index
-  );
   const touchStartX = useRef(null);
 
   const handleTouchStart = (e) => {
@@ -224,7 +240,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         <Link to={`/product/${product.slug}`} className="product-card__image-link">
           <img
             src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 800)}
-            alt={`${productName} - View ${activeImgIdx + 1}`}
+            alt={`${product.name} - View ${activeImgIdx + 1}`}
             className="product-card__image"
             loading="lazy"
             onError={(e) => {
@@ -259,7 +275,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
             e.stopPropagation();
             if (toggleWishlist) toggleWishlist(product);
           }}
-          aria-label={inWishlist ? `Remove ${productName} from wishlist` : `Add ${productName} to wishlist`}
+          aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
           title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#c0392b" : "none"} stroke={inWishlist ? "#c0392b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -298,7 +314,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
 
             {/* Pagination Dots */}
             <div className="card-img-dots" role="tablist" aria-label="Product photos">
-              {visibleImageIndices.map(i => (
+              {imagesList.map((_, i) => (
                 <button
                   key={i}
                   type="button"
@@ -341,7 +357,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         </div>
 
         <Link to={`/product/${product.slug}`} className="product-card__name">
-          {productName}
+          {product.name}
         </Link>
 
         {/* Sizes */}
@@ -350,26 +366,26 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
             Please select a size first
           </div>
         )}
-        <div 
-          className="product-card__sizes"
-          style={sizePrompt ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '6px', padding: '4px' } : {}}
-        >
-          {availableSizes.map((size) => (
-            <button
-              key={size}
-              className={`product-card__size ${selectedSize === size ? 'product-card__size--selected' : ''} ${isOutOfStock ? 'product-card__size--disabled' : ''}`}
-              onClick={() => {
-                if (!isOutOfStock) {
+        {/* Sizes - Only render in-stock sizes */}
+        {availableSizes.length > 0 && !isOutOfStock && (
+          <div 
+            className="product-card__sizes"
+            style={sizePrompt ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '6px', padding: '4px' } : {}}
+          >
+            {availableSizes.map((size) => (
+              <button
+                key={size}
+                className={`product-card__size ${selectedSize === size ? 'product-card__size--selected' : ''}`}
+                onClick={() => {
                   setSelectedSize(size);
                   setSizePrompt(false);
-                }
-              }}
-              disabled={isOutOfStock}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
+                }}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Offer Timer */}
         {offerActive && countdown && (

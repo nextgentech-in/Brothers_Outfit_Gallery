@@ -6,20 +6,18 @@ import TrendingCarousel from '../components/TrendingCarousel';
 import SaleProductCard from '../components/SaleProductCard';
 import ProductCard from '../components/ProductCard';
 import TrustBar from '../components/TrustBar';
-import { optimizeImage } from '../utils/imageUtils';
-import { getHomepageCategoryItems } from '../utils/productUtils';
+import ShopByCategory from '../components/ShopByCategory';
 import './HomePage.css';
 
 export default function HomePage() {
   const [saleProducts, setSaleProducts] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
   const [shopProducts, setShopProducts] = useState([]);
-  const [categoryItems, setCategoryItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [homepageConfig, setHomepageConfig] = useState(() => {
     const fallback = {
       showHero: true,
-      showCategories: true,
+      showShopCategory: true,
       showTrending: true,
       showSaleSection: true,
       showNewArrivals: true,
@@ -35,7 +33,7 @@ export default function HomePage() {
       hero: {
         bannerImage: '/images/hero.png',
         mobileBannerImage: '',
-        eyebrow: 'NEW SEASON 2026',
+        eyebrow: '',
         heading: 'DEFINE YOUR\nEVERYDAY STYLE',
         description: "Premium men's clothing designed for confidence, comfort and effortless style.",
         saleButtonText: 'Season Sale — Up to 50% Off',
@@ -94,13 +92,6 @@ export default function HomePage() {
 
         setSaleProducts(saleRes);
         setNewArrivals(newRes);
-        const configuredCategories = Array.isArray(configRes?.categories)
-          ? configRes.categories.filter(category => category?.name?.trim())
-          : [];
-        const categoryList = configRes?.categoriesConfigured === true || configuredCategories.length > 0
-          ? getHomepageCategoryItems(shopRes.products, configuredCategories)
-          : getHomepageCategoryItems(shopRes.products);
-        setCategoryItems(categoryList);
         if (configRes && Object.keys(configRes).length > 0) {
           setHomepageConfig(prev => ({ ...prev, ...configRes }));
         }
@@ -129,43 +120,13 @@ export default function HomePage() {
       {/* 1. Hero */}
       {homepageConfig.showHero !== false && <Hero heroConfig={homepageConfig?.hero} />}
 
-      {/* 2. Shop by Category */}
-      {homepageConfig.showCategories !== false && categoryItems.length > 0 && (
-        <section className="home-category-section" aria-labelledby="home-category-heading">
-          <div className="home-container">
-            <div className="category-section-heading">
-              <h2 id="home-category-heading">Shop by Category</h2>
-            </div>
-            <div className="category-grid">
-              {categoryItems.map(category => (
-                <Link
-                  key={category.name}
-                  to={`/shop?category=${encodeURIComponent(category.category || category.name)}`}
-                  className="category-card"
-                  aria-label={`Shop ${category.name}`}
-                >
-                  <span className="category-card__name">{category.name}</span>
-                  <span className="category-card__image-wrap">
-                    <img
-                      src={optimizeImage(category.image, { width: 480, quality: 78 })}
-                      alt=""
-                      width="480"
-                      height="480"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* 2. Shop By Category */}
+      {homepageConfig.showShopCategory !== false && <ShopByCategory />}
 
       {/* 3. Trending Now */}
       {homepageConfig.showTrending !== false && <TrendingCarousel trendingConfig={homepageConfig?.trending} />}
 
-      {/* 4. Sale Products */}
+      {/* 3. Sale Products */}
       {homepageConfig.showSaleSection !== false && (saleProducts.length > 0 || loading) && (
         <section className="home-section sale-section">
           <div className="home-container">
@@ -190,7 +151,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 5. New Arrivals */}
+      {/* 4. New Arrivals */}
       {homepageConfig.showNewArrivals !== false && (newArrivals.length > 0 || loading) && (
         <section className="home-section new-arrivals-section">
           <div className="home-container">
@@ -215,7 +176,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 6. Shop Our Collection */}
+      {/* 5. Shop Our Collection */}
       {homepageConfig.showShopCollection !== false && (
         <section className="home-section shop-section">
           <div className="home-container">
@@ -240,7 +201,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 7. About Us Preview */}
+      {/* 6. About Us Preview */}
       {homepageConfig.showAboutPreview !== false && (
         <section className="home-section about-preview-section">
           <div className="home-container">
@@ -267,7 +228,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 8. Why Shop With Us */}
+      {/* 7. Why Shop With Us */}
       {homepageConfig.showTrustBadges !== false && (
         <section className="home-section trust-section">
           <div className="home-container">
@@ -318,7 +279,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* 9. Customer Reviews */}
+      {/* 8. Customer Reviews */}
       {homepageConfig.showReviews !== false && (
         <section className="home-section reviews-section">
           <div className="home-container">

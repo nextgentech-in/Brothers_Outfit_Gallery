@@ -2,16 +2,15 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
 import { optimizeImage } from '../../utils/imageUtils';
-import { getProductImages } from '../../utils/productUtils';
 import './ProductGallery.css';
 
-export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors }) {
+export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors, isOutOfStock = false }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef(null);
 
   // Extract purely the URL regardless if it's the legacy string format or the object format
-  const extractUrl = (img) => (typeof img === 'object' && img !== null) ? (img.url || img.thumbnailUrl || '') : (typeof img === 'string' ? img : '');
+  const extractUrl = (img) => (typeof img === 'object' && img !== null && img.url) ? img.url : (typeof img === 'string' ? img : '');
   const extractColor = (img) => (typeof img === 'object' && img !== null && img.color) ? String(img.color).trim() : '';
 
   const isGeneralImage = (img) => {
@@ -30,8 +29,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     if (!images || images.length === 0) return [];
 
     // Filter out invalid items
-    const originalImages = images.filter(img => extractUrl(img));
-    const validImages = getProductImages({ images }).filter(img => extractUrl(img));
+    const validImages = images.filter(img => extractUrl(img));
     if (validImages.length === 0) return [];
 
     // If 'All' is selected, show all images (general + color images)
@@ -50,7 +48,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     // Fallback if no images found for this specific color: show general images or all
     const generalImages = validImages.filter(img => isGeneralImage(img));
     if (generalImages.length > 0) {
-      return originalImages.every(isGeneralImage) ? originalImages : generalImages;
+      return generalImages;
     }
 
     return validImages;
@@ -61,35 +59,24 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     setCurrentIndex(0);
   }, [selectedColor]);
 
-  // Keep legacy untagged galleries grouped by color while honoring the primary image on initial view.
+  // Legacy fallback: if images are not color-tagged, jump to corresponding index when color index changes
   useEffect(() => {
-    if (!images?.length || selectedColorIndex == null || totalColors < 1) return;
-    if (images.some(img => !isGeneralImage(img))) return;
+    if (!images || images.length === 0) return;
+    const hasSpecificColorImages = images.some(img => !isGeneralImage(img));
 
-    if (selectedColorIndex < 0 || !selectedColor || selectedColor.toLowerCase() === 'all') {
-      const primaryIndex = displayImages.findIndex(img => img?.isPrimary);
-      setCurrentIndex(Math.max(0, primaryIndex));
-      return;
+    // Only use sequential math if no specific color tagging was explicitly defined
+    if (!hasSpecificColorImages && selectedColorIndex != null && totalColors && totalColors > 0) {
+      const imagesPerColor = images.length / totalColors;
+      const targetIndex = Math.min(Math.floor(selectedColorIndex * imagesPerColor), images.length - 1);
+      setCurrentIndex(targetIndex);
     }
-
-    const imagesPerColor = images.length / totalColors;
-    const targetIndex = Math.min(
-      Math.floor(selectedColorIndex * imagesPerColor),
-      displayImages.length - 1
-    );
-    setCurrentIndex(Math.max(0, targetIndex));
-  }, [selectedColor, selectedColorIndex, totalColors, images, displayImages]);
+  }, [selectedColorIndex, totalColors, images]);
 
   if (!displayImages || displayImages.length === 0) {
     return <div className="product-gallery-empty">No Images Available</div>;
   }
 
   const safeCurrentIndex = Math.min(currentIndex, displayImages.length - 1);
-  const visibleDotStart = Math.max(0, Math.min(safeCurrentIndex - 2, displayImages.length - 5));
-  const visibleImageIndices = Array.from(
-    { length: Math.min(5, displayImages.length) },
-    (_, index) => visibleDotStart + index
-  );
   const currentImage = extractUrl(displayImages[safeCurrentIndex]) || extractUrl(displayImages[0]);
 
   const handleNavigate = (direction) => {
@@ -159,6 +146,30 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
           onClick={() => setLightboxOpen(true)}
         />
 
+        {isOutOfStock && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(15, 23, 42, 0.88)',
+            backdropFilter: 'blur(8px)',
+            color: '#ffffff',
+            padding: '12px 28px',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: '800',
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+            border: '2px solid rgba(255, 255, 255, 0.35)',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.45)',
+            zIndex: 10,
+            pointerEvents: 'none'
+          }}>
+            OUT OF STOCK
+          </div>
+        )}
+
         {/* Previous / Next Arrow Overlay Controls */}
         {displayImages.length > 1 && (
           <>
@@ -183,7 +194,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
         {displayImages.length > 1 && (
           <>
             <div className="product-gallery-dots" role="tablist" aria-label="Product gallery images">
-              {visibleImageIndices.map(idx => (
+              {displayImages.map((_, idx) => (
                 <button 
                   key={idx}
                   type="button"
@@ -218,3 +229,4 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     </div>
   );
 }
+

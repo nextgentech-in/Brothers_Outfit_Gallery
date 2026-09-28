@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProductBySlug } from '../services/productService';
+import { getProductBySlug, isProductInStock } from '../services/productService';
 import ProductGallery from '../components/product/ProductGallery';
 import ProductInfo from '../components/product/ProductInfo';
 import ReviewsModule from '../components/product/ReviewsModule';
 import RelatedProducts from '../components/product/RelatedProducts';
-import { getProductDisplayName } from '../utils/productUtils';
 import './ProductPage.css';
 
 export default function ProductPage() {
@@ -94,20 +93,36 @@ export default function ProductPage() {
     );
   }
 
-  if (!product) {
+  if (!product || product.active === false || !isProductInStock(product)) {
     return (
       <div className="product-not-found">
-        <h1>PRODUCT NOT FOUND</h1>
-        <p>The product you're looking for may have been removed or is no longer available.</p>
+        <h1>PRODUCT NOT AVAILABLE</h1>
+        <p>This item is currently sold out or no longer available in the store.</p>
         <Link to="/shop" className="btn-back-shop">BACK TO SHOP</Link>
       </div>
     );
   }
 
   // Pre-bake images array ensuring a main image is pushed if images doesn't exist logically
-  const rawImages = product.images && product.images.length > 0 
-    ? product.images 
+  // Primary image is strictly first (index 0)
+  let rawImages = product.images && product.images.length > 0 
+    ? [...product.images] 
     : [product.thumbnailUrl || product.image || '/images/hero.png'];
+
+  const primaryTarget = product.thumbnailUrl || null;
+  rawImages.sort((a, b) => {
+    const aIsPrimary = Boolean(
+      (typeof a === 'object' && a !== null && a.isPrimary) ||
+      (primaryTarget && (a === primaryTarget || (typeof a === 'object' && a?.url === primaryTarget)))
+    );
+    const bIsPrimary = Boolean(
+      (typeof b === 'object' && b !== null && b.isPrimary) ||
+      (primaryTarget && (b === primaryTarget || (typeof b === 'object' && b?.url === primaryTarget)))
+    );
+    if (aIsPrimary && !bIsPrimary) return -1;
+    if (!aIsPrimary && bIsPrimary) return 1;
+    return 0;
+  });
   const allImages = rawImages.filter(Boolean);
 
   // Count actual displayable colors for gallery-color mapping
@@ -134,8 +149,8 @@ export default function ProductPage() {
             </>
           )}
           <span className="breadcrumb-separator">/</span>
-          <span className="breadcrumb-current" title={getProductDisplayName(product.title || product.name)}>
-            {getProductDisplayName(product.title || product.name)}
+          <span className="breadcrumb-current" title={product.title || product.name}>
+            {product.title || product.name}
           </span>
         </nav>
 
@@ -146,6 +161,7 @@ export default function ProductPage() {
               selectedColor={selectedColor}
               selectedColorIndex={selectedColorIndex}
               totalColors={totalColors}
+              isOutOfStock={!isProductInStock(product)}
             />
           </div>
           

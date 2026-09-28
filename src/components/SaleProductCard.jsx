@@ -1,16 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import OfferCountdown from './OfferCountdown';
 import { optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
+import { getAvailableProductSizes } from '../utils/productUtils';
 import AuthModal from './auth/AuthModal';
-import { getProductDisplayName } from '../utils/productUtils';
 import './SaleProductCard.css';
 
 export default function SaleProductCard({ product, onAddToCart, onOfferExpire }) {
-  const productName = getProductDisplayName(product.name);
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -19,11 +18,24 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
   const [addedAnimation, setAddedAnimation] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
-  const isOutOfStock = product.stock === 0;
-  const availableSizes = product.sizes || (product.variants ? [...new Set(product.variants.map(v => v.size))] : []);
+  const totalStock = product.variants?.length > 0
+    ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock ?? v.quantity, 10) || 0), 0)
+    : (parseInt(product.stock ?? product.quantity, 10) || 0);
+
+  // Strictly filter out discontinued and 0-stock sizes
+  const availableSizes = getAvailableProductSizes(product);
+
+  const isOutOfStock = totalStock <= 0 || product.inStock === false || product.active === false || (product.variants?.length > 0 && availableSizes.length === 0);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const hasMultipleSizes = availableSizes.length > 1;
   const needsSizeSelection = hasMultipleSizes && !selectedSize;
+
+  // Auto-sync selected size if available sizes change
+  useEffect(() => {
+    if (selectedSize && !availableSizes.includes(selectedSize)) {
+      setSelectedSize(availableSizes.length === 1 ? availableSizes[0] : null);
+    }
+  }, [availableSizes, selectedSize]);
 
   const handleAddToCart = (e) => {
     e.preventDefault();
@@ -102,7 +114,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
         <Link to={`/product/${product.slug}`} style={{ display: 'block', width: '100%', height: '100%' }}>
           <img
             src={optimizeImage(product.image || product.thumbnailUrl, 800)}
-            alt={productName}
+            alt={product.name}
             className="sale-card__image"
             loading="lazy"
             onError={(e) => {
@@ -130,7 +142,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
             e.stopPropagation();
             if (toggleWishlist) toggleWishlist(product);
           }}
-          aria-label={inWishlist ? `Remove ${productName} from wishlist` : `Add ${productName} to wishlist`}
+          aria-label={inWishlist ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
           title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill={inWishlist ? "#c0392b" : "none"} stroke={inWishlist ? "#c0392b" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -142,7 +154,7 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
       {/* Card Info */}
       <div className="sale-card__info">
         <Link to={`/product/${product.slug}`} className="sale-card__name">
-          {productName}
+          {product.name}
         </Link>
         
         {/* Dynamic Countdown */}
@@ -162,26 +174,26 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
             Please select a size first
           </div>
         )}
-        <div 
-          className="sale-card__sizes"
-          style={sizePrompt ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '6px', padding: '4px' } : {}}
-        >
-          {availableSizes.map((size) => (
-            <button
-              key={size}
-              className={`sale-card__size ${selectedSize === size ? 'sale-card__size--selected' : ''} ${isOutOfStock ? 'sale-card__size--disabled' : ''}`}
-              onClick={() => {
-                if (!isOutOfStock) {
+        {/* Sizes - Only render in-stock sizes */}
+        {availableSizes.length > 0 && !isOutOfStock && (
+          <div 
+            className="sale-card__sizes"
+            style={sizePrompt ? { outline: '2px solid var(--color-accent-gold)', borderRadius: '6px', padding: '4px' } : {}}
+          >
+            {availableSizes.map((size) => (
+              <button
+                key={size}
+                className={`sale-card__size ${selectedSize === size ? 'sale-card__size--selected' : ''}`}
+                onClick={() => {
                   setSelectedSize(size);
                   setSizePrompt(false);
-                }
-              }}
-              disabled={isOutOfStock}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
+                }}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="sale-card__btn-group">
           <button
@@ -213,3 +225,4 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     </div>
   );
 }
+

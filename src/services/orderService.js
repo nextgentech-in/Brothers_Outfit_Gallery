@@ -21,6 +21,82 @@ export const createOrder = async (orderId, orderData) => {
     console.warn('Could not store orderId in localStorage:', e);
   }
 
+  // Decrement product & variant stock in Firestore
+  if (Array.isArray(orderData.items)) {
+    try {
+      for (const item of orderData.items) {
+        const prodId = item.id || item.productId;
+        if (!prodId) continue;
+        const pRef = doc(db, 'products', String(prodId));
+        const pSnap = await getDoc(pRef);
+        if (!pSnap.exists()) continue;
+        const pData = pSnap.data();
+        const orderedQty = Math.max(1, parseInt(item.quantity, 10) || 1);
+        const orderedSize = item.size || item.selectedSize || null;
+        const orderedColor = item.color || item.selectedColor || null;
+
+        if (Array.isArray(pData.variants) && pData.variants.length > 0) {
+          const variants = [...pData.variants];
+          const cleanSize = orderedSize ? String(orderedSize).trim().toLowerCase() : null;
+          const cleanColor = orderedColor ? String(orderedColor).trim().toLowerCase() : null;
+
+          let matchIdx = -1;
+          if (cleanSize) {
+            matchIdx = variants.findIndex(v => {
+              const vSize = String(v.size || '').trim().toLowerCase();
+              if (vSize !== cleanSize) return false;
+              if (!cleanColor) return true;
+              const vCol = String(v.color || '').trim().toLowerCase();
+              return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
+            });
+            if (matchIdx < 0) {
+              matchIdx = variants.findIndex(v => String(v.size || '').trim().toLowerCase() === cleanSize);
+            }
+          }
+          if (matchIdx < 0) matchIdx = 0;
+
+          if (matchIdx >= 0 && matchIdx < variants.length) {
+            const currentStock = parseInt(variants[matchIdx].stock ?? variants[matchIdx].quantity, 10) || 0;
+            const updatedVarStock = Math.max(0, currentStock - orderedQty);
+            variants[matchIdx] = {
+              ...variants[matchIdx],
+              stock: updatedVarStock,
+              quantity: updatedVarStock
+            };
+          }
+
+          const newTotalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock ?? v.quantity, 10) || 0), 0);
+          const hasRemainingStock = newTotalStock > 0;
+          const availableSizes = [...new Set(variants.filter(v => (parseInt(v.stock ?? v.quantity, 10) || 0) > 0).map(v => v.size))].filter(Boolean);
+
+          await updateDoc(pRef, {
+            variants,
+            stock: Math.max(0, newTotalStock),
+            quantity: Math.max(0, newTotalStock),
+            inStock: hasRemainingStock,
+            active: hasRemainingStock, // If quantity 0, not visible on store
+            sizes: availableSizes,     // Only available sizes displayed
+            updatedAt: new Date()
+          });
+        } else {
+          const currentStock = parseInt(pData.stock ?? pData.quantity, 10) || 0;
+          const newStock = Math.max(0, currentStock - orderedQty);
+          const hasRemainingStock = newStock > 0;
+
+          await updateDoc(pRef, {
+            stock: newStock,
+            quantity: newStock,
+            inStock: hasRemainingStock,
+            active: hasRemainingStock, // If quantity 0, not visible on store
+            updatedAt: new Date()
+          });
+        }
+      }
+    } catch (stockErr) {
+      console.warn('Client order stock decrement warning:', stockErr);
+    }
+  }
+
   return orderId;
 };
 
@@ -121,3 +197,23 @@ export const cancelUserOrder = async (orderId, reason = 'Cancelled by Customer',
 
   return true;
 };
+
+export const requestUserOrderExchange = async (orderId, { reason, itemNames, replacementSize, notes }) => {
+  const docRef = doc(db, 'orders', orderId);
+  const exchangePayload = {
+    reason,
+    itemNames: itemNames || 'Items',
+    replacementSize: replacementSize || 'N/A',
+    notes: notes || '',
+    requestedAt: new Date()
+  };
+
+  await updateDoc(docRef, {
+    status: 'Exchange Requested',
+    exchangeDetails: exchangePayload,
+    updatedAt: new Date()
+  });
+
+  return true;
+};
+

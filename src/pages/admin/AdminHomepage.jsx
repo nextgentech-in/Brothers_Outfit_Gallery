@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { getHomepageConfig, saveHomepageConfig, getAdminProducts, toggleProductTrending } from '../../services/adminService';
 import { uploadImageToImageKit } from '../../utils/imageUtils';
-import { getShopProducts } from '../../services/productService';
-import { getHomepageCategoryItems } from '../../utils/productUtils';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminHomepage.css';
 
@@ -13,25 +11,39 @@ const PRESET_BANNERS = [
   { name: 'Streetwear Collection', url: '/images/trending-streetwear.png' },
 ];
 
+const DEFAULT_CATEGORIES = [
+  'Kurta', 'Shirts', 'T-Shirts', 'Jeans', 'Trousers', 'Shorts',
+  'Jackets', 'Hoodies', 'Ethnic Wear', 'Perfumes', 'Slippers',
+  'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Accessories'
+];
+
 export default function AdminHomepage() {
-  const [activeTab, setActiveTab] = useState('hero'); // 'hero' | 'trending' | 'categories' | 'sections'
+  const [activeTab, setActiveTab] = useState('hero'); // 'hero' | 'categories' | 'trending' | 'sections'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
   const fileInputRef = useRef(null);
   const { showToast } = useAdminUI();
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [uploadingCategoryId, setUploadingCategoryId] = useState(null);
 
-  // Catalog products for Trending placement manager
+  // Category image upload & management state
+  const [categorySearch, setCategorySearch] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryUploadFolder, setCategoryUploadFolder] = useState('categories');
+  const [uploadingCategory, setUploadingCategory] = useState(null);
+  const [uploadingNewCategory, setUploadingNewCategory] = useState(false);
+  const [activeUploadCategory, setActiveUploadCategory] = useState(null);
+  const categoryFileInputRef = useRef(null);
+  const newCategoryFileInputRef = useRef(null);
+
+  // Catalog products for Trending & Category placement manager
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [trendingSearch, setTrendingSearch] = useState('');
   const [togglingTrendingId, setTogglingTrendingId] = useState(null);
 
   const [config, setConfig] = useState({
     showHero: true,
-    showCategories: true,
+    showShopCategory: true,
     showTrending: true,
     showSaleSection: true,
     showNewArrivals: true,
@@ -39,8 +51,7 @@ export default function AdminHomepage() {
     showAboutPreview: true,
     showTrustBadges: true,
     showReviews: true,
-    categories: [],
-    categoriesConfigured: false,
+    categoryImages: {},
     trending: {
       label: 'CURATED FOR YOU',
       title: 'TRENDING NOW',
@@ -49,7 +60,7 @@ export default function AdminHomepage() {
     hero: {
       bannerImage: '/images/hero.png',
       mobileBannerImage: '',
-      eyebrow: 'NEW SEASON 2026',
+      eyebrow: '',
       heading: 'DEFINE YOUR\nEVERYDAY STYLE',
       description: "Premium men's clothing designed for confidence, comfort and effortless style.",
       saleButtonText: '🔥 SALE — UP TO 50% OFF',
@@ -66,35 +77,31 @@ export default function AdminHomepage() {
     async function load() {
       setLoading(true);
       try {
-        const [data, productsData, shopData] = await Promise.all([
+        const [data, productsData] = await Promise.all([
           getHomepageConfig(),
-          getAdminProducts().catch(() => []),
-          getShopProducts('All', 'featured', null, 8).catch(err => {
-            console.error('Failed to load storefront categories:', err);
-            return { products: [] };
-          })
+          getAdminProducts().catch(() => [])
         ]);
-        const savedCategories = Array.isArray(data?.categories) ? data.categories : [];
-        const categoriesConfigured = data?.categoriesConfigured ?? savedCategories.length > 0;
-        const categories = categoriesConfigured || savedCategories.length > 0
-          ? getHomepageCategoryItems(shopData.products, savedCategories)
-          : getHomepageCategoryItems(shopData.products);
-        setConfig(prev => ({
-          ...prev,
-          ...(data || {}),
-          categories,
-          categoriesConfigured,
-          hero: {
-            ...prev.hero,
-            ...(data?.hero || {})
-          },
-          trending: {
-            label: 'CURATED FOR YOU',
-            title: 'TRENDING NOW',
-            subtitle: "Discover the styles defining men's fashion right now.",
-            ...(data?.trending || {})
+        if (data && Object.keys(data).length > 0) {
+          setConfig(prev => ({
+            ...prev,
+            ...data,
+            categoryImages: data.categoryImages || {},
+            categoryUploadFolder: data.categoryUploadFolder || 'categories',
+            hero: {
+              ...prev.hero,
+              ...(data.hero || {})
+            },
+            trending: {
+              label: 'CURATED FOR YOU',
+              title: 'TRENDING NOW',
+              subtitle: "Discover the styles defining men's fashion right now.",
+              ...(data.trending || {})
+            }
+          }));
+          if (data.categoryUploadFolder) {
+            setCategoryUploadFolder(data.categoryUploadFolder);
           }
-        }));
+        }
         setCatalogProducts(productsData || []);
       } catch (err) {
         console.error('Failed to load homepage config:', err);
@@ -153,77 +160,6 @@ export default function AdminHomepage() {
     setSaveStatus(null);
   };
 
-  const handleAddCategory = (e) => {
-    e.preventDefault();
-    const name = newCategoryName.trim();
-    if (!name) return;
-    if (config.categories.some(category => category.name?.trim().toLowerCase() === name.toLowerCase())) {
-      showToast('That homepage category already exists.', 'warning');
-      return;
-    }
-
-    setConfig(prev => ({
-      ...prev,
-      categoriesConfigured: true,
-      categories: [...prev.categories, { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, name, category: name, image: '' }]
-    }));
-    setNewCategoryName('');
-    setSaveStatus(null);
-  };
-
-  const handleCategoryChange = (categoryId, field, value) => {
-    setConfig(prev => ({
-      ...prev,
-      categoriesConfigured: true,
-      categories: prev.categories.map(category =>
-        category.id === categoryId
-          ? {
-            ...category,
-            [field]: value,
-            ...(field === 'name' && category.category === category.name ? { category: value } : {})
-          }
-          : category
-      )
-    }));
-    setSaveStatus(null);
-  };
-
-  const handleCategoryImageUpload = async (categoryId, e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      showToast('Please select a valid image file.', 'warning');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      showToast('Image size exceeds 10MB. Please choose a smaller image.', 'error');
-      return;
-    }
-
-    setUploadingCategoryId(categoryId);
-    try {
-      const result = await uploadImageToImageKit(file, 'categories/');
-      if (!result?.url) throw new Error('The image upload did not return a URL.');
-      handleCategoryChange(categoryId, 'image', result.url);
-      showToast('Category image uploaded. Save homepage changes to publish it.', 'success');
-    } catch (err) {
-      console.error('Category image upload error:', err);
-      showToast(`Category image upload failed: ${err.message || 'Please try again.'}`, 'error');
-    } finally {
-      setUploadingCategoryId(null);
-    }
-  };
-
-  const handleRemoveCategory = (categoryId) => {
-    setConfig(prev => ({
-      ...prev,
-      categoriesConfigured: true,
-      categories: prev.categories.filter(category => category.id !== categoryId)
-    }));
-    setSaveStatus(null);
-  };
-
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -258,38 +194,31 @@ export default function AdminHomepage() {
   };
 
   const handleSave = async () => {
-    const invalidCategory = config.categories.find(category => !category.name?.trim() || !(category.category || category.name)?.trim());
-    if (invalidCategory) {
-      setActiveTab('categories');
-      setSaveStatus({ type: 'error', text: 'Each homepage category needs both a tile label and a product category.' });
-      return;
-    }
-    const categoryNames = config.categories.map(category => category.name.trim().toLowerCase());
-    if (new Set(categoryNames).size !== categoryNames.length) {
-      setActiveTab('categories');
-      setSaveStatus({ type: 'error', text: 'Homepage category tile labels must be unique.' });
-      return;
-    }
-    if (uploadingImage || uploadingCategoryId || saving) return;
-
-    const configToSave = {
-      ...config,
-      categories: config.categories.map(category => ({
-        ...category,
-        name: category.name.trim(),
-        category: (category.category || category.name).trim()
-      }))
-    };
     setSaving(true);
     setSaveStatus(null);
     try {
-      await saveHomepageConfig(configToSave);
-      setConfig(configToSave);
-      setSaveStatus({ type: 'success', text: 'Homepage settings saved successfully.' });
+      // Filter out any oversized data URLs that might cause Firestore entity errors
+      const sanitizedCatImages = {};
+      for (const [k, v] of Object.entries(config.categoryImages || {})) {
+        if (typeof v === 'string' && v.trim()) {
+          if (v.startsWith('data:image/') && v.length > 250000) continue;
+          sanitizedCatImages[k] = v.trim();
+        }
+      }
+      const toSave = {
+        ...config,
+        categoryImages: sanitizedCatImages,
+        categoryUploadFolder: categoryUploadFolder || 'categories'
+      };
+      const saved = await saveHomepageConfig(toSave);
+      if (saved) setConfig(prev => ({ ...prev, ...saved }));
+      setSaveStatus({ type: 'success', text: '🎉 Homepage settings & Category Images updated! Changes are live on the store in 0ms.' });
+      showToast('Homepage settings & Category Images saved successfully!', 'success');
       setTimeout(() => setSaveStatus(null), 6000);
     } catch (err) {
       console.error('Error saving homepage config:', err);
-      setSaveStatus({ type: 'error', text: 'Failed to save settings: ' + err.message });
+      setSaveStatus({ type: 'error', text: 'Failed to save settings: ' + (err.message || 'Please check your connection.') });
+      showToast('Failed to save settings: ' + (err.message || 'Unknown error'), 'error');
     } finally {
       setSaving(false);
     }
@@ -302,18 +231,196 @@ export default function AdminHomepage() {
     setSaveStatus(null);
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
-        <div className="product-skeleton" style={{ maxWidth: '400px', height: '180px', margin: '0 auto 20px' }} />
-        Loading homepage manager...
-      </div>
-    );
-  }
+  // Categories derived from default set, products, and custom images
+  const allCategoryList = useMemo(() => {
+    const list = [...DEFAULT_CATEGORIES];
+    catalogProducts.forEach(p => {
+      const c = p.categoryId || p.category;
+      if (c && typeof c === 'string' && c.trim()) {
+        const trimmed = c.trim();
+        if (!list.some(item => item.toLowerCase() === trimmed.toLowerCase())) {
+          list.push(trimmed);
+        }
+      }
+    });
+    if (config.categoryImages) {
+      Object.keys(config.categoryImages).forEach(k => {
+        if (k && typeof k === 'string' && k.trim()) {
+          const trimmed = k.trim();
+          if (!list.some(item => item.toLowerCase() === trimmed.toLowerCase())) {
+            list.push(trimmed);
+          }
+        }
+      });
+    }
+    return list;
+  }, [catalogProducts, config.categoryImages]);
+
+  const filteredCategories = useMemo(() => {
+    if (!categorySearch.trim()) return allCategoryList;
+    const q = categorySearch.toLowerCase().trim();
+    return allCategoryList.filter(c => c.toLowerCase().includes(q));
+  }, [allCategoryList, categorySearch]);
+
+  const getCategoryFallbackImage = (catName) => {
+    const prods = catalogProducts.filter(p => {
+      const c = (p.categoryId || p.category || '').toLowerCase();
+      return c === catName.toLowerCase();
+    });
+    for (const p of prods) {
+      const url = p.thumbnailUrl ||
+        (Array.isArray(p.images) ? (p.images[0]?.url || (typeof p.images[0] === 'string' ? p.images[0] : null)) : null) ||
+        p.image;
+      if (url) return { url, count: prods.length };
+    }
+    return { url: null, count: prods.length };
+  };
+
+  const triggerCategoryUpload = (catName) => {
+    setActiveUploadCategory(catName);
+    if (categoryFileInputRef.current) {
+      categoryFileInputRef.current.value = '';
+      categoryFileInputRef.current.click();
+    }
+  };
+
+  const handleCategoryFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    const category = activeUploadCategory;
+    if (!file || !category) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (JPG, PNG, WEBP).', 'warning');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Image size exceeds 10MB. Please select a smaller image.', 'error');
+      return;
+    }
+
+    setUploadingCategory(category);
+    try {
+      const folderTarget = `${categoryUploadFolder || 'categories'}/`;
+      const result = await uploadImageToImageKit(file, folderTarget);
+      if (result?.url) {
+        handleCategoryImageUrlChange(category, result.url);
+        showToast(`Image uploaded for "${category}" directly to folder "${categoryUploadFolder || 'categories'}"! Click "Save Changes" to publish.`, 'success');
+      }
+    } catch (err) {
+      console.error('Category upload error:', err);
+      showToast('Upload failed: ' + (err.message || 'Check network connection.'), 'error');
+    } finally {
+      setUploadingCategory(null);
+      setActiveUploadCategory(null);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleAddNewCategoryWithFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      showToast('Please enter a category name first.', 'warning');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (JPG, PNG, WEBP).', 'warning');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Image size exceeds 10MB. Please select a smaller image.', 'error');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    setUploadingNewCategory(true);
+    try {
+      const folderTarget = `${categoryUploadFolder || 'categories'}/`;
+      const result = await uploadImageToImageKit(file, folderTarget);
+      if (result?.url) {
+        setConfig(prev => ({
+          ...prev,
+          categoryImages: {
+            ...(prev.categoryImages || {}),
+            [trimmed]: result.url
+          }
+        }));
+        setCategorySearch(trimmed);
+        setNewCategoryName('');
+        showToast(`🎉 Category "${trimmed}" added and image uploaded to folder "${categoryUploadFolder || 'categories'}"! Click "Save Changes" to publish.`, 'success');
+      }
+    } catch (err) {
+      console.error('New category image upload error:', err);
+      showToast('Upload failed: ' + (err.message || 'Check network connection.'), 'error');
+    } finally {
+      setUploadingNewCategory(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleCategoryImageUrlChange = (category, url) => {
+    const cleanUrl = typeof url === 'string' ? url.trim() : '';
+    if (cleanUrl.startsWith('data:image/') && cleanUrl.length > 250000) {
+      showToast('Photo is too large for inline saving. Please select a smaller image.', 'warning');
+      return;
+    }
+    setConfig(prev => ({
+      ...prev,
+      categoryImages: {
+        ...(prev.categoryImages || {}),
+        [category]: cleanUrl
+      }
+    }));
+    setSaveStatus(null);
+  };
+
+  const handleRemoveCategoryImage = (category) => {
+    setConfig(prev => {
+      const updated = { ...(prev.categoryImages || {}) };
+      delete updated[category];
+      return {
+        ...prev,
+        categoryImages: updated
+      };
+    });
+    showToast(`Removed custom image for "${category}". Reverted to catalog photo.`, 'info');
+    setSaveStatus(null);
+  };
+
+  const handleAddCustomCategory = () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      showToast('Please enter a category name.', 'warning');
+      return;
+    }
+    if (allCategoryList.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      showToast(`Category "${trimmed}" is already in the list.`, 'info');
+      setCategorySearch(trimmed);
+      setNewCategoryName('');
+      return;
+    }
+    setConfig(prev => ({
+      ...prev,
+      categoryImages: {
+        ...(prev.categoryImages || {}),
+        [trimmed]: ''
+      }
+    }));
+    setCategorySearch(trimmed);
+    setNewCategoryName('');
+    showToast(`Category "${trimmed}" added! You can now upload or set an image.`, 'success');
+  };
 
   const sections = [
     { key: 'showHero', title: 'Hero Banner Section', desc: 'Main full-width banner with headline and calls to action' },
-    { key: 'showCategories', title: 'Shop by Category Grid', desc: 'Image-led category links displayed below the hero banner' },
+    { key: 'showShopCategory', title: 'Shop By Category Section', desc: 'Category cards showcase with large full-bleed imagery and small text' },
     { key: 'showTrending', title: 'Trending Now Carousel', desc: 'Infinite horizontal scrolling carousel of curated trends' },
     { key: 'showSaleSection', title: 'Limited Time Sale Banner', desc: 'Active sales products grid with live countdown timer' },
     { key: 'showNewArrivals', title: 'New Arrivals Grid', desc: 'Fresh arrivals catalog added in the last 15 days' },
@@ -322,6 +429,15 @@ export default function AdminHomepage() {
     { key: 'showTrustBadges', title: 'Why Shop With Us (Trust Bar)', desc: 'Shipping, exchanges, fabric quality, and concierge' },
     { key: 'showReviews', title: 'Customer Reviews Carousel', desc: 'Verified customer ratings & real reviews showcase' },
   ];
+
+  if (loading) {
+    return (
+      <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
+        <div className="product-skeleton" style={{ maxWidth: '400px', height: '180px', margin: '0 auto 20px' }} />
+        Loading homepage manager...
+      </div>
+    );
+  }
 
   const hero = config.hero || {};
 
@@ -339,7 +455,7 @@ export default function AdminHomepage() {
           <button 
             type="button" 
             onClick={handleSave} 
-            disabled={saving || uploadingImage || Boolean(uploadingCategoryId)}
+            disabled={saving}
             className="admin-btn-primary"
             style={{ padding: '10px 22px', fontSize: '13px', letterSpacing: '0.5px' }}
           >
@@ -358,40 +474,80 @@ export default function AdminHomepage() {
       </div>
 
       {/* Tabs */}
-      <div className="admin-tabs" role="tablist" aria-label="Homepage manager sections">
+      <div className="admin-tabs" style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', marginBottom: '28px' }}>
         <button
-          role="tab"
-          aria-selected={activeTab === 'hero'}
           type="button"
           onClick={() => setActiveTab('hero')}
-          className={`admin-homepage-tab${activeTab === 'hero' ? ' is-active' : ''}`}
+          style={{
+            padding: '12px 20px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'hero' ? '2px solid #0f172a' : '2px solid transparent',
+            color: activeTab === 'hero' ? '#0f172a' : '#64748b',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
         >
           🎨 Hero Banner & Content
         </button>
         <button
-          role="tab"
-          aria-selected={activeTab === 'trending'}
+          type="button"
+          onClick={() => setActiveTab('categories')}
+          style={{
+            padding: '12px 20px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'categories' ? '2px solid #0f172a' : '2px solid transparent',
+            color: activeTab === 'categories' ? '#0f172a' : '#64748b',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          📁 Category Images ({Object.values(config.categoryImages || {}).filter(Boolean).length})
+        </button>
+        <button
           type="button"
           onClick={() => setActiveTab('trending')}
-          className={`admin-homepage-tab${activeTab === 'trending' ? ' is-active' : ''}`}
+          style={{
+            padding: '12px 20px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'trending' ? '2px solid #0f172a' : '2px solid transparent',
+            color: activeTab === 'trending' ? '#0f172a' : '#64748b',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
         >
           🔥 Trending Section ({catalogProducts.filter(p => p.isTrending === true).length})
         </button>
         <button
-          role="tab"
-          aria-selected={activeTab === 'categories'}
-          type="button"
-          onClick={() => setActiveTab('categories')}
-          className={`admin-homepage-tab${activeTab === 'categories' ? ' is-active' : ''}`}
-        >
-          🛍️ Categories ({config.categories.length})
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === 'sections'}
           type="button"
           onClick={() => setActiveTab('sections')}
-          className={`admin-homepage-tab${activeTab === 'sections' ? ' is-active' : ''}`}
+          style={{
+            padding: '12px 20px',
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'sections' ? '2px solid #0f172a' : '2px solid transparent',
+            color: activeTab === 'sections' ? '#0f172a' : '#64748b',
+            fontWeight: 700,
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
         >
           👁️ Section Visibility
         </button>
@@ -723,7 +879,455 @@ export default function AdminHomepage() {
         </div>
       )}
 
-      {/* TAB 2: TRENDING SECTION MANAGER */}
+      {/* TAB 2: CATEGORY IMAGES MANAGER */}
+      {activeTab === 'categories' && (
+        <div className="category-manager-container">
+          {/* Header Card */}
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '24px',
+            marginBottom: '24px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: '#0f172a' }}>
+                  📁 Shop By Category Images & Cards
+                </h2>
+                <p style={{ margin: 0, fontSize: '13.5px', color: '#64748b' }}>
+                  Upload full-card images for category cards shown on the homepage.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  border: '1px solid #86efac'
+                }}>
+                  ● {Object.values(config.categoryImages || {}).filter(Boolean).length} Custom Images Active
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="admin-btn-primary"
+                  style={{ padding: '8px 20px', fontSize: '13px' }}
+                >
+                  {saving ? 'SAVING...' : '✓ SAVE CHANGES'}
+                </button>
+              </div>
+            </div>
+
+            {/* Filter and Add Category Row */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 260px' }}>
+                <input
+                  type="text"
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  placeholder="🔍 Search categories (e.g. Kurta, Shirts, Jeans)..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13.5px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flex: '1 1 420px', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddCustomCategory()}
+                  placeholder="New category name (e.g. Blazers, Kurtis)..."
+                  style={{
+                    flex: '1 1 180px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13.5px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={uploadingNewCategory}
+                  onClick={() => {
+                    if (!newCategoryName.trim()) {
+                      showToast('Please type a category name first.', 'warning');
+                      return;
+                    }
+                    if (newCategoryFileInputRef.current) {
+                      newCategoryFileInputRef.current.value = '';
+                      newCategoryFileInputRef.current.click();
+                    }
+                  }}
+                  style={{
+                    padding: '10px 16px',
+                    background: '#16a34a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: uploadingNewCategory ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={`Upload category picture directly to ImageKit folder "${categoryUploadFolder}" and add`}
+                >
+                  {uploadingNewCategory ? '⏳ Uploading...' : '📤 Upload Image & Add'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddCustomCategory}
+                  style={{
+                    padding: '10px 14px',
+                    background: '#0f172a',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  + Add Empty
+                </button>
+              </div>
+            </div>
+
+            {/* Target ImageKit Folder Configuration Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '10px',
+              marginTop: '16px',
+              padding: '10px 14px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              color: '#334155'
+            }}>
+              <span style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                📁 ImageKit Upload Folder:
+              </span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ color: '#64748b', fontFamily: 'monospace' }}>/</span>
+                <input
+                  type="text"
+                  value={categoryUploadFolder}
+                  onChange={(e) => {
+                    const cleaned = e.target.value.replace(/[^a-zA-Z0-9_-]/g, '');
+                    setCategoryUploadFolder(cleaned);
+                    setConfig(prev => ({ ...prev, categoryUploadFolder: cleaned }));
+                    setSaveStatus(null);
+                  }}
+                  placeholder="categories"
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '12px',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    background: '#ffffff',
+                    width: '130px'
+                  }}
+                />
+                <span style={{ color: '#64748b', fontFamily: 'monospace' }}>/</span>
+              </div>
+              <span style={{ color: '#16a34a', fontWeight: 600, fontSize: '11.5px' }}>
+                ✓ Direct CDN Upload active to folder: <strong>{categoryUploadFolder || 'categories'}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Hidden File Input for New Category Direct Upload */}
+          <input
+            type="file"
+            ref={newCategoryFileInputRef}
+            onChange={handleAddNewCategoryWithFile}
+            accept="image/png, image/jpeg, image/jpg, image/webp"
+            style={{ display: 'none' }}
+          />
+
+          {/* Hidden File Input for Category Card Image Upload */}
+          <input
+            type="file"
+            ref={categoryFileInputRef}
+            onChange={handleCategoryFileChange}
+            accept="image/png, image/jpeg, image/jpg, image/webp"
+            style={{ display: 'none' }}
+          />
+
+          {/* Categories Grid */}
+          {filteredCategories.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+              No categories matching "{categorySearch}".
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '14px'
+            }}>
+              {filteredCategories.map(catName => {
+                const customImg = config.categoryImages?.[catName] || '';
+                const fallback = getCategoryFallbackImage(catName);
+                const displayImg = customImg;
+                const isCustom = Boolean(customImg);
+                const isUploading = uploadingCategory === catName;
+
+                return (
+                  <div
+                    key={catName}
+                    style={{
+                      background: '#fff',
+                      borderRadius: '12px',
+                      border: isCustom ? '2px solid #0f172a' : '1px solid #e2e8f0',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      boxShadow: isCustom ? '0 4px 14px rgba(15, 23, 42, 0.08)' : '0 2px 6px rgba(0,0,0,0.03)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {/* Live Preview of Category Card (compact 4 in a row matching homepage) */}
+                    <div style={{
+                      position: 'relative',
+                      aspectRatio: '1 / 1',
+                      maxHeight: '175px',
+                      background: '#1a1a1a',
+                      overflow: 'hidden'
+                    }}>
+                      {displayImg ? (
+                        <img
+                          src={displayImg}
+                          alt={catName}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center top'
+                          }}
+                          onError={(e) => {
+                            e.target.style.opacity = '0.2';
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '100%',
+                          color: '#94a3b8',
+                          padding: '20px',
+                          textAlign: 'center'
+                        }}>
+                          <span style={{ fontSize: '36px', marginBottom: '8px' }}>🖼️</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>No Image Assigned</span>
+                          <span style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '4px' }}>Upload category image below</span>
+                        </div>
+                      )}
+
+                      {/* Gradient Overlay for Text Legibility */}
+                      <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.25) 45%, transparent 100%)',
+                        pointerEvents: 'none'
+                      }} />
+
+                      {/* Status Badge */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        zIndex: 3
+                      }}>
+                        {isCustom ? (
+                          <span style={{
+                            padding: '4px 9px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: '#16a34a',
+                            color: '#ffffff',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                            letterSpacing: '0.3px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            ✓ Active Category Image
+                          </span>
+                        ) : (
+                          <span style={{
+                            padding: '4px 9px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            background: 'rgba(71, 85, 105, 0.88)',
+                            backdropFilter: 'blur(6px)',
+                            color: '#ffffff'
+                          }}>
+                            No Image Assigned
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Upload Spinner Overlay */}
+                      {isUploading && (
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'rgba(15, 23, 42, 0.85)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#fff',
+                          zIndex: 5
+                        }}>
+                          <div style={{
+                            width: '36px',
+                            height: '36px',
+                            border: '3px solid rgba(255,255,255,0.2)',
+                            borderTopColor: '#fff',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite',
+                            marginBottom: '10px'
+                          }} />
+                          <span style={{ fontSize: '13px', fontWeight: 600 }}>Uploading to ImageKit...</span>
+                        </div>
+                      )}
+
+                      {/* Category Label at bottom */}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        padding: '16px 18px',
+                        zIndex: 2,
+                        color: '#fff'
+                      }}>
+                        <div style={{
+                          fontSize: '16px',
+                          fontWeight: 800,
+                          letterSpacing: '1.2px',
+                          textTransform: 'uppercase',
+                          textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+                          lineHeight: 1.2
+                        }}>
+                          {catName}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: 'rgba(255, 255, 255, 0.75)',
+                          marginTop: '3px'
+                        }}>
+                          {fallback.count} {fallback.count === 1 ? 'Product' : 'Products'} in catalog
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Actions */}
+                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Device Upload Button */}
+                        <button
+                          type="button"
+                          disabled={isUploading}
+                          onClick={() => triggerCategoryUpload(catName)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            background: '#0f172a',
+                            color: '#fff',
+                            border: 'none',
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            cursor: isUploading ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'background 0.2s'
+                          }}
+                        >
+                          📤 {isCustom ? 'Replace Image' : 'Upload Image'}
+                        </button>
+
+                        {/* URL Input */}
+                        <div>
+                          <input
+                            type="text"
+                            value={customImg}
+                            onChange={(e) => handleCategoryImageUrlChange(catName, e.target.value)}
+                            placeholder="Or paste image URL (https://...)"
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              fontSize: '12px',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Reset Button (only if custom image is active) */}
+                      {isCustom && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCategoryImage(catName)}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            borderRadius: '6px',
+                            background: '#fff1f2',
+                            color: '#e11d48',
+                            border: '1px solid #fecdd3',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          🗑️ Remove Custom Image
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: TRENDING SECTION MANAGER */}
       {activeTab === 'trending' && (
         <div className="trending-editor-container">
           {/* Section 1: Heading & Copy Config */}
@@ -991,99 +1595,19 @@ export default function AdminHomepage() {
         </div>
       )}
 
-      {activeTab === 'categories' && (
-        <section className="homepage-category-editor" role="tabpanel">
-          <div className="homepage-category-editor__header">
-            <div>
-              <h2>Homepage Categories</h2>
-              <p>Add, edit, or replace the photos for category tiles shown on the storefront.</p>
-            </div>
-            <form className="homepage-category-add" onSubmit={handleAddCategory}>
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={e => setNewCategoryName(e.target.value)}
-                placeholder="Category name"
-                aria-label="New homepage category name"
-                maxLength={40}
-              />
-              <button type="submit" disabled={!newCategoryName.trim() || saving || Boolean(uploadingCategoryId)}>Add Category</button>
-            </form>
-          </div>
-
-          {config.categories.length === 0 ? (
-            <p className="homepage-category-empty">
-              No custom categories yet. Add one to replace the automatically selected category tiles on the storefront.
-            </p>
-          ) : (
-            <div className="homepage-category-list">
-              {config.categories.map(category => (
-                <article className="homepage-category-item" key={category.id}>
-                  <div className="homepage-category-image">
-                    {category.image
-                      ? <img src={category.image} alt={`${category.name} category preview`} />
-                      : <span>White-background image preview</span>}
-                  </div>
-                  <div className="homepage-category-fields">
-                    <label>
-                      Tile label
-                      <input
-                        type="text"
-                        value={category.name}
-                        onChange={e => handleCategoryChange(category.id, 'name', e.target.value)}
-                        maxLength={40}
-                        disabled={saving}
-                      />
-                    </label>
-                    <label>
-                      Product category
-                      <input
-                        type="text"
-                        value={category.category || category.name}
-                        onChange={e => handleCategoryChange(category.id, 'category', e.target.value)}
-                        maxLength={40}
-                        disabled={saving}
-                      />
-                    </label>
-                    <div className="homepage-category-actions">
-                      <label className="homepage-category-upload">
-                        {uploadingCategoryId === category.id ? 'Uploading photo…' : category.image ? 'Replace photo' : 'Upload photo'}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
-                          disabled={saving || Boolean(uploadingCategoryId)}
-                          onChange={e => handleCategoryImageUpload(category.id, e)}
-                        />
-                      </label>
-                      {category.image && (
-                        <button type="button" onClick={() => handleCategoryChange(category.id, 'image', '')} disabled={saving || Boolean(uploadingCategoryId)}>
-                          Remove photo
-                        </button>
-                      )}
-                      <button type="button" onClick={() => handleRemoveCategory(category.id)} disabled={saving || Boolean(uploadingCategoryId)}>
-                        Remove category
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* TAB: SECTIONS VISIBILITY */}
+      {/* TAB 2: SECTIONS VISIBILITY */}
       {activeTab === 'sections' && (
-        <div role="tabpanel">
-          <div className="homepage-sections-actions">
-            <button
-              type="button"
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+            <button 
+              type="button" 
               onClick={handleEnableAll}
-              className="homepage-enable-all"
+              style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
             >
               Enable All Sections
             </button>
           </div>
+
           <div className="homepage-sections-list">
             {sections.map(sec => (
               <div key={sec.key} className="section-toggle-card">
@@ -1092,10 +1616,10 @@ export default function AdminHomepage() {
                   <p>{sec.desc}</p>
                 </div>
                 <label className="switch">
-                  <input
-                    type="checkbox"
-                    checked={config[sec.key] !== false}
-                    onChange={() => handleToggle(sec.key)}
+                  <input 
+                    type="checkbox" 
+                    checked={config[sec.key] !== false} 
+                    onChange={() => handleToggle(sec.key)} 
                   />
                   <span className="slider round"></span>
                 </label>
@@ -1108,8 +1632,8 @@ export default function AdminHomepage() {
       {/* Bottom Save Action */}
       <div style={{ marginTop: '36px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
         <button 
-          onClick={handleSave}
-          disabled={saving || uploadingImage || Boolean(uploadingCategoryId)}
+          onClick={handleSave} 
+          disabled={saving} 
           className="admin-btn-primary"
           style={{ padding: '14px 36px', fontSize: '14px', letterSpacing: '1px' }}
         >

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const ShopContext = createContext();
 
@@ -39,6 +39,15 @@ export function ShopProvider({ children }) {
 
   // Scroll Preservation
   const [scrollPosition, setScrollPosition] = useState(0);
+
+  // Automatically clear stale products when inventory or catalog updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      setProducts([]);
+    };
+    window.addEventListener('bo_products_updated', handleUpdate);
+    return () => window.removeEventListener('bo_products_updated', handleUpdate);
+  }, []);
 
   // Reset function to clear state on fresh entry
   const resetShopState = () => {

@@ -5,7 +5,6 @@ import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useShop } from '../context/ShopContext';
 import { optimizeImage } from '../utils/imageUtils';
-import { getProductDisplayName } from '../utils/productUtils';
 import './Navbar.css';
 
 const navLinks = [
@@ -216,8 +215,8 @@ export default function Navbar() {
           <ul className="navbar__links">
             {desktopLinks.map((link) => (
               <li key={link.label}>
-                <Link 
-                  to={link.to} 
+                <Link
+                  to={link.to}
                   className={`navbar__link ${link.label === 'ADMIN' ? 'navbar__link--admin' : ''} ${link.label.toLowerCase() === 'sale' ? 'navbar__link--sale' : ''}`}
                   onClick={() => {
                     if (link.to === '/shop' && resetShopState) resetShopState();
@@ -373,19 +372,19 @@ export default function Navbar() {
                           {product.images && product.images[0] ? (
                             <img
                               src={optimizeImage(product.images[0], { width: 90, quality: 75 })}
-                              alt={getProductDisplayName(product.name)}
+                              alt={product.name}
                               loading="lazy"
                             />
                           ) : (
                             <div className="search-result-placeholder">
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"/>
+                                <path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
                               </svg>
                             </div>
                           )}
                         </div>
                         <div className="search-result-info">
-                          <span className="search-result-name">{getProductDisplayName(product.name)}</span>
+                          <span className="search-result-name">{product.name}</span>
                           <span className="search-result-category">{product.category || 'Apparel'}</span>
                         </div>
                         <div className="search-result-pricing">
@@ -436,14 +435,14 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="mobile-menu__guest-card">
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="mobile-menu__login-btn"
                 onClick={() => setMobileOpen(false)}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
                 Login / Sign Up
               </Link>
@@ -473,7 +472,7 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
             >
               <svg className="mobile-menu__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
               </svg>
               Wishlist {wishlistCount > 0 && `(${wishlistCount})`}
             </Link>
@@ -488,9 +487,9 @@ export default function Navbar() {
               }}
             >
               <svg className="mobile-menu__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <path d="M16 10a4 4 0 01-8 0"/>
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <path d="M16 10a4 4 0 01-8 0" />
               </svg>
               Shopping Bag {totalItems > 0 && `(${totalItems})`}
             </button>
@@ -519,8 +518,8 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
               >
                 <svg className="mobile-menu__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
                 My Profile
               </Link>
@@ -530,9 +529,9 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
               >
                 <svg className="mobile-menu__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="21 8 21 21 3 21 3 8"/>
-                  <rect x="1" y="3" width="22" height="5"/>
-                  <line x1="10" y1="12" x2="14" y2="12"/>
+                  <polyline points="21 8 21 21 3 21 3 8" />
+                  <rect x="1" y="3" width="22" height="5" />
+                  <line x1="10" y1="12" x2="14" y2="12" />
                 </svg>
                 My Orders
               </Link>
@@ -543,7 +542,7 @@ export default function Navbar() {
                   onClick={() => setMobileOpen(false)}
                 >
                   <svg className="mobile-menu__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
                   Admin Dashboard
                 </Link>
@@ -554,9 +553,9 @@ export default function Navbar() {
                 onClick={handleLogout}
               >
                 <svg className="mobile-menu__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
                 Logout
               </button>

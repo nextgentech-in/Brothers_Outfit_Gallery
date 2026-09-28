@@ -1,6 +1,5 @@
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
-import { getProductDisplayName } from '../utils/productUtils';
 
 export const getUserProfile = async (uid) => {
   const docRef = doc(db, 'users', uid);
@@ -27,7 +26,7 @@ export const addToWishlist = async (uid, product) => {
   await setDoc(docRef, {
     id: product.id,
     productId: product.id,
-    name: getProductDisplayName(product.name),
+    name: product.name,
     slug: product.slug || '',
     price: product.price || product.salePrice || 0,
     mrp: product.mrp || product.compareAtPrice || 0,

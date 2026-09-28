@@ -36,7 +36,7 @@ export default function Hero({ heroConfig: propConfig }) {
   // Bulletproof fallbacks ensuring 0 errors & zero broken UI
   const bannerImage = heroConfig?.bannerImage || '/images/hero.png';
   const mobileBanner = heroConfig?.mobileBannerImage || bannerImage;
-  const eyebrow = heroConfig?.eyebrow || 'NEW SEASON 2026';
+  const eyebrow = (heroConfig?.eyebrow && heroConfig.eyebrow !== 'NEW SEASON 2026') ? heroConfig.eyebrow : '';
   const heading = heroConfig?.heading || 'DEFINE YOUR\nEVERYDAY STYLE';
   const description = heroConfig?.description || "Premium men's clothing designed for confidence, comfort and effortless style.";
   const saleBtnText = heroConfig?.saleButtonText ? heroConfig.saleButtonText.replace(/^[🔥⚡\s]+/, '') : 'Season Sale — Up to 50% Off';
@@ -77,7 +77,7 @@ export default function Hero({ heroConfig: propConfig }) {
         {/* Content */}
         <div className="hero__content">
           <div className="hero__text">
-            <span className="hero__eyebrow">{eyebrow}</span>
+            {eyebrow ? <span className="hero__eyebrow">{eyebrow}</span> : null}
             <h1 className="hero__heading">
               {heading.split('\n').map((line, idx) => (
                 <span key={idx} style={{ display: 'block' }}>{line}</span>

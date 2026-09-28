@@ -1,5 +1,4 @@
 import React from 'react';
-import { businessInfo } from '../config/business';
 import './PolicyPages.css';
 
 export default function ReturnsPolicyPage() {
@@ -79,7 +78,7 @@ export default function ReturnsPolicyPage() {
                 💬 WhatsApp: +91 84602 33020
               </a>
               <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: '6px' }}>
-                {businessInfo.openingHours.map(slot => `${slot.day}: ${slot.hours}`).join(' · ')}
+                Mon - Sat: 10:00 AM – 8:00 PM IST
               </p>
             </div>
           </div>
