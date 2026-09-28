@@ -27,22 +27,30 @@ export const generateProductId = () => {
   return doc(collection(db, PRODUCTS)).id;
 };
 
-// Sanitize sizeGuide for Firestore to prevent "Nested arrays are not supported" errors
+// Sanitize sizeGuide for Firestore to prevent "Property array contains an invalid nested entity" errors
 export const sanitizeSizeGuideForFirestore = (sizeGuide) => {
   if (!sizeGuide) return { enabled: false, unit: 'in', columns: [], rows: [] };
+  const columns = Array.isArray(sizeGuide.columns) ? sizeGuide.columns.map(c => String(c ?? '')) : [];
   return {
     enabled: Boolean(sizeGuide.enabled),
     unit: sizeGuide.unit === 'cm' ? 'cm' : 'in',
-    columns: Array.isArray(sizeGuide.columns) ? sizeGuide.columns : [],
+    columns,
     rows: Array.isArray(sizeGuide.rows)
       ? sizeGuide.rows.map(row => {
+        let cells = [];
         if (Array.isArray(row)) {
-          return { cells: row.map(c => (c !== undefined && c !== null ? String(c) : '')) };
+          cells = row;
+        } else if (row && typeof row === 'object' && Array.isArray(row.cells)) {
+          cells = row.cells;
+        } else if (row && typeof row === 'object') {
+          cells = columns.map((col, idx) => row[`c${idx}`] ?? row[idx] ?? row[col] ?? '');
         }
-        if (row && typeof row === 'object' && Array.isArray(row.cells)) {
-          return { cells: row.cells.map(c => (c !== undefined && c !== null ? String(c) : '')) };
-        }
-        return { cells: [] };
+        // Store as a flat key-value object (c0, c1, ...) without any nested arrays inside
+        const rowObj = {};
+        cells.forEach((val, idx) => {
+          rowObj[`c${idx}`] = val !== undefined && val !== null ? String(val) : '';
+        });
+        return rowObj;
       })
       : []
   };
@@ -55,9 +63,9 @@ export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
   const rows = Array.isArray(sizeGuide.rows)
     ? sizeGuide.rows.map(row => {
       if (Array.isArray(row)) return row;
-      if (row && typeof row === 'object' && Array.isArray(row.cells)) return row.cells;
       if (row && typeof row === 'object') {
-        return columns.map((col, idx) => row[idx] ?? row[col] ?? '');
+        if (Array.isArray(row.cells)) return row.cells;
+        return columns.map((col, idx) => row[`c${idx}`] ?? row[idx] ?? row[col] ?? '');
       }
       return [];
     })

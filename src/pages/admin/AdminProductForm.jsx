@@ -14,6 +14,7 @@ import { invalidateProductCache } from '../../services/productService';
 import './AdminProductForm.css';
 
 import { getBackendUrl } from '../../utils/apiConfig';
+import { uploadImageToImageKit } from '../../utils/imageUtils';
 import {
   convertMeasurementValue,
   convertColumnHeader
@@ -288,6 +289,7 @@ export default function AdminProductForm() {
   const [pendingImages, setPendingImages] = useState([]);
   const [imagesToDelete, setImagesToDelete] = useState([]);
   const [uploadTargetColor, setUploadTargetColor] = useState('');
+  const [uploadStatus, setUploadStatus] = useState('');
 
   useEffect(() => {
     if (isEdit) {
@@ -875,92 +877,29 @@ export default function AdminProductForm() {
         await deleteProductImage(publicId);
       }
 
-      // 2. Upload pending images via ImageKit API (with resilient offline/fallback support)
+      // 2. Upload pending images with resilient multi-tier pipeline (ImageKit -> Firebase Storage -> Canvas <60KB)
       const newlyUploaded = [];
       if (pendingImages.length > 0) {
-        const fileToDataUrl = (file) => new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => resolve(URL.createObjectURL(file));
-          reader.readAsDataURL(file);
-        });
-
-        const getImageKitAuthParams = async () => {
-          const backendUrl = getBackendUrl();
-          const endpoints = [
-            backendUrl ? `${backendUrl}/api/imagekit/auth` : '/api/imagekit/auth',
-            'http://localhost:3001/api/imagekit/auth'
-          ];
-
-          for (const ep of endpoints) {
-            try {
-              const res = await fetch(ep);
-              if (res.ok) {
-                const data = await res.json();
-                if (data.token && data.signature && data.expire) {
-                  return data;
-                }
-              }
-            } catch { }
-          }
-          return null;
-        };
-
-        let authParams = null;
-        try {
-          authParams = await getImageKitAuthParams();
-        } catch { }
-
         for (let i = 0; i < pendingImages.length; i++) {
           const item = pendingImages[i];
-          let uploaded = false;
-
-          if (authParams && authParams.token && authParams.signature && authParams.expire) {
-            try {
-              const uniqueFileName = `${Date.now()}-${item.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-              const formDataToUpload = new FormData();
-              formDataToUpload.append("file", item.file);
-              formDataToUpload.append("publicKey", import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || "public_QnN311x97x1oXo+s5/J4/t3fI4A=");
-              formDataToUpload.append("signature", authParams.signature);
-              formDataToUpload.append("expire", authParams.expire);
-              formDataToUpload.append("token", authParams.token);
-              formDataToUpload.append("fileName", uniqueFileName);
-              formDataToUpload.append("folder", `products/${finalProductId}/`);
-
-              const uploadRes = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-                method: "POST",
-                body: formDataToUpload
+          setUploadStatus(`Optimizing & uploading image ${i + 1} of ${pendingImages.length}...`);
+          try {
+            const uploadResult = await uploadImageToImageKit(item.file, `products/${finalProductId}`);
+            if (uploadResult?.url) {
+              newlyUploaded.push({
+                url: uploadResult.url,
+                publicId: uploadResult.fileId || null,
+                alt: formData.name + ' - ' + (i + 1),
+                isPrimary: item.isPrimary,
+                color: item.color || ''
               });
-
-              if (uploadRes.ok) {
-                const uploadData = await uploadRes.json();
-                newlyUploaded.push({
-                  url: uploadData.url,
-                  publicId: uploadData.fileId,
-                  alt: formData.name + ' - ' + (i + 1),
-                  isPrimary: item.isPrimary,
-                  color: item.color || ''
-                });
-                uploaded = true;
-              }
-            } catch (err) {
-              console.warn(`ImageKit upload attempt failed for ${item.name}, using data URL:`, err);
             }
-          }
-
-          if (!uploaded) {
-            // Graceful fallback to data URL so product save never fails
-            const dataUrl = await fileToDataUrl(item.file);
-            newlyUploaded.push({
-              url: dataUrl,
-              publicId: null,
-              alt: formData.name + ' - ' + (i + 1),
-              isPrimary: item.isPrimary,
-              color: item.color || ''
-            });
+          } catch (uploadErr) {
+            console.warn(`Upload error for ${item.name}:`, uploadErr);
           }
         }
       }
+      setUploadStatus('Publishing product to store catalog...');
 
       // 3. Combine images and fix sort ordering with primary image guaranteed first (index 0)
       let combinedImages = [...existingImages, ...newlyUploaded];
@@ -1095,6 +1034,8 @@ export default function AdminProductForm() {
         setError(`Failed to save product: ${err.message}`);
       }
       setSubmitting(false);
+    } finally {
+      setUploadStatus('');
     }
   };
 
@@ -2255,8 +2196,8 @@ export default function AdminProductForm() {
               {submitting ? 'SAVING...' : '＋ SAVE AND NEW'}
             </button>
             {submitting && (
-              <p style={{ fontSize: '12px', color: '#78716c', textAlign: 'center', marginTop: '-4px' }}>
-                Uploading images to ImageKit securely...
+              <p style={{ fontSize: '12px', color: '#0284c7', textAlign: 'center', marginTop: '-4px', fontWeight: 600 }}>
+                {uploadStatus || 'Saving product to store...'}
               </p>
             )}
             <button

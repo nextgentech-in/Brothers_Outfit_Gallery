@@ -312,24 +312,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
               ›
             </button>
 
-            {/* Pagination Dots */}
-            <div className="card-img-dots" role="tablist" aria-label="Product photos">
-              {imagesList.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === activeImgIdx}
-                  aria-label={`View photo ${i + 1} of ${imagesList.length}`}
-                  className={`card-img-dot ${i === activeImgIdx ? 'active' : ''}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setActiveImgIdx(i);
-                  }}
-                />
-              ))}
-            </div>
+
 
             {/* Screen-reader live update for slide changes */}
             <span className="sr-only" aria-live="polite" aria-atomic="true">

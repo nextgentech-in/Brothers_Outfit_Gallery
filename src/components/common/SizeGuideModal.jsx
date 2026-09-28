@@ -291,10 +291,10 @@ export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', o
     if (!customSizeGuide?.enabled || !Array.isArray(customSizeGuide?.rows)) return [];
     return customSizeGuide.rows.map(row => {
       if (Array.isArray(row)) return row;
-      if (row && typeof row === 'object' && Array.isArray(row.cells)) return row.cells;
       if (row && typeof row === 'object') {
+        if (Array.isArray(row.cells)) return row.cells;
         const cols = customSizeGuide.columns || [];
-        return cols.map((col, idx) => row[idx] ?? row[col] ?? '');
+        return cols.map((col, idx) => row[`c${idx}`] ?? row[idx] ?? row[col] ?? '');
       }
       return [];
     });

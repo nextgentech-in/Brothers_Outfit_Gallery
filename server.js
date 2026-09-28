@@ -814,19 +814,23 @@ async function calculateServerOrderTotal(items, couponCode) {
 
 app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
   try {
+    const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
+    if (!privateKey || privateKey === 'dummy_private_key') {
+      return res.status(503).json({
+        error: 'ImageKit private key not configured. Using client fallback storage.',
+        configured: false
+      });
+    }
     const result = imagekit.getAuthenticationParameters();
     if (result && result.token && result.signature && result.expire) {
-      return res.json(result);
+      return res.json({ ...result, configured: true });
     }
     throw new Error("Invalid parameters from ImageKit SDK");
   } catch (error) {
-    console.warn("ImageKit Auth warning, using fallback signature params:", error.message);
-    const expire = Math.floor(Date.now() / 1000) + 1800;
-    const token = 'ik_tok_' + Math.random().toString(36).substring(2) + Date.now();
-    res.json({
-      token,
-      expire,
-      signature: 'ik_sig_' + Math.random().toString(36).substring(2)
+    console.warn("ImageKit Auth notice:", error.message);
+    return res.status(503).json({
+      error: error.message,
+      configured: false
     });
   }
 });
