@@ -238,7 +238,7 @@ export const getProductBySlug = async (slug) => {
   // 1. Instant check in memory cache
   const cached = getCachedProducts();
   if (cached) {
-    const found = cached.find(p => p.slug === slug);
+    const found = cached.find(p => p.slug === slug || p.id === slug);
     if (found) return found;
   }
 
@@ -246,10 +246,20 @@ export const getProductBySlug = async (slug) => {
   try {
     const q = query(collection(db, PRODUCTS), where('slug', '==', slug), limit(1));
     const snapshot = await getDocs(q);
-    if (snapshot.empty) return null;
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    if (!snapshot.empty) {
+      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    }
+
+    // Fallback: lookup by direct Firestore document ID
+    const { doc, getDoc } = await import('firebase/firestore');
+    const docSnap = await getDoc(doc(db, PRODUCTS, slug));
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+
+    return null;
   } catch (err) {
-    console.error('Error fetching product by slug:', err);
+    console.error('Error fetching product by slug or id:', err);
     return null;
   }
 };

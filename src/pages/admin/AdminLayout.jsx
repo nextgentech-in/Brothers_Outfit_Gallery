@@ -79,6 +79,7 @@ export default function AdminLayout() {
     { label: 'Dashboard', to: '/admin' },
     { label: 'Products', to: '/admin/products' },
     { label: 'Orders', to: '/admin/orders' },
+    { label: 'Exchanges', to: '/admin/exchanges' },
     { label: 'Customers', to: '/admin/customers' },
     { label: 'Inventory', to: '/admin/inventory' },
     { label: 'Reviews', to: '/admin/reviews' },

@@ -1,8 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getUserOrders, cancelUserOrder, requestUserOrderExchange } from '../services/orderService';
+import { getUserOrders, cancelUserOrder } from '../services/orderService';
+import ExchangeRequestModal from '../components/exchange/ExchangeRequestModal';
+import { subscribeCustomerExchanges } from '../services/exchangeService';
+import { normalizeShipmentStatus, INTERNAL_STATUS } from '../utils/shipmentStatus';
+import { EXCHANGE_STATUS_METADATA, CUSTOMER_EXCHANGE_STEPS, EXCHANGE_STATUS } from '../utils/exchangeConstants';
+import { getBackendUrl } from '../utils/apiConfig';
 import './Profile.css';
 
 const CUSTOMER_CANCEL_REASONS = [
@@ -15,24 +20,18 @@ const CUSTOMER_CANCEL_REASONS = [
   'Other'
 ];
 
-const CUSTOMER_EXCHANGE_REASONS = [
-  'Size too small (Need larger size)',
-  'Size too large (Need smaller size)',
-  'Defective / Damaged garment',
-  'Wrong item received',
-  'Color/pattern mismatch',
-  'Other'
-];
-
 export default function Profile() {
   const { currentUser, userProfile, logout, updateFirestoreProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const initialTab = searchParams.get('tab') === 'orders' ? 'orders' : 'profile';
-  const [activeTab, setActiveTab] = useState(initialTab); // 'profile' or 'orders'
+  const tabParam = searchParams.get('tab');
+  const initialTab = tabParam === 'orders' ? 'orders' : tabParam === 'exchanges' ? 'exchanges' : 'profile';
+  const [activeTab, setActiveTab] = useState(initialTab); // 'profile', 'orders', or 'exchanges'
   const [userOrders, setUserOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [customerExchanges, setCustomerExchanges] = useState([]);
+  const [customerNotifications, setCustomerNotifications] = useState([]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,12 +83,100 @@ export default function Profile() {
     loadUserOrders();
   }, [loadUserOrders]);
 
+  // Real-time subscription to customer's exchange requests
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const unsubscribe = subscribeCustomerExchanges(currentUser.uid, (exchanges) => {
+      setCustomerExchanges(exchanges);
+    });
+    return () => unsubscribe();
+  }, [currentUser?.uid]);
+
+  // Load customer notifications
+  const loadNotifications = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const token = await currentUser.getIdToken();
+      const res = await fetch(`${getBackendUrl()}/api/notifications/customer`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerNotifications(data.notifications || []);
+      }
+    } catch (err) {
+      console.warn('Could not load notifications:', err.message);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const handleDismissNotification = async (notificationId) => {
+    try {
+      const token = await currentUser.getIdToken();
+      await fetch(`${getBackendUrl()}/api/notifications/customer/mark-read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ notificationId })
+      });
+      setCustomerNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (err) {
+      console.warn('Dismiss notification warning:', err);
+    }
+  };
+
   const [cancellingId, setCancellingId] = useState(null);
   const [cancelModal, setCancelModal] = useState({ open: false, order: null });
   const [cancelReason, setCancelReason] = useState('');
   const [cancelCustomReason, setCancelCustomReason] = useState('');
   const [orderFeedback, setOrderFeedback] = useState(null);
   const [copiedOrderId, setCopiedOrderId] = useState(null);
+
+  // Exchange Modal State (Driven by new ExchangeRequestModal)
+  const [selectedExchangeOrder, setSelectedExchangeOrder] = useState(null);
+
+  // Delivery status verification helper
+  const isOrderDelivered = useCallback((order) => {
+    if (!order) return false;
+    const normalized = normalizeShipmentStatus(order.shipmentStatus || order.status, order.rawProviderStatusCode);
+    if (normalized === INTERNAL_STATUS.DELIVERED) return true;
+    const st = String(order.status || '').toLowerCase().trim();
+    const sst = String(order.shipmentStatus || '').toLowerCase().trim();
+    return st === 'delivered' || sst === 'delivered';
+  }, []);
+
+  // Filter delivered orders eligible for exchange (no active/in-progress exchange already submitted)
+  const eligibleDeliveredOrders = useMemo(() => {
+    return userOrders.filter(order => {
+      const isDelivered = isOrderDelivered(order);
+      const hasActiveExchange = customerExchanges.some(ex =>
+        ex.orderId === order.id &&
+        ex.status !== EXCHANGE_STATUS.REJECTED &&
+        ex.status !== EXCHANGE_STATUS.CANCELLED &&
+        ex.status !== EXCHANGE_STATUS.QC_REJECTED
+      );
+      const isCancelled = String(order.status || '').toLowerCase().includes('cancel');
+      const isExchanged = String(order.status || '').toLowerCase() === 'exchanged';
+      return isDelivered && !hasActiveExchange && !isCancelled && !isExchanged;
+    });
+  }, [userOrders, customerExchanges, isOrderDelivered]);
+
+  // Auto-launch exchange modal if query param is set (e.g. ?tab=exchanges&exchangeOrderId=...)
+  useEffect(() => {
+    const exchangeOrderId = searchParams.get('exchangeOrderId') || 
+      (searchParams.get('action') === 'exchange' ? searchParams.get('orderId') : null);
+    if (exchangeOrderId && userOrders.length > 0 && !selectedExchangeOrder) {
+      const match = userOrders.find(o => o.id === exchangeOrderId);
+      if (match) {
+        setSelectedExchangeOrder(match);
+      }
+    }
+  }, [searchParams, userOrders, selectedExchangeOrder]);
 
   const openCancelModal = (order) => {
     setCancelModal({ open: true, order });
@@ -106,72 +193,6 @@ export default function Profile() {
     setCancelCustomReason('');
     if (typeof document !== 'undefined') {
       document.body.style.overflow = '';
-    }
-  };
-
-  const [exchangeModal, setExchangeModal] = useState({ open: false, order: null });
-  const [exchangeItem, setExchangeItem] = useState('');
-  const [exchangeReason, setExchangeReason] = useState('');
-  const [exchangeReplacementSize, setExchangeReplacementSize] = useState('');
-  const [exchangeCustomReason, setExchangeCustomReason] = useState('');
-  const [exchangeConfirmedVideo, setExchangeConfirmedVideo] = useState(false);
-  const [submittingExchange, setSubmittingExchange] = useState(false);
-
-  const openExchangeModal = (order) => {
-    setExchangeModal({ open: true, order });
-    const firstItem = order.items?.[0];
-    setExchangeItem(firstItem ? `${firstItem.name} (${firstItem.size || 'Size N/A'})` : 'All Items');
-    setExchangeReason('');
-    setExchangeReplacementSize('');
-    setExchangeCustomReason('');
-    setExchangeConfirmedVideo(false);
-    if (typeof document !== 'undefined') {
-      document.body.style.overflow = 'hidden';
-    }
-  };
-
-  const closeExchangeModal = () => {
-    setExchangeModal({ open: false, order: null });
-    setExchangeItem('');
-    setExchangeReason('');
-    setExchangeReplacementSize('');
-    setExchangeCustomReason('');
-    setExchangeConfirmedVideo(false);
-    if (typeof document !== 'undefined') {
-      document.body.style.overflow = '';
-    }
-  };
-
-  const handleConfirmExchange = async () => {
-    const order = exchangeModal.order;
-    if (!order) return;
-
-    const finalReason = exchangeReason === 'Other'
-      ? (exchangeCustomReason.trim() || 'Other')
-      : exchangeReason;
-
-    if (!finalReason || !exchangeConfirmedVideo) return;
-
-    setSubmittingExchange(true);
-    try {
-      await requestUserOrderExchange(order.id, {
-        reason: finalReason,
-        itemNames: exchangeItem,
-        replacementSize: exchangeReplacementSize,
-        notes: exchangeCustomReason
-      });
-      closeExchangeModal();
-      setOrderFeedback({
-        type: 'success',
-        text: `Exchange request recorded for Order #${order.id}. Please send your unboxing video to our WhatsApp concierge (+91 84602 33020).`
-      });
-      loadUserOrders();
-      setTimeout(() => setOrderFeedback(null), 8000);
-    } catch (err) {
-      setOrderFeedback({ type: 'error', text: `Failed to request exchange: ${err.message}` });
-      setTimeout(() => setOrderFeedback(null), 6000);
-    } finally {
-      setSubmittingExchange(false);
     }
   };
 
@@ -279,31 +300,56 @@ export default function Profile() {
           </div>
           <nav className="profile-nav">
             <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => handleTabChange('profile')}>My Profile</button>
-            <button className={activeTab === 'orders' ? 'active' : ''} onClick={() => handleTabChange('orders')}>My Orders</button>
-            <button onClick={handleLogout} style={{ color: '#c0392b' }}>Logout</button>
+            <button className={activeTab === 'orders' ? 'active' : ''} onClick={() => handleTabChange('orders')}>My Orders ({userOrders.length})</button>
+            <button className={activeTab === 'exchanges' ? 'active' : ''} onClick={() => handleTabChange('exchanges')}>
+              🔄 My Exchanges ({customerExchanges.length})
+            </button>
           </nav>
         </div>
 
         <div className="profile-content">
+          {/* Unread Customer In-App Notifications Banner */}
+          {customerNotifications.filter(n => !n.read).length > 0 && (
+            <div className="profile-notifications-stack">
+              {customerNotifications.filter(n => !n.read).map(n => (
+                <div key={n.id} className="profile-notif-banner">
+                  <span className="notif-bell-icon">🔔</span>
+                  <div className="notif-body">
+                    <strong>{n.title}</strong>
+                    <p>{n.message}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="notif-close-btn"
+                    onClick={() => handleDismissNotification(n.id)}
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Mobile Profile Navigation Tabs (Always Visible at Top on Mobile) */}
           <div className="profile-mobile-tabs">
             <button 
               className={`profile-mobile-tab ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => handleTabChange('profile')}
             >
-              👤 My Profile
+              👤 Profile
             </button>
             <button 
               className={`profile-mobile-tab ${activeTab === 'orders' ? 'active' : ''}`}
               onClick={() => handleTabChange('orders')}
             >
-              📦 My Orders ({userOrders.length})
+              📦 Orders ({userOrders.length})
             </button>
             <button 
-              className="profile-mobile-tab profile-mobile-tab--logout"
-              onClick={handleLogout}
+              className={`profile-mobile-tab ${activeTab === 'exchanges' ? 'active' : ''}`}
+              onClick={() => handleTabChange('exchanges')}
             >
-              🚪 Logout
+              🔄 Exchanges ({customerExchanges.length})
             </button>
           </div>
 
@@ -343,15 +389,19 @@ export default function Profile() {
               ) : (
                 <div className="orders-list">
                   {userOrders.map(order => {
+                    const normalizedShipment = normalizeShipmentStatus(order.shipmentStatus || order.status, order.rawProviderStatusCode);
+                    const isDelivered = isOrderDelivered(order);
                     const isProcessing = (order.status || 'Processing') === 'Processing';
                     const isCancelled = (order.status || '').toLowerCase() === 'cancelled';
                     const isShipped = (order.status || '').toLowerCase() === 'shipped';
-                    const isDelivered = (order.status || '').toLowerCase() === 'delivered';
-                    const isExchangeRequested = (order.status || '').toLowerCase().includes('exchange');
+                    
+                    // Authoritative exchange lookup for this order
+                    const orderExchange = customerExchanges.find(ex => ex.orderId === order.id);
+
                     const statusClass = isCancelled 
                       ? 'status-cancelled' 
-                      : isExchangeRequested
-                      ? 'status-exchange'
+                      : orderExchange
+                      ? (orderExchange.status === EXCHANGE_STATUS.REJECTED ? 'status-cancelled' : 'status-exchange')
                       : isDelivered 
                       ? 'status-delivered' 
                       : isShipped 
@@ -364,7 +414,7 @@ export default function Profile() {
 
                     return (
                       <div key={order.id} className="order-card">
-                        {/* Order Header: 2 Structured Rows to prevent any overlap on mobile */}
+                        {/* Order Header: 2 Structured Rows */}
                         <div className="order-card-header">
                           <div className="order-card-header-top">
                             <div className="order-id-line">
@@ -391,7 +441,9 @@ export default function Profile() {
                             </div>
 
                             <span className={`order-status-pill ${statusClass}`}>
-                              {order.status || 'Processing'}
+                              {orderExchange 
+                                ? (EXCHANGE_STATUS_METADATA[orderExchange.status]?.label || orderExchange.status)
+                                : (order.status || 'Processing')}
                             </span>
                           </div>
 
@@ -481,27 +533,45 @@ export default function Profile() {
                             </div>
                           )}
 
-                          {isExchangeRequested && (
+                          {/* Authoritative Exchange Banner */}
+                          {orderExchange && (
                             <div className="order-exchange-banner">
                               <div className="exchange-banner-header">
-                                <span className="exchange-banner-badge">🔄 Exchange Requested</span>
-                                <span className="exchange-policy-badge">48-Hr Replacement</span>
+                                <span className="exchange-banner-badge">
+                                  🔄 Exchange: {EXCHANGE_STATUS_METADATA[orderExchange.status]?.label || orderExchange.status}
+                                </span>
+                                <span className="exchange-policy-badge">
+                                  Req: Size {orderExchange.requestedVariant?.size || 'N/A'}
+                                </span>
                               </div>
                               <div className="exchange-banner-body">
-                                <div><strong>Item:</strong> {order.exchangeDetails?.itemNames || 'Item'}</div>
-                                <div><strong>Reason:</strong> {order.exchangeDetails?.reason || 'Exchange requested'}</div>
-                                {order.exchangeDetails?.replacementSize && (
-                                  <div><strong>Requested Size:</strong> {order.exchangeDetails.replacementSize}</div>
+                                <div><strong>Item:</strong> {orderExchange.productName || 'Garment Item'}</div>
+                                <div><strong>Reason:</strong> {orderExchange.reason}</div>
+                                {orderExchange.status === EXCHANGE_STATUS.REJECTED && orderExchange.rejectionReason && (
+                                  <div className="exchange-rejection-msg">
+                                    <strong>Admin Reason:</strong> {orderExchange.rejectionReason}
+                                  </div>
+                                )}
+                                {orderExchange.reversePickupAwb && (
+                                  <div className="exchange-awb-line">
+                                    <strong>Delhivery Reverse AWB:</strong> {orderExchange.reversePickupAwb} ({orderExchange.reversePickupStatus || 'Scheduled'})
+                                  </div>
+                                )}
+                                {orderExchange.replacementAwb && (
+                                  <div className="exchange-awb-line">
+                                    <strong>Replacement AWB:</strong> {orderExchange.replacementAwb}
+                                  </div>
                                 )}
                               </div>
-                              <a
-                                href={`https://wa.me/918460233020?text=${encodeURIComponent(`Hi Brother's Outfit Gallery team, I requested an exchange for Order #${order.id}. Item: ${order.exchangeDetails?.itemNames || ''}, Reason: ${order.exchangeDetails?.reason || ''}, Size: ${order.exchangeDetails?.replacementSize || ''}. Sharing my unboxing video proof here.`)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="btn-exchange-wa"
-                              >
-                                💬 Send Unboxing Video on WhatsApp
-                              </a>
+                              <div className="exchange-banner-footer">
+                                <button
+                                  type="button"
+                                  className="btn-order-view-exchange"
+                                  onClick={() => setActiveTab('exchanges')}
+                                >
+                                  View Full Exchange Timeline →
+                                </button>
+                              </div>
                             </div>
                           )}
 
@@ -526,9 +596,11 @@ export default function Profile() {
                               </a>
                             )}
 
-                            {isDelivered && !isExchangeRequested && (order.status || '').toLowerCase() !== 'exchanged' && (
+                            {/* BUSINESS RULE: Show Exchange button ONLY if order is DELIVERED and no active exchange */}
+                            {isDelivered && !orderExchange && (order.status || '').toLowerCase() !== 'exchanged' && (
                               <button
-                                onClick={() => openExchangeModal(order)}
+                                type="button"
+                                onClick={() => setSelectedExchangeOrder(order)}
                                 className="btn-order-exchange"
                                 title="Request 48-Hour Size or Quality Exchange"
                               >
@@ -546,6 +618,283 @@ export default function Profile() {
                               </button>
                             )}
                           </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : activeTab === 'exchanges' ? (
+            <div className="profile-exchanges-view">
+              <div className="profile-header">
+                <h1>MY EXCHANGES ({customerExchanges.length})</h1>
+                {eligibleDeliveredOrders.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn-header-exchange"
+                    onClick={() => setSelectedExchangeOrder(eligibleDeliveredOrders[0])}
+                    title="Request exchange for your recent delivered order"
+                  >
+                    🔄 Request New Exchange
+                  </button>
+                )}
+              </div>
+
+              <div className="exchange-policy-card">
+                <span className="policy-icon" aria-hidden="true">🛡️</span>
+                <div>
+                  <strong>Brother’s Outfit Gallery Exchange-Only Policy</strong>
+                  <p>
+                    We offer hassle-free size and quality exchanges within 48 hours of parcel delivery.
+                    Garments must remain unused and unwashed with original brand tags intact.
+                    Reverse pickup is scheduled via Delhivery upon admin approval.
+                  </p>
+                </div>
+              </div>
+
+              {/* Delivered Orders Eligible for Exchange - Open Modal Right Here */}
+              {eligibleDeliveredOrders.length > 0 && (
+                <div className="eligible-exchange-section">
+                  <div className="eligible-section-title">
+                    <span>📦 DELIVERED ORDERS READY FOR EXCHANGE ({eligibleDeliveredOrders.length})</span>
+                  </div>
+                  <div className="eligible-orders-grid">
+                    {eligibleDeliveredOrders.map(order => {
+                      const formattedDate = order.createdAt?.toDate 
+                        ? order.createdAt.toDate().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : (order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent');
+
+                      return (
+                        <div key={order.id} className="eligible-order-card">
+                          <div className="eligible-card-top">
+                            <div>
+                              <span className="eligible-order-id">Order #{order.id}</span>
+                              <span className="eligible-order-date">Placed on {formattedDate}</span>
+                            </div>
+                            <span className="eligible-status-badge">✓ Delivered (Eligible)</span>
+                          </div>
+
+                          <div className="eligible-items-preview">
+                            {order.items?.map((item, idx) => (
+                              <div key={idx} className="eligible-item-chip">
+                                <img 
+                                  src={item.thumbnailUrl || item.image || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'} 
+                                  alt={item.name} 
+                                  className="eligible-item-thumb" 
+                                />
+                                <div className="eligible-item-info">
+                                  <div className="eligible-item-name">{item.name}</div>
+                                  <div className="eligible-item-sub">
+                                    {item.size && <span>Size: {item.size}</span>}
+                                    {item.color && <span> • {item.color}</span>}
+                                    <span> • Qty: {item.quantity || 1}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="eligible-card-actions">
+                            <button
+                              type="button"
+                              className="btn-start-exchange-now"
+                              onClick={() => setSelectedExchangeOrder(order)}
+                            >
+                              🔄 Request Exchange for Order #{order.id.length > 12 ? `${order.id.slice(0, 10)}...` : order.id}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {customerExchanges.length === 0 ? (
+                <div className="profile-empty-exchanges">
+                  <span className="empty-icon" aria-hidden="true">🔄</span>
+                  <h3>{eligibleDeliveredOrders.length > 0 ? 'No In-Progress Exchanges' : 'No exchange requests yet'}</h3>
+                  <p>
+                    {eligibleDeliveredOrders.length > 0
+                      ? 'You can request a size exchange for your delivered orders using the button above.'
+                      : 'Delivered orders are eligible for exchange within 48 hours. You can request an exchange from your "My Orders" tab.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('orders')}
+                    className="btn-auth-primary"
+                    style={{ width: 'auto', marginTop: '16px' }}
+                  >
+                    GO TO MY ORDERS →
+                  </button>
+                </div>
+              ) : (
+                <div className="customer-exchanges-list">
+                  {customerExchanges.map((ex) => {
+                    const meta = EXCHANGE_STATUS_METADATA[ex.status] || {
+                      label: ex.status,
+                      description: '',
+                      badgeClass: 'badge-pending',
+                      step: 1
+                    };
+                    const isRejected = ex.status === EXCHANGE_STATUS.REJECTED || ex.status === EXCHANGE_STATUS.QC_REJECTED;
+                    const currentStep = meta.step || 1;
+
+                    return (
+                      <div key={ex.id || ex.docId} className="customer-exchange-card">
+                        <div className="exchange-card-header">
+                          <div>
+                            <span className="exchange-id-badge">#{ex.id}</span>
+                            <span className="exchange-order-ref">
+                              Order #{ex.orderId}
+                            </span>
+                          </div>
+                          <span className={`exchange-status-pill ${meta.badgeClass}`}>
+                            {meta.label}
+                          </span>
+                        </div>
+
+                        {/* Product Detail */}
+                        <div className="exchange-card-product-row">
+                          {ex.productSlug || ex.productId ? (
+                            <Link
+                              to={`/product/${ex.productSlug || ex.productId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="exchange-card-img-link"
+                              title="Open Product Page"
+                            >
+                              <img
+                                src={ex.productImage || ex.productImageSnapshot || '/images/hero.png'}
+                                alt={ex.productName || 'Product'}
+                                className="exchange-card-img"
+                              />
+                            </Link>
+                          ) : (
+                            <img
+                              src={ex.productImage || ex.productImageSnapshot || '/images/hero.png'}
+                              alt={ex.productName || 'Product'}
+                              className="exchange-card-img"
+                            />
+                          )}
+                          <div className="exchange-card-product-details">
+                            {ex.productSlug || ex.productId ? (
+                              <Link
+                                to={`/product/${ex.productSlug || ex.productId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="exchange-product-title-link"
+                                title="Open Product Page"
+                              >
+                                <h4 className="exchange-product-title">
+                                  <span>{ex.productName || ex.productNameSnapshot || 'Garment Item'}</span>
+                                  <span className="open-ext-arrow" aria-hidden="true">↗</span>
+                                </h4>
+                              </Link>
+                            ) : (
+                              <h4 className="exchange-product-title">{ex.productName || ex.productNameSnapshot || 'Garment Item'}</h4>
+                            )}
+                            <div className="exchange-variant-transition">
+                              <span className="variant-pill current-variant">
+                                Current: {ex.currentVariant?.size || 'Standard'}
+                              </span>
+                              <span className="variant-arrow">→</span>
+                              <span className="variant-pill requested-variant">
+                                Requested: {ex.requestedVariant?.size || 'N/A'}
+                              </span>
+                            </div>
+                            <div className="exchange-reason-text">
+                              <strong>Reason:</strong> {ex.reason}
+                            </div>
+                            {ex.customerMessage && (
+                              <div className="exchange-customer-msg">
+                                <strong>Your Note:</strong> "{ex.customerMessage}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Rejection Alert Banner */}
+                        {isRejected && (
+                          <div className="exchange-rejection-card">
+                            <div className="rejection-card-title">✕ Exchange Request Not Approved</div>
+                            <p className="rejection-card-desc">Your exchange request was reviewed and rejected.</p>
+                            {ex.rejectionReason && (
+                              <div className="rejection-reason-box">
+                                <strong>Admin Reason:</strong> {ex.rejectionReason}
+                              </div>
+                            )}
+                            <p className="rejection-subtext">No reverse pickup was created. Please contact our support if you have questions.</p>
+                          </div>
+                        )}
+
+                        {/* Delhivery Reverse Pickup Card */}
+                        {ex.reversePickupAwb && (
+                          <div className="exchange-courier-card">
+                            <span className="courier-icon" aria-hidden="true">📦</span>
+                            <div className="courier-details">
+                              <div className="courier-title">Delhivery Reverse Pickup Scheduled</div>
+                              <div className="courier-meta">
+                                <span><strong>AWB:</strong> {ex.reversePickupAwb}</span>
+                                <span><strong>Status:</strong> {ex.reversePickupStatus || 'Scheduled'}</span>
+                              </div>
+                              <p className="courier-hint">
+                                A Delhivery courier representative will visit your address to collect the garment.
+                                Please keep the unwashed garment packed with brand tags attached.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Replacement Shipped Card */}
+                        {ex.replacementAwb && (
+                          <div className="exchange-courier-card replacement-card">
+                            <span className="courier-icon" aria-hidden="true">🚚</span>
+                            <div className="courier-details">
+                              <div className="courier-title">Replacement Garment Dispatched</div>
+                              <div className="courier-meta">
+                                <span><strong>Delhivery Express AWB:</strong> {ex.replacementAwb}</span>
+                              </div>
+                              <p className="courier-hint">Your replacement size has been packed and handed over to Delhivery.</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Visual 6-Step Status Timeline */}
+                        {!isRejected && (
+                          <div className="exchange-timeline-wrap">
+                            <div className="exchange-timeline-header">Exchange Status Timeline</div>
+                            <div className="exchange-timeline-steps">
+                              {CUSTOMER_EXCHANGE_STEPS.map((s) => {
+                                const isComplete = currentStep > s.step;
+                                const isCurrent = currentStep === s.step;
+                                return (
+                                  <div
+                                    key={s.step}
+                                    className={`exchange-step-item ${isComplete ? 'completed' : ''} ${isCurrent ? 'active' : ''}`}
+                                  >
+                                    <div className="exchange-step-circle">
+                                      {isComplete ? '✓' : s.step}
+                                    </div>
+                                    <span className="exchange-step-label">{s.label}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Card Footer WhatsApp Action */}
+                        <div className="exchange-card-footer">
+                          <a
+                            href={`https://wa.me/918460233020?text=${encodeURIComponent(`Hi Brother's Outfit Gallery team, I have a query regarding Exchange #${ex.id} for Order #${ex.orderId}.`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn-exchange-support"
+                          >
+                            💬 Contact WhatsApp Concierge
+                          </a>
                         </div>
                       </div>
                     );
@@ -688,9 +1037,51 @@ export default function Profile() {
 
                   <h3 className="section-title" style={{ marginTop: '40px' }}>DELIVERY ADDRESS</h3>
                   <div className="address-card">
-                    <p>{userProfile.address?.line1}</p>
-                    <p>{userProfile.address?.city}, {userProfile.address?.state}</p>
-                    <p>{userProfile.address?.pincode}</p>
+                    <div className="info-item">
+                      <span className="info-label">Address Line</span>
+                      <span className="info-value">{userProfile.address?.line1 || '-'}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">City & State</span>
+                      <span className="info-value">{userProfile.address?.city ? `${userProfile.address?.city}, ${userProfile.address?.state || ''}` : '-'}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Pincode</span>
+                      <span className="info-value">{userProfile.address?.pincode || '-'}</span>
+                    </div>
+                  </div>
+
+                  {/* Eligible Delivered Order Quick Exchange Callout in Profile View */}
+                  {eligibleDeliveredOrders.length > 0 && (
+                    <div className="profile-exchange-callout">
+                      <div className="callout-icon">🔄</div>
+                      <div className="callout-content">
+                        <strong>Order #{eligibleDeliveredOrders[0].id} is Eligible for Exchange</strong>
+                        <p>Need a size exchange (38, 40, 42, 44, or custom fit)? Exchanges are active for 48 hours.</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-callout-exchange"
+                        onClick={() => setSelectedExchangeOrder(eligibleDeliveredOrders[0])}
+                      >
+                        Request Exchange →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Account Actions Section with Logout */}
+                  <div className="profile-account-footer">
+                    <div className="account-footer-info">
+                      <span className="account-footer-label">Logged In As</span>
+                      <span className="account-footer-val">{userProfile.email}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="btn-account-logout"
+                    >
+                      🚪 Log Out from Account
+                    </button>
                   </div>
                 </div>
               )}
@@ -749,107 +1140,22 @@ export default function Profile() {
       )}
 
       {/* Customer Exchange Modal (Strict Exchange-Only Policy) */}
-      {exchangeModal.open && typeof document !== 'undefined' && createPortal(
-        <div className="cancel-overlay" onClick={closeExchangeModal}>
-          <div className="cancel-modal exchange-modal" onClick={e => e.stopPropagation()}>
-            <div className="cancel-modal-header">
-              <div>
-                <h3>Request Exchange • Order #{exchangeModal.order?.id}</h3>
-                <p className="exchange-modal-subtitle">48-Hour Replacement Window for Size / Defect</p>
-              </div>
-              <button className="cancel-modal-close" onClick={closeExchangeModal}>✕</button>
-            </div>
-            <div className="cancel-modal-body">
-              <div className="exchange-policy-notice">
-                ℹ️ <strong>Exchange-Only Policy:</strong> We do not offer cash refunds. Eligible orders can be exchanged for size or defective replacement. You will be asked to share your package unboxing video with our concierge.
-              </div>
-
-              {exchangeModal.order?.items && exchangeModal.order.items.length > 1 && (
-                <div className="exchange-item-picker">
-                  <label className="exchange-field-label">Select Item to Exchange:</label>
-                  <select 
-                    className="exchange-select"
-                    value={exchangeItem}
-                    onChange={(e) => setExchangeItem(e.target.value)}
-                  >
-                    {exchangeModal.order.items.map((it, i) => (
-                      <option key={i} value={`${it.name} (${it.size || 'Size N/A'})`}>
-                        {it.name} — Size: {it.size || 'N/A'} (₹{it.price})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <p className="cancel-modal-desc">Select Reason for Exchange:</p>
-              <div className="cancel-modal-options">
-                {CUSTOMER_EXCHANGE_REASONS.map(reason => (
-                  <label key={reason} className={`cancel-modal-option ${exchangeReason === reason ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="customerExchangeReason"
-                      value={reason}
-                      checked={exchangeReason === reason}
-                      onChange={(e) => setExchangeReason(e.target.value)}
-                    />
-                    <span>{reason}</span>
-                  </label>
-                ))}
-              </div>
-
-              {exchangeReason.includes('Size') && (
-                <div className="exchange-size-input-block">
-                  <label className="exchange-field-label">Requested Replacement Size:</label>
-                  <input
-                    type="text"
-                    className="exchange-text-input"
-                    placeholder="e.g. M, L, XL, XXL (or describe size needed)"
-                    value={exchangeReplacementSize}
-                    onChange={(e) => setExchangeReplacementSize(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
-
-              {exchangeReason === 'Other' && (
-                <textarea
-                  className="cancel-modal-textarea"
-                  placeholder="Please describe why you need an exchange..."
-                  value={exchangeCustomReason}
-                  onChange={(e) => setExchangeCustomReason(e.target.value)}
-                  rows={2}
-                />
-              )}
-
-              <div className="exchange-checkbox-row">
-                <input
-                  type="checkbox"
-                  id="confirmUnboxingVideo"
-                  checked={exchangeConfirmedVideo}
-                  onChange={(e) => setExchangeConfirmedVideo(e.target.checked)}
-                />
-                <label htmlFor="confirmUnboxingVideo">
-                  I confirm the garment is unwashed with original tags, and I will share my unboxing video proof on WhatsApp.
-                </label>
-              </div>
-
-              <div className="cancel-modal-actions">
-                <button className="cancel-modal-btn-ghost" onClick={closeExchangeModal} disabled={submittingExchange}>
-                  Cancel
-                </button>
-                <button
-                  className="cancel-modal-btn-primary"
-                  onClick={handleConfirmExchange}
-                  disabled={!exchangeReason || !exchangeConfirmedVideo || submittingExchange || (exchangeReason === 'Other' && !exchangeCustomReason.trim())}
-                >
-                  {submittingExchange ? 'Submitting...' : 'Submit Exchange Request'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <ExchangeRequestModal
+        isOpen={!!selectedExchangeOrder}
+        order={selectedExchangeOrder}
+        existingExchanges={customerExchanges}
+        onClose={() => setSelectedExchangeOrder(null)}
+        onSuccess={() => {
+          setSelectedExchangeOrder(null);
+          setActiveTab('exchanges');
+          loadUserOrders();
+          setOrderFeedback({
+            type: 'success',
+            text: 'Exchange request submitted successfully! Our team will review and approve reverse pickup shortly.'
+          });
+          setTimeout(() => setOrderFeedback(null), 8000);
+        }}
+      />
     </div>
   );
 }

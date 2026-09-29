@@ -1,27 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getBackendUrl } from '../utils/apiConfig';
+import {
+  INTERNAL_STATUS,
+  TIMELINE_MILESTONES,
+  normalizeShipmentStatus,
+  calculateTimelineStep,
+  formatDeliveryTimestamp
+} from '../utils/shipmentStatus';
 import './TrackOrderPage.css';
-
-const STATUS_STEPS = [
-  { key: 'placed', label: 'Order Placed', desc: 'Received & Verified' },
-  { key: 'packing', label: 'Packing', desc: 'At Himmatnagar Hub' },
-  { key: 'dispatched', label: 'Dispatched', desc: 'Handed to Delhivery' },
-  { key: 'transit', label: 'In Transit', desc: 'On Route' },
-  { key: 'out_for_delivery', label: 'Out for Delivery', desc: 'Arriving Today' },
-  { key: 'delivered', label: 'Delivered', desc: 'Package Received' }
-];
-
-function getActiveStepIndex(status) {
-  const s = String(status || '').toLowerCase();
-  if (s.includes('cancel')) return -1;
-  if (s.includes('deliver')) return 5;
-  if (s.includes('out')) return 4;
-  if (s.includes('transit')) return 3;
-  if (s.includes('ship') || s.includes('manifest')) return 2;
-  return 1; // Default processing/packing
-}
 
 export default function TrackOrderPage() {
   const { orderId: paramOrderId } = useParams();
@@ -30,31 +18,25 @@ export default function TrackOrderPage() {
 
   const [query, setQuery] = useState(queryParam);
   const [loading, setLoading] = useState(false);
+  const [refreshingOrderId, setRefreshingOrderId] = useState(null);
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState(null);
   const [searched, setSearched] = useState(false);
 
   const { currentUser } = useAuth() || {};
 
-  // Auto-track if query param exists or if last_placed_order is in localStorage
-  useEffect(() => {
-    const initialQuery = queryParam || localStorage.getItem('last_placed_order') || '';
-    if (initialQuery) {
-      setQuery(initialQuery);
-      performTrack(initialQuery);
-    }
-  }, [queryParam]);
-
-  const performTrack = async (searchQuery) => {
+  const performTrack = useCallback(async (searchQuery, isManualRefresh = false) => {
     const clean = String(searchQuery || '').trim();
     if (!clean) {
       setError('Please enter your Order ID, Mobile Number, or Delhivery Waybill number.');
       return;
     }
 
-    setLoading(true);
-    setError(null);
-    setSearched(true);
+    if (!isManualRefresh) {
+      setLoading(true);
+      setError(null);
+      setSearched(true);
+    }
 
     try {
       const backendUrl = getBackendUrl();
@@ -70,17 +52,36 @@ export default function TrackOrderPage() {
       }
 
       setOrders(data.orders || []);
+      setError(null);
     } catch (err) {
-      setError(err.message || 'Unable to track order. Please verify your details.');
-      setOrders([]);
+      if (!isManualRefresh) {
+        setError(err.message || 'Unable to track order. Please verify your details.');
+        setOrders([]);
+      }
     } finally {
       setLoading(false);
+      setRefreshingOrderId(null);
     }
-  };
+  }, []);
+
+  // Auto-track if query param exists or if last_placed_order is in localStorage
+  useEffect(() => {
+    const initialQuery = queryParam || localStorage.getItem('last_placed_order') || '';
+    if (initialQuery) {
+      setQuery(initialQuery);
+      performTrack(initialQuery);
+    }
+  }, [queryParam, performTrack]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     performTrack(query);
+  };
+
+  const handleManualRefresh = async (order) => {
+    if (!order) return;
+    setRefreshingOrderId(order.id);
+    await performTrack(order.waybill || order.id, true);
   };
 
   return (
@@ -109,6 +110,7 @@ export default function TrackOrderPage() {
                 type="button"
                 className="track-clear-btn"
                 onClick={() => { setQuery(''); setOrders([]); setSearched(false); }}
+                title="Clear input"
               >
                 ✕
               </button>
@@ -147,8 +149,16 @@ export default function TrackOrderPage() {
         {!loading && !error && orders.length > 0 && (
           <div className="track-orders-list">
             {orders.map((order) => {
-              const activeStep = getActiveStepIndex(order.status);
-              const isCancelled = String(order.status || '').toLowerCase().includes('cancel');
+              // Normalize status from centralized model
+              const normalizedStatus = normalizeShipmentStatus(order.shipmentStatus || order.status, order.rawProviderStatusCode);
+              const isDelivered = normalizedStatus === INTERNAL_STATUS.DELIVERED || String(order.status || '').toLowerCase() === 'delivered';
+              const isCancelled = normalizedStatus === INTERNAL_STATUS.CANCELLED || String(order.status || '').toLowerCase().includes('cancel');
+              const isRTO = normalizedStatus === INTERNAL_STATUS.RTO || String(order.status || '').toLowerCase().includes('rto');
+              
+              // Active step: 1 (Placed), 2 (Confirmed), 3 (Shipped), 4 (Out for Delivery), 5 (Delivered)
+              const activeStep = isDelivered ? 5 : calculateTimelineStep(normalizedStatus);
+              const formattedDeliveredAt = formatDeliveryTimestamp(order.deliveredAt);
+              const isRefreshing = refreshingOrderId === order.id;
 
               return (
                 <div key={order.id} className="track-order-card">
@@ -163,8 +173,18 @@ export default function TrackOrderPage() {
                     </div>
 
                     <div className="track-order-status-wrap">
-                      <span className={`track-status-pill status-${order.status?.toLowerCase()}`}>
-                        {isCancelled ? '✕ Cancelled' : (order.status === 'Shipped' ? '🚚 In Transit with Courier' : (order.status || 'Processing'))}
+                      <span className={`track-status-pill ${isDelivered ? 'status-delivered' : (isCancelled ? 'status-cancelled' : (isRTO ? 'status-cancelled' : (activeStep >= 3 ? 'status-shipped' : 'status-processing')))}`}>
+                        {isCancelled 
+                          ? '✕ Cancelled' 
+                          : isRTO
+                          ? '↩ Returned to Origin'
+                          : isDelivered 
+                          ? '✓ Delivered' 
+                          : (normalizedStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY 
+                              ? '🚚 Out for Delivery' 
+                              : (order.status === 'Shipped' || normalizedStatus === INTERNAL_STATUS.IN_TRANSIT 
+                                  ? '🚚 In Transit with Courier' 
+                                  : (order.status || 'Processing')))}
                       </span>
                       <span className="track-payment-info">
                         ₹{order.totalAmount} • {order.paymentMethod}
@@ -172,22 +192,42 @@ export default function TrackOrderPage() {
                     </div>
                   </div>
 
-                  {/* Stepper Timeline (if not cancelled) */}
-                  {!isCancelled && (
+                  {/* Stepper Timeline (if not cancelled / RTO) */}
+                  {!isCancelled && !isRTO && (
                     <div className="track-stepper-box">
                       <div className="track-stepper">
-                        {STATUS_STEPS.map((step, idx) => {
-                          const isDone = idx <= activeStep;
-                          const isCurrent = idx === activeStep;
+                        {TIMELINE_MILESTONES.map((step, idx) => {
+                          const stepNumber = step.step; // 1 to 5
+                          const isDone = isDelivered || stepNumber <= activeStep;
+                          const isCurrent = !isDelivered && stepNumber === activeStep;
+                          const isFinalDelivered = isDelivered && stepNumber === 5;
+
+                          // Show checkmark for ALL completed steps. If Delivered, step 5 also gets ✓!
+                          let circleContent;
+                          if (isDelivered || (isDone && !isCurrent)) {
+                            circleContent = '✓';
+                          } else {
+                            circleContent = stepNumber;
+                          }
+
                           return (
-                            <div key={step.key} className={`track-step-item ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''}`}>
+                            <div 
+                              key={step.key} 
+                              className={`track-step-item ${isDone ? 'is-done' : ''} ${isCurrent ? 'is-current' : ''} ${isFinalDelivered ? 'is-delivered-step' : ''}`}
+                            >
                               <div className="track-step-circle">
-                                {isDone && !isCurrent ? '✓' : idx + 1}
+                                {circleContent}
                               </div>
                               <div className="track-step-label">{step.label}</div>
-                              <div className="track-step-desc">{step.desc}</div>
-                              {idx < STATUS_STEPS.length - 1 && (
-                                <div className={`track-step-line ${idx < activeStep ? 'line-done' : ''}`} />
+                              <div className="track-step-desc">
+                                {stepNumber === 5 && isDelivered && formattedDeliveredAt ? (
+                                  <span className="track-delivered-time">{formattedDeliveredAt}</span>
+                                ) : (
+                                  step.desc
+                                )}
+                              </div>
+                              {idx < TIMELINE_MILESTONES.length - 1 && (
+                                <div className={`track-step-line ${(isDelivered || stepNumber < activeStep) ? 'line-done' : ''}`} />
                               )}
                             </div>
                           );
@@ -203,16 +243,32 @@ export default function TrackOrderPage() {
                         <span className="delhivery-badge">DELHIVERY EXPRESS</span>
                         <div className="delhivery-awb-wrap">
                           <span>Tracking AWB: <strong>{order.waybill}</strong></span>
+                          {isDelivered && formattedDeliveredAt && (
+                            <span className="delhivery-delivered-tag">
+                              ✓ Delivered on {formattedDeliveredAt}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <a
-                        href={order.trackingUrl || `https://www.delhivery.com/track/package/${order.waybill}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-delhivery-live"
-                      >
-                        Live Tracking on Delhivery.com ↗
-                      </a>
+                      <div className="delhivery-actions-group">
+                        <button
+                          type="button"
+                          className="btn-refresh-tracking"
+                          onClick={() => handleManualRefresh(order)}
+                          disabled={isRefreshing || isDelivered}
+                          title={isDelivered ? 'Delivery confirmed' : 'Refresh live status from Delhivery'}
+                        >
+                          {isDelivered ? '✓ Confirmed' : (isRefreshing ? '↻ Refreshing...' : '↻ Refresh Status')}
+                        </button>
+                        <a
+                          href={order.trackingUrl || `https://www.delhivery.com/track/package/${order.waybill}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-delhivery-live"
+                        >
+                          Live Delhivery.com ↗
+                        </a>
+                      </div>
                     </div>
                   ) : (
                     <div className="track-delhivery-pending">

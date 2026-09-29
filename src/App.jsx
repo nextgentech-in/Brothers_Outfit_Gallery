@@ -72,6 +72,7 @@ const AdminDashboard = lazyWithRetry(() => import('./pages/admin/AdminDashboard'
 const AdminProducts = lazyWithRetry(() => import('./pages/admin/AdminProducts'));
 const AdminProductForm = lazyWithRetry(() => import('./pages/admin/AdminProductForm'));
 const AdminOrders = lazyWithRetry(() => import('./pages/admin/AdminOrders'));
+const AdminExchanges = lazyWithRetry(() => import('./pages/admin/AdminExchanges'));
 const AdminCustomers = lazyWithRetry(() => import('./pages/admin/AdminCustomers'));
 const AdminInventory = lazyWithRetry(() => import('./pages/admin/AdminInventory'));
 const AdminCoupons = lazyWithRetry(() => import('./pages/admin/AdminCoupons'));
@@ -383,6 +384,7 @@ function AppContent() {
             <Route path="products/new" element={<AdminProductForm />} />
             <Route path="products/:id/edit" element={<AdminProductForm />} />
             <Route path="orders" element={<AdminOrders />} />
+            <Route path="exchanges" element={<AdminExchanges />} />
             <Route path="customers" element={<AdminCustomers />} />
             <Route path="inventory" element={<AdminInventory />} />
             <Route path="coupons" element={<AdminCoupons />} />

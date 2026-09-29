@@ -314,9 +314,16 @@
   animation: pulseCurrent 1.8s infinite;
 }
 
-@keyframes pulseCurrent {
-  0%, 100% { box-shadow: 0 0 0 4px #e2e8f0; }
-  50% { box-shadow: 0 0 0 8px rgba(15, 23, 42, 0.15); }
+.track-step-item.is-delivered-step .track-step-circle {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 4px #bbf7d0;
+  animation: pulseDelivered 2.2s infinite;
+}
+
+@keyframes pulseDelivered {
+  0%, 100% { box-shadow: 0 0 0 4px #bbf7d0; }
+  50% { box-shadow: 0 0 0 8px rgba(22, 163, 74, 0.25); }
 }
 
 .track-step-label {
@@ -326,7 +333,10 @@
   margin-bottom: 2px;
 }
 
-.track-step-item.is-done .track-step-label,
+.track-step-item.is-done .track-step-label {
+  color: #15803d;
+}
+
 .track-step-item.is-current .track-step-label {
   color: #0f172a;
 }
@@ -334,6 +344,17 @@
 .track-step-desc {
   font-size: 11px;
   color: #94a3b8;
+}
+
+.track-delivered-time {
+  display: inline-block;
+  font-weight: 700;
+  color: #15803d;
+  font-size: 10.5px;
+  background: #dcfce7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
 }
 
 .track-step-line {
@@ -377,6 +398,52 @@
 .delhivery-awb-wrap {
   font-size: 13.5px;
   color: #166534;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.delhivery-delivered-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+}
+
+.delhivery-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-refresh-tracking {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1.5px solid #cbd5e1;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-refresh-tracking:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.btn-refresh-tracking:disabled {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+  cursor: default;
 }
 
 .btn-delhivery-live {

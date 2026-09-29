@@ -15,7 +15,7 @@ export default function ProductPage() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed?.data)) {
-          return parsed.data.find(p => p.slug === slug) || null;
+          return parsed.data.find(p => p.slug === slug || p.id === slug) || null;
         }
       }
     } catch {}
@@ -40,7 +40,7 @@ export default function ProductPage() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed?.data)) {
-          cachedProd = parsed.data.find(p => p.slug === slug) || null;
+          cachedProd = parsed.data.find(p => p.slug === slug || p.id === slug) || null;
         }
       }
     } catch {}

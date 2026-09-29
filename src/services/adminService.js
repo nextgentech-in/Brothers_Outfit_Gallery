@@ -256,8 +256,48 @@ export const getAdminOrders = async () => {
 };
 
 export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
+  // 1. First attempt update via trusted backend API (bypasses Firestore client security limits)
+  try {
+    const backendUrl = getBackendUrl();
+    const token = await auth.currentUser?.getIdToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${backendUrl}/api/admin/orders/update-status`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ orderId, status, extraPayload })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    } else {
+      const errData = await res.json().catch(() => ({}));
+      console.warn('Backend update-status returned non-ok status:', errData.error || res.statusText);
+    }
+  } catch (backendErr) {
+    console.warn('Backend update-status attempt failed, falling back to direct Firestore:', backendErr.message);
+  }
+
+  // 2. Direct Firestore fallback
   const docRef = doc(db, 'orders', orderId);
-  await updateDoc(docRef, { status, ...extraPayload, updatedAt: serverTimestamp() });
+  const firestorePayload = { status, ...extraPayload, updatedAt: serverTimestamp() };
+  if (status === 'Delivered') {
+    firestorePayload.shipmentStatus = 'DELIVERED';
+    if (!firestorePayload.deliveredAt) firestorePayload.deliveredAt = serverTimestamp();
+  } else if (status === 'Shipped') {
+    if (!firestorePayload.shipmentStatus) firestorePayload.shipmentStatus = 'IN_TRANSIT';
+    if (!firestorePayload.shippedAt) firestorePayload.shippedAt = serverTimestamp();
+  } else if (status === 'Cancelled') {
+    firestorePayload.shipmentStatus = 'CANCELLED';
+    if (!firestorePayload.cancelledAt) firestorePayload.cancelledAt = serverTimestamp();
+  } else if (status === 'Processing') {
+    firestorePayload.shipmentStatus = 'PROCESSING';
+  }
+
+  await updateDoc(docRef, firestorePayload);
+  return { success: true, orderId, status };
 };
 
 export const updateOrderShipment = async (orderId, shipmentData) => {

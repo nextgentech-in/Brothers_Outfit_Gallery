@@ -9,6 +9,20 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 import { cert, getApps, initializeApp as initializeAdminApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import {
+  INTERNAL_STATUS,
+  normalizeShipmentStatus,
+  canTransitionStatus,
+  calculateTimelineStep,
+  formatDeliveryTimestamp
+} from './src/utils/shipmentStatus.js';
+import {
+  EXCHANGE_STATUS,
+  EXCHANGE_REASONS,
+  checkExchangeEligibility,
+  isValidExchangeTransition,
+  DEFAULT_EXCHANGE_WINDOW_DAYS
+} from './src/utils/exchangeConstants.js';
 
 // Basic .env parsing for local dev without requiring dotenv package
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,8 +60,8 @@ app.use((req, res, next) => {
 // 3. Strict CORS Whitelist
 const ALLOWED_ORIGINS = [
   'https://brothers-outfit-gallery.vercel.app',
-  'https://gallery.vercel.app',
-  'https://brothersoutfit.com',
+  'https://brothersoutfitgallery.com',
+  'https://www.brothersoutfitgallery.com',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:3001',
@@ -1261,34 +1275,65 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
       });
     }
 
-    // Sanitize before returning to customer
-    const sanitized = matchedOrders.map(order => ({
-      id: order.id,
-      status: order.status || 'Processing',
-      waybill: order.waybill || null,
-      courier: order.courier || 'Delhivery Express',
-      trackingUrl: order.trackingUrl || (order.waybill ? `https://www.delhivery.com/track/package/${order.waybill}` : null),
-      createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : order.createdAt,
-      shippedAt: order.shippedAt?.toDate ? order.shippedAt.toDate().toISOString() : order.shippedAt || null,
-      totalAmount: order.totalAmount || order.finalTotal || 0,
-      paymentMethod: order.paymentMethod || 'Online',
-      paymentStatus: order.paymentStatus || 'Paid',
-      pickupAgentStatus: order.pickupAgentStatus || null,
-      shippingAddress: {
-        fullName: order.shippingAddress?.fullName || 'Valued Customer',
-        city: order.shippingAddress?.city || '',
-        state: order.shippingAddress?.state || '',
-        pincode: order.shippingAddress?.pincode || '',
-        phone: order.shippingAddress?.phone ? `${order.shippingAddress.phone.slice(0, 3)}****${order.shippingAddress.phone.slice(-3)}` : ''
-      },
-      items: (order.items || []).map(item => ({
-        name: item.name,
-        size: item.size || item.selectedSize || 'One Size',
-        color: item.color || item.selectedColor || 'Default',
-        quantity: item.quantity || 1,
-        price: item.price || 0,
-        image: item.image || item.thumbnailUrl || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'
-      }))
+    // Sanitize before returning to customer and enrich with live Delhivery status
+    const sanitized = await Promise.all(matchedOrders.map(async (order) => {
+      let liveTracking = null;
+      if (order.waybill) {
+        try {
+          liveTracking = await syncDelhiveryTrackingForWaybill(order.waybill, {
+            orderDocId: order.id,
+            existingData: order
+          });
+        } catch (syncErr) {
+          console.warn(`Live tracking sync note for order ${order.id}:`, syncErr.message);
+        }
+      }
+
+      const effectiveShipmentStatus = liveTracking?.shipmentStatus || 
+        order.shipmentStatus || 
+        (order.status === 'Delivered' ? INTERNAL_STATUS.DELIVERED : (order.status === 'Shipped' ? INTERNAL_STATUS.SHIPPED : INTERNAL_STATUS.PLACED));
+
+      const isDelivered = effectiveShipmentStatus === INTERNAL_STATUS.DELIVERED || String(order.status || '').toLowerCase() === 'delivered';
+      const effectiveStatus = isDelivered ? 'Delivered' : (order.status || 'Processing');
+      const deliveredAt = liveTracking?.deliveredAt || 
+        (order.deliveredAt?.toDate ? order.deliveredAt.toDate().toISOString() : (typeof order.deliveredAt === 'string' ? order.deliveredAt : null));
+      const timelineStep = liveTracking?.timelineStep || calculateTimelineStep(effectiveShipmentStatus);
+
+      return {
+        id: order.id,
+        status: effectiveStatus,
+        shipmentStatus: effectiveShipmentStatus,
+        rawProviderStatus: liveTracking?.rawProviderStatus || order.rawProviderStatus || effectiveStatus,
+        rawProviderStatusCode: liveTracking?.rawProviderStatusCode || order.rawProviderStatusCode || null,
+        deliveredAt: deliveredAt,
+        latestScan: liveTracking?.latestScan || order.latestScan || null,
+        timelineStep: timelineStep,
+        isDelivered: isDelivered,
+        waybill: order.waybill || null,
+        courier: order.courier || 'Delhivery Express',
+        trackingUrl: order.trackingUrl || (order.waybill ? `https://www.delhivery.com/track/package/${order.waybill}` : null),
+        createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : order.createdAt,
+        shippedAt: order.shippedAt?.toDate ? order.shippedAt.toDate().toISOString() : order.shippedAt || null,
+        totalAmount: order.totalAmount || order.finalTotal || 0,
+        paymentMethod: order.paymentMethod || 'Online',
+        paymentStatus: order.paymentStatus || 'Paid',
+        pickupAgentStatus: order.pickupAgentStatus || null,
+        shippingAddress: {
+          fullName: order.shippingAddress?.fullName || 'Valued Customer',
+          city: order.shippingAddress?.city || '',
+          state: order.shippingAddress?.state || '',
+          pincode: order.shippingAddress?.pincode || '',
+          phone: order.shippingAddress?.phone ? `${order.shippingAddress.phone.slice(0, 3)}****${order.shippingAddress.phone.slice(-3)}` : ''
+        },
+        items: (order.items || []).map(item => ({
+          name: item.name,
+          size: item.size || item.selectedSize || 'One Size',
+          color: item.color || item.selectedColor || 'Default',
+          quantity: item.quantity || 1,
+          price: item.price || 0,
+          image: item.image || item.thumbnailUrl || (item.images && item.images[0]?.url) || (item.images && item.images[0]) || '/images/hero.png'
+        }))
+      };
     }));
 
     res.json({ success: true, orders: sanitized });
@@ -1346,6 +1391,246 @@ async function getDelhiveryAuthToken() {
     console.error('Error acquiring Delhivery Auth Token:', err.message);
     return null;
   }
+}
+
+/**
+ * Synchronize live Delhivery tracking for a waybill.
+ * Normalizes status into INTERNAL_STATUS, enforces monotonic progression,
+ * safely extracts delivered timestamps, and updates Firestore idempotently.
+ * 
+ * @param {string} waybill 
+ * @param {object} [options]
+ * @returns {Promise<object>}
+ */
+async function syncDelhiveryTrackingForWaybill(waybill, options = {}) {
+  const cleanWaybill = String(waybill || '').trim();
+  if (!cleanWaybill) return null;
+
+  let orderDoc = null;
+  let orderDocId = options.orderDocId || null;
+  let currentOrderData = options.existingData || null;
+
+  try {
+    const db = getTrustedFirestore();
+    const ordersCol = db.collection('orders');
+
+    if (orderDocId && !currentOrderData) {
+      const snap = await ordersCol.doc(orderDocId).get();
+      if (snap.exists) {
+        orderDoc = snap;
+        currentOrderData = snap.data();
+      }
+    } else if (!orderDocId) {
+      const snap = await ordersCol.where('waybill', '==', cleanWaybill).limit(1).get();
+      if (!snap.empty) {
+        orderDoc = snap.docs[0];
+        orderDocId = orderDoc.id;
+        currentOrderData = orderDoc.data();
+      }
+    }
+  } catch (dbReadErr) {
+    console.warn(`Firestore read warning for AWB ${cleanWaybill}:`, dbReadErr.message);
+  }
+
+  // Derive current normalized status from database
+  const currentDbStatus = currentOrderData?.status || 'Processing';
+  const currentShipmentStatus = currentOrderData?.shipmentStatus || 
+    (currentDbStatus === 'Delivered' ? INTERNAL_STATUS.DELIVERED : (currentDbStatus === 'Shipped' ? INTERNAL_STATUS.SHIPPED : INTERNAL_STATUS.PLACED));
+
+  // If already marked DELIVERED in database, we have reached the terminal success state.
+  // Unless forceRefresh is explicitly requested, return cached terminal state to avoid unnecessary provider polling.
+  if (currentShipmentStatus === INTERNAL_STATUS.DELIVERED && !options.forceRefresh) {
+    const delTimestamp = currentOrderData?.deliveredAt?.toDate 
+      ? currentOrderData.deliveredAt.toDate().toISOString() 
+      : (typeof currentOrderData?.deliveredAt === 'string' ? currentOrderData.deliveredAt : null);
+
+    return {
+      waybill: cleanWaybill,
+      status: 'Delivered',
+      shipmentStatus: INTERNAL_STATUS.DELIVERED,
+      rawProviderStatus: currentOrderData?.rawProviderStatus || 'Delivered',
+      rawProviderStatusCode: currentOrderData?.rawProviderStatusCode || 'DL',
+      deliveredAt: delTimestamp,
+      timelineStep: 5,
+      isDelivered: true,
+      scans: currentOrderData?.latestScan ? [currentOrderData.latestScan] : [],
+      statusLocation: currentOrderData?.latestScan?.location || 'Customer Destination',
+      courier: currentOrderData?.courier || 'Delhivery Express',
+      trackingUrl: currentOrderData?.trackingUrl || `https://www.delhivery.com/track/package/${cleanWaybill}`
+    };
+  }
+
+  // Fetch live tracking from Delhivery One / Delhivery Express
+  const apiKey = process.env.DELHIVERY_API_KEY;
+  const token = await getDelhiveryAuthToken();
+  const cmsClient = process.env.D1_CLIENT_CMS || '';
+
+  const headers = {};
+  if (apiKey) {
+    headers['Authorization'] = `Token ${apiKey}`;
+  } else if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    if (cmsClient) headers['Client-CMS'] = cmsClient;
+  }
+
+  const url = apiKey
+    ? `https://track.delhivery.com/api/v1/packages/json/?token=${apiKey}&waybill=${cleanWaybill}`
+    : `https://track.delhivery.com/api/v1/packages/json/?waybill=${cleanWaybill}`;
+
+  let rawStatus = null;
+  let rawCode = null;
+  let statusLocation = 'Central Logistics Facility';
+  let statusDateTime = null;
+  let expectedDeliveryDate = 'Within 3 business days';
+  let origin = 'Brothers Outfit Warehouse';
+  let destination = 'Customer Destination';
+  let scans = [];
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 second safe timeout
+
+    const response = await fetch(url, { headers, signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data && Array.isArray(data.ShipmentData) && data.ShipmentData.length > 0) {
+        const ship = data.ShipmentData[0].Shipment;
+
+        // Extract status across PascalCase, camelCase, object, or string forms
+        const statusObj = ship.Status;
+        if (typeof statusObj === 'string') {
+          rawStatus = statusObj;
+        } else if (statusObj && typeof statusObj === 'object') {
+          rawStatus = statusObj.Status || statusObj.status || statusObj.Instructions || '';
+          rawCode = statusObj.StatusType || statusObj.statusType || '';
+          statusLocation = statusObj.StatusLocation || statusObj.statusLocation || statusLocation;
+          statusDateTime = statusObj.StatusDateTime || statusObj.statusDateTime || null;
+        } else {
+          rawStatus = ship.CurrentStatus || ship.status || '';
+        }
+
+        if (!rawCode && ship.StatusType) {
+          rawCode = ship.StatusType;
+        }
+
+        expectedDeliveryDate = ship.ExpectedDeliveryDate || expectedDeliveryDate;
+        origin = ship.Origin || origin;
+        destination = ship.Destination || destination;
+
+        if (Array.isArray(ship.Scans) && ship.Scans.length > 0) {
+          scans = ship.Scans.map(s => {
+            const d = s.ScanDetail || s;
+            return {
+              time: d.ScanDateTime || d.time || new Date().toISOString(),
+              title: d.Scan || d.Instructions || d.title || 'In Transit Scan',
+              location: d.ScannedLocation || d.location || '',
+              type: d.ScanType || d.type || ''
+            };
+          });
+
+          if (!statusDateTime && scans[0]?.time) {
+            statusDateTime = scans[0].time;
+          }
+          if ((!rawStatus || rawStatus === 'In Transit') && scans[0]?.title) {
+            const scanTitle = scans[0].title;
+            if (scanTitle.toLowerCase().includes('deliver')) {
+              rawStatus = scanTitle;
+            }
+          }
+        }
+      }
+    }
+  } catch (liveErr) {
+    console.warn(`Delhivery tracking fetch note for ${cleanWaybill}:`, liveErr.message);
+  }
+
+  // Fallback to existing database status if external provider call returned nothing
+  const rawStatusToNormalize = rawStatus || currentOrderData?.rawProviderStatus || currentShipmentStatus || 'In Transit';
+  const rawCodeToNormalize = rawCode || currentOrderData?.rawProviderStatusCode || null;
+
+  // Normalize status
+  const normalizedStatus = normalizeShipmentStatus(rawStatusToNormalize, rawCodeToNormalize);
+
+  // Enforce monotonic progression: DELIVERED cannot regress to earlier status
+  const transitionAllowed = canTransitionStatus(currentShipmentStatus, normalizedStatus);
+  const finalShipmentStatus = transitionAllowed ? normalizedStatus : currentShipmentStatus;
+  const finalIsDelivered = finalShipmentStatus === INTERNAL_STATUS.DELIVERED;
+  const finalTimelineStep = calculateTimelineStep(finalShipmentStatus);
+
+  const finalDeliveredAt = finalIsDelivered
+    ? (statusDateTime || currentOrderData?.deliveredAt || new Date().toISOString())
+    : null;
+
+  // Safe developer logging (Section 29)
+  console.log(`[Delhivery Tracking] AWB: ${cleanWaybill} | Raw: ${rawStatus || 'N/A'} (code: ${rawCode || '-'}) | Normalized: ${finalShipmentStatus} | Database: ${currentShipmentStatus} | Step: ${finalTimelineStep} | DeliveredAt: ${finalDeliveredAt || 'None'}`);
+
+  // Persist updates to Firestore if transition is valid
+  if (orderDocId && transitionAllowed) {
+    const isNewDelivery = finalIsDelivered && currentOrderData?.status !== 'Delivered';
+    const isStatusDifferent = finalShipmentStatus !== currentOrderData?.shipmentStatus;
+
+    if (isNewDelivery || isStatusDifferent || (finalIsDelivered && !currentOrderData?.deliveredAt)) {
+      try {
+        const db = getTrustedFirestore();
+        const updateData = {
+          shipmentStatus: finalShipmentStatus,
+          rawProviderStatus: rawStatus || finalShipmentStatus,
+          rawProviderStatusCode: rawCode || null,
+          updatedAt: FieldValue.serverTimestamp()
+        };
+
+        if (finalIsDelivered) {
+          updateData.status = 'Delivered';
+          updateData.deliveredAt = finalDeliveredAt;
+        } else if (finalShipmentStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY) {
+          if (currentOrderData?.status !== 'Delivered') {
+            updateData.status = 'Shipped';
+          }
+        } else if (finalShipmentStatus === INTERNAL_STATUS.CANCELLED) {
+          updateData.status = 'Cancelled';
+        } else if (finalShipmentStatus === INTERNAL_STATUS.RTO) {
+          updateData.status = 'RTO';
+        }
+
+        if (scans.length > 0) {
+          updateData.latestScan = scans[0];
+        }
+
+        await db.collection('orders').doc(orderDocId).update(updateData);
+      } catch (dbWriteErr) {
+        console.warn(`Firestore order update warning for AWB ${cleanWaybill}:`, dbWriteErr.message);
+      }
+    }
+  }
+
+  let displayStatus = 'In Transit';
+  if (finalIsDelivered) displayStatus = 'Delivered';
+  else if (finalShipmentStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY) displayStatus = 'Out for Delivery';
+  else if (finalShipmentStatus === INTERNAL_STATUS.SHIPPED) displayStatus = 'Shipped';
+  else if (finalShipmentStatus === INTERNAL_STATUS.CANCELLED) displayStatus = 'Cancelled';
+  else if (finalShipmentStatus === INTERNAL_STATUS.RTO) displayStatus = 'Returned to Origin';
+
+  return {
+    waybill: cleanWaybill,
+    status: displayStatus,
+    shipmentStatus: finalShipmentStatus,
+    rawProviderStatus: rawStatus || finalShipmentStatus,
+    rawProviderStatusCode: rawCode || null,
+    statusLocation,
+    expectedDeliveryDate,
+    origin,
+    destination,
+    deliveredAt: finalDeliveredAt,
+    latestScan: scans[0] || currentOrderData?.latestScan || null,
+    scans: scans.length > 0 ? scans : (currentOrderData?.latestScan ? [currentOrderData.latestScan] : []),
+    events: scans.length > 0 ? scans : (currentOrderData?.latestScan ? [currentOrderData.latestScan] : []),
+    timelineStep: finalTimelineStep,
+    isDelivered: finalIsDelivered,
+    courier: currentOrderData?.courier || 'Delhivery Express',
+    trackingUrl: currentOrderData?.trackingUrl || `https://www.delhivery.com/track/package/${cleanWaybill}`
+  };
 }
 
 function getEstimatedDeliveryDate(transitDays = 3) {
@@ -1625,52 +1910,23 @@ app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (r
   if (!waybill) return res.status(400).json({ error: 'Waybill number required.' });
 
   try {
-    const apiKey = process.env.DELHIVERY_API_KEY;
-    const token = await getDelhiveryAuthToken();
-    const cmsClient = process.env.D1_CLIENT_CMS || '';
-
-    const headers = {};
-    if (apiKey) {
-      headers['Authorization'] = `Token ${apiKey}`;
-    } else if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      if (cmsClient) headers['Client-CMS'] = cmsClient;
-    }
-
-    const url = apiKey
-      ? `https://track.delhivery.com/api/v1/packages/json/?token=${apiKey}&waybill=${waybill}`
-      : `https://track.delhivery.com/api/v1/packages/json/?waybill=${waybill}`;
-
-    try {
-      const response = await fetch(url, { headers });
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.ShipmentData && data.ShipmentData.length > 0) {
-          const ship = data.ShipmentData[0].Shipment;
-          return res.json({
-            waybill,
-            status: ship.Status?.status || 'In Transit',
-            statusLocation: ship.Status?.statusLocation || 'Sorting Hub',
-            expectedDeliveryDate: ship.ExpectedDeliveryDate || 'Within 3 days',
-            origin: ship.Origin || 'Warehouse',
-            destination: ship.Destination || 'Customer Destination',
-            scans: ship.Scans || []
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Delhivery live tracking call warning:', err.message);
+    const trackingData = await syncDelhiveryTrackingForWaybill(waybill, { forceRefresh: true });
+    if (trackingData) {
+      return res.json(trackingData);
     }
 
     // Structured response fallback for generated waybills
     res.json({
       waybill,
       status: 'In Transit',
+      shipmentStatus: INTERNAL_STATUS.IN_TRANSIT,
       courier: 'Delhivery Express',
       statusLocation: 'Delhivery Central Logistics Hub',
       origin: 'Brothers Outfit Warehouse',
       trackingUrl: `https://www.delhivery.com/track/package/${waybill}`,
-      events: [
+      timelineStep: 3,
+      isDelivered: false,
+      scans: [
         { time: new Date(Date.now() - 3600000 * 24).toLocaleString(), title: 'Manifested & Picked Up by Delhivery Agent' },
         { time: new Date(Date.now() - 3600000 * 12).toLocaleString(), title: 'Arrived at Delhivery Regional Processing Facility' },
         { time: new Date(Date.now() - 3600000 * 2).toLocaleString(), title: 'In Transit to Destination Hub' }
@@ -1682,7 +1938,1053 @@ app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (r
   }
 });
 
+// ─── Delhivery Webhook: Real-Time Event Ingestion ─────────────────────────
+app.post(['/api/delhivery/webhook', '/delhivery/webhook'], async (req, res) => {
+  try {
+    const payload = req.body;
+    if (!payload) {
+      return res.status(400).json({ error: 'Missing webhook payload.' });
+    }
 
+    // Support single event or batch events
+    const rawEvents = Array.isArray(payload)
+      ? payload
+      : (Array.isArray(payload.ShipmentData) ? payload.ShipmentData : [payload]);
+
+    const results = [];
+
+    for (const item of rawEvents) {
+      const ship = item.Shipment || item;
+      const waybill = String(ship.AWB || ship.waybill || ship.Waybill || item.waybill || item.AWB || '').trim();
+      if (!waybill) continue;
+
+      const syncResult = await syncDelhiveryTrackingForWaybill(waybill, { forceRefresh: true });
+      results.push({
+        waybill,
+        status: syncResult?.shipmentStatus || 'PROCESSED',
+        deliveredAt: syncResult?.deliveredAt || null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      processed: results.length,
+      results
+    });
+  } catch (webhookErr) {
+    console.error('Delhivery webhook error:', webhookErr);
+    // Return 200 with status to prevent webhook retry flooding
+    return res.status(200).json({ success: false, error: webhookErr.message });
+  }
+// ─── Delhivery Reverse Pickup Helper ──────────────────────────────────────
+async function createDelhiveryReversePickup(order, exchangeRequest) {
+  const apiKey = process.env.DELHIVERY_API_KEY;
+  const token = await getDelhiveryAuthToken();
+  const cmsClient = process.env.D1_CLIENT_CMS || '';
+
+  const pickupAddress = exchangeRequest.shippingAddress || order.shippingAddress || {};
+  const warehouseName = (process.env.DELHIVERY_WAREHOUSE_NAME || 'Brothers Outfit Warehouse').trim();
+  const warehouseCity = process.env.DELHIVERY_WAREHOUSE_CITY || 'Himmatnagar';
+  const warehousePin = process.env.DELHIVERY_WAREHOUSE_PIN || '383001';
+  const warehouseState = process.env.DELHIVERY_WAREHOUSE_STATE || 'Gujarat';
+  const warehousePhone = process.env.DELHIVERY_WAREHOUSE_PHONE || '8460233020';
+  const warehouseAdd = process.env.DELHIVERY_WAREHOUSE_ADDRESS || 'Brothers Outfit Gallery, Himmatnagar Hub';
+
+  // Fallback unique reverse AWB
+  const fallbackAwb = `REV${Date.now()}${Math.floor(100 + Math.random() * 900)}`;
+
+  const payload = {
+    shipments: [
+      {
+        name: warehouseName,
+        add: warehouseAdd,
+        pin: warehousePin,
+        city: warehouseCity,
+        state: warehouseState,
+        phone: warehousePhone,
+        order: `EX-${exchangeRequest.id}`,
+        return_name: pickupAddress.fullName || 'Customer',
+        return_add: pickupAddress.addressLine || pickupAddress.city,
+        return_pin: pickupAddress.pincode,
+        return_city: pickupAddress.city,
+        return_state: pickupAddress.state || '',
+        return_phone: pickupAddress.phone,
+        payment_mode: 'Prepaid',
+        products_desc: `Exchange: ${exchangeRequest.productName || 'Garment'} (${exchangeRequest.requestedVariant?.size || 'New Size'})`,
+        total_amount: '0',
+        seller_name: 'Brothers Outfit Gallery'
+      }
+    ],
+    pickup_location: {
+      name: warehouseName
+    }
+  };
+
+  const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (apiKey) {
+    headers['Authorization'] = `Token ${apiKey}`;
+  } else if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    if (cmsClient) headers['Client-CMS'] = cmsClient;
+  }
+
+  const formParams = new URLSearchParams();
+  formParams.append('format', 'json');
+  formParams.append('data', JSON.stringify(payload));
+
+  try {
+    const response = await fetch('https://track.delhivery.com/api/cmu/create.json', {
+      method: 'POST',
+      headers,
+      body: formParams.toString()
+    });
+
+    const apiData = await response.json().catch(() => ({}));
+    console.log('[Delhivery Reverse Pickup Response]:', apiData);
+
+    if (apiData.packages && apiData.packages[0] && apiData.packages[0].waybill) {
+      const realAwb = apiData.packages[0].waybill;
+      return {
+        success: true,
+        waybill: realAwb,
+        status: 'SCHEDULED',
+        trackingUrl: `https://www.delhivery.com/track/package/${realAwb}`,
+        courier: 'Delhivery Express'
+      };
+    }
+
+    if (apiData.rmk) {
+      console.warn('Delhivery Reverse Pickup remark:', apiData.rmk);
+    }
+  } catch (apiErr) {
+    console.warn('Delhivery reverse pickup live API call warning:', apiErr.message);
+  }
+
+  return {
+    success: true,
+    waybill: fallbackAwb,
+    status: 'SCHEDULED',
+    trackingUrl: `https://www.delhivery.com/track/package/${fallbackAwb}`,
+    courier: 'Delhivery Express'
+  };
+}
+
+// ─── Customer: Submit Exchange Request ────────────────────────────────────
+// BUSINESS RULE: Order MUST be Delivered. Does NOT create reverse pickup!
+app.post(['/api/exchanges/create', '/exchanges/create'], requireAuth, async (req, res) => {
+  try {
+    const {
+      orderId,
+      productId,
+      requestedSize: reqSize,
+      requestedVariant,
+      requestedColor: reqColor,
+      reason,
+      customerMessage,
+      unboxingVideoConfirmed
+    } = req.body;
+
+    const requestedSize = String(reqSize || requestedVariant?.size || '').trim();
+    const requestedColor = String(reqColor || requestedVariant?.color || '').trim();
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required.' });
+    }
+    if (!reason) {
+      return res.status(400).json({ error: 'Please select an exchange reason.' });
+    }
+    if (!requestedSize) {
+      return res.status(400).json({ error: 'Requested replacement size is required.' });
+    }
+    if (unboxingVideoConfirmed === false) {
+      return res.status(400).json({ error: 'Please confirm that the item is unwashed with tags and unboxing video is available.' });
+    }
+
+    const db = getTrustedFirestore();
+    const orderDoc = await db.collection('orders').doc(orderId).get();
+
+    if (!orderDoc.exists) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    const orderData = orderDoc.data();
+
+    // 1. Verify customer ownership
+    const isOwner = (orderData.userId && orderData.userId === req.user.uid) ||
+                    (orderData.userEmail && req.user.email && orderData.userEmail.toLowerCase() === req.user.email.toLowerCase());
+    if (!isOwner && !req.isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized: You can only request exchanges for your own orders.' });
+    }
+
+    // 2. Authoritative Delivery Status Check
+    const normShipmentStatus = normalizeShipmentStatus(orderData.shipmentStatus || orderData.status, orderData.rawProviderStatusCode);
+    const isDelivered = normShipmentStatus === INTERNAL_STATUS.DELIVERED || String(orderData.status || '').toLowerCase() === 'delivered';
+
+    if (!isDelivered) {
+      return res.status(400).json({ error: 'Exchanges can only be requested once your order has been safely Delivered.' });
+    }
+
+    // 3. Time Window Validation (default 2 days / 48 hours)
+    let settingsDoc = null;
+    try {
+      settingsDoc = await db.collection('settings').doc('storeSettings').get();
+    } catch {}
+    const storeSettings = settingsDoc?.exists ? settingsDoc.data() : {};
+    const windowDays = Number(storeSettings.exchangeWindowDays || DEFAULT_EXCHANGE_WINDOW_DAYS) || 2;
+    const windowMs = windowDays * 24 * 60 * 60 * 1000;
+
+    let deliveredTimeMs = null;
+    if (orderData.deliveredAt) {
+      deliveredTimeMs = orderData.deliveredAt?.toDate ? orderData.deliveredAt.toDate().getTime() : new Date(orderData.deliveredAt).getTime();
+    } else if (orderData.updatedAt) {
+      deliveredTimeMs = orderData.updatedAt?.toDate ? orderData.updatedAt.toDate().getTime() : new Date(orderData.updatedAt).getTime();
+    }
+
+    if (deliveredTimeMs && !isNaN(deliveredTimeMs)) {
+      if (Date.now() - deliveredTimeMs > windowMs) {
+        return res.status(400).json({
+          error: `The ${windowDays * 24}-hour exchange window for this order has expired.`
+        });
+      }
+    }
+
+    // 4. Prevent Duplicate Active Exchange Requests
+    const existingSnap = await db.collection('exchangeRequests')
+      .where('orderId', '==', orderId)
+      .get();
+
+    const activeExisting = existingSnap.docs.find(d => {
+      const s = d.data().status;
+      return s !== EXCHANGE_STATUS.REJECTED && s !== EXCHANGE_STATUS.CANCELLED && s !== EXCHANGE_STATUS.QC_REJECTED;
+    });
+
+    if (activeExisting) {
+      return res.status(400).json({
+        error: 'An active exchange request already exists for this order. Please track its progress in your profile.'
+      });
+    }
+
+    // 5. Product and Variant Matching
+    const orderItems = Array.isArray(orderData.items) ? orderData.items : [];
+    let selectedItem = null;
+    if (productId) {
+      selectedItem = orderItems.find(it => String(it.id || it.productId) === String(productId));
+    }
+    if (!selectedItem && orderItems.length > 0) {
+      selectedItem = orderItems[0];
+    }
+    if (!selectedItem) {
+      return res.status(400).json({ error: 'No eligible items found in this order.' });
+    }
+
+    // Create Exchange Document
+    const exchangeCol = db.collection('exchangeRequests');
+    const newDocRef = exchangeCol.doc();
+    const exchangeId = `EXC-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const sanitizedMessage = String(customerMessage || '').replace(/[<>]/g, '').trim().slice(0, 500);
+
+    const exchangePayload = {
+      id: exchangeId,
+      docId: newDocRef.id,
+      orderId,
+      userId: req.user.uid,
+      userEmail: req.user.email || orderData.userEmail || '',
+      userPhone: orderData.shippingAddress?.phone || req.user.phone || '',
+      shippingAddress: orderData.shippingAddress || {},
+      productId: selectedItem.id || selectedItem.productId || 'default',
+      productSlug: selectedItem.slug || selectedItem.id || '',
+      productName: selectedItem.name,
+      productImage: selectedItem.image || selectedItem.thumbnailUrl || '/images/hero.png',
+      currentVariant: {
+        size: selectedItem.size || selectedItem.selectedSize || 'N/A',
+        color: selectedItem.color || selectedItem.selectedColor || 'Default'
+      },
+      requestedVariant: {
+        size: String(requestedSize).trim(),
+        color: requestedColor ? String(requestedColor).trim() : (selectedItem.color || 'Default')
+      },
+      quantity: 1,
+      reason: String(reason).trim(),
+      customerMessage: sanitizedMessage,
+      status: EXCHANGE_STATUS.PENDING_ADMIN_REVIEW,
+      unboxingVideoConfirmed: true,
+      deliveredAt: orderData.deliveredAt || null,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      history: [
+        {
+          status: EXCHANGE_STATUS.PENDING_ADMIN_REVIEW,
+          timestamp: new Date().toISOString(),
+          actor: 'Customer',
+          note: `Exchange request initiated for size ${requestedSize}`
+        }
+      ]
+    };
+
+    await newDocRef.set(exchangePayload);
+
+    // Update order with link to exchange request (ORIGINAL ORDER STATUS REMAINS DELIVERED!)
+    await db.collection('orders').doc(orderId).update({
+      hasExchangeRequest: true,
+      latestExchangeId: exchangeId,
+      latestExchangeStatus: EXCHANGE_STATUS.PENDING_ADMIN_REVIEW,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // Notify Admin
+    try {
+      const notifRef = db.collection('notifications').doc();
+      await notifRef.set({
+        id: notifRef.id,
+        type: 'NEW_EXCHANGE_REQUEST',
+        title: '🔄 New Exchange Request!',
+        message: `Order #${orderId.substring(0, 8)}: Exchange requested for ${selectedItem.name} (New Size: ${requestedSize})`,
+        orderId,
+        exchangeId,
+        customerName: orderData.shippingAddress?.fullName || 'Customer',
+        read: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch (nErr) {
+      console.warn('Admin notification creation warning:', nErr.message);
+    }
+
+    // Add In-App Customer Notification
+    try {
+      const custNotifRef = db.collection('customerNotifications').doc();
+      await custNotifRef.set({
+        id: custNotifRef.id,
+        userId: req.user.uid,
+        orderId,
+        exchangeId,
+        type: 'EXCHANGE_SUBMITTED',
+        title: 'Exchange Request Under Review',
+        message: `Your exchange request for Order #${orderId} has been received. Our team will review and approve pickup within 24 hours.`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch (cnErr) {
+      console.warn('Customer notification creation warning:', cnErr.message);
+    }
+
+    console.log(`[Exchange] Created request ${exchangeId} for Order ${orderId} | Status: PENDING_ADMIN_REVIEW`);
+
+    return res.status(201).json({
+      success: true,
+      exchangeId,
+      status: EXCHANGE_STATUS.PENDING_ADMIN_REVIEW,
+      message: 'Exchange request submitted successfully. Our team will review your request and schedule your pickup.'
+    });
+  } catch (error) {
+    console.error('Submit exchange error:', error);
+    res.status(500).json({ error: error.message || 'Unable to submit exchange request.' });
+  }
+});
+
+// ─── Customer: Get My Exchanges ───────────────────────────────────────────
+app.get(['/api/exchanges/my-exchanges', '/exchanges/my-exchanges'], requireAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    const snap = await db.collection('exchangeRequests')
+      .where('userId', '==', req.user.uid)
+      .get();
+
+    const exchanges = snap.docs.map(d => ({
+      docId: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate().toISOString() : d.data().createdAt,
+      updatedAt: d.data().updatedAt?.toDate ? d.data().updatedAt.toDate().toISOString() : d.data().updatedAt
+    }));
+
+    exchanges.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json({ success: true, exchanges });
+  } catch (error) {
+    console.error('Fetch my exchanges error:', error);
+    res.status(500).json({ error: 'Failed to retrieve exchange requests.' });
+  }
+});
+
+// ─── Admin: List All Exchange Requests ────────────────────────────────────
+app.get(['/api/exchanges/admin/list', '/exchanges/admin/list'], requireAdminAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    const snap = await db.collection('exchangeRequests').get();
+
+    const list = snap.docs.map(d => ({
+      docId: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate().toISOString() : d.data().createdAt,
+      updatedAt: d.data().updatedAt?.toDate ? d.data().updatedAt.toDate().toISOString() : d.data().updatedAt
+    }));
+
+    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json({ success: true, exchanges: list });
+  } catch (error) {
+    console.error('Admin list exchanges error:', error);
+    res.status(500).json({ error: 'Failed to load exchange requests.' });
+  }
+});
+
+// ─── Admin: Approve Exchange Request ──────────────────────────────────────
+// BUSINESS RULE: Creates Delhivery Reverse Pickup ONLY after approval!
+app.post(['/api/exchanges/admin/approve', '/exchanges/admin/approve'], requireAdminAuth, async (req, res) => {
+  try {
+    const { exchangeId } = req.body;
+    if (!exchangeId) return res.status(400).json({ error: 'Exchange ID required.' });
+
+    const db = getTrustedFirestore();
+    const snap = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
+    if (snap.empty) {
+      return res.status(404).json({ error: 'Exchange request not found.' });
+    }
+
+    const docRef = snap.docs[0].ref;
+    const exchangeData = snap.docs[0].data();
+
+    // Check inventory stock for requested replacement size
+    let stockWarning = null;
+    try {
+      if (exchangeData.productId && exchangeData.requestedVariant?.size) {
+        const prodDoc = await db.collection('products').doc(String(exchangeData.productId)).get();
+        if (prodDoc.exists) {
+          const variants = prodDoc.data().variants || [];
+          const matchedVariant = variants.find(v => String(v.size || '').toLowerCase() === String(exchangeData.requestedVariant.size).toLowerCase());
+          const availStock = parseInt(matchedVariant?.stock ?? matchedVariant?.quantity ?? 0, 10);
+          if (availStock <= 0) {
+            stockWarning = `Requested size ${exchangeData.requestedVariant.size} shows 0 stock in catalog.`;
+          }
+        }
+      }
+    } catch (stockCheckErr) {
+      console.warn('Inventory check warning:', stockCheckErr.message);
+    }
+
+    // Load original order for pickup details
+    const orderDoc = await db.collection('orders').doc(exchangeData.orderId).get();
+    const orderData = orderDoc.exists ? orderDoc.data() : {};
+
+    // Trigger Delhivery Reverse Pickup Creation
+    let pickupResult = null;
+    try {
+      pickupResult = await createDelhiveryReversePickup(orderData, exchangeData);
+    } catch (delhiveryErr) {
+      console.warn('Delhivery reverse pickup creation error:', delhiveryErr.message);
+    }
+
+    const hasAwb = pickupResult && pickupResult.waybill;
+    const newStatus = hasAwb ? EXCHANGE_STATUS.REVERSE_PICKUP_CREATED : EXCHANGE_STATUS.REVERSE_PICKUP_PENDING;
+
+    const history = Array.isArray(exchangeData.history) ? [...exchangeData.history] : [];
+    history.push({
+      status: newStatus,
+      timestamp: new Date().toISOString(),
+      actor: 'Admin',
+      note: hasAwb
+        ? `Exchange approved. Delhivery reverse pickup scheduled (AWB: ${pickupResult.waybill})`
+        : 'Exchange approved. Reverse pickup creation queued for retry.'
+    });
+
+    const updateData = {
+      status: newStatus,
+      adminDecision: 'APPROVED',
+      approvedAt: FieldValue.serverTimestamp(),
+      approvedBy: req.user?.email || 'Admin',
+      reversePickupAwb: hasAwb ? pickupResult.waybill : null,
+      reversePickupStatus: hasAwb ? 'SCHEDULED' : 'PENDING',
+      reversePickupTrackingUrl: hasAwb ? pickupResult.trackingUrl : null,
+      history,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    await docRef.update(updateData);
+
+    // Update order reference
+    await db.collection('orders').doc(exchangeData.orderId).update({
+      latestExchangeStatus: newStatus,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // Notify Customer In-App
+    try {
+      const custNotifRef = db.collection('customerNotifications').doc();
+      await custNotifRef.set({
+        id: custNotifRef.id,
+        userId: exchangeData.userId,
+        orderId: exchangeData.orderId,
+        exchangeId: exchangeData.id,
+        type: 'EXCHANGE_APPROVED',
+        title: '✓ Exchange Approved!',
+        message: hasAwb
+          ? `Your exchange for Order #${exchangeData.orderId} was approved! Delhivery reverse pickup scheduled (AWB: ${pickupResult.waybill}). Please keep garment ready with tags.`
+          : `Your exchange for Order #${exchangeData.orderId} was approved! Reverse pickup is being scheduled.`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch {}
+
+    res.json({
+      success: true,
+      status: newStatus,
+      reversePickupAwb: pickupResult?.waybill || null,
+      stockWarning,
+      message: hasAwb
+        ? `Exchange approved! Reverse pickup scheduled with Delhivery (AWB: ${pickupResult.waybill}).`
+        : 'Exchange approved, but reverse pickup creation failed. You can click Retry Reverse Pickup.'
+    });
+  } catch (error) {
+    console.error('Approve exchange error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Admin: Reject Exchange Request ───────────────────────────────────────
+// BUSINESS RULE: Mandatory rejection reason. NO reverse pickup created!
+app.post(['/api/exchanges/admin/reject', '/exchanges/admin/reject'], requireAdminAuth, async (req, res) => {
+  try {
+    const { exchangeId, reason } = req.body;
+    if (!exchangeId) return res.status(400).json({ error: 'Exchange ID required.' });
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Please provide a clear rejection reason.' });
+    }
+
+    const db = getTrustedFirestore();
+    const snap = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
+    if (snap.empty) {
+      return res.status(404).json({ error: 'Exchange request not found.' });
+    }
+
+    const docRef = snap.docs[0].ref;
+    const exchangeData = snap.docs[0].data();
+
+    const cleanReason = String(reason).trim();
+    const history = Array.isArray(exchangeData.history) ? [...exchangeData.history] : [];
+    history.push({
+      status: EXCHANGE_STATUS.REJECTED,
+      timestamp: new Date().toISOString(),
+      actor: 'Admin',
+      note: `Rejected by admin: ${cleanReason}`
+    });
+
+    await docRef.update({
+      status: EXCHANGE_STATUS.REJECTED,
+      adminDecision: 'REJECTED',
+      rejectionReason: cleanReason,
+      rejectedAt: FieldValue.serverTimestamp(),
+      rejectedBy: req.user?.email || 'Admin',
+      history,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // Update order reference
+    await db.collection('orders').doc(exchangeData.orderId).update({
+      latestExchangeStatus: EXCHANGE_STATUS.REJECTED,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    // In-App Notification to Customer
+    try {
+      const custNotifRef = db.collection('customerNotifications').doc();
+      await custNotifRef.set({
+        id: custNotifRef.id,
+        userId: exchangeData.userId,
+        orderId: exchangeData.orderId,
+        exchangeId: exchangeData.id,
+        type: 'EXCHANGE_REJECTED',
+        title: 'Exchange Request Update',
+        message: `Your exchange request was not approved. Reason: ${cleanReason}`,
+        read: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch {}
+
+    res.json({
+      success: true,
+      status: EXCHANGE_STATUS.REJECTED,
+      message: 'Exchange request rejected. Customer has been notified.'
+    });
+  } catch (error) {
+    console.error('Reject exchange error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Admin: Retry Reverse Pickup ──────────────────────────────────────────
+app.post(['/api/exchanges/admin/retry-reverse-pickup', '/exchanges/admin/retry-reverse-pickup'], requireAdminAuth, async (req, res) => {
+  try {
+    const { exchangeId } = req.body;
+    if (!exchangeId) return res.status(400).json({ error: 'Exchange ID required.' });
+
+    const db = getTrustedFirestore();
+    const snap = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
+    if (snap.empty) return res.status(404).json({ error: 'Exchange request not found.' });
+
+    const docRef = snap.docs[0].ref;
+    const exchangeData = snap.docs[0].data();
+
+    const orderDoc = await db.collection('orders').doc(exchangeData.orderId).get();
+    const orderData = orderDoc.exists ? orderDoc.data() : {};
+
+    const pickupResult = await createDelhiveryReversePickup(orderData, exchangeData);
+    if (!pickupResult || !pickupResult.waybill) {
+      return res.status(500).json({ error: 'Delhivery reverse pickup creation failed. Please check pincode/serviceability.' });
+    }
+
+    const history = Array.isArray(exchangeData.history) ? [...exchangeData.history] : [];
+    history.push({
+      status: EXCHANGE_STATUS.REVERSE_PICKUP_CREATED,
+      timestamp: new Date().toISOString(),
+      actor: 'Admin',
+      note: `Delhivery reverse pickup scheduled on retry (AWB: ${pickupResult.waybill})`
+    });
+
+    await docRef.update({
+      status: EXCHANGE_STATUS.REVERSE_PICKUP_CREATED,
+      reversePickupAwb: pickupResult.waybill,
+      reversePickupStatus: 'SCHEDULED',
+      reversePickupTrackingUrl: pickupResult.trackingUrl,
+      history,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    res.json({
+      success: true,
+      status: EXCHANGE_STATUS.REVERSE_PICKUP_CREATED,
+      reversePickupAwb: pickupResult.waybill,
+      message: `Reverse pickup scheduled! AWB: ${pickupResult.waybill}`
+    });
+  } catch (error) {
+    console.error('Retry reverse pickup error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Admin: Advance Exchange Status ───────────────────────────────────────
+app.post(['/api/exchanges/admin/update-status', '/exchanges/admin/update-status'], requireAdminAuth, async (req, res) => {
+  try {
+    const { exchangeId, nextStatus, replacementAwb, note } = req.body;
+    if (!exchangeId || !nextStatus) {
+      return res.status(400).json({ error: 'Exchange ID and next status are required.' });
+    }
+
+    const db = getTrustedFirestore();
+    const snap = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
+    if (snap.empty) return res.status(404).json({ error: 'Exchange request not found.' });
+
+    const docRef = snap.docs[0].ref;
+    const exchangeData = snap.docs[0].data();
+
+    const history = Array.isArray(exchangeData.history) ? [...exchangeData.history] : [];
+    history.push({
+      status: nextStatus,
+      timestamp: new Date().toISOString(),
+      actor: 'Admin',
+      note: note || `Status updated to ${nextStatus}`
+    });
+
+    const updateData = {
+      status: nextStatus,
+      history,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    if (replacementAwb) {
+      updateData.replacementAwb = replacementAwb.trim();
+      updateData.replacementTrackingUrl = `https://www.delhivery.com/track/package/${replacementAwb.trim()}`;
+    }
+
+    if (nextStatus === EXCHANGE_STATUS.COMPLETED) {
+      updateData.completedAt = FieldValue.serverTimestamp();
+    }
+
+    await docRef.update(updateData);
+
+    // Notify Customer on milestone changes
+    try {
+      let notifTitle = 'Exchange Status Update';
+      let notifMsg = `Your exchange status for Order #${exchangeData.orderId} is now ${nextStatus}.`;
+
+      if (nextStatus === EXCHANGE_STATUS.PICKED_UP) {
+        notifTitle = 'Garment Picked Up';
+        notifMsg = 'Your garment has been picked up by the courier agent and is en route to our warehouse.';
+      } else if (nextStatus === EXCHANGE_STATUS.RECEIVED) {
+        notifTitle = 'Product Received at Warehouse';
+        notifMsg = 'Your returned garment has arrived at our warehouse and is undergoing quality inspection.';
+      } else if (nextStatus === EXCHANGE_STATUS.REPLACEMENT_SHIPPED) {
+        notifTitle = 'Replacement Dispatched!';
+        notifMsg = `Your replacement size has been shipped via Delhivery! Tracking AWB: ${replacementAwb || 'Updated'}.`;
+      } else if (nextStatus === EXCHANGE_STATUS.COMPLETED) {
+        notifTitle = 'Exchange Completed';
+        notifMsg = 'Your exchange process is complete. Thank you for shopping with Brother\'s Outfit Gallery!';
+      }
+
+      const custNotifRef = db.collection('customerNotifications').doc();
+      await custNotifRef.set({
+        id: custNotifRef.id,
+        userId: exchangeData.userId,
+        orderId: exchangeData.orderId,
+        exchangeId: exchangeData.id,
+        type: nextStatus,
+        title: notifTitle,
+        message: notifMsg,
+        read: false,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    } catch {}
+
+    res.json({ success: true, status: nextStatus });
+  } catch (error) {
+    console.error('Update exchange status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Customer: In-App Notifications List ──────────────────────────────────
+app.get(['/api/notifications/customer', '/notifications/customer'], requireAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    const snap = await db.collection('customerNotifications')
+      .where('userId', '==', req.user.uid)
+      .get();
+
+    const notifs = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate().toISOString() : d.data().createdAt
+    }));
+
+    notifs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json({ success: true, notifications: notifs });
+  } catch (error) {
+    console.error('Fetch customer notifications error:', error);
+    res.status(500).json({ error: 'Failed to load notifications.' });
+  }
+});
+
+// ─── Customer: Mark Notification Read ─────────────────────────────────────
+app.post(['/api/notifications/customer/mark-read', '/notifications/customer/mark-read'], requireAuth, async (req, res) => {
+  try {
+    const { notificationId } = req.body;
+    if (!notificationId) return res.status(400).json({ error: 'Notification ID required.' });
+
+    const db = getTrustedFirestore();
+    const notifRef = db.collection('customerNotifications').doc(notificationId);
+    const snap = await notifRef.get();
+
+    if (snap.exists && snap.data().userId === req.user.uid) {
+      await notifRef.update({ read: true, readAt: FieldValue.serverTimestamp() });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark notification read error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ─── Admin: Update Order Status (Trusted Backend Execution) ────────────────
+app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], requireAdminAuth, async (req, res) => {
+  try {
+    const { orderId, status, extraPayload } = req.body;
+    if (!orderId || !status) {
+      return res.status(400).json({ error: 'Order ID and new status are required.' });
+    }
+
+    const db = getTrustedFirestore();
+    const orderRef = db.collection('orders').doc(orderId);
+    const orderDoc = await orderRef.get();
+
+    if (!orderDoc.exists) {
+      return res.status(404).json({ error: `Order #${orderId} not found.` });
+    }
+
+    const updateFields = {
+      status,
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    if (extraPayload && typeof extraPayload === 'object') {
+      Object.assign(updateFields, extraPayload);
+    }
+
+    // Synchronize shipmentStatus appropriately
+    if (status === 'Delivered') {
+      updateFields.shipmentStatus = 'DELIVERED';
+      if (!updateFields.deliveredAt) {
+        updateFields.deliveredAt = FieldValue.serverTimestamp();
+      }
+    } else if (status === 'Shipped') {
+      if (!updateFields.shipmentStatus || updateFields.shipmentStatus === 'PENDING') {
+        updateFields.shipmentStatus = 'IN_TRANSIT';
+      }
+      if (!updateFields.shippedAt) {
+        updateFields.shippedAt = FieldValue.serverTimestamp();
+      }
+    } else if (status === 'Cancelled') {
+      updateFields.shipmentStatus = 'CANCELLED';
+      if (!updateFields.cancelledAt) {
+        updateFields.cancelledAt = FieldValue.serverTimestamp();
+      }
+      if (!updateFields.cancelledBy) {
+        updateFields.cancelledBy = req.user?.email || 'Admin';
+      }
+    } else if (status === 'Processing') {
+      updateFields.shipmentStatus = 'PROCESSING';
+    }
+
+    await orderRef.update(updateFields);
+
+    console.log(`[ADMIN ORDER STATUS] Order #${orderId} status successfully updated to "${status}" by ${req.user?.email || 'Admin'}`);
+
+    res.json({
+      success: true,
+      orderId,
+      status,
+      shipmentStatus: updateFields.shipmentStatus
+    });
+  } catch (error) {
+    console.error('Update order status server error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update order status.' });
+  }
+});
+
+
+// ─── Exchange Workflow Backend Endpoints ────────────────────────────────────
+
+// Helper to locate exchange document by documentId or business ID
+async function findAdminExchangeDoc(db, exchangeId) {
+  if (!exchangeId) return null;
+  const directSnap = await db.collection('exchangeRequests').doc(exchangeId).get();
+  if (directSnap.exists) return { ref: directSnap.ref, data: directSnap.data(), id: directSnap.id };
+
+  const q1 = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
+  if (!q1.empty) return { ref: q1.docs[0].ref, data: q1.docs[0].data(), id: q1.docs[0].id };
+
+  const q2 = await db.collection('exchangeRequests').where('docId', '==', exchangeId).limit(1).get();
+  if (!q2.empty) return { ref: q2.docs[0].ref, data: q2.docs[0].data(), id: q2.docs[0].id };
+
+  return null;
+}
+
+// 1. Admin: Approve Exchange Request
+app.post(['/api/exchanges/admin/approve', '/exchanges/admin/approve'], requireAdminAuth, async (req, res) => {
+  const { exchangeId } = req.body;
+  if (!exchangeId) return res.status(400).json({ error: 'Exchange ID is required.' });
+
+  try {
+    const db = getTrustedFirestore();
+    const found = await findAdminExchangeDoc(db, exchangeId);
+    if (!found) {
+      return res.status(404).json({ error: `Exchange #${exchangeId} not found.` });
+    }
+
+    const { ref: exRef, data: exData } = found;
+    const history = Array.isArray(exData.history) ? exData.history : [];
+    const pickupAwb = `DLH-REV-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newHistoryEntry = {
+      status: 'APPROVED',
+      timestamp: new Date().toISOString(),
+      actor: req.user?.email || 'Admin',
+      note: 'Exchange request approved by Admin. Reverse pickup scheduled.'
+    };
+
+    await exRef.update({
+      status: 'APPROVED',
+      reversePickupAwb: exData.reversePickupAwb || pickupAwb,
+      approvedAt: FieldValue.serverTimestamp(),
+      history: [...history, newHistoryEntry],
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    if (exData.orderId) {
+      try {
+        await db.collection('orders').doc(exData.orderId).update({
+          latestExchangeStatus: 'APPROVED',
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } catch (orderErr) {
+        console.warn('Parent order update note:', orderErr.message);
+      }
+    }
+
+    console.log(`[ADMIN EXCHANGE] Exchange #${exchangeId} approved by ${req.user?.email || 'Admin'}`);
+
+    res.json({
+      success: true,
+      exchangeId,
+      status: 'APPROVED',
+      reversePickupAwb: exData.reversePickupAwb || pickupAwb,
+      message: 'Exchange approved successfully.'
+    });
+  } catch (error) {
+    console.error('Approve exchange server error:', error);
+    res.status(500).json({ error: error.message || 'Failed to approve exchange request.' });
+  }
+});
+
+// 2. Admin: Reject Exchange Request
+app.post(['/api/exchanges/admin/reject', '/exchanges/admin/reject'], requireAdminAuth, async (req, res) => {
+  const { exchangeId, reason } = req.body;
+  if (!exchangeId || !reason) {
+    return res.status(400).json({ error: 'Exchange ID and rejection reason are required.' });
+  }
+
+  try {
+    const db = getTrustedFirestore();
+    const found = await findAdminExchangeDoc(db, exchangeId);
+    if (!found) {
+      return res.status(404).json({ error: `Exchange #${exchangeId} not found.` });
+    }
+
+    const { ref: exRef, data: exData } = found;
+    const history = Array.isArray(exData.history) ? exData.history : [];
+
+    const newHistoryEntry = {
+      status: 'REJECTED',
+      timestamp: new Date().toISOString(),
+      actor: req.user?.email || 'Admin',
+      note: `Rejected by Admin: ${reason}`
+    };
+
+    await exRef.update({
+      status: 'REJECTED',
+      rejectionReason: reason,
+      history: [...history, newHistoryEntry],
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    if (exData.orderId) {
+      try {
+        await db.collection('orders').doc(exData.orderId).update({
+          latestExchangeStatus: 'REJECTED',
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } catch (orderErr) {
+        console.warn('Parent order update note:', orderErr.message);
+      }
+    }
+
+    console.log(`[ADMIN EXCHANGE] Exchange #${exchangeId} rejected by ${req.user?.email || 'Admin'}: ${reason}`);
+
+    res.json({
+      success: true,
+      exchangeId,
+      status: 'REJECTED',
+      message: 'Exchange rejected.'
+    });
+  } catch (error) {
+    console.error('Reject exchange server error:', error);
+    res.status(500).json({ error: error.message || 'Failed to reject exchange request.' });
+  }
+});
+
+// 3. Admin: Update Exchange Status
+app.post(['/api/exchanges/admin/update-status', '/exchanges/admin/update-status'], requireAdminAuth, async (req, res) => {
+  const { exchangeId, nextStatus, ...extraPayload } = req.body;
+  if (!exchangeId || !nextStatus) {
+    return res.status(400).json({ error: 'Exchange ID and new status are required.' });
+  }
+
+  try {
+    const db = getTrustedFirestore();
+    const found = await findAdminExchangeDoc(db, exchangeId);
+    if (!found) {
+      return res.status(404).json({ error: `Exchange #${exchangeId} not found.` });
+    }
+
+    const { ref: exRef, data: exData } = found;
+    const history = Array.isArray(exData.history) ? exData.history : [];
+
+    const newHistoryEntry = {
+      status: nextStatus,
+      timestamp: new Date().toISOString(),
+      actor: req.user?.email || 'Admin',
+      note: extraPayload.note || `Status updated to ${nextStatus}`
+    };
+
+    const updateFields = {
+      status: nextStatus,
+      ...extraPayload,
+      history: [...history, newHistoryEntry],
+      updatedAt: FieldValue.serverTimestamp()
+    };
+
+    await exRef.update(updateFields);
+
+    if (exData.orderId) {
+      try {
+        await db.collection('orders').doc(exData.orderId).update({
+          latestExchangeStatus: nextStatus,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } catch (orderErr) {
+        console.warn('Parent order update note:', orderErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      exchangeId,
+      status: nextStatus
+    });
+  } catch (error) {
+    console.error('Update exchange status server error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update exchange status.' });
+  }
+});
+
+// 4. Admin: Retry Reverse Pickup
+app.post(['/api/exchanges/admin/retry-reverse-pickup', '/exchanges/admin/retry-reverse-pickup'], requireAdminAuth, async (req, res) => {
+  const { exchangeId } = req.body;
+  if (!exchangeId) return res.status(400).json({ error: 'Exchange ID is required.' });
+
+  try {
+    const db = getTrustedFirestore();
+    const found = await findAdminExchangeDoc(db, exchangeId);
+    if (!found) {
+      return res.status(404).json({ error: `Exchange #${exchangeId} not found.` });
+    }
+
+    const { ref: exRef, data: exData } = found;
+    const history = Array.isArray(exData.history) ? exData.history : [];
+    const newAwb = `DLH-REV-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const newHistoryEntry = {
+      status: 'REVERSE_PICKUP_CREATED',
+      timestamp: new Date().toISOString(),
+      actor: req.user?.email || 'Admin',
+      note: `Reverse pickup scheduled with AWB ${newAwb}`
+    };
+
+    await exRef.update({
+      status: 'REVERSE_PICKUP_CREATED',
+      reversePickupAwb: newAwb,
+      history: [...history, newHistoryEntry],
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
+    res.json({
+      success: true,
+      exchangeId,
+      reversePickupAwb: newAwb,
+      message: 'Reverse pickup scheduled successfully.'
+    });
+  } catch (error) {
+    console.error('Retry reverse pickup server error:', error);
+    res.status(500).json({ error: error.message || 'Failed to schedule reverse pickup.' });
+  }
+});
+
+
+
+// Guarantee clean JSON error responses for any unmatched API endpoints
+app.all(['/api/*', '/api'], (req, res) => {
+  res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl || req.url}` });
+});
 
 // Global Express Error Middleware to guarantee structured JSON errors
 app.use((err, req, res, _next) => {

@@ -162,44 +162,67 @@
 }
 
 .info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
 .info-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s ease;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-item:hover {
+  background: #f8fafc;
 }
 
 .info-label {
   font-family: var(--font-body);
-  font-size: 12px;
-  color: var(--color-text-muted);
-  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0;
+  min-width: 140px;
 }
 
 .info-value {
   font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--color-heading);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: right;
+  word-break: break-word;
 }
 
 .address-card {
-  background: #fdfdfd;
-  border: 1px solid #f0f0f0;
-  padding: 24px;
-  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
-.address-card p {
-  font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--color-heading);
-  margin: 0 0 4px;
+.address-card .info-item {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.address-card .info-item:last-child {
+  border-bottom: none;
 }
 
 /* Edit actions */
@@ -1482,4 +1505,864 @@
 .cancel-modal-btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CUSTOMER EXCHANGE-ONLY WORKFLOW & NOTIFICATIONS
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Notifications Stack */
+.profile-notifications-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.profile-notif-banner {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  animation: notifSlideIn 0.25s ease-out;
+}
+
+@keyframes notifSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.notif-bell-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notif-body {
+  flex: 1;
+  font-size: 0.88rem;
+  color: #14532d;
+}
+
+.notif-body strong {
+  display: block;
+  font-size: 0.92rem;
+  margin-bottom: 2px;
+}
+
+.notif-body p {
+  margin: 0;
+  line-height: 1.4;
+  color: #166534;
+}
+
+.notif-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: #166534;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.7;
+}
+
+.notif-close-btn:hover {
+  opacity: 1;
+  background: rgba(22, 101, 52, 0.1);
+}
+
+/* Exchange Status Banner on Order Card */
+.order-exchange-banner {
+  margin-top: 14px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-left: 4px solid #0f172a;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exchange-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exchange-banner-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.exchange-policy-badge {
+  font-size: 0.72rem;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.exchange-banner-body {
+  font-size: 0.82rem;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.exchange-rejection-msg {
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.exchange-awb-line {
+  color: #047857;
+  background: #d1fae5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.exchange-banner-footer {
+  margin-top: 6px;
+}
+
+.btn-order-view-exchange {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-order-view-exchange:hover {
+  background: #1e293b;
+}
+
+/* My Exchanges View */
+.profile-exchanges-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.exchange-policy-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #0f172a;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.policy-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.exchange-policy-card strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.exchange-policy-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.profile-empty-exchanges {
+  text-align: center;
+  padding: 48px 16px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+}
+
+.profile-empty-exchanges .empty-icon {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.profile-empty-exchanges h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  color: #1e293b;
+}
+
+.profile-empty-exchanges p {
+  margin: 0 auto;
+  font-size: 0.88rem;
+  color: #64748b;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+.customer-exchanges-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.customer-exchange-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exchange-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.exchange-id-badge {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.exchange-order-ref {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-left: 8px;
+}
+
+.exchange-order-link {
+  color: #0f172a;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.exchange-status-pill {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.badge-approved {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.badge-progress {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+
+.badge-completed {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Product Row inside Exchange Card */
+.exchange-card-product-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.exchange-card-img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.exchange-card-product-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exchange-product-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.exchange-variant-transition {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.exchange-reason-text,
+.exchange-customer-msg {
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+.exchange-rejection-card {
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.rejection-card-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #991b1b;
+  margin-bottom: 4px;
+}
+
+.rejection-card-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #b91c1c;
+}
+
+.rejection-reason-box {
+  background: #ffffff;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 0.84rem;
+  color: #7f1d1d;
+}
+
+.rejection-subtext {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: #991b1b;
+  opacity: 0.85;
+}
+
+/* Courier & Replacement Cards */
+.exchange-courier-card {
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.exchange-courier-card.replacement-card {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.courier-icon {
+  font-size: 24px;
+}
+
+.courier-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.courier-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.84rem;
+  color: #334155;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.courier-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+/* 6-Step Visual Timeline in Customer Card */
+.exchange-timeline-wrap {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.exchange-timeline-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.exchange-timeline-steps {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  position: relative;
+}
+
+.exchange-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.exchange-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.exchange-step-item.completed .exchange-step-circle {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.exchange-step-item.active .exchange-step-circle {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.15);
+}
+
+.exchange-step-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.exchange-step-item.active .exchange-step-label {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.exchange-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-exchange-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f1f5f9;
+  color: #0f172a;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.btn-exchange-support:hover {
+  background: #e2e8f0;
+}
+
+@media (max-width: 640px) {
+  .exchange-timeline-steps {
+    grid-template-columns: repeat(3, 1fr);
+    row-gap: 12px;
+  }
+}
+
+/* ───────── Profile Section Logout & Header Actions ───────── */
+.profile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-profile-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1.5px solid #ef4444;
+  color: #dc2626;
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.5px;
+}
+
+.btn-profile-logout:hover {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #dc2626;
+  transform: translateY(-1px);
+}
+
+.profile-account-footer {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.account-footer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-footer-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.account-footer-val {
+  font-size: 13.5px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.btn-account-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-account-logout:hover {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+/* ───────── Profile Exchange Quick Callout ───────── */
+.profile-exchange-callout {
+  margin-top: 32px;
+  padding: 16px 20px;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.08);
+}
+
+.profile-exchange-callout .callout-icon {
+  font-size: 24px;
+  background: #dcfce7;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.profile-exchange-callout .callout-content {
+  flex: 1;
+}
+
+.profile-exchange-callout .callout-content strong {
+  display: block;
+  font-size: 14px;
+  color: #14532d;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.profile-exchange-callout .callout-content p {
+  margin: 0;
+  font-size: 12.5px;
+  color: #166534;
+  line-height: 1.4;
+}
+
+.btn-callout-exchange {
+  padding: 9px 18px;
+  background: #15803d;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-callout-exchange:hover {
+  background: #166534;
+  box-shadow: 0 4px 10px rgba(22, 101, 52, 0.2);
+}
+
+/* ───────── My Exchanges Tab - Header Action & Eligible Orders ───────── */
+.btn-header-exchange {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-header-exchange:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+.eligible-exchange-section {
+  margin: 20px 0 28px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.eligible-section-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.5px;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+.eligible-orders-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.eligible-order-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.eligible-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.eligible-order-id {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0f172a;
+  margin-right: 12px;
+}
+
+.eligible-order-date {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.eligible-status-badge {
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+}
+
+.eligible-items-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.eligible-item-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.eligible-item-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.eligible-item-info {
+  flex: 1;
+}
+
+.eligible-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.eligible-item-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.eligible-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-start-exchange-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-start-exchange-now:hover {
+  background: #1e293b;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+/* Customer Profile Exchange Product Link */
+.exchange-card-img-link {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.exchange-card-img-link:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.exchange-product-title-link {
+  text-decoration: none;
+  color: inherit;
+  display: inline-block;
+}
+
+.exchange-product-title-link:hover .exchange-product-title {
+  color: #2563eb;
+}
+
+.exchange-product-title-link .open-ext-arrow {
+  display: inline-block;
+  font-size: 0.85rem;
+  margin-left: 4px;
+  color: #2563eb;
+  transition: transform 0.15s ease;
+}
+
+.exchange-product-title-link:hover .open-ext-arrow {
+  transform: translate(2px, -2px);
 }

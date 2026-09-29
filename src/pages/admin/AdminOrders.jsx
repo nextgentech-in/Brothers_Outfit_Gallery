@@ -96,10 +96,23 @@ export default function AdminOrders() {
   }, [fetchOrders]);
 
   const handleStatusChange = async (orderId, newStatus) => {
-    await updateOrderStatus(orderId, newStatus);
-    fetchOrders();
+    // 1. Optimistic UI update so the change reflects immediately in UI
+    const previousOrders = [...orders];
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     if (selectedOrder && selectedOrder.id === orderId) {
       setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+    }
+
+    try {
+      await updateOrderStatus(orderId, newStatus);
+      showToast(`Order #${formatDisplayOrderId(orderId)} status updated to "${newStatus}".`, 'success', 3000);
+      await fetchOrders();
+    } catch (err) {
+      console.error('Failed to change order status:', err);
+      showToast(`Failed to update status: ${err.message}`, 'error', 5000);
+      // Revert optimistic update on failure
+      setOrders(previousOrders);
+      await fetchOrders();
     }
   };
 
@@ -219,6 +232,9 @@ export default function AdminOrders() {
   const handleOpenTracking = async (waybill) => {
     const trackingData = await trackDelhiveryShipment(waybill);
     setActiveTracking(trackingData);
+    if (trackingData?.isDelivered) {
+      setOrders(prev => prev.map(o => o.waybill === waybill ? { ...o, status: 'Delivered', shipmentStatus: 'DELIVERED', deliveredAt: trackingData.deliveredAt } : o));
+    }
   };
 
   const filteredOrders = orders.filter(o => {
@@ -689,8 +705,23 @@ export default function AdminOrders() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>Order Status</div>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: selectedOrder.status === 'Cancelled' ? '#dc2626' : (selectedOrder.status === 'Delivered' ? '#16a34a' : '#0f172a') }}>
-                    {selectedOrder.status || 'Processing'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <select
+                      value={selectedOrder.status || 'Processing'}
+                      onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
+                      className="admin-status-dropdown"
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        borderColor: selectedOrder.status === 'Cancelled' ? '#f87171' : (selectedOrder.status === 'Delivered' ? '#4ade80' : '#cbd5e1')
+                      }}
+                    >
+                      <option value="Processing">Processing</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
                   </div>
                 </div>
 

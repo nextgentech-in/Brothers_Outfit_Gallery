@@ -12,8 +12,6 @@ import {
 import { useAdminUI } from '../../context/AdminUIContext';
 import { invalidateProductCache } from '../../services/productService';
 import './AdminProductForm.css';
-
-import { getBackendUrl } from '../../utils/apiConfig';
 import { uploadImageToImageKit } from '../../utils/imageUtils';
 import {
   convertMeasurementValue,

@@ -15,7 +15,8 @@ export default function AdminSettings() {
     whatsappNumber: '',
     freeShippingMin: 1500,
     autoDiscountThreshold: 2000,
-    autoDiscountAmount: 250
+    autoDiscountAmount: 250,
+    exchangeWindowDays: 2
   });
 
   useEffect(() => {
@@ -135,6 +136,26 @@ export default function AdminSettings() {
                 value={settings.autoDiscountAmount} 
                 onChange={handleChange}
               />
+            </div>
+          </div>
+        </section>
+
+        <section className="admin-form-section">
+          <h3>Exchange Policy Settings</h3>
+          <div className="admin-form-row">
+            <div className="admin-form-group">
+              <label>Exchange Window (Days from Delivery)</label>
+              <input 
+                type="number" 
+                name="exchangeWindowDays" 
+                min="1"
+                max="30"
+                value={settings.exchangeWindowDays || 2} 
+                onChange={handleChange}
+              />
+              <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                Default is 2 days (48 hours per published store policy). Exchange button and requests are only valid within this window.
+              </span>
             </div>
           </div>
         </section>
