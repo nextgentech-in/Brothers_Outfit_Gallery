@@ -31,7 +31,7 @@ const HOME_SCHEMA = {
       "@type": ["ClothingStore", "LocalBusiness"],
       "@id": "https://www.brothersoutfitgallery.com/#localbusiness",
       "name": "Brother’s Outfit Gallery",
-      "image": "https://www.brothersoutfitgallery.com/images/store-real-1.jpeg",
+      "image": "https://www.brothersoutfitgallery.com/images/hero.png",
       "url": "https://www.brothersoutfitgallery.com/",
       "telephone": "+918460233020",
       "priceRange": "₹₹",
@@ -282,8 +282,8 @@ export default function HomePage() {
             <div className="about-grid">
               <div className="about-img-wrap">
                 <img
-                  src="/images/unnamed.jpg"
-                  alt="Brothers Outfit Gallery - Himatnagar Store"
+                  src="/images/store-real-4.jpeg"
+                  alt="Brothers Outfit Gallery clothing collection inside the Himatnagar store"
                   className="about-img"
                   width="1280"
                   height="960"

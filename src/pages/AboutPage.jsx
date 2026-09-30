@@ -17,7 +17,7 @@ const ABOUT_SCHEMA = [
     "telephone": businessInfo.phone || "+91 84602 33020",
     "email": businessInfo.email || "brothersoutfitgallery@gmail.com",
     "priceRange": "₹₹",
-    "image": "https://www.brothersoutfitgallery.com/images/store-real-1.jpeg",
+    "image": "https://www.brothersoutfitgallery.com/images/hero.png",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "FF-57, Pratham Square, Sahakari Jin Road",
@@ -72,43 +72,43 @@ export default function AboutPage() {
   const storeImages = [
     {
       url: "/images/store-real-1.jpeg",
-      alt: "Brothers Outfit Gallery Storefront & Main Entrance",
+      alt: "Brothers Outfit Gallery storefront and exterior",
       caption: "Our Official Storefront - Welcome to Brothers Outfit Gallery",
       width: 1280,
       height: 741
     },
     {
       url: "/images/store-real-2.jpeg",
-      alt: "Brothers Outfit Gallery Interior Collection Display",
-      caption: "Spacious Interior & Contemporary Styles",
+      alt: "Brothers Outfit Gallery fragrance and accessories display",
+      caption: "Fragrance & Accessories Collection",
       width: 1280,
       height: 960
     },
     {
       url: "/images/store-real-3.jpeg",
-      alt: "Brothers Outfit Gallery Casuals & Designer Shirts Rack",
-      caption: "Pure Cotton Casuals & Designer Shirts Collection",
+      alt: "Brothers Outfit Gallery folded shirts collection",
+      caption: "Curated Shirts & Casuals",
       width: 1280,
       height: 960
     },
     {
       url: "/images/store-real-4.jpeg",
-      alt: "Brothers Outfit Gallery Premium T-Shirts & Smart Formals",
-      caption: "High-Density Graphic Tees & Formal Shirts",
+      alt: "Brothers Outfit Gallery apparel display",
+      caption: "Fresh Styles In Store",
       width: 1280,
       height: 960
     },
     {
       url: "/images/store-real-5.jpeg",
-      alt: "Brothers Outfit Gallery Denims, Jeans & Trousers Area",
-      caption: "Curated Denims, Cargoes & Comfort-Fit Trousers",
+      alt: "Brothers Outfit Gallery customer service counter",
+      caption: "Personal Styling & Support",
       width: 1280,
       height: 960
     },
     {
       url: "/images/store-real-6.jpeg",
-      alt: "Brothers Outfit Gallery Customer Care & Styling Counter",
-      caption: "Friendly Service & Personal Styling Consultation",
+      alt: "Brothers Outfit Gallery denim and trousers collection",
+      caption: "Denims, Trousers & Everyday Essentials",
       width: 1280,
       height: 960
     }

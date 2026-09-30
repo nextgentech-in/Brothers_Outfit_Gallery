@@ -496,25 +496,6 @@ export default function AdminHomepage() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('categories')}
-          style={{
-            padding: '12px 20px',
-            background: 'none',
-            border: 'none',
-            borderBottom: activeTab === 'categories' ? '2px solid #0f172a' : '2px solid transparent',
-            color: activeTab === 'categories' ? '#0f172a' : '#64748b',
-            fontWeight: 700,
-            fontSize: '14px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          📁 Category Images ({Object.values(config.categoryImages || {}).filter(Boolean).length})
-        </button>
-        <button
-          type="button"
           onClick={() => setActiveTab('trending')}
           style={{
             padding: '12px 20px',

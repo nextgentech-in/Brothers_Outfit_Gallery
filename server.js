@@ -2024,6 +2024,8 @@ app.post(['/api/delhivery/webhook', '/delhivery/webhook'], async (req, res) => {
     // Return 200 with status to prevent webhook retry flooding
     return res.status(200).json({ success: false, error: webhookErr.message });
   }
+});
+
 // ─── Delhivery Reverse Pickup Helper ──────────────────────────────────────
 async function createDelhiveryReversePickup(order, exchangeRequest) {
   const apiKey = process.env.DELHIVERY_API_KEY;
@@ -3030,7 +3032,7 @@ app.post(['/api/exchanges/admin/retry-reverse-pickup', '/exchanges/admin/retry-r
 
 
 // Guarantee clean JSON error responses for any unmatched API endpoints
-app.all(['/api/*', '/api'], (req, res) => {
+app.all(['/api/*splat', '/api'], (req, res) => {
   res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl || req.url}` });
 });
 

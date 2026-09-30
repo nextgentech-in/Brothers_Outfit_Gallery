@@ -17,8 +17,13 @@ const CATEGORY_FALLBACK_IMAGES = {
   Shirts: '/images/category-rail/shirts-cutout-v2.png',
   'T-Shirts': '/images/category-rail/tshirts-cutout.png',
   Jeans: '/images/category-rail/jeans-cutout.png',
+  Trousers: '/images/category-rail/trousers-cutout.png',
+  Shorts: '/images/category-rail/shorts-cutout.png',
+  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.png',
   Perfumes: '/images/category-rail/perfumes-cutout.png'
 };
+
+const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
 
 /**
  * Extract the best available image URL from a product.
@@ -89,6 +94,7 @@ export default function ShopByCategory() {
 
         // Combine categories from products and any admin-configured custom category images
         const allCategoryNames = new Set([
+          ...CURATED_CATEGORY_NAMES,
           ...Object.keys(categoryMap),
           ...Object.keys(adminCategoryImages).filter(k => adminCategoryImages[k])
         ]);
