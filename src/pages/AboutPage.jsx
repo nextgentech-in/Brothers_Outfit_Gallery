@@ -254,7 +254,7 @@ export default function AboutPage() {
 
             <div className="about-story__media">
               <div className="story-image-card">
-                <img src="/images/store-real-3.jpeg" alt="Brothers Outfit Interior Showroom" className="story-image-main" />
+                <img src="/images/hero.png" alt="Brother's Outfit Gallery storefront" className="story-image-main" />
                 <div className="story-floating-badge">
                   <span className="badge-star">★</span>
                   <div>
