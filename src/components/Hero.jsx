@@ -56,7 +56,7 @@ export default function Hero({ heroConfig: propConfig }) {
             )}
             <img
               src={optimizeImage(bannerImage, 1920)}
-              alt="Brothers Outfit - Premium Fashion"
+              alt="Brother's Outfit Gallery - Premium Men's Fashion & Clothing Store in Himatnagar"
               className="hero__image"
               loading="eager"
               fetchPriority="high"
@@ -78,7 +78,7 @@ export default function Hero({ heroConfig: propConfig }) {
         <div className="hero__content">
           <div className="hero__text">
             {eyebrow ? <span className="hero__eyebrow">{eyebrow}</span> : null}
-            <h1 className="hero__heading">
+            <h1 className="hero__heading" aria-label="Brother's Outfit Gallery — Modern Men's Clothing Store in Himatnagar">
               {heading.split('\n').map((line, idx) => (
                 <span key={idx} style={{ display: 'block' }}>{line}</span>
               ))}

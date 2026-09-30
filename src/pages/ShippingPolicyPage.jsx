@@ -1,10 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/common/SEO';
 import './PolicyPages.css';
 
 export default function ShippingPolicyPage() {
   return (
     <div className="policy-page">
+      <SEO
+        title="Shipping Policy & Delivery Timelines | Brother’s Outfit Gallery"
+        description="Learn about Brother’s Outfit Gallery shipping terms, dispatch timelines, Delhivery courier tracking, and doorstep delivery across 19,000+ pin codes in India."
+        canonical="/shipping"
+      />
       <div className="policy-container">
         <div className="policy-header">
           <span className="policy-label">DELIVERY INFORMATION</span>

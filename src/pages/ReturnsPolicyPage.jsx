@@ -1,13 +1,19 @@
 import React from 'react';
+import SEO from '../components/common/SEO';
 import './PolicyPages.css';
 
 export default function ReturnsPolicyPage() {
   return (
     <div className="policy-page">
+      <SEO
+        title="Returns & Exchange Policy | Brother’s Outfit Gallery"
+        description="Understand Brother’s Outfit Gallery's 48-hour replacement and exchange terms for damaged, defective, or incorrect items with Delhivery reverse pickup."
+        canonical="/returns"
+      />
       <div className="policy-container">
         <div className="policy-header">
           <span className="policy-label">PURCHASE CONFIDENCE</span>
-          <h1 className="policy-title">Returns & Exchange Policy</h1>
+          <h1 className="policy-title">Exchange Policy</h1>
           <p className="policy-updated">Last Updated: September 2026</p>
         </div>
 

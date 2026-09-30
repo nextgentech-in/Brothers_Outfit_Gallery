@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getOrderById } from '../services/orderService';
+import SEO from '../components/common/SEO';
 import './OrderConfirmationPage.css';
 
 export default function OrderConfirmationPage() {
@@ -24,6 +25,7 @@ export default function OrderConfirmationPage() {
 
   return (
     <div className="order-confirm-container">
+      <SEO title="Order Confirmed | Brother’s Outfit Gallery" noindex={true} />
       <div className="order-confirm-card">
         <div className="success-icon">✓</div>
         <h1>ORDER CONFIRMED!</h1>

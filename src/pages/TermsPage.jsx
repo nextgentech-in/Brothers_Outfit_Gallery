@@ -1,9 +1,15 @@
 import React from 'react';
+import SEO from '../components/common/SEO';
 import './PolicyPages.css';
 
 export default function TermsPage() {
   return (
     <div className="policy-page">
+      <SEO
+        title="Terms & Conditions | Brother’s Outfit Gallery"
+        description="Review the official Terms and Conditions of service, purchases, and website use for Brother’s Outfit Gallery, Himatnagar, Gujarat."
+        canonical="/terms"
+      />
       <div className="policy-container">
         <div className="policy-header">
           <span className="policy-label">LEGAL AGREEMENT</span>

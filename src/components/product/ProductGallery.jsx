@@ -4,7 +4,7 @@ import ImageLightbox from './ImageLightbox';
 import { optimizeImage } from '../../utils/imageUtils';
 import './ProductGallery.css';
 
-export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors, isOutOfStock = false }) {
+export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors, isOutOfStock = false, productName = 'Men’s Wear' }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef(null);
@@ -121,10 +121,10 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
                 key={idx} 
                 className={`thumbnail-btn ${idx === safeCurrentIndex ? 'active' : ''}`}
                 onClick={() => setCurrentIndex(idx)}
-                aria-label={`View image ${idx + 1}`}
+                aria-label={`View ${productName} image ${idx + 1}`}
                 title={imgColor ? `Color: ${imgColor}` : `View image ${idx + 1}`}
               >
-                <img loading="lazy" decoding="async" src={optimizeImage(thumbUrl, 240)} alt={`Thumbnail ${idx + 1}`} />
+                <img loading="lazy" decoding="async" src={optimizeImage(thumbUrl, 240)} alt={`${productName} thumbnail ${idx + 1}`} />
               </button>
             );
           })}
@@ -142,7 +142,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
             width: typeof window !== 'undefined' && window.innerWidth < 768 ? 1200 : 1600,
             quality: 92
           })} 
-          alt={`Product view ${safeCurrentIndex + 1}`} 
+          alt={`${productName} - ${selectedColor || 'Classic'} View ${safeCurrentIndex + 1} | Brother’s Outfit Gallery`} 
           onClick={() => setLightboxOpen(true)}
         />
 

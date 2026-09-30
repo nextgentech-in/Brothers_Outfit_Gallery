@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import SEO from '../components/common/SEO';
 import './AuthPage.css';
 
 export default function CompleteProfile() {
@@ -76,6 +77,7 @@ export default function CompleteProfile() {
 
   return (
     <div className="auth-page">
+      <SEO title="Complete Profile | Brother’s Outfit Gallery" noindex={true} />
       <div className="auth-split">
         <div className="auth-content">
           <div className="auth-box" style={{ maxWidth: '600px', margin: '40px auto' }}>

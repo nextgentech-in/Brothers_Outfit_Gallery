@@ -252,6 +252,18 @@
   color: #15803d;
 }
 
+.track-status-pill.status-out-for-delivery {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  animation: ofdGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes ofdGlow {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  100% { box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.25); }
+}
+
 .track-status-pill.status-cancelled {
   background: #fef2f2;
   color: #b91c1c;
@@ -261,6 +273,120 @@
   font-size: 12.5px;
   font-weight: 600;
   color: #475569;
+}
+
+/* Out for Delivery Live Banner */
+.track-ofd-banner {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-bottom: 2px solid #fde68a;
+  padding: 18px 24px;
+}
+
+.track-ofd-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.track-ofd-live-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #b45309;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.track-ofd-beacon {
+  width: 7px;
+  height: 7px;
+  background: #fef08a;
+  border-radius: 50%;
+  display: inline-block;
+  animation: ofdBeaconPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ofdBeaconPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
+}
+
+.track-ofd-eta-chip {
+  font-size: 12px;
+  font-weight: 800;
+  color: #92400e;
+  background: #fef9c3;
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid #fef08a;
+}
+
+.track-ofd-banner-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.track-ofd-icon-bubble {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  background: #ffffff;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 4px 10px rgba(180, 83, 9, 0.12);
+  border: 1px solid #fde68a;
+}
+
+.track-ofd-details {
+  flex: 1;
+}
+
+.track-ofd-heading {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #78350f;
+}
+
+.track-ofd-subtext {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #92400e;
+  line-height: 1.45;
+}
+
+.track-ofd-guidelines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ofd-guide-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid #fde68a;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #78350f;
+}
+
+.guide-icon {
+  font-size: 12px;
 }
 
 /* Stepper */
@@ -415,6 +541,18 @@
   border: 1px solid #bbf7d0;
 }
 
+.delhivery-ofd-tag {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid #fde68a;
+  animation: ofdGlow 2s ease-in-out infinite alternate;
+}
+
 .delhivery-actions-group {
   display: flex;
   align-items: center;
@@ -459,6 +597,97 @@
 
 .btn-delhivery-live:hover {
   background: #15803d;
+}
+
+/* Live Scans History */
+.track-scans-summary {
+  background: #f8fafc;
+  padding: 14px 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.track-scans-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.scans-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.scans-count {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.track-scans-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scan-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  padding-left: 2px;
+}
+
+.scan-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.scan-feed-item.is-latest .scan-bullet {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+}
+
+.scan-content {
+  flex: 1;
+  background: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.scan-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #0f172a;
+}
+
+.scan-latest-chip {
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.scan-location-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 3px;
 }
 
 .track-delhivery-pending {

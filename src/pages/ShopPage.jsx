@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { getShopProducts, isProductInStock } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
+import SEO from '../components/common/SEO';
 import './ShopPage.css';
 
 const CATEGORIES = ['All', 'Kurta', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
@@ -271,13 +272,87 @@ export default function ShopPage() {
     // Optional: could implement a toast notification here later
   };
 
+  // Dynamic SEO Computation
+  const activeCategory = category && category !== 'All' ? category : null;
+  const isSearchActive = Boolean(debouncedSearch && debouncedSearch.trim());
+
+  const seoTitle = useMemo(() => {
+    if (isSearchActive) return `Search: "${debouncedSearch.trim()}" | Brother’s Outfit Gallery`;
+    if (activeCategory === 'Kurta') return "Men’s Designer Kurtas & Ethnic Wear | Brother’s Outfit Gallery";
+    if (activeCategory === 'Shirts') return "Men's Casual, Formal & Linen Shirts | Brother’s Outfit Gallery";
+    if (activeCategory === 'T-Shirts') return "Men's Oversized, Polo & Graphic T-Shirts | Brother’s Outfit";
+    if (activeCategory === 'Jeans') return "Men’s Jeans: Baggy, Slim & Straight Fits | Brother’s Outfit Gallery";
+    if (activeCategory === 'Trousers') return "Men's Trousers, Chinos & Cargo Pants | Brother’s Outfit Gallery";
+    if (activeCategory === 'Ethnic Wear') return "Men’s Festive Ethnic Wear & Kurtas | Brother’s Outfit Gallery";
+    if (activeCategory) return `Men's ${activeCategory} Collection | Brother’s Outfit Gallery`;
+    return "Men's Fashion & Clothing Collection | Brother’s Outfit Gallery";
+  }, [activeCategory, isSearchActive, debouncedSearch]);
+
+  const seoDescription = useMemo(() => {
+    if (activeCategory === 'Kurta') return "Shop men's designer kurtas online. Explore Lakhnavi embroidery, printed cotton, and festive ethnic wear crafted for celebrations. Express delivery across India.";
+    if (activeCategory === 'Shirts') return "Upgrade your wardrobe with stylish casual, formal, printed, and linen shirts for men. Superior comfort and tailored fits. Shop online with fast shipping.";
+    if (activeCategory === 'T-Shirts') return "Shop trendy oversized, drop-shoulder, polo, and graphic tees for men. Premium 220+ GSM heavy cotton fabric designed for streetwear comfort.";
+    if (activeCategory === 'Jeans') return "Explore premium men's jeans in slim, straight, baggy, and relaxed fits. Durable stretch denim crafted for daily style. Order online today.";
+    if (activeCategory === 'Trousers') return "Shop smart chinos, functional utility cargo pants, and formal trousers for men. Tailored fits with stretch comfort. Fast delivery across India.";
+    if (activeCategory) return `Discover our curated men's ${activeCategory} collection at Brother’s Outfit Gallery. Premium craftsmanship, tailored fits, and fast pan-India express shipping.`;
+    return "Explore our complete menswear catalog. Shop casual shirts, oversized t-shirts, ethnic kurtas & jeans crafted for comfort. Fast express delivery across India.";
+  }, [activeCategory]);
+
+  const displayH1 = useMemo(() => {
+    if (isSearchActive) return `Search Results for "${debouncedSearch.trim()}"`;
+    if (activeCategory === 'Kurta') return "Men's Designer Kurtas & Ethnic Wear";
+    if (activeCategory === 'Shirts') return "Men's Casual, Formal & Linen Shirts";
+    if (activeCategory === 'T-Shirts') return "Men's T-Shirts & Casual Streetwear";
+    if (activeCategory === 'Jeans') return "Men's Jeans & Denim Pants";
+    if (activeCategory === 'Trousers') return "Men's Trousers, Chinos & Cargos";
+    if (activeCategory === 'Ethnic Wear') return "Men's Festive Ethnic Wear Collection";
+    if (activeCategory) return `Men's ${activeCategory} Collection`;
+    return "Men's Clothing & Style Collection";
+  }, [activeCategory, isSearchActive, debouncedSearch]);
+
+  const displaySubtitle = useMemo(() => {
+    if (activeCategory === 'Kurta') return "Authentic Lakhnavi embroidery, printed cotton, and festive silhouettes tailored for celebrations and everyday elegance.";
+    if (activeCategory === 'Shirts') return "From sharp corporate formals and crisp linens to relaxed printed casuals crafted for all-day comfort.";
+    if (activeCategory === 'T-Shirts') return "Heavyweight 220+ GSM cotton, drop-shoulder oversized cuts, and classic polos designed for modern streetwear.";
+    if (activeCategory === 'Jeans') return "Engineered stretch denim in baggy, slim, and straight fits for durable everyday style.";
+    if (activeCategory) return `Explore handpicked ${activeCategory} crafted with premium fabrics and tailored for a modern fit.`;
+    return "Discover our latest menswear collection curated for confidence, fit, and effortless individuality.";
+  }, [activeCategory]);
+
+  const canonicalUrl = useMemo(() => {
+    if (isSearchActive) return '/shop';
+    if (activeCategory) return `/shop?category=${encodeURIComponent(activeCategory)}`;
+    return '/shop';
+  }, [activeCategory, isSearchActive]);
+
+  const collectionSchema = useMemo(() => {
+    return {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": displayH1,
+      "description": seoDescription,
+      "url": `https://www.brothersoutfitgallery.com${canonicalUrl}`,
+      "isPartOf": {
+        "@type": "WebSite",
+        "@id": "https://www.brothersoutfitgallery.com/#website"
+      }
+    };
+  }, [displayH1, seoDescription, canonicalUrl]);
+
   return (
     <div className="shop-page">
+      <SEO
+        title={seoTitle}
+        description={seoDescription}
+        canonical={canonicalUrl}
+        noindex={isSearchActive}
+        jsonLd={collectionSchema}
+      />
       {/* Header */}
       <div className="shop-header">
         <span className="shop-header__label">COLLECTION</span>
-        <h1 className="shop-header__title">Shop All</h1>
-        <p className="shop-header__subtitle">Discover our latest menswear collection.</p>
+        <h1 className="shop-header__title">{displayH1}</h1>
+        <p className="shop-header__subtitle">{displaySubtitle}</p>
       </div>
 
       {/* Controls */}

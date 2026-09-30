@@ -234,6 +234,8 @@ export default function AdminOrders() {
     setActiveTracking(trackingData);
     if (trackingData?.isDelivered) {
       setOrders(prev => prev.map(o => o.waybill === waybill ? { ...o, status: 'Delivered', shipmentStatus: 'DELIVERED', deliveredAt: trackingData.deliveredAt } : o));
+    } else if (trackingData?.isOutOfDelivery || trackingData?.status === 'Out for Delivery' || trackingData?.shipmentStatus === 'OUT_FOR_DELIVERY') {
+      setOrders(prev => prev.map(o => o.waybill === waybill ? { ...o, status: 'Out for Delivery', shipmentStatus: 'OUT_FOR_DELIVERY' } : o));
     }
   };
 
@@ -276,6 +278,7 @@ export default function AdminOrders() {
           <option value="ALL">All Statuses</option>
           <option value="Processing">Processing</option>
           <option value="Shipped">Shipped</option>
+          <option value="Out for Delivery">Out for Delivery</option>
           <option value="Delivered">Delivered</option>
           <option value="Cancelled">Cancelled</option>
         </select>
@@ -423,6 +426,7 @@ export default function AdminOrders() {
                   >
                     <option value="Processing">Processing</option>
                     <option value="Shipped">Shipped</option>
+                    <option value="Out for Delivery">Out for Delivery</option>
                     <option value="Delivered">Delivered</option>
                     <option value="Cancelled">Cancelled</option>
                   </select>
@@ -622,6 +626,7 @@ export default function AdminOrders() {
                       >
                         <option value="Processing">Processing</option>
                         <option value="Shipped">Shipped</option>
+                        <option value="Out for Delivery">Out for Delivery</option>
                         <option value="Delivered">Delivered</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
@@ -902,7 +907,11 @@ export default function AdminOrders() {
                 </div>
                 <div>
                   <span className="meta-label">Status:</span>
-                  <strong style={{ color: '#16a34a' }}>{activeTracking.status}</strong>
+                  <strong style={{ 
+                    color: activeTracking.isDelivered ? '#16a34a' : (activeTracking.isOutOfDelivery || activeTracking.status === 'Out for Delivery' ? '#d97706' : '#2563eb') 
+                  }}>
+                    {activeTracking.isOutOfDelivery || activeTracking.status === 'Out for Delivery' ? '⚡ Out for Delivery Today' : activeTracking.status}
+                  </strong>
                 </div>
                 <div>
                   <span className="meta-label">Location:</span>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useCart } from '../context/CartContext';
 import Hero from '../components/Hero';
 import TrendingCarousel from '../components/TrendingCarousel';
@@ -7,7 +7,75 @@ import SaleProductCard from '../components/SaleProductCard';
 import ProductCard from '../components/ProductCard';
 import TrustBar from '../components/TrustBar';
 import ShopByCategory from '../components/ShopByCategory';
+import SEO from '../components/common/SEO';
 import './HomePage.css';
+
+const HOME_SCHEMA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.brothersoutfitgallery.com/#organization",
+      "name": "Brother’s Outfit Gallery",
+      "url": "https://www.brothersoutfitgallery.com/",
+      "logo": "https://www.brothersoutfitgallery.com/favicon.svg",
+      "email": "brothersoutfitgallery@gmail.com",
+      "telephone": "+918460233020",
+      "sameAs": [
+        "https://maps.app.goo.gl/LdPv9pHvtFU8cj4E8",
+        "https://www.instagram.com/brothersoutfitgallery/",
+        "https://www.facebook.com/share/1Hz6w71LC8/"
+      ]
+    },
+    {
+      "@type": ["ClothingStore", "LocalBusiness"],
+      "@id": "https://www.brothersoutfitgallery.com/#localbusiness",
+      "name": "Brother’s Outfit Gallery",
+      "image": "https://www.brothersoutfitgallery.com/images/store-real-1.jpeg",
+      "url": "https://www.brothersoutfitgallery.com/",
+      "telephone": "+918460233020",
+      "priceRange": "₹₹",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "FF-57, Pratham Square, Sahakari Jin Road",
+        "addressLocality": "Himatnagar",
+        "addressRegion": "Gujarat",
+        "postalCode": "383001",
+        "addressCountry": "IN"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 23.5875977,
+        "longitude": 72.9697925
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          "opens": "10:00",
+          "closes": "20:00"
+        }
+      ],
+      "parentOrganization": {
+        "@id": "https://www.brothersoutfitgallery.com/#organization"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.brothersoutfitgallery.com/#website",
+      "url": "https://www.brothersoutfitgallery.com/",
+      "name": "Brother’s Outfit Gallery",
+      "publisher": {
+        "@id": "https://www.brothersoutfitgallery.com/#organization"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.brothersoutfitgallery.com/shop?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+};
 
 export default function HomePage() {
   const [saleProducts, setSaleProducts] = useState([]);
@@ -117,6 +185,12 @@ export default function HomePage() {
 
   return (
     <div className="home-page">
+      <SEO
+        title="Brother’s Outfit Gallery | Men's Clothing Store in Himatnagar"
+        description="Shop premium men's clothing in Himatnagar. Discover trendy shirts, festive kurtas, denims, jeans & accessories. Free delivery on orders over ₹999."
+        canonical="/"
+        jsonLd={HOME_SCHEMA}
+      />
       {/* 1. Hero */}
       {homepageConfig.showHero !== false && <Hero heroConfig={homepageConfig?.hero} />}
 

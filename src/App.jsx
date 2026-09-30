@@ -57,6 +57,7 @@ const ReturnsPolicyPage = lazyWithRetry(() => import('./pages/ReturnsPolicyPage'
 const PrivacyPolicyPage = lazyWithRetry(() => import('./pages/PrivacyPolicyPage'));
 const TermsPage = lazyWithRetry(() => import('./pages/TermsPage'));
 const TrackOrderPage = lazyWithRetry(() => import('./pages/TrackOrderPage'));
+const NotFoundPage = lazyWithRetry(() => import('./pages/NotFoundPage'));
 
 // Auth Pages (Lazy)
 const Login = lazyWithRetry(() => import('./pages/Login'));
@@ -371,6 +372,7 @@ function AppContent() {
             } />
 
             <Route path="/product/:slug" element={<ProductPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Admin Routes */}

@@ -54,6 +54,12 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
+
+  // Vercel Serverless path normalizer: restore original path if rewritten to /api
+  const forwardedPath = req.headers['x-matched-path'] || req.headers['x-rewrite-url'] || req.headers['x-original-url'];
+  if ((req.url === '/api' || req.url === '/api/') && forwardedPath && forwardedPath.startsWith('/api')) {
+    req.url = forwardedPath;
+  }
   next();
 });
 
@@ -1214,7 +1220,11 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
 app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 30)) return;
 
-  const rawQuery = String(req.body?.query || req.body?.orderId || '').trim();
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { body = {}; }
+  }
+  const rawQuery = String(body?.query || body?.orderId || '').trim();
   if (!rawQuery) {
     return res.status(400).json({ error: 'Please enter an Order ID, Mobile Number, or Waybill tracking number.' });
   }
@@ -1294,7 +1304,12 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
         (order.status === 'Delivered' ? INTERNAL_STATUS.DELIVERED : (order.status === 'Shipped' ? INTERNAL_STATUS.SHIPPED : INTERNAL_STATUS.PLACED));
 
       const isDelivered = effectiveShipmentStatus === INTERNAL_STATUS.DELIVERED || String(order.status || '').toLowerCase() === 'delivered';
-      const effectiveStatus = isDelivered ? 'Delivered' : (order.status || 'Processing');
+      const isOutOfDelivery = effectiveShipmentStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY || String(order.status || '').toLowerCase().includes('out for delivery');
+      const effectiveStatus = isDelivered 
+        ? 'Delivered' 
+        : (isOutOfDelivery 
+            ? 'Out for Delivery' 
+            : (liveTracking?.status || order.status || 'Processing'));
       const deliveredAt = liveTracking?.deliveredAt || 
         (order.deliveredAt?.toDate ? order.deliveredAt.toDate().toISOString() : (typeof order.deliveredAt === 'string' ? order.deliveredAt : null));
       const timelineStep = liveTracking?.timelineStep || calculateTimelineStep(effectiveShipmentStatus);
@@ -1309,6 +1324,10 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
         latestScan: liveTracking?.latestScan || order.latestScan || null,
         timelineStep: timelineStep,
         isDelivered: isDelivered,
+        isOutOfDelivery: isOutOfDelivery,
+        expectedDeliveryDate: liveTracking?.expectedDeliveryDate || order.expectedDeliveryDate || null,
+        statusLocation: liveTracking?.statusLocation || order.statusLocation || null,
+        scans: liveTracking?.scans || order.scans || [],
         waybill: order.waybill || null,
         courier: order.courier || 'Delhivery Express',
         trackingUrl: order.trackingUrl || (order.waybill ? `https://www.delhivery.com/track/package/${order.waybill}` : null),
@@ -1359,10 +1378,15 @@ async function getDelhiveryAuthToken() {
     return cachedDelhiveryToken;
   }
 
+  const clientSecret = (process.env.D1_CLIENT_SECRET || '').trim();
+  if (!clientSecret) {
+    // If no client secret is configured, skip outbound OAuth call immediately
+    return null;
+  }
+
   const authUrl = process.env.D1_AUTH_URL || 'https://ucp-auth.delhivery.com/holyknight';
   const realm = process.env.D1_REALM || 'ucp-X4KJ9MPMCUTI';
   const clientId = process.env.D1_CLIENT_ID || 'ucp-service-cli';
-  const clientSecret = process.env.D1_CLIENT_SECRET || '';
 
   const tokenEndpoint = `${authUrl}/realms/${realm}/protocol/openid-connect/token`;
 
@@ -1372,11 +1396,16 @@ async function getDelhiveryAuthToken() {
     params.append('client_id', clientId);
     params.append('client_secret', clientSecret);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second max timeout
+
     const response = await fetch(tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.warn('Delhivery Auth response status:', response.status);
@@ -1388,7 +1417,7 @@ async function getDelhiveryAuthToken() {
     tokenExpiryTime = Date.now() + (data.expires_in || 300) * 1000;
     return cachedDelhiveryToken;
   } catch (err) {
-    console.error('Error acquiring Delhivery Auth Token:', err.message);
+    console.warn('Delhivery Auth Token note:', err.message);
     return null;
   }
 }
@@ -1461,9 +1490,27 @@ async function syncDelhiveryTrackingForWaybill(waybill, options = {}) {
   }
 
   // Fetch live tracking from Delhivery One / Delhivery Express
-  const apiKey = process.env.DELHIVERY_API_KEY;
+  const apiKey = (process.env.DELHIVERY_API_KEY || '').trim();
   const token = await getDelhiveryAuthToken();
-  const cmsClient = process.env.D1_CLIENT_CMS || '';
+  const cmsClient = (process.env.D1_CLIENT_CMS || '').trim();
+
+  // If no Delhivery credentials are provided, return current order state gracefully without attempting unauthenticated request
+  if (!apiKey && !token) {
+    return {
+      waybill: cleanWaybill,
+      status: currentDbStatus,
+      shipmentStatus: currentShipmentStatus,
+      rawProviderStatus: currentOrderData?.rawProviderStatus || currentDbStatus,
+      rawProviderStatusCode: currentOrderData?.rawProviderStatusCode || null,
+      deliveredAt: currentOrderData?.deliveredAt?.toDate ? currentOrderData.deliveredAt.toDate().toISOString() : (typeof currentOrderData?.deliveredAt === 'string' ? currentOrderData.deliveredAt : null),
+      timelineStep: calculateTimelineStep(currentShipmentStatus),
+      isDelivered: currentShipmentStatus === INTERNAL_STATUS.DELIVERED,
+      scans: currentOrderData?.latestScan ? [currentOrderData.latestScan] : [],
+      statusLocation: currentOrderData?.latestScan?.location || 'Central Logistics Hub',
+      courier: currentOrderData?.courier || 'Delhivery Express',
+      trackingUrl: currentOrderData?.trackingUrl || `https://www.delhivery.com/track/package/${cleanWaybill}`
+    };
+  }
 
   const headers = {};
   if (apiKey) {
@@ -1535,7 +1582,7 @@ async function syncDelhiveryTrackingForWaybill(waybill, options = {}) {
           }
           if ((!rawStatus || rawStatus === 'In Transit') && scans[0]?.title) {
             const scanTitle = scans[0].title;
-            if (scanTitle.toLowerCase().includes('deliver')) {
+            if (scanTitle.toLowerCase().includes('deliver') || scanTitle.toLowerCase().includes('out for delivery') || scanTitle.toLowerCase().includes('dispatched')) {
               rawStatus = scanTitle;
             }
           }
@@ -1586,7 +1633,7 @@ async function syncDelhiveryTrackingForWaybill(waybill, options = {}) {
           updateData.deliveredAt = finalDeliveredAt;
         } else if (finalShipmentStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY) {
           if (currentOrderData?.status !== 'Delivered') {
-            updateData.status = 'Shipped';
+            updateData.status = 'Out for Delivery';
           }
         } else if (finalShipmentStatus === INTERNAL_STATUS.CANCELLED) {
           updateData.status = 'Cancelled';
@@ -1616,6 +1663,7 @@ async function syncDelhiveryTrackingForWaybill(waybill, options = {}) {
     waybill: cleanWaybill,
     status: displayStatus,
     shipmentStatus: finalShipmentStatus,
+    isOutOfDelivery: finalShipmentStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY,
     rawProviderStatus: rawStatus || finalShipmentStatus,
     rawProviderStatusCode: rawCode || null,
     statusLocation,

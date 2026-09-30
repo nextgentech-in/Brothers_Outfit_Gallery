@@ -3,7 +3,36 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { getNewArrivals } from '../services/productService';
 import ProductCard from '../components/ProductCard';
+import SEO from '../components/common/SEO';
 import './NewArrivalsPage.css';
+
+const NEW_ARRIVALS_SCHEMA = [
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "New Arrivals | Brother’s Outfit Gallery",
+    "description": "Explore the newest arrivals in men's fashion, streetwear, casuals, and formal clothing at Brother’s Outfit Gallery in Himatnagar, Gujarat.",
+    "url": "https://www.brothersoutfitgallery.com/new-arrivals"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.brothersoutfitgallery.com/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "New Arrivals",
+        "item": "https://www.brothersoutfitgallery.com/new-arrivals"
+      }
+    ]
+  }
+];
 
 export default function NewArrivalsPage() {
   const [newArrivals, setNewArrivals] = useState([]);
@@ -40,12 +69,17 @@ export default function NewArrivalsPage() {
 
   return (
     <div className="new-arrivals-page">
+      <SEO
+        title="New Arrivals - Latest Men's Clothing | Brother’s Outfit Gallery"
+        description="Explore the latest men's fashion arrivals at Brother’s Outfit Gallery. Discover new shirts, t-shirts, denim jeans, and streetwear styles in Himatnagar, Gujarat."
+        canonical="/new-arrivals"
+        schema={NEW_ARRIVALS_SCHEMA}
+      />
       {/* Header */}
       <div className="na-header">
         <span className="na-header__label">JUST DROPPED</span>
         <h1 className="na-header__title">NEW ARRIVALS</h1>
-        <p className="na-header__subtitle">Fresh styles stock added at BROTHERS OUTFIT GALLARY.</p>
-
+        <p className="na-header__subtitle">Fresh styles and newest menswear additions at Brother’s Outfit Gallery.</p>
       </div>
 
       {/* Product Grid or Empty State */}

@@ -3,33 +3,70 @@ import { Link } from 'react-router-dom';
 import { businessInfo } from '../config/business';
 import PhotoGallery from '../components/PhotoGallery';
 import TestimonialMarquee from '../components/TestimonialMarquee';
+import SEO from '../components/common/SEO';
 import './AboutPage.css';
 
-export default function AboutPage() {
-
-  // Inject explicit LD+JSON structured data strictly aligned with known local business data
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.type = 'application/ld+json';
-    script.innerHTML = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": ["LocalBusiness", "ClothingStore"],
-      "name": businessInfo.name,
-      "address": businessInfo.address,
-      "telephone": businessInfo.phone,
-      "url": window.location.origin,
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": businessInfo.coordinates?.lat || 23.5875977,
-        "longitude": businessInfo.coordinates?.lng || 72.9697925
+const ABOUT_SCHEMA = [
+  {
+    "@context": "https://schema.org",
+    "@type": ["ClothingStore", "LocalBusiness"],
+    "name": "Brother’s Outfit Gallery",
+    "alternateName": "Brothers Outfit Gallery Himatnagar",
+    "description": "Brother’s Outfit Gallery is Himatnagar's destination for modern men's fashion, premium shirts, t-shirts, denim jeans, trousers, and accessories.",
+    "url": "https://www.brothersoutfitgallery.com/about",
+    "telephone": businessInfo.phone || "+91 84602 33020",
+    "email": businessInfo.email || "brothersoutfitgallery@gmail.com",
+    "priceRange": "₹₹",
+    "image": "https://www.brothersoutfitgallery.com/images/store-real-1.jpeg",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "FF-57, Pratham Square, Sahakari Jin Road",
+      "addressLocality": "Himatnagar",
+      "addressRegion": "Gujarat",
+      "postalCode": "383001",
+      "addressCountry": "IN"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": businessInfo.coordinates?.lat || 23.5875977,
+      "longitude": businessInfo.coordinates?.lng || 72.9697925
+    },
+    "openingHoursSpecification": [
+      {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        "opens": "10:00",
+        "closes": "20:00"
+      }
+    ],
+    "sameAs": [
+      businessInfo.googleMapsUrl || "https://maps.app.goo.gl/LdPv9pHvtFU8cj4E8",
+      "https://www.instagram.com/brothers_outfit_gallery"
+    ]
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.brothersoutfitgallery.com/"
       },
-      "sameAs": [businessInfo.googleMapsUrl]
-    });
-    document.head.appendChild(script);
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "About Us",
+        "item": "https://www.brothersoutfitgallery.com/about"
+      }
+    ]
+  }
+];
 
-    return () => {
-      document.head.removeChild(script);
-    };
+export default function AboutPage() {
+  useEffect(() => {
+    window.scrollTo(0, 0);
   }, []);
 
   const storeImages = [
@@ -79,6 +116,13 @@ export default function AboutPage() {
 
   return (
     <div className="about-page">
+      <SEO
+        title="About Us | Brother’s Outfit Gallery - Men's Fashion Store Himatnagar"
+        description="Visit Brother’s Outfit Gallery at FF-57, Pratham Square, Himatnagar, Gujarat. Discover premium shirts, jeans, t-shirts, and everyday men's fashion essentials."
+        canonical="/about"
+        ogImage="https://www.brothersoutfitgallery.com/images/store-real-1.jpeg"
+        schema={ABOUT_SCHEMA}
+      />
       {/* 1. Hero Section with Real Store Showcase */}
       <section className="about-hero">
         <div className="about-container">

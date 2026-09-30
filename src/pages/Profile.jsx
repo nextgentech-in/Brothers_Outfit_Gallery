@@ -8,6 +8,7 @@ import { subscribeCustomerExchanges } from '../services/exchangeService';
 import { normalizeShipmentStatus, INTERNAL_STATUS } from '../utils/shipmentStatus';
 import { EXCHANGE_STATUS_METADATA, CUSTOMER_EXCHANGE_STEPS, EXCHANGE_STATUS } from '../utils/exchangeConstants';
 import { getBackendUrl } from '../utils/apiConfig';
+import SEO from '../components/common/SEO';
 import './Profile.css';
 
 const CUSTOMER_CANCEL_REASONS = [
@@ -290,6 +291,7 @@ export default function Profile() {
 
   return (
     <div className="profile-page">
+      <SEO title="My Account | Brother’s Outfit Gallery" noindex={true} />
       <div className="profile-container">
 
         <div className="profile-sidebar">

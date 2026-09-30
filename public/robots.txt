@@ -1,0 +1,31 @@
+# Robots.txt for Brother's Outfit Gallery (https://www.brothersoutfitgallery.com/)
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /product/
+Allow: /new-arrivals
+Allow: /sale
+Allow: /accessories
+Allow: /about
+Allow: /shipping
+Allow: /returns
+Allow: /privacy
+Allow: /terms
+Allow: /images/
+Allow: /assets/
+
+# Block Private, Transactional & User-Specific Routes
+Disallow: /admin
+Disallow: /admin/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order-confirmation/
+Disallow: /profile
+Disallow: /complete-profile
+Disallow: /login
+Disallow: /signup
+Disallow: /track-order/
+Disallow: /*?search=*
+
+# Sitemap Index
+Sitemap: https://www.brothersoutfitgallery.com/sitemap.xml

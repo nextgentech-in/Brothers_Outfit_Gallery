@@ -8,6 +8,7 @@ import { invalidateProductCache } from '../services/productService';
 import { getBackendUrl } from '../utils/apiConfig';
 import AuthModal from '../components/auth/AuthModal';
 import PhoneOtpModal from '../components/checkout/PhoneOtpModal';
+import SEO from '../components/common/SEO';
 import './CheckoutPage.css';
 
 
@@ -496,6 +497,7 @@ export default function CheckoutPage() {
   if (cartItems.length === 0) {
     return (
       <div className="checkout-page-wrapper">
+        <SEO title="Secure Checkout | Brother’s Outfit Gallery" noindex={true} />
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <h2 style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-charcoal, #111111)', letterSpacing: '-0.3px', fontWeight: 700 }}>Your Cart is Empty</h2>
           <button onClick={() => navigate('/shop')} className="btn-continue-shopping" style={{ margin: '20px auto', display: 'inline-block' }}>
@@ -508,6 +510,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="checkout-page-wrapper">
+      <SEO title="Secure Checkout | Brother’s Outfit Gallery" noindex={true} />
       <div className="checkout-page-container">
         <div className="checkout-header">
           <h1>Secure Checkout</h1>

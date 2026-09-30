@@ -1,9 +1,15 @@
 import React from 'react';
+import SEO from '../components/common/SEO';
 import './PolicyPages.css';
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="policy-page">
+      <SEO
+        title="Privacy Policy | Brother’s Outfit Gallery"
+        description="Read the Brother’s Outfit Gallery Privacy Policy to learn how we protect your personal information, manage orders securely, and safeguard your online data."
+        canonical="/privacy-policy"
+      />
       <div className="policy-container">
         <div className="policy-header">
           <span className="policy-label">DATA & SECURITY</span>

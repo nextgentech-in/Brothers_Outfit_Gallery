@@ -3,7 +3,36 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { getSaleProducts } from '../services/productService';
 import SaleProductCard from '../components/SaleProductCard';
+import SEO from '../components/common/SEO';
 import './SalePage.css';
+
+const SALE_SCHEMA = [
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Sale & Offers | Brother’s Outfit Gallery",
+    "description": "Discover limited-time sales, discounts, and exclusive offers on premium men's clothing at Brother’s Outfit Gallery.",
+    "url": "https://www.brothersoutfitgallery.com/sale"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.brothersoutfitgallery.com/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Sale",
+        "item": "https://www.brothersoutfitgallery.com/sale"
+      }
+    ]
+  }
+];
 
 export default function SalePage() {
   const [saleProducts, setSaleProducts] = useState([]);
@@ -57,6 +86,12 @@ export default function SalePage() {
 
   return (
     <div className="sale-page">
+      <SEO
+        title="Special Offers & Men's Fashion Sale | Brother’s Outfit Gallery"
+        description="Shop limited-time discounts, offers, and sale prices on men's shirts, t-shirts, jeans, and casuals at Brother’s Outfit Gallery in Himatnagar, Gujarat."
+        canonical="/sale"
+        schema={SALE_SCHEMA}
+      />
       {/* Promotional Hero */}
       <section className="sale-hero">
         <div className="sale-hero__content">

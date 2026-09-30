@@ -4,6 +4,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { optimizeImage } from '../utils/imageUtils';
 import { isClothingProduct, getAvailableProductSizes } from '../utils/productUtils';
+import SEO from '../components/common/SEO';
 import './WishlistPage.css';
 
 export default function WishlistPage() {
@@ -46,6 +47,7 @@ export default function WishlistPage() {
 
   return (
     <div className="wishlist-page">
+      <SEO title="My Wishlist | Brother’s Outfit Gallery" noindex={true} />
       <div className="wishlist-container">
         {/* Header */}
         <div className="wishlist-header">

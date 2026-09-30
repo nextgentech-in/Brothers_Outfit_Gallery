@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { fetchAllActiveProducts, isProductInStock } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
+import SEO from '../components/common/SEO';
 import './AccessoriesPage.css';
 
 const ACCESSORY_CATEGORIES = [
@@ -12,6 +13,34 @@ const ACCESSORY_CATEGORIES = [
   { id: 'Wallets', label: 'Wallets & Bags' },
   { id: 'Caps', label: 'Caps & Hats' },
   { id: 'Perfumes', label: 'Perfumes' },
+];
+
+const ACCESSORIES_SCHEMA = [
+  {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": "Men's Accessories | Brother’s Outfit Gallery",
+    "description": "Discover curated men's fashion accessories including watches, leather belts, wallets, caps, sunglasses, and fragrances at Brother’s Outfit Gallery.",
+    "url": "https://www.brothersoutfitgallery.com/accessories"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.brothersoutfitgallery.com/"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Accessories",
+        "item": "https://www.brothersoutfitgallery.com/accessories"
+      }
+    ]
+  }
 ];
 
 export default function AccessoriesPage() {
@@ -64,6 +93,12 @@ export default function AccessoriesPage() {
 
   return (
     <div className="accessories-page-wrapper">
+      <SEO
+        title="Men's Fashion Accessories - Watches, Belts & Fragrances | Brother’s Outfit Gallery"
+        description="Shop premium men's accessories at Brother’s Outfit Gallery in Himatnagar. Discover quality watches, leather belts, sunglasses, wallets, caps, and fragrances."
+        canonical="/accessories"
+        schema={ACCESSORIES_SCHEMA}
+      />
       {/* Hero Banner */}
       <div className="accessories-hero">
         <div className="accessories-hero-content">

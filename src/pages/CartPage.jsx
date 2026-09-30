@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import CartItemCard from '../components/cart/CartItemCard';
 import OrderSummary from '../components/cart/OrderSummary';
+import SEO from '../components/common/SEO';
 import './CartPage.css';
 
 export default function CartPage() {
@@ -10,6 +11,7 @@ export default function CartPage() {
   if (cartItems.length === 0) {
     return (
       <div className="cart-page-wrapper">
+        <SEO title="Shopping Cart | Brother’s Outfit Gallery" noindex={true} />
         <div className="cart-empty-state">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.2, margin: '0 auto 24px' }}>
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
@@ -26,6 +28,7 @@ export default function CartPage() {
 
   return (
     <div className="cart-page-wrapper">
+      <SEO title="Shopping Cart | Brother’s Outfit Gallery" noindex={true} />
       <div className="cart-page-container">
         <div className="cart-header-block">
           <h1 className="cart-main-heading">Your Cart</h1>

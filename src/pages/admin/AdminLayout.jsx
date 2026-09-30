@@ -4,6 +4,7 @@ import { subscribeAdminNotifications, markAllNotificationsAsRead, markNotificati
 import { AdminUIProvider } from '../../context/AdminUIContext';
 import AdminConfirmModal from '../../components/admin/AdminConfirmModal';
 import AdminToast from '../../components/admin/AdminToast';
+import SEO from '../../components/common/SEO';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
@@ -89,6 +90,7 @@ export default function AdminLayout() {
   ];  return (
     <AdminUIProvider>
       <div className="admin-layout">
+        <SEO title="Admin Portal | Brother’s Outfit Gallery" noindex={true} />
         <AdminToast />
         <AdminConfirmModal />
 

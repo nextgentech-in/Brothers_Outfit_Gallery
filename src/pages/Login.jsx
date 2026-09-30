@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import SEO from '../components/common/SEO';
 import './AuthPage.css';
 
 export default function Login() {
@@ -103,6 +104,7 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <SEO title="Account Login | Brother’s Outfit Gallery" noindex={true} />
       <div className="auth-split">
         <div className="auth-image"></div>
         <div className="auth-content">
