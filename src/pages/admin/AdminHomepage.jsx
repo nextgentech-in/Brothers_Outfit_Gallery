@@ -1083,7 +1083,7 @@ export default function AdminHomepage() {
               No categories matching "{categorySearch}".
             </div>
           ) : (
-            <div style={{
+            <div className="category-admin-grid" style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '14px'
@@ -1098,6 +1098,7 @@ export default function AdminHomepage() {
                 return (
                   <div
                     key={catName}
+                    className="category-admin-card"
                     style={{
                       background: '#fff',
                       borderRadius: '12px',
@@ -1110,7 +1111,7 @@ export default function AdminHomepage() {
                     }}
                   >
                     {/* Live Preview of Category Card (compact 4 in a row matching homepage) */}
-                    <div style={{
+                    <div className="category-admin-preview" style={{
                       position: 'relative',
                       aspectRatio: '1 / 1',
                       maxHeight: '175px',
@@ -1251,8 +1252,8 @@ export default function AdminHomepage() {
                     </div>
 
                     {/* Card Actions */}
-                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="category-admin-actions" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, justifyContent: 'space-between' }}>
+                      <div className="category-admin-action-stack" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {/* Device Upload Button */}
                         <button
                           type="button"
@@ -1274,6 +1275,7 @@ export default function AdminHomepage() {
                             gap: '8px',
                             transition: 'background 0.2s'
                           }}
+                          className="category-admin-upload-btn"
                         >
                           📤 {isCustom ? 'Replace Image' : 'Upload Image'}
                         </button>
@@ -1281,6 +1283,7 @@ export default function AdminHomepage() {
                         {/* URL Input */}
                         <div>
                           <input
+                            className="category-admin-url-input"
                             type="text"
                             value={customImg}
                             onChange={(e) => handleCategoryImageUrlChange(catName, e.target.value)}
@@ -1314,6 +1317,7 @@ export default function AdminHomepage() {
                             cursor: 'pointer',
                             transition: 'all 0.2s'
                           }}
+                          className="category-admin-remove-btn"
                         >
                           🗑️ Remove Custom Image
                         </button>
@@ -1433,6 +1437,7 @@ export default function AdminHomepage() {
                             alignItems: 'center',
                             transition: 'all 0.15s ease'
                           }}
+                          className="category-admin-remove-btn"
                         >
                           <img
                             src={img}

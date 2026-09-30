@@ -11,6 +11,15 @@ const CATEGORY_DISPLAY_ORDER = [
   'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Accessories'
 ];
 
+// Polished local fallbacks keep the storefront useful before every category has an admin upload.
+const CATEGORY_FALLBACK_IMAGES = {
+  Kurta: '/images/category-rail/kurta-cutout.png',
+  Shirts: '/images/category-rail/shirts-cutout-v2.png',
+  'T-Shirts': '/images/category-rail/tshirts-cutout.png',
+  Jeans: '/images/category-rail/jeans-cutout.png',
+  Perfumes: '/images/category-rail/perfumes-cutout.png'
+};
+
 /**
  * Extract the best available image URL from a product.
  * Handles string arrays, object arrays with .url, thumbnailUrl, and legacy .image field.
@@ -88,8 +97,8 @@ export default function ShopByCategory() {
         const categoryEntries = Array.from(allCategoryNames)
           .map(name => {
             const products = categoryMap[name] || [];
-            // Strictly use admin-configured category image (no auto fallback from products)
-            let imageUrl = adminCategoryImages[name] || null;
+            // Prefer the actual product cutout for a catalog-style category rail.
+            let imageUrl = CATEGORY_FALLBACK_IMAGES[name] || getProductImageUrl(products[0]) || adminCategoryImages[name] || null;
             if (!imageUrl) {
               const matchedKey = Object.keys(adminCategoryImages).find(k => k.toLowerCase() === name.toLowerCase());
               if (matchedKey) imageUrl = adminCategoryImages[matchedKey];
@@ -101,7 +110,7 @@ export default function ShopByCategory() {
               productCount: products.length
             };
           })
-          .filter(cat => cat.imageUrl); // Only show categories with valid custom images
+          .filter(cat => cat.imageUrl); // Only show categories that have an image source
 
         // Sort by preferred display order
         categoryEntries.sort((a, b) => {
@@ -140,7 +149,7 @@ export default function ShopByCategory() {
           <div className="sbc-heading-line" aria-hidden="true" />
         </div>
 
-        {/* Category Grid — Full Image Cards */}
+        {/* Horizontally scrollable catalog rail */}
         <div className="sbc-grid" role="list">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
@@ -156,7 +165,7 @@ export default function ShopByCategory() {
                 role="listitem"
                 aria-label={`Shop ${cat.name}`}
               >
-                {/* Full-bleed background image */}
+                {/* Product image */}
                 <img
                   src={cat.imageUrl}
                   alt={`${cat.name} collection`}
@@ -165,9 +174,7 @@ export default function ShopByCategory() {
                   decoding="async"
                   onError={(e) => { e.target.style.opacity = '0'; }}
                 />
-                {/* Gradient overlay for text legibility */}
-                <div className="sbc-card-overlay" aria-hidden="true" />
-                {/* Category label — small text at bottom */}
+                {/* Category label */}
                 <div className="sbc-card-info">
                   <span className="sbc-card-name">{cat.name.toUpperCase()}</span>
                   <span className="sbc-card-count">{cat.productCount} {cat.productCount === 1 ? 'Product' : 'Products'}</span>

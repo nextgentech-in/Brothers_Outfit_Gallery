@@ -144,3 +144,65 @@ input:checked + .slider:before {
   flex-direction: column;
 }
 
+/* Homepage manager — a complete glass surface system for all admin controls. */
+.admin-homepage-mgr .editor-card,
+.admin-homepage-mgr .category-manager-container,
+.admin-homepage-mgr .section-toggle-card,
+.category-admin-card {
+  background: rgba(255, 255, 255, 0.64) !important;
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 14px 32px rgba(54, 47, 39, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.category-manager-container {
+  padding: 24px;
+  border-radius: 20px;
+}
+
+.category-admin-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+  gap: 18px !important;
+}
+
+.category-admin-card {
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
+.category-admin-preview {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.category-admin-actions {
+  padding: 14px !important;
+}
+
+.category-admin-upload-btn {
+  background: linear-gradient(135deg, #202127, #111218) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 7px 15px rgba(16, 17, 20, 0.16) !important;
+}
+
+.category-admin-url-input {
+  background: rgba(255, 255, 255, 0.64) !important;
+  border: 1px solid rgba(148, 138, 121, 0.28) !important;
+  border-radius: 10px !important;
+}
+
+.category-admin-remove-btn {
+  border-radius: 10px !important;
+}
+
+@media (max-width: 600px) {
+  .category-manager-container { padding: 14px; border-radius: 16px; }
+  .category-admin-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
+  .category-admin-card { display: grid !important; grid-template-columns: 132px minmax(0, 1fr); }
+  .category-admin-preview { aspect-ratio: auto !important; max-height: none !important; min-height: 174px; }
+  .category-admin-actions { min-width: 0; padding: 12px !important; }
+  .category-admin-upload-btn { padding: 10px 8px !important; font-size: 12px !important; }
+  .category-admin-url-input { font-size: 11px !important; }
+}
+

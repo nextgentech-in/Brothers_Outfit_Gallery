@@ -2,7 +2,7 @@
 .hero {
   position: relative;
   width: 100%;
-  height: 90vh;
+  height: min(90vh, 850px);
   min-height: 600px;
   overflow: hidden;
   display: flex;
@@ -43,6 +43,14 @@
   );
 }
 
+.hero__image-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.14), transparent 32%, rgba(198, 163, 104, 0.1));
+}
+
 /* Content */
 .hero__content {
   position: relative;
@@ -55,6 +63,12 @@
 
 .hero__text {
   max-width: 600px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Eyebrow */
@@ -69,7 +83,7 @@
   margin-bottom: 20px;
   padding: 8px 18px;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  border-radius: var(--radius-full);
   opacity: 0;
   transform: translateY(20px);
   transition: opacity 0.8s ease 0.3s, transform 0.8s ease 0.3s;
@@ -92,6 +106,7 @@
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   color: #fff;
+  text-shadow: 0 3px 22px rgba(0, 0, 0, 0.45);
   margin: 0 0 24px;
   opacity: 0;
   transform: translateY(30px);
@@ -109,6 +124,7 @@
   font-size: 16px;
   line-height: 1.7;
   color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.48);
   margin-bottom: 40px;
   max-width: 440px;
   opacity: 0;
@@ -148,13 +164,13 @@
   letter-spacing: 2px;
   text-transform: uppercase;
   padding: 16px 36px;
-  border-radius: 2px;
+  border-radius: var(--radius-full);
   transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .hero__btn--primary {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
   border: 1.5px solid rgba(255, 255, 255, 0.6);
 }
@@ -193,7 +209,7 @@
   overflow: hidden;
   font-weight: 700;
   letter-spacing: 1.5px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.36);
 }
 
 .hero__btn--sale:hover {
@@ -334,6 +350,7 @@
 
   .hero__text {
     max-width: 100%;
+    padding: 0;
   }
 
   .hero__heading {
@@ -369,6 +386,7 @@
   .hero__content {
     padding: 24px 20px 40px;
   }
+
 
   .hero__actions {
     flex-direction: column;

@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .sbc-section {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.3);
   padding: 72px 0 80px;
   border-bottom: 1px solid rgba(217, 211, 199, 0.5);
 }
@@ -44,14 +44,14 @@
   margin-top: 14px;
   width: 100%;
   height: 1.5px;
-  background: linear-gradient(90deg, var(--color-charcoal, #111111) 0%, var(--color-charcoal, #111111) 30%, rgba(217, 211, 199, 0.5) 100%);
+  background: linear-gradient(90deg, var(--color-accent-gold, #B88A2E) 0%, rgba(184, 138, 46, 0.45) 30%, rgba(217, 211, 199, 0.15) 100%);
 }
 
 /* ── Grid — 4 in One Row on Desktop with Flush Edges ── */
 .sbc-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0;
+  gap: 14px;
 }
 
 /* ── Card — Compact Square Ratio (1:1) Reduced Size on Desktop ── */
@@ -59,13 +59,14 @@
   position: relative;
   display: block;
   aspect-ratio: 1 / 1;
-  border-radius: 0;
+  border-radius: var(--radius-md);
   overflow: hidden;
   text-decoration: none;
   color: #ffffff;
   cursor: pointer;
   background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow: 0 12px 28px rgba(54, 47, 39, 0.11);
 }
 
 .sbc-card-bg {
@@ -472,4 +473,150 @@
   .sbc-skeleton-shimmer::after {
     animation: none;
   }
+}
+
+/* ── Catalog rail redesign ─────────────────────────────────────────────── */
+.sbc-section {
+  padding: 88px 0 84px;
+  background: rgba(255, 255, 255, 0.26);
+  overflow: hidden;
+}
+
+.sbc-container {
+  max-width: none;
+  padding: 0;
+}
+
+.sbc-heading {
+  margin: 0 auto 38px;
+  max-width: 1400px;
+  padding: 0 48px;
+}
+
+.sbc-heading-eyebrow {
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--color-charcoal, #111111);
+  letter-spacing: -0.8px;
+}
+
+.sbc-heading-title {
+  font-size: clamp(34px, 4vw, 52px);
+  line-height: 0.96;
+  letter-spacing: -2.4px;
+}
+
+.sbc-heading-line {
+  width: min(390px, 100%);
+  height: 3px;
+  margin-top: 20px;
+  background: #c79b46;
+}
+
+.sbc-grid {
+  display: flex;
+  width: 100%;
+  gap: 28px;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px)) 8px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.sbc-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.sbc-card {
+  flex: 0 0 clamp(190px, 17vw, 258px);
+  aspect-ratio: 0.78 / 1;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-charcoal, #111111);
+  scroll-snap-align: start;
+}
+
+.sbc-card-bg {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 70px);
+  object-fit: contain;
+  object-position: center center;
+  padding: 4px 8px;
+  mix-blend-mode: multiply;
+  filter: drop-shadow(0 17px 16px rgba(24, 20, 16, 0.14));
+}
+
+.sbc-card:hover .sbc-card-bg {
+  transform: translateY(-8px) scale(1.025);
+}
+
+.sbc-card-overlay,
+.sbc-card-arrow,
+.sbc-card-count {
+  display: none;
+}
+
+.sbc-card-info {
+  position: relative;
+  inset: auto;
+  padding: 13px 0 0;
+  align-items: center;
+  text-align: center;
+}
+
+.sbc-card-name {
+  color: var(--color-charcoal, #111111);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  text-shadow: none;
+}
+
+.sbc-footer {
+  margin: 34px auto 0;
+  max-width: 1400px;
+  padding: 0 48px;
+  text-align: left;
+}
+
+.sbc-shop-all-btn {
+  padding: 0 0 5px;
+  background: transparent;
+  color: var(--color-charcoal, #111111);
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.sbc-shop-all-btn:hover {
+  background: transparent;
+  color: var(--color-accent-gold-text, #855E18);
+  transform: none;
+}
+
+@media (max-width: 768px) {
+  .sbc-section { padding: 58px 0 54px; }
+  .sbc-heading { padding: 0 22px; margin-bottom: 28px; }
+  .sbc-heading-eyebrow { font-size: 14px; }
+  .sbc-heading-title { font-size: 34px; }
+  .sbc-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px 12px;
+    padding: 0 16px 8px;
+    overflow: visible;
+  }
+  .sbc-card { flex: none; width: 100%; aspect-ratio: 0.72 / 1; }
+  .sbc-card-bg { height: calc(100% - 48px); padding: 0; }
+  .sbc-card-info { padding-top: 8px; }
+  .sbc-card-name { font-size: 11px; letter-spacing: -0.4px; }
+  .sbc-footer { padding: 0 22px; margin-top: 24px; }
 }

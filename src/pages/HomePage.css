@@ -1,7 +1,7 @@
 /* ───────── HomePage Layout ───────── */
 .home-page {
   padding-top: 72px; /* For fixed navbar */
-  background: var(--color-ivory, #F7F4EE);
+  background: transparent;
   min-height: 100vh;
 }
 
@@ -107,26 +107,26 @@
 
 /* Sale Section */
 .sale-section {
-  background: var(--color-ivory, #F7F4EE);
-  border-bottom: 1px solid rgba(217, 211, 199, 0.6);
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.62);
 }
 
 /* New Arrivals Section */
 .new-arrivals-section {
-  background: #ffffff;
-  border-bottom: 1px solid rgba(217, 211, 199, 0.6);
+  background: rgba(255, 255, 255, 0.34);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.62);
 }
 
 /* Shop Section */
 .shop-section {
-  background: var(--color-ivory, #F7F4EE);
-  border-bottom: 1px solid rgba(217, 211, 199, 0.6);
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.62);
 }
 
 /* About Preview */
 .about-preview-section {
-  background: #ffffff;
-  border-bottom: 1px solid rgba(217, 211, 199, 0.6);
+  background: rgba(255, 255, 255, 0.34);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.62);
 }
 
 .about-grid {
@@ -139,8 +139,9 @@
 .about-img-wrap {
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid rgba(217, 211, 199, 0.6);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-lg);
 }
 
 .about-img {
@@ -177,8 +178,8 @@
 
 /* Trust Section */
 .trust-section {
-  background: var(--color-ivory, #F7F4EE);
-  border-bottom: 1px solid rgba(217, 211, 199, 0.6);
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.62);
 }
 
 .trust-grid {
@@ -190,10 +191,7 @@
 .trust-item {
   text-align: center;
   padding: 36px 24px;
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid rgba(217, 211, 199, 0.8);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  border-radius: var(--radius-md);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -232,7 +230,7 @@
 
 /* Reviews */
 .reviews-section {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.34);
 }
 
 .reviews-grid {
@@ -244,9 +242,7 @@
 
 .review-card {
   padding: 36px 28px;
-  background: var(--color-ivory, #F7F4EE);
-  border: 1px solid rgba(217, 211, 199, 0.7);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   transition: transform 0.25s ease;
@@ -357,4 +353,3 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
-

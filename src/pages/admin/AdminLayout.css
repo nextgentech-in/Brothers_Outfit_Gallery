@@ -10,6 +10,83 @@
   box-sizing: border-box;
 }
 
+/* Admin glass system — presentation-only, preserving the existing dashboard controls. */
+.admin-layout {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(207, 170, 100, 0.2), transparent 30rem),
+    linear-gradient(135deg, #f6f4f0, #ebe7df 55%, #f8f6f1);
+}
+
+.admin-sidebar {
+  background: linear-gradient(160deg, rgba(12, 13, 16, 0.96), rgba(26, 24, 23, 0.88));
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 12px 0 36px rgba(20, 17, 13, 0.16);
+  backdrop-filter: blur(26px) saturate(145%);
+  -webkit-backdrop-filter: blur(26px) saturate(145%);
+}
+
+.admin-sidebar__title {
+  border-bottom-color: rgba(255, 255, 255, 0.11);
+}
+
+.admin-sidebar__link {
+  border-radius: 12px;
+}
+
+.admin-sidebar__link:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.admin-sidebar__link.active {
+  background: linear-gradient(90deg, rgba(203, 160, 81, 0.24), rgba(255, 255, 255, 0.08));
+  box-shadow: inset 3px 0 0 #d5a84f, inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.admin-main {
+  padding: 36px 44px;
+}
+
+.admin-btn-primary,
+.admin-btn-secondary {
+  border-radius: 999px;
+}
+
+/* Mobile admin chrome: a dark, legible glass header and drawer. */
+@media (max-width: 900px) {
+  .admin-mobile-header {
+    background: linear-gradient(110deg, rgba(9, 10, 13, 0.94), rgba(29, 29, 34, 0.84)) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: 0 10px 26px rgba(15, 13, 11, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(24px) saturate(145%);
+    -webkit-backdrop-filter: blur(24px) saturate(145%);
+  }
+
+  .admin-menu-toggle,
+  .admin-mobile-back-btn,
+  .admin-notif-bell {
+    min-height: 38px;
+    border-radius: 11px;
+  }
+
+  .admin-menu-toggle { background: rgba(255, 255, 255, 0.1); }
+  .admin-mobile-back-btn { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.16); }
+  .admin-sidebar { width: min(82vw, 310px); left: min(-82vw, -310px); }
+  .admin-sidebar.open { left: 0; }
+  .admin-main { padding: 16px 12px 28px; }
+  .admin-inline-header { display: none; }
+}
+
+.admin-btn-primary {
+  background: linear-gradient(135deg, #222126, #121214);
+  box-shadow: 0 10px 20px rgba(20, 18, 16, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+}
+
+.admin-btn-secondary {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
 /* Mobile Header (Hidden on Desktop) */
 .admin-mobile-header {
   display: none;
