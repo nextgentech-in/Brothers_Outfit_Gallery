@@ -106,6 +106,9 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_GENERAL_REQ_PER_MIN = 180; // 180 req/min per IP to avoid false 429 errors during fast browsing
 
 function getClientIp(req) {
+  if (!IS_PRODUCTION && req.headers['x-simulated-user-ip']) {
+    return String(req.headers['x-simulated-user-ip']).trim();
+  }
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
@@ -1275,10 +1278,14 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
     const db = getTrustedFirestore();
     const ordersCol = db.collection('orders');
     const matchedMap = new Map();
+    const withDbTimeout = (p, ms = 2000) => Promise.race([
+      p,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), ms))
+    ]);
 
     // 1. Direct match by exact document ID
     try {
-      const directDoc = await ordersCol.doc(rawQuery).get();
+      const directDoc = await withDbTimeout(ordersCol.doc(rawQuery).get(), 2000);
       if (directDoc.exists) {
         matchedMap.set(directDoc.id, { id: directDoc.id, ...directDoc.data() });
       }
@@ -1288,13 +1295,13 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
     const cleanPhone = rawQuery.replace(/\D/g, '').slice(-10);
     if (matchedMap.size === 0 && cleanPhone.length === 10) {
       try {
-        const snapPhone = await ordersCol.where('shippingAddress.phone', '==', cleanPhone).limit(5).get();
+        const snapPhone = await withDbTimeout(ordersCol.where('shippingAddress.phone', '==', cleanPhone).limit(5).get(), 2000);
         snapPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
       } catch {}
 
       if (matchedMap.size === 0) {
         try {
-          const snapUserPhone = await ordersCol.where('userPhone', '==', cleanPhone).limit(5).get();
+          const snapUserPhone = await withDbTimeout(ordersCol.where('userPhone', '==', cleanPhone).limit(5).get(), 2000);
           snapUserPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
         } catch {}
       }
@@ -1303,7 +1310,7 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
     // 3. Search by Delhivery Waybill / AWB
     if (matchedMap.size === 0) {
       try {
-        const snapWaybill = await ordersCol.where('waybill', '==', rawQuery).limit(2).get();
+        const snapWaybill = await withDbTimeout(ordersCol.where('waybill', '==', rawQuery).limit(2).get(), 2000);
         snapWaybill.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
       } catch {}
     }
@@ -1311,7 +1318,7 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
     // 4. Substring / Prefix match for short Order IDs (e.g. 311019e6)
     if (matchedMap.size === 0 && rawQuery.length >= 6) {
       try {
-        const allRecent = await ordersCol.orderBy('createdAt', 'desc').limit(40).get();
+        const allRecent = await withDbTimeout(ordersCol.orderBy('createdAt', 'desc').limit(40).get(), 2000);
         allRecent.forEach(d => {
           if (d.id.toLowerCase().includes(rawQuery.toLowerCase())) {
             matchedMap.set(d.id, { id: d.id, ...d.data() });
