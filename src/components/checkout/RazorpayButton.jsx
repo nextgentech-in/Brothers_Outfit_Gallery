@@ -40,7 +40,7 @@ export default function RazorpayButton({
         orderId: orderData.order_id || orderData.orderId,
         amount: orderData.amount,
         currency: orderData.currency,
-        key: orderData.key || import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: orderData.key,
         prefill,
         onDismiss: () => {
           setLoading(false);

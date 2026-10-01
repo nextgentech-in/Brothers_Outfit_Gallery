@@ -76,7 +76,7 @@
   width: 340px;
   text-decoration: none;
   color: inherit;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
   position: relative;
   background: #fff;

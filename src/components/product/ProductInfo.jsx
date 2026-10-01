@@ -9,6 +9,33 @@ import AuthModal from '../auth/AuthModal';
 import SizeGuideModal from '../common/SizeGuideModal';
 import './ProductInfo.css';
 
+const COLOR_SWATCHES = [
+  ['black', '#111111'], ['white', '#f8fafc'], ['grey', '#9ca3af'], ['gray', '#9ca3af'],
+  ['maroon', '#7f1d1d'], ['marron', '#7f1d1d'], ['brown', '#8b5e3c'], ['beige', '#d6c3a1'],
+  ['khaki', '#b6a26d'], ['pink', '#d58a91'], ['purple', '#77608e'], ['blue', '#35679b'],
+  ['green', '#259b4a'], ['olive', '#667a36'], ['yellow', '#d5a321'], ['red', '#bd3f3f'],
+  ['orange', '#d96f29'], ['navy', '#173c6b'], ['cyan', '#59d5de']
+];
+
+function getColorSwatchStyle({ name, hex }) {
+  if (hex && /^#([\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(hex.trim())) {
+    return { backgroundColor: hex.trim() };
+  }
+
+  const normalizedName = String(name || '').toLowerCase();
+  const colors = [...new Set(
+    COLOR_SWATCHES
+      .filter(([keyword]) => normalizedName.includes(keyword))
+      .map(([, color]) => color)
+  )];
+
+  if (colors.length > 1) {
+    return { backgroundImage: `linear-gradient(135deg, ${colors.join(', ')})` };
+  }
+
+  return { backgroundColor: colors[0] || '#9ca3af' };
+}
+
 // Reusable mock countdown logic mimicking SalePage behavior securely inside component space
 function MiniCountdown({ targetDate }) {
   const [timeLeft, setTimeLeft] = useState('');
@@ -342,9 +369,10 @@ export default function ProductInfo({ product, onColorChange }) {
           <div className="color-buttons">
             <button
               type="button"
-              className={`color-btn ${selectedColor === 'All' ? 'selected' : ''}`}
+              className={`color-btn color-btn--all ${selectedColor === 'All' ? 'selected' : ''}`}
               onClick={() => { setSelectedColor('All'); onColorChange?.('All', -1); }}
               aria-label="View all colors"
+              aria-pressed={selectedColor === 'All'}
             >
               <span className="color-btn-all-icon">⊞</span>
               <span>All</span>
@@ -353,15 +381,17 @@ export default function ProductInfo({ product, onColorChange }) {
               <button
                 key={col.name || idx}
                 type="button"
-                className={`color-btn ${selectedColor === col.name ? 'selected' : ''}`}
+                className={`color-btn color-btn--swatch ${selectedColor === col.name ? 'selected' : ''}`}
                 onClick={() => { setSelectedColor(col.name); onColorChange?.(col.name, idx); }}
                 aria-label={`Select color ${col.name}`}
+                aria-pressed={selectedColor === col.name}
+                title={col.name}
               >
                 <span
                   className="color-btn-dot"
-                  style={{ backgroundColor: col.hex || col.name.toLowerCase() }}
+                  style={getColorSwatchStyle(col)}
+                  aria-hidden="true"
                 />
-                <span>{col.name}</span>
               </button>
             ))}
           </div>

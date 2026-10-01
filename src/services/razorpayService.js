@@ -104,7 +104,10 @@ export async function openRazorpayCheckout({
     throw new Error('Razorpay SDK failed to load. Please check your internet connection.');
   }
 
-  const razorpayKey = key || import.meta.env.VITE_RAZORPAY_KEY_ID;
+  const razorpayKey = key;
+  if (!razorpayKey) {
+    throw new Error('Payment gateway configuration is unavailable. Please try again later.');
+  }
 
   return new Promise((resolve, reject) => {
     const options = {

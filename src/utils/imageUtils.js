@@ -36,6 +36,22 @@ export const optimizeImage = (input, optionsOrWidth = 800) => {
 };
 
 /**
+ * Creates responsive ImageKit sources so the browser downloads only the image
+ * size needed by the current card instead of a full product original.
+ */
+export const getOptimizedImageSrcSet = (input, widths = [320, 480, 640, 960], quality = 82) => {
+  const url = (typeof input === 'object' && input !== null)
+    ? (input.url || input.thumbnailUrl || input.path || '')
+    : String(input || '');
+
+  if (!url.includes('ik.imagekit.io') || url.includes('tr=')) return undefined;
+
+  return widths
+    .map(width => `${optimizeImage(url, { width, quality })} ${width}w`)
+    .join(', ');
+};
+
+/**
  * Pre-compresses and resizes an image file in the browser using HTML5 Canvas.
  * Converts large camera photos (5-15MB) into high-fidelity web images (~80-150KB) in milliseconds.
  * 
@@ -169,11 +185,11 @@ export const uploadImageToImageKit = async (file, folder = 'categories') => {
       // Backend not running or timeout - proceed to fallback
     }
 
-    if (authParams?.signature && authParams?.token && authParams?.expire) {
+    if (authParams?.signature && authParams?.token && authParams?.expire && authParams?.publicKey) {
       const uniqueFileName = `${cleanFolder.replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}-${(fileToUpload.name || 'image').replace(/[^a-zA-Z0-9.]/g, '_')}`;
       const formData = new FormData();
       formData.append("file", fileToUpload);
-      formData.append("publicKey", import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || "public_QnN311x97x1oXo+s5/J4/t3fI4A=");
+      formData.append("publicKey", authParams.publicKey);
       formData.append("signature", authParams.signature);
       formData.append("expire", authParams.expire);
       formData.append("token", authParams.token);

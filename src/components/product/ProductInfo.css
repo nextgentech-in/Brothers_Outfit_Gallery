@@ -136,6 +136,18 @@
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.color-btn--all {
+  min-width: 90px;
+}
+.color-btn--swatch {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  justify-content: center;
+  padding: 5px;
+  border-radius: 50%;
+}
 .color-btn:hover {
   border-color: var(--color-charcoal, #111111);
   background: #fafafa;
@@ -151,8 +163,8 @@
   line-height: 1;
 }
 .color-btn-dot {
-  width: 14px;
-  height: 14px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px solid rgba(0, 0, 0, 0.15);
   display: inline-block;
@@ -160,6 +172,19 @@
 }
 .color-btn.selected .color-btn-dot {
   border-color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 480px) {
+  .color-buttons {
+    gap: 8px;
+  }
+
+  .color-btn--swatch {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
 }
 
 .size-header {

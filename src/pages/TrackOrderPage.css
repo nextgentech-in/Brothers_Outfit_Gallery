@@ -3,7 +3,7 @@
 .track-page-container {
   min-height: 80vh;
   background: #f8fafc;
-  padding: 40px 20px 80px;
+  padding: calc(var(--total-header-height, 104px) + 32px) 20px 80px;
   font-family: inherit;
 }
 

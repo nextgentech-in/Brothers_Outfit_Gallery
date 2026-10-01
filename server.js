@@ -482,9 +482,9 @@ app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
 });
 
 const imagekit = new ImageKit({
-  publicKey: process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
+  publicKey: process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "dummy_private_key",
-  urlEndpoint: process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/dummy",
+  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/dummy",
 });
 
 const getRazorpayClient = () => {
@@ -511,7 +511,9 @@ try {
 
 // ─── Token Verification & Admin Authentication Middleware ──────────────────
 const adminTokenCache = new Map();
-const FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY || "AIzaSyB7HF5zw63Rt2sxj2BiIGx3AgPZTqoxgvw";
+// This is used only for Firebase's token lookup fallback. Keep it server-side;
+// never place credentials such as service-account or payment secrets in VITE_* variables.
+const FIREBASE_API_KEY = (process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY || '').trim();
 const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || "brothersoutfitgallary";
 
 // Administrative Firestore access is deliberately server-only. Customer-created
@@ -570,6 +572,7 @@ function getTrustedFirestore() {
 
 async function verifyUserToken(idToken) {
   if (!idToken || typeof idToken !== 'string') return null;
+  if (!FIREBASE_API_KEY) return null;
   const tokenHash = crypto.createHash('sha256').update(idToken).digest('hex');
   const cached = adminTokenCache.get(tokenHash);
   if (cached && Date.now() < cached.expiresAt) {
@@ -835,7 +838,8 @@ async function calculateServerOrderTotal(items, couponCode) {
 app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
   try {
     const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
-    if (!privateKey || privateKey === 'dummy_private_key') {
+    const publicKey = (process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
+    if (!privateKey || privateKey === 'dummy_private_key' || !publicKey) {
       return res.status(503).json({
         error: 'ImageKit private key not configured. Using client fallback storage.',
         configured: false
@@ -843,7 +847,7 @@ app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
     }
     const result = imagekit.getAuthenticationParameters();
     if (result && result.token && result.signature && result.expire) {
-      return res.json({ ...result, configured: true });
+      return res.json({ ...result, publicKey, configured: true });
     }
     throw new Error("Invalid parameters from ImageKit SDK");
   } catch (error) {

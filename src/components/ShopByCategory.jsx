@@ -2,25 +2,27 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAllActiveProducts, isProductInStock } from '../services/productService';
 import { getHomepageConfig } from '../services/configService';
+import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
 import './ShopByCategory.css';
 
 // Preferred display order — categories not listed here appear at the end alphabetically
 const CATEGORY_DISPLAY_ORDER = [
   'Kurta', 'Shirts', 'T-Shirts', 'Jeans', 'Trousers', 'Shorts',
-  'Jackets', 'Hoodies', 'Ethnic Wear', 'Perfumes', 'Slippers',
-  'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Accessories'
+  'Jackets', 'Hoodies', 'Accessories', 'Perfumes', 'Slippers',
+  'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Ethnic Wear'
 ];
 
 // Polished local fallbacks keep the storefront useful before every category has an admin upload.
 const CATEGORY_FALLBACK_IMAGES = {
-  Kurta: '/images/category-rail/kurta-cutout.png',
-  Shirts: '/images/category-rail/shirts-cutout-v2.png',
-  'T-Shirts': '/images/category-rail/tshirts-cutout.png',
-  Jeans: '/images/category-rail/jeans-cutout.png',
-  Trousers: '/images/category-rail/trousers-cutout.png',
-  Shorts: '/images/category-rail/shorts-cutout.png',
-  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.png',
-  Perfumes: '/images/category-rail/perfumes-cutout.png'
+  Kurta: '/images/category-rail/kurta-cutout.jpg',
+  Shirts: '/images/category-rail/shirts-cutout-v2.jpg',
+  'T-Shirts': '/images/category-rail/tshirts-cutout.jpg',
+  Jeans: '/images/category-rail/jeans-cutout.jpg',
+  Trousers: '/images/category-rail/trousers-cutout.jpg',
+  Shorts: '/images/category-rail/shorts-cutout.jpg',
+  Accessories: '/images/category-rail/accessories-cutout.jpg',
+  Perfumes: '/images/category-rail/perfumes-cutout.jpg',
+  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.jpg'
 };
 
 const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
@@ -113,6 +115,7 @@ export default function ShopByCategory() {
             return {
               name,
               imageUrl,
+              fallbackImage: CATEGORY_FALLBACK_IMAGES[name] || null,
               productCount: products.length
             };
           })
@@ -166,19 +169,30 @@ export default function ShopByCategory() {
             : categories.map(cat => (
               <Link
                 key={cat.name}
-                to={`/shop?category=${encodeURIComponent(cat.name)}`}
+                to={cat.name === 'Accessories' ? '/accessories' : `/shop?category=${encodeURIComponent(cat.name)}`}
                 className="sbc-card"
                 role="listitem"
                 aria-label={`Shop ${cat.name}`}
               >
                 {/* Product image */}
                 <img
-                  src={cat.imageUrl}
+                  src={optimizeImage(cat.imageUrl, { width: 480, quality: 78 })}
+                  srcSet={getOptimizedImageSrcSet(cat.imageUrl, [240, 360, 480], 78)}
+                  sizes="(max-width: 768px) 30vw, 258px"
                   alt={`${cat.name} collection`}
                   className="sbc-card-bg"
                   loading="lazy"
                   decoding="async"
-                  onError={(e) => { e.target.style.opacity = '0'; }}
+                  onError={(e) => {
+                    const image = e.currentTarget;
+                    if (cat.fallbackImage && image.dataset.fallbackApplied !== 'true') {
+                      image.dataset.fallbackApplied = 'true';
+                      image.src = cat.fallbackImage;
+                      image.removeAttribute('srcset');
+                      return;
+                    }
+                    image.style.opacity = '0';
+                  }}
                 />
                 {/* Category label */}
                 <div className="sbc-card-info">

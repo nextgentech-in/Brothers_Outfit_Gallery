@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import OfferCountdown from './OfferCountdown';
-import { optimizeImage } from '../utils/imageUtils';
+import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -114,9 +114,12 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
         <Link to={`/product/${product.slug}`} style={{ display: 'block', width: '100%', height: '100%' }}>
           <img
             src={optimizeImage(product.image || product.thumbnailUrl, 800)}
+            srcSet={getOptimizedImageSrcSet(product.image || product.thumbnailUrl)}
+            sizes="(max-width: 480px) 50vw, (max-width: 1024px) 33vw, 320px"
             alt={product.name}
             className="sale-card__image"
             loading="lazy"
+            decoding="async"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = '/images/hero.png';

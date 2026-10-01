@@ -7,6 +7,14 @@ import {
   persistentMultipleTabManager 
 } from "firebase/firestore";
 
+// Firebase web configuration is public by design, but the API key itself must be
+// supplied through deployment configuration rather than embedded in the source.
+// Restrict this key to the site's domains and Firebase APIs in Google Cloud.
+const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+if (!firebaseApiKey) {
+  throw new Error('Missing VITE_FIREBASE_API_KEY. Configure the Firebase web app before starting the client.');
+}
+
 // Normalize authDomain and project id to guarantee valid Firebase project credentials
 const rawAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "brothersoutfitgallary.firebaseapp.com";
 const normalizedAuthDomain = rawAuthDomain.replace(/brothersoutfitgallery\.firebaseapp\.com/g, "brothersoutfitgallary.firebaseapp.com");
@@ -19,7 +27,7 @@ const normalizedStorage = rawStorage.replace(/brothersoutfitgallery/g, "brothers
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyB7HF5zw63Rt2sxj2BiIGx3AgPZTqoxgvw",
+  apiKey: firebaseApiKey,
   authDomain: normalizedAuthDomain,
   projectId: normalizedProjectId,
   storageBucket: normalizedStorage,
@@ -47,5 +55,4 @@ try {
 }
 
 export const db = firestoreDb;
-
 

@@ -539,6 +539,8 @@
   box-shadow: none;
   color: var(--color-charcoal, #111111);
   scroll-snap-align: start;
+  content-visibility: auto;
+  contain-intrinsic-size: 258px 330px;
 }
 
 .sbc-card-bg {

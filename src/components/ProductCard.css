@@ -5,7 +5,7 @@
   flex-direction: column;
   background: rgba(255, 255, 255, 0.64);
   border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   overflow: hidden;
   box-shadow: 0 12px 30px rgba(54, 47, 39, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(18px) saturate(130%);

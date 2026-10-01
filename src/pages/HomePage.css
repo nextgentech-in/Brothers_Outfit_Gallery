@@ -1,6 +1,7 @@
 /* ───────── HomePage Layout ───────── */
 .home-page {
-  padding-top: 72px; /* For fixed navbar */
+  /* Clears both the announcement bar and fixed navigation on every viewport. */
+  padding-top: var(--total-header-height);
   background: transparent;
   min-height: 100vh;
 }
@@ -302,8 +303,12 @@
 }
 
 @media (max-width: 768px) {
+  .home-container {
+    padding: 0 16px;
+  }
+
   .home-section {
-    padding: 60px 0;
+    padding: 56px 0;
   }
   .product-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -316,6 +321,23 @@
 }
 
 @media (max-width: 480px) {
+  .home-section {
+    padding: 48px 0;
+  }
+
+  .section-header {
+    margin-bottom: 32px;
+  }
+
+  .about-grid {
+    gap: 28px;
+  }
+
+  .about-content h2 {
+    font-size: 26px;
+    margin-bottom: 16px;
+  }
+
   .product-grid {
     gap: 10px;
   }

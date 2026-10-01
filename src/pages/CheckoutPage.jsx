@@ -412,7 +412,7 @@ export default function CheckoutPage() {
 
       // 2. Configure Razorpay modal options
       const options = {
-        key: orderData.key || import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: orderData.key,
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
         name: 'Brothers Outfit Gallery',

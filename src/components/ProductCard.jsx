@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { optimizeImage } from '../utils/imageUtils';
+import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -240,9 +240,12 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
         <Link to={`/product/${product.slug}`} className="product-card__image-link">
           <img
             src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 800)}
+            srcSet={getOptimizedImageSrcSet(imagesList[activeImgIdx] || imagesList[0])}
+            sizes="(max-width: 480px) 50vw, (max-width: 1024px) 33vw, 320px"
             alt={`${product.name} - View ${activeImgIdx + 1}`}
             className="product-card__image"
             loading="lazy"
+            decoding="async"
             onError={(e) => {
               e.currentTarget.onerror = null;
               e.currentTarget.src = '/images/hero.png';
