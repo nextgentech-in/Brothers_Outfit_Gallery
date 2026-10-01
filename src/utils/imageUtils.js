@@ -171,9 +171,15 @@ export const uploadImageToImageKit = async (file, folder = 'categories') => {
   try {
     let authParams = null;
     try {
+      const { auth } = await import('../firebase/firebaseAuth');
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Admin authentication is required for uploads.');
       const controller = new AbortController();
       const authTimeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${backendUrl}/api/imagekit/auth`, { signal: controller.signal });
+      const res = await fetch(`${backendUrl}/api/imagekit/auth`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+        signal: controller.signal
+      });
       clearTimeout(authTimeout);
       if (res.ok) {
         const data = await res.json();

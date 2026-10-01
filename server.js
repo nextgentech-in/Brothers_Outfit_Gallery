@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import ImageKit from 'imagekit';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -41,6 +40,11 @@ if (fs.existsSync(envPath)) {
 
 const app = express();
 const port = process.env.PORT || 3001;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+
+// Vercel adds one trusted proxy hop. Outside Vercel, never trust a caller-
+// supplied X-Forwarded-For header when applying abuse limits.
+app.set('trust proxy', process.env.VERCEL ? 1 : false);
 
 // ───────────── ENHANCED SECURITY CONFIGURATION ─────────────
 // 1. Hide Server Fingerprints
@@ -54,6 +58,8 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
 
   // Vercel Serverless path normalizer: restore original path if rewritten to /api
   const forwardedPath = req.headers['x-matched-path'] || req.headers['x-rewrite-url'] || req.headers['x-original-url'];
@@ -67,20 +73,20 @@ app.use((req, res, next) => {
 const ALLOWED_ORIGINS = [
   'https://brothers-outfit-gallery.vercel.app',
   'https://brothersoutfitgallery.com',
-  'https://www.brothersoutfitgallery.com',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000'
+  'https://www.brothersoutfitgallery.com'
 ];
+
+for (const configuredOrigin of (process.env.ALLOWED_ORIGINS || '').split(',')) {
+  const cleanOrigin = configuredOrigin.trim();
+  if (cleanOrigin && !ALLOWED_ORIGINS.includes(cleanOrigin)) ALLOWED_ORIGINS.push(cleanOrigin);
+}
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow non-browser agents, mobile apps, or local curl
     if (!origin) return callback(null, true);
-    const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /\.vercel\.app$/.test(origin) || isLocal;
+    const isLocal = !IS_PRODUCTION && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || isLocal;
     if (isAllowed) {
       callback(null, true);
     } else {
@@ -99,6 +105,10 @@ const sensitiveRateLimits = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_GENERAL_REQ_PER_MIN = 180; // 180 req/min per IP to avoid false 429 errors during fast browsing
 
+function getClientIp(req) {
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
 // Periodic cleanup every 5 minutes
 setInterval(() => {
   const now = Date.now();
@@ -114,7 +124,7 @@ setInterval(() => {
 app.use((req, res, next) => {
   if (req.path === '/api/health') return next();
 
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   const now = Date.now();
 
   let ipRecord = ipRateLimits.get(clientIp);
@@ -139,7 +149,7 @@ app.get(['/api/health', '/health'], (req, res) => {
 
 // Helper function for sensitive endpoints (Payments, Email Alerts)
 function checkSensitiveRateLimit(req, res, maxRequests = 15) {
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   const now = Date.now();
 
   let ipRecord = sensitiveRateLimits.get(clientIp);
@@ -180,9 +190,10 @@ function sanitizeValue(val) {
   return val;
 }
 
-// 6. Secure Payload Body Parsing with 15MB Limit
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+// Media uploads go directly to ImageKit/Firebase, so API JSON never needs to be
+// huge. A tight limit reduces memory-exhaustion and slow-body abuse.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 100 }));
 
 app.use((req, res, next) => {
   if (req.body && typeof req.body === 'object') {
@@ -237,7 +248,7 @@ app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-aler
   try {
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       await mailTransporter.sendMail({
-        from: '"Brothers Outfit" <noreply@brothersoutfit.com>',
+        from: '"Brothers Outfit Gallery" <brothersoutfitgallery@gmail.com>',
         to: ADMIN_EMAILS.join(', '),
         subject: `🚨 NEW ORDER RECEIVED: #${orderId} (₹${totalAmount})`,
         text: alertMsg,
@@ -256,6 +267,7 @@ app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-aler
 const otpStore = new Map(); // phone -> { otp, expiresAt, attempts, createdAt }
 const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_VERIFY_ATTEMPTS = 5;
+const ALLOW_DEV_OTP = !IS_PRODUCTION && process.env.ALLOW_DEV_OTP !== 'false';
 
 // Clean expired OTPs every 5 minutes
 setInterval(() => {
@@ -292,7 +304,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   }
 
   // Generate secure 6-digit numeric OTP
-  const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const generatedOtp = crypto.randomInt(100000, 1000000).toString();
 
   otpStore.set(cleanPhone, {
     otp: generatedOtp,
@@ -301,9 +313,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
     createdAt: now
   });
 
-  console.log(`\n======================================================`);
-  console.log(`[PHONE OTP DISPATCH] Number: +91 ${cleanPhone} | OTP Code: ${generatedOtp} (Valid 5 mins)`);
-  console.log(`======================================================\n`);
+  console.log(`[PHONE OTP DISPATCH] Sending a code to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}.`);
 
   // Dispatch Real SMS via available provider
   let realSmsSent = false;
@@ -401,16 +411,24 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   );
 
   if (!realSmsSent) {
-    // If live SMS gateway is not configured or failed, provide fallback OTP with code so customer orders are never blocked
-    console.log(`[OTP FALLBACK ACTIVE] SMS notice: ${lastGatewayError || 'No live SMS gateway configured'}.`);
-    console.log(`[OTP FALLBACK ACTIVE] Generated OTP: ${generatedOtp} for +91 ${cleanPhone}`);
-    return res.json({
-      success: true,
-      message: `OTP generated for +91 ${cleanPhone}.`,
-      phone: cleanPhone,
-      expiresIn: 300,
-      realSmsSent: false,
-      devOtp: generatedOtp
+    if (ALLOW_DEV_OTP) {
+      console.warn(`[OTP DEVELOPMENT MODE] SMS unavailable: ${lastGatewayError || 'No live SMS gateway configured'}.`);
+      return res.json({
+        success: true,
+        message: `Development OTP generated for +91 ${cleanPhone}.`,
+        phone: cleanPhone,
+        expiresIn: 300,
+        realSmsSent: false,
+        devOtp: generatedOtp
+      });
+    }
+
+    otpStore.delete(cleanPhone);
+    return res.status(503).json({
+      success: false,
+      error: hasConfiguredGateway
+        ? 'The SMS provider is temporarily unavailable. Please try again shortly.'
+        : 'Phone verification is temporarily unavailable.'
     });
   }
 
@@ -426,6 +444,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
 
 // 2. Verify Entered OTP
 app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 20)) return;
   const { phone, otp } = req.body;
   if (!phone || !otp) {
     return res.status(400).json({ error: 'Phone number and 6-digit OTP are required.' });
@@ -434,8 +453,8 @@ app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
   const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
   const cleanOtp = String(otp).trim();
 
-  // Universal test code bypass for testing numbers or instant verification
-  if (cleanOtp === '123456' || cleanOtp === '000000') {
+  // Test codes are never accepted by production deployments.
+  if (ALLOW_DEV_OTP && (cleanOtp === '123456' || cleanOtp === '000000')) {
     otpStore.delete(cleanPhone);
     return res.json({
       success: true,
@@ -479,12 +498,6 @@ app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
     phone: cleanPhone,
     verifiedAt: new Date().toISOString()
   });
-});
-
-const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "dummy_private_key",
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/dummy",
 });
 
 const getRazorpayClient = () => {
@@ -613,8 +626,10 @@ setInterval(() => {
 
 async function requireAdminAuth(req, res, next) {
   const adminSecret = (process.env.ADMIN_SECRET || '').trim();
-  const reqSecret = req.headers['x-admin-secret'];
-  if (adminSecret && reqSecret && reqSecret === adminSecret) {
+  const reqSecret = String(req.headers['x-admin-secret'] || '');
+  const expectedSecret = Buffer.from(adminSecret);
+  const suppliedSecret = Buffer.from(reqSecret);
+  if (adminSecret && expectedSecret.length === suppliedSecret.length && crypto.timingSafeEqual(expectedSecret, suppliedSecret)) {
     req.isAdmin = true;
     return next();
   }
@@ -637,8 +652,10 @@ async function requireAdminAuth(req, res, next) {
 
 async function requireAuth(req, res, next) {
   const adminSecret = (process.env.ADMIN_SECRET || '').trim();
-  const reqSecret = req.headers['x-admin-secret'];
-  if (adminSecret && reqSecret && reqSecret === adminSecret) {
+  const reqSecret = String(req.headers['x-admin-secret'] || '');
+  const expectedSecret = Buffer.from(adminSecret);
+  const suppliedSecret = Buffer.from(reqSecret);
+  if (adminSecret && expectedSecret.length === suppliedSecret.length && crypto.timingSafeEqual(expectedSecret, suppliedSecret)) {
     req.isAdmin = true;
     return next();
   }
@@ -835,21 +852,23 @@ async function calculateServerOrderTotal(items, couponCode) {
   };
 }
 
-app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
+app.get(['/api/imagekit/auth', '/imagekit/auth'], requireAdminAuth, (req, res) => {
   try {
     const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
     const publicKey = (process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
-    if (!privateKey || privateKey === 'dummy_private_key' || !publicKey) {
+    if (!privateKey || !publicKey) {
       return res.status(503).json({
         error: 'ImageKit private key not configured. Using client fallback storage.',
         configured: false
       });
     }
-    const result = imagekit.getAuthenticationParameters();
-    if (result && result.token && result.signature && result.expire) {
-      return res.json({ ...result, publicKey, configured: true });
-    }
-    throw new Error("Invalid parameters from ImageKit SDK");
+    const token = crypto.randomBytes(24).toString('hex');
+    const expire = Math.floor(Date.now() / 1000) + 30 * 60;
+    const signature = crypto
+      .createHmac('sha1', privateKey)
+      .update(`${token}${expire}`)
+      .digest('hex');
+    return res.json({ token, expire, signature, publicKey, configured: true });
   } catch (error) {
     console.warn("ImageKit Auth notice:", error.message);
     return res.status(503).json({
@@ -865,14 +884,26 @@ app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], require
   if (!fileId) return res.status(400).json({ error: "Missing fileId" });
 
   try {
-    const result = await imagekit.deleteFile(fileId);
-    res.json(result);
+    const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
+    if (!privateKey) return res.status(503).json({ error: 'ImageKit is not configured.' });
+
+    const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}`
+      }
+    });
+    if (response.status === 404) {
+      return res.json({ success: true, message: 'File already deleted.' });
+    }
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`ImageKit deletion failed (${response.status}): ${body.slice(0, 200)}`);
+    }
+    return res.json({ success: true });
   } catch (error) {
     console.error("ImageKit Delete Error:", error);
-    if (error.message && error.message.includes('No file found')) {
-      return res.json({ success: true, message: "File already deleted." });
-    }
-    res.status(500).json({ error: error.message });
+    res.status(502).json({ error: 'Image deletion failed.' });
   }
 });
 
@@ -891,6 +922,9 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
   }
 
   const { amount, currency = 'INR', receipt, items, couponCode } = req.body;
+  if (String(currency).toUpperCase() !== 'INR') {
+    return res.status(400).json({ error: 'Only INR payments are supported.' });
+  }
   let amountInPaise = 0;
 
   // Case 1: Items array supplied (Calculate authoritative total server-side)
@@ -917,13 +951,16 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
       error: 'Invalid amount. Minimum amount must be at least 100 paise (₹1.00).'
     });
   }
+  if (amountInPaise > 100000000) {
+    return res.status(400).json({ error: 'Payment amount exceeds the supported limit.' });
+  }
 
   try {
     const rzp = getRazorpayClient();
     const orderReceipt = receipt || `rcpt_${Date.now().toString().slice(-8)}`;
     const order = await rzp.orders.create({
       amount: amountInPaise,
-      currency: currency || 'INR',
+      currency: 'INR',
       receipt: String(orderReceipt).slice(0, 40),
     });
 
@@ -945,6 +982,7 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
 
 // ─── Razorpay: Verify Payment Signature (HMAC-SHA256 Timing-Safe Comparison) ──
 app.post(['/api/verify-payment', '/verify-payment', '/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
   const razorpay_order_id = req.body.razorpay_order_id || req.body.order_id;
   const razorpay_payment_id = req.body.razorpay_payment_id || req.body.payment_id;
   const razorpay_signature = req.body.razorpay_signature || req.body.signature;
@@ -1992,6 +2030,21 @@ app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (r
 
 // ─── Delhivery Webhook: Real-Time Event Ingestion ─────────────────────────
 app.post(['/api/delhivery/webhook', '/delhivery/webhook'], async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
+
+  const webhookSecret = (process.env.DELHIVERY_WEBHOOK_SECRET || '').trim();
+  if (IS_PRODUCTION && !webhookSecret) {
+    return res.status(503).json({ error: 'Webhook authentication is not configured.' });
+  }
+  if (webhookSecret) {
+    const supplied = String(req.headers['x-delhivery-webhook-secret'] || '');
+    const expectedBuffer = Buffer.from(webhookSecret);
+    const suppliedBuffer = Buffer.from(supplied);
+    if (expectedBuffer.length !== suppliedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+      return res.status(401).json({ error: 'Invalid webhook signature.' });
+    }
+  }
+
   try {
     const payload = req.body;
     if (!payload) {

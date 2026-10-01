@@ -3,7 +3,7 @@ import { db } from '../firebase/firebaseConfig';
 
 const PRODUCTS = 'products';
 const CATEGORIES = 'categories';
-const CACHE_TTL_MS = 30 * 1000; // 30 seconds fresh cache
+const CACHE_TTL_MS = 2 * 60 * 1000; // fast revisits; checkout still force-refreshes stock
 
 // In-Memory & Session Storage Caching + Request Coalescing Layer
 let memoryCache = null;

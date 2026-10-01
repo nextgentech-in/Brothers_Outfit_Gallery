@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { fetchAllActiveProducts } from '../services/productService';
 
 const CartContext = createContext();
 
@@ -50,6 +49,7 @@ export const CartProvider = ({ children }) => {
     if (rawCart.length === 0) return;
 
     try {
+      const { fetchAllActiveProducts } = await import('../services/productService');
       const allProducts = await fetchAllActiveProducts(true);
       if (!allProducts || allProducts.length === 0) return;
 

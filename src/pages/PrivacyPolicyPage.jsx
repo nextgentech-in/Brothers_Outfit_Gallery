@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
               <p><strong>Contact our Data Protection Desk:</strong></p>
               <p>Brothers Outfit Gallery</p>
               <p>📍 Store Address: Himatnagar, Gujarat, India</p>
-              <p>✉️ Email: support@brothersoutfit.in</p>
+              <p>✉️ Email: brothersoutfitgallery@gmail.com</p>
               <p>📱 WhatsApp: +91 84602 33020</p>
             </div>
           </div>

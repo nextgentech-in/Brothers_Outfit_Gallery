@@ -148,8 +148,10 @@
 .about-img {
   width: 100%;
   height: auto;
-  aspect-ratio: 4/3;
-  object-fit: cover;
+  /* Preserve the complete storefront photo on narrow screens. */
+  aspect-ratio: 1424 / 728;
+  object-fit: contain;
+  object-position: center;
   transition: transform 0.8s ease;
 }
 

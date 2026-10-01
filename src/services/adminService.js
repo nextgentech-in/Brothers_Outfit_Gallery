@@ -426,7 +426,7 @@ export const getStoreSettings = async () => {
     return snap.exists() ? snap.data() : {
       storeName: "Brothers Outfit Gallery",
       phone: "+91 84602 33020",
-      email: "contact@brothersoutfit.com",
+      email: "brothersoutfitgallery@gmail.com",
       address: "FF 57, Pratham Square, Sahakari Jin Rd, Anant Vihar Society, Himatnagar, Gujarat 383001",
       whatsappNumber: "918460233020",
       freeShippingMin: 1500,
