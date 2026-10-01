@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 const DEFAULT_TITLE = "Brother’s Outfit Gallery | Men's Clothing Store in Himatnagar";
 const DEFAULT_DESCRIPTION = "Shop premium men's clothing in Himatnagar. Discover trendy shirts, kurtas, denim, jeans & accessories. Free delivery on orders over ₹999.";
 const DOMAIN = "https://www.brothersoutfitgallery.com";
-const DEFAULT_OG_IMAGE = `${DOMAIN}/images/hero.png`;
+const DEFAULT_OG_IMAGE = `${DOMAIN}/images/brothers-storefront.jpg`;
 
 function setMetaTag(selector, attrName, attrValue, content) {
   let element = document.querySelector(selector);

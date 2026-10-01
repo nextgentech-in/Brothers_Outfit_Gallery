@@ -63,7 +63,7 @@ export const sanitizeHomepageConfig = (raw) => {
   // Clean hero fields
   if (raw.hero && typeof raw.hero === 'object') {
     clean.hero = {
-      bannerImage: typeof raw.hero.bannerImage === 'string' ? raw.hero.bannerImage : '/images/hero.png',
+      bannerImage: typeof raw.hero.bannerImage === 'string' ? raw.hero.bannerImage : '/images/brothers-storefront.jpg',
       mobileBannerImage: typeof raw.hero.mobileBannerImage === 'string' ? raw.hero.mobileBannerImage : '',
       eyebrow: typeof raw.hero.eyebrow === 'string' ? raw.hero.eyebrow : '',
       heading: typeof raw.hero.heading === 'string' ? raw.hero.heading : 'DEFINE YOUR\nEVERYDAY STYLE',

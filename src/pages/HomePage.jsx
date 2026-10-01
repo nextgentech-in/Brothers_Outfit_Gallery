@@ -31,7 +31,7 @@ const HOME_SCHEMA = {
       "@type": ["ClothingStore", "LocalBusiness"],
       "@id": "https://www.brothersoutfitgallery.com/#localbusiness",
       "name": "Brother’s Outfit Gallery",
-      "image": "https://www.brothersoutfitgallery.com/images/hero.png",
+      "image": "https://www.brothersoutfitgallery.com/images/brothers-storefront.jpg",
       "url": "https://www.brothersoutfitgallery.com/",
       "telephone": "+918460233020",
       "priceRange": "₹₹",
@@ -99,7 +99,7 @@ export default function HomePage() {
         subtitle: "Discover the styles defining men's fashion right now."
       },
       hero: {
-        bannerImage: '/images/hero.png',
+        bannerImage: '/images/brothers-storefront.jpg',
         mobileBannerImage: '',
         eyebrow: '',
         heading: 'DEFINE YOUR\nEVERYDAY STYLE',
@@ -282,7 +282,7 @@ export default function HomePage() {
             <div className="about-grid">
               <div className="about-img-wrap">
                 <img
-                  src="/images/brothers-storefront.png"
+                  src="/images/brothers-storefront.jpg"
                   alt="Front of Brother's Outfit Gallery in Himatnagar"
                   className="about-img"
                   width="1424"

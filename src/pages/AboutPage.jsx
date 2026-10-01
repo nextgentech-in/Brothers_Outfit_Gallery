@@ -6,6 +6,16 @@ import TestimonialMarquee from '../components/TestimonialMarquee';
 import SEO from '../components/common/SEO';
 import './AboutPage.css';
 
+const ABOUT_IMAGE_BASE = '/images/About%20us%20images/';
+const ABOUT_IMAGES = {
+  storefront: '/images/brothers-storefront.jpg',
+  arrivals: `${ABOUT_IMAGE_BASE}WhatsApp%20Image%202026-09-30%20at%2011.20.18%20AM%20(1).jpeg`,
+  counter: `${ABOUT_IMAGE_BASE}WhatsApp%20Image%202026-09-30%20at%2011.20.18%20AM%20(2).jpeg`,
+  fragrances: `${ABOUT_IMAGE_BASE}WhatsApp%20Image%202026-09-30%20at%2011.20.18%20AM.jpeg`,
+  service: `${ABOUT_IMAGE_BASE}WhatsApp%20Image%202026-09-30%20at%2011.20.19%20AM%20(1).jpeg`,
+  essentials: `${ABOUT_IMAGE_BASE}WhatsApp%20Image%202026-09-30%20at%2011.20.19%20AM.jpeg`
+};
+
 const ABOUT_SCHEMA = [
   {
     "@context": "https://schema.org",
@@ -17,7 +27,7 @@ const ABOUT_SCHEMA = [
     "telephone": businessInfo.phone || "+91 84602 33020",
     "email": businessInfo.email || "brothersoutfitgallery@gmail.com",
     "priceRange": "₹₹",
-    "image": "https://www.brothersoutfitgallery.com/images/hero.png",
+    "image": "https://www.brothersoutfitgallery.com/images/brothers-storefront.jpg",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "FF-57, Pratham Square, Sahakari Jin Road",
@@ -71,42 +81,42 @@ export default function AboutPage() {
 
   const storeImages = [
     {
-      url: "/images/store-real-1.jpeg",
+      url: ABOUT_IMAGES.storefront,
       alt: "Brothers Outfit Gallery storefront and exterior",
       caption: "Our Official Storefront - Welcome to Brothers Outfit Gallery",
       width: 1280,
       height: 741
     },
     {
-      url: "/images/store-real-2.jpeg",
+      url: ABOUT_IMAGES.arrivals,
       alt: "Brothers Outfit Gallery fragrance and accessories display",
       caption: "Fragrance & Accessories Collection",
       width: 1280,
       height: 960
     },
     {
-      url: "/images/store-real-3.jpeg",
+      url: ABOUT_IMAGES.counter,
       alt: "Brothers Outfit Gallery folded shirts collection",
       caption: "Curated Shirts & Casuals",
       width: 1280,
       height: 960
     },
     {
-      url: "/images/store-real-4.jpeg",
+      url: ABOUT_IMAGES.fragrances,
       alt: "Brothers Outfit Gallery apparel display",
       caption: "Fresh Styles In Store",
       width: 1280,
       height: 960
     },
     {
-      url: "/images/store-real-5.jpeg",
+      url: ABOUT_IMAGES.service,
       alt: "Brothers Outfit Gallery customer service counter",
       caption: "Personal Styling & Support",
       width: 1280,
       height: 960
     },
     {
-      url: "/images/store-real-6.jpeg",
+      url: ABOUT_IMAGES.essentials,
       alt: "Brothers Outfit Gallery denim and trousers collection",
       caption: "Denims, Trousers & Everyday Essentials",
       width: 1280,
@@ -120,7 +130,7 @@ export default function AboutPage() {
         title="About Us | Brother’s Outfit Gallery - Men's Fashion Store Himatnagar"
         description="Visit Brother’s Outfit Gallery at FF-57, Pratham Square, Himatnagar, Gujarat. Discover premium shirts, jeans, t-shirts, and everyday men's fashion essentials."
         canonical="/about"
-        ogImage="https://www.brothersoutfitgallery.com/images/store-real-1.jpeg"
+        ogImage="https://www.brothersoutfitgallery.com/images/brothers-storefront.jpg"
         schema={ABOUT_SCHEMA}
       />
       {/* 1. Hero Section with Real Store Showcase */}
@@ -143,18 +153,19 @@ export default function AboutPage() {
           <div className="about-hero-collage">
             <div className="hero-collage-item primary">
               <img
-                src="/images/store-real-1.jpeg"
+                src={ABOUT_IMAGES.storefront}
                 alt="Brothers Outfit Gallery Front"
-                width="1280"
-                height="741"
-                loading="lazy"
+                width="1200"
+                height="613"
+                loading="eager"
+                fetchPriority="high"
                 decoding="async"
               />
               <div className="collage-label">Main Entrance</div>
             </div>
             <div className="hero-collage-item">
               <img
-                src="/images/store-real-2.jpeg"
+                src={ABOUT_IMAGES.arrivals}
                 alt="Men's Wear Display"
                 width="1280"
                 height="960"
@@ -165,7 +176,7 @@ export default function AboutPage() {
             </div>
             <div className="hero-collage-item">
               <img
-                src="/images/store-real-3.jpeg"
+                src={ABOUT_IMAGES.counter}
                 alt="Designer Shirts Rack"
                 width="1280"
                 height="960"
@@ -176,7 +187,7 @@ export default function AboutPage() {
             </div>
             <div className="hero-collage-item">
               <img
-                src="/images/store-real-4.jpeg"
+                src={ABOUT_IMAGES.fragrances}
                 alt="Casual & Streetwear Collection"
                 width="1280"
                 height="960"
@@ -254,7 +265,7 @@ export default function AboutPage() {
 
             <div className="about-story__media">
               <div className="story-image-card">
-                <img src="/images/hero.png" alt="Brother's Outfit Gallery storefront" className="story-image-main" />
+                <img src={ABOUT_IMAGES.service} alt="Brother's Outfit Gallery in-store collection" className="story-image-main" loading="lazy" decoding="async" />
                 <div className="story-floating-badge">
                   <span className="badge-star">★</span>
                   <div>

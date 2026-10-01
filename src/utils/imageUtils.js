@@ -9,13 +9,13 @@ import { getBackendUrl } from './apiConfig';
  * @returns {string} - The optimized URL
  */
 export const optimizeImage = (input, optionsOrWidth = 800) => {
-  if (!input) return '/images/hero.png';
+  if (!input) return '/images/brothers-storefront.jpg';
   const url = (typeof input === 'object' && input !== null)
     ? (input.url || input.thumbnailUrl || input.path || '')
     : String(input);
 
   if (!url || typeof url !== 'string' || url === '[object Object]') {
-    return '/images/hero.png';
+    return '/images/brothers-storefront.jpg';
   }
 
   let width = 800;

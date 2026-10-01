@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchAllActiveProducts, isProductInStock } from '../services/productService';
-import { getHomepageConfig } from '../services/configService';
 import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
 import './ShopByCategory.css';
 
@@ -26,6 +24,13 @@ const CATEGORY_FALLBACK_IMAGES = {
 };
 
 const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
+
+const getCuratedCategories = () => CURATED_CATEGORY_NAMES.map(name => ({
+  name,
+  imageUrl: CATEGORY_FALLBACK_IMAGES[name],
+  fallbackImage: CATEGORY_FALLBACK_IMAGES[name],
+  productCount: 0
+}));
 
 /**
  * Extract the best available image URL from a product.
@@ -61,18 +66,24 @@ function getProductImageUrl(product) {
 }
 
 export default function ShopByCategory() {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Render the lightweight local rail immediately. Product counts and custom
+  // categories are enhanced after first paint instead of delaying the page.
+  const [categories, setCategories] = useState(getCuratedCategories);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     const buildCategories = async () => {
       try {
-        // Fetch products and admin-configured category images in parallel
+        // Keep Firestore and its metadata out of the first home-page paint.
+        const [productService, configService] = await Promise.all([
+          import('../services/productService'),
+          import('../services/configService')
+        ]);
         const [allProducts, homepageConfig] = await Promise.all([
-          fetchAllActiveProducts(),
-          getHomepageConfig().catch(() => ({}))
+          productService.fetchAllActiveProducts(),
+          configService.getHomepageConfig().catch(() => ({}))
         ]);
 
         // Get admin-set custom category images from homepage config
@@ -80,7 +91,7 @@ export default function ShopByCategory() {
 
         // Filter to only active + in-stock products
         const activeProducts = allProducts.filter(
-          p => p.active !== false && isProductInStock(p)
+          p => p.active !== false && productService.isProductInStock(p)
         );
 
         // Group by categoryId
@@ -141,8 +152,19 @@ export default function ShopByCategory() {
       }
     };
 
-    buildCategories();
-    return () => { cancelled = true; };
+    // Do not compete with the hero and local category assets during startup.
+    const idleId = typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback(buildCategories, { timeout: 1500 })
+      : window.setTimeout(buildCategories, 700);
+
+    return () => {
+      cancelled = true;
+      if (typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
   }, []);
 
   // Don't render the section at all if no categories after loading

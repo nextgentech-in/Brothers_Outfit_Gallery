@@ -34,7 +34,13 @@ export default function Hero({ heroConfig: propConfig }) {
   }, []);
 
   // Bulletproof fallbacks ensuring 0 errors & zero broken UI
-  const bannerImage = heroConfig?.bannerImage || '/images/hero.png';
+  // Older saved homepage settings point at the large PNG. Serve its compact
+  // equivalent without requiring admins to re-save their configuration.
+  const defaultHeroImage = '/images/brothers-storefront.jpg';
+  const configuredBanner = heroConfig?.bannerImage;
+  const bannerImage = !configuredBanner || configuredBanner === '/images/hero.png'
+    ? defaultHeroImage
+    : configuredBanner;
   const mobileBanner = heroConfig?.mobileBannerImage || bannerImage;
   const eyebrow = (heroConfig?.eyebrow && heroConfig.eyebrow !== 'NEW SEASON 2026') ? heroConfig.eyebrow : '';
   const heading = heroConfig?.heading || 'DEFINE YOUR\nEVERYDAY STYLE';
@@ -62,7 +68,7 @@ export default function Hero({ heroConfig: propConfig }) {
               fetchPriority="high"
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                e.currentTarget.src = '/images/hero.png';
+                e.currentTarget.src = defaultHeroImage;
               }}
             />
           </picture>
