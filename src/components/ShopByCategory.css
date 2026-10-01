@@ -478,7 +478,8 @@
 /* ── Catalog rail redesign ─────────────────────────────────────────────── */
 .sbc-section {
   padding: 88px 0 84px;
-  background: rgba(255, 255, 255, 0.26);
+  /* Keep the image canvases visually continuous with their section. */
+  background: #f7f5f0;
   overflow: hidden;
 }
 
@@ -533,7 +534,7 @@
   flex: 0 0 clamp(190px, 17vw, 258px);
   aspect-ratio: 0.78 / 1;
   overflow: visible;
-  background: transparent;
+  background: #f7f5f0;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -541,6 +542,7 @@
   scroll-snap-align: start;
   content-visibility: auto;
   contain-intrinsic-size: 258px 330px;
+  isolation: isolate;
 }
 
 .sbc-card-bg {
@@ -550,8 +552,9 @@
   object-fit: contain;
   object-position: center center;
   padding: 4px 8px;
-  mix-blend-mode: multiply;
-  filter: drop-shadow(0 17px 16px rgba(24, 20, 16, 0.14));
+  /* White JPEG canvases multiply into the matching section colour. */
+  mix-blend-mode: multiply !important;
+  filter: none;
 }
 
 .sbc-card:hover .sbc-card-bg {
