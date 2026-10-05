@@ -106,12 +106,9 @@ export default function ShopByCategory() {
           categoryMap[catKey].push(product);
         });
 
-        // Combine categories from products and any admin-configured custom category images
-        const allCategoryNames = new Set([
-          ...CURATED_CATEGORY_NAMES,
-          ...Object.keys(categoryMap),
-          ...Object.keys(adminCategoryImages).filter(k => adminCategoryImages[k])
-        ]);
+        // Keep the home category rail fixed. Product uploads must not create a
+        // new category tile automatically; only the curated storefront choices appear.
+        const allCategoryNames = CURATED_CATEGORY_NAMES;
 
         // Build category entries with representative image
         const categoryEntries = Array.from(allCategoryNames)

@@ -1,14 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../firebase/firebaseAuth';
 import {
-  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   sendPasswordResetEmail,
   RecaptchaVerifier,
   signInWithPhoneNumber
@@ -74,7 +70,7 @@ export function AuthProvider({ children }) {
         }
         setUserProfile({ id: docSnap.id, ...data, isAdmin });
       } else {
-        // Auto-create basic profile for new users (e.g. Google Sign-In)
+        // Auto-create a basic profile for newly authenticated users.
         const newProfile = {
           fullName: authUser?.displayName || auth.currentUser?.displayName || effectiveEmail.split('@')[0] || 'User',
           email: effectiveEmail,
@@ -109,28 +105,6 @@ export function AuthProvider({ children }) {
 
   function logout() {
     return signOut(auth);
-  }
-
-  async function loginWithGoogle() {
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      if (result && result.user) {
-        setCurrentUser(result.user);
-        fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
-      }
-      return result;
-    } catch (error) {
-      console.warn("Google signInWithPopup error code:", error.code, error.message);
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-        console.warn("Falling back to signInWithRedirect...");
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-        return await signInWithRedirect(auth, provider);
-      }
-      throw error;
-    }
   }
 
   async function startPhoneSignIn(phone, recaptchaContainerId) {
@@ -189,20 +163,6 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }, 1500);
 
-    // Process redirect sign in results (from Google redirect)
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          setCurrentUser(result.user);
-          fetchUserProfile(result.user.uid, result.user).catch(err => console.error(err));
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.warn("Redirect sign-in check:", err.message);
-        setLoading(false);
-      });
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       clearTimeout(safetyTimer);
       setCurrentUser(user);
@@ -231,7 +191,6 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    loginWithGoogle,
     startPhoneSignIn,
     verifyPhoneSignIn,
     updateFirestoreProfile,

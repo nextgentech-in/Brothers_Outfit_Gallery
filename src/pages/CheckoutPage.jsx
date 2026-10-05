@@ -95,7 +95,7 @@ export default function CheckoutPage() {
         shippingAddress: {
           ...shippingAddress,
           phone: activePhone,
-          email: (currentUser.email || shippingAddress.email || '').toLowerCase().trim()
+          email: shippingAddress.email.toLowerCase().trim()
         },
         items: cartItems.map(item => ({
           id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
@@ -273,8 +273,12 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
+    if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.email || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
       return setError('Please fill in all required shipping address fields.');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingAddress.email.trim())) {
+      return setError('Please enter a valid email address to place your order.');
     }
 
     const cleanInputPhone = String(shippingAddress.phone).replace(/\D/g, '').slice(-10);

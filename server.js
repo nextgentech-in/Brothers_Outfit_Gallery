@@ -1048,8 +1048,8 @@ function normalizeShippingAddress(address = {}) {
   const pincode = String(address.pincode || '').replace(/\D/g, '').slice(0, 6);
   const email = String(address.email || '').trim().toLowerCase();
 
-  if (!fullName || !addressLine || !city || !/^[6-9]\d{9}$/.test(phone) || !/^\d{6}$/.test(pincode)) {
-    throw new Error('A complete delivery address and valid Indian mobile number are required.');
+  if (!fullName || !addressLine || !city || !/^[6-9]\d{9}$/.test(phone) || !/^\d{6}$/.test(pincode) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('A complete delivery address, valid Indian mobile number, and email address are required.');
   }
 
   return { fullName, phone, addressLine, city, state, pincode, email };
@@ -1116,9 +1116,9 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
     const orderRef = db.collection('orders').doc(orderId);
     const order = {
       userId: req.user.uid,
-      userEmail: req.user.email || address.email || '',
+      userEmail: address.email,
       userPhone: address.phone,
-      shippingAddress: { ...address, email: req.user.email || address.email || '' },
+      shippingAddress: address,
       items: calculation.items,
       subtotal: calculation.subtotal,
       discount: calculation.discount,

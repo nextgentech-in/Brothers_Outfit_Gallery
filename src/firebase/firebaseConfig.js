@@ -6,7 +6,7 @@ import {
 } from "firebase/firestore";
 import { app } from './firebaseApp';
 export { app } from './firebaseApp';
-export { auth, googleProvider } from './firebaseAuth';
+export { auth } from './firebaseAuth';
 
 // Initialize Cloud Firestore with persistent local cache for instant loading & 0 network latency
 let firestoreDb;
