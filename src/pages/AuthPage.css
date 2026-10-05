@@ -193,6 +193,43 @@
   border-color: #bbb;
 }
 
+.btn-auth-phone {
+  background: #fff;
+  color: var(--color-heading);
+  border: 1px solid #ddd;
+  padding: 14px;
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+}
+
+.btn-auth-phone:hover:not(:disabled) {
+  background: #f8f8f8;
+  border-color: #bbb;
+}
+
+.btn-auth-phone:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-phone-form {
+  gap: 12px;
+}
+
+.auth-text-button {
+  border: 0;
+  background: transparent;
+  color: var(--color-heading);
+  font: 700 13px var(--font-body);
+  cursor: pointer;
+  padding: 4px;
+}
+
 .auth-links {
   margin-top: 24px;
   text-align: center;

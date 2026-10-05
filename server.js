@@ -2799,6 +2799,131 @@ app.post(['/api/notifications/customer/mark-read', '/notifications/customer/mark
   }
 });
 
+// Restores inventory as part of the order cancellation transaction. The
+// `stockRestoredAt` marker makes retries safe: stock cannot be put back twice.
+async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellationReason }) {
+  return db.runTransaction(async (transaction) => {
+    const orderDoc = await transaction.get(orderRef);
+    if (!orderDoc.exists) {
+      const error = new Error('Order not found.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const order = orderDoc.data();
+    if (String(order.status || '').toLowerCase() === 'cancelled' || order.stockRestoredAt) {
+      return { alreadyCancelled: true, order };
+    }
+
+    const productItems = new Map();
+    for (const item of Array.isArray(order.items) ? order.items : []) {
+      const productId = item?.productId || item?.id;
+      if (!productId) continue;
+      const items = productItems.get(String(productId)) || [];
+      items.push(item);
+      productItems.set(String(productId), items);
+    }
+
+    const productEntries = Array.from(productItems.entries());
+    const productSnapshots = await Promise.all(productEntries.map(async ([productId]) => {
+      const ref = db.collection('products').doc(productId);
+      return { ref, items: productItems.get(productId), snapshot: await transaction.get(ref) };
+    }));
+
+    for (const { ref, items, snapshot } of productSnapshots) {
+      if (!snapshot.exists) continue;
+      const product = snapshot.data();
+      const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+
+      if (variants.length > 0) {
+        for (const item of items) {
+          const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+          const size = String(item.size || item.selectedSize || '').trim().toLowerCase();
+          const color = String(item.color || item.selectedColor || '').trim().toLowerCase();
+          let index = variants.findIndex(variant => {
+            const variantSize = String(variant.size || '').trim().toLowerCase();
+            const variantColor = String(variant.color || '').trim().toLowerCase();
+            return variantSize === size && (!color || variantColor === color || variantColor === 'standard' || variantColor === 'default');
+          });
+          if (index < 0 && size) {
+            index = variants.findIndex(variant => String(variant.size || '').trim().toLowerCase() === size);
+          }
+          // Match the checkout fallback for older orders that do not retain a size.
+          if (index < 0) index = 0;
+          const current = parseInt(variants[index].stock ?? variants[index].quantity, 10) || 0;
+          variants[index] = { ...variants[index], stock: current + quantity, quantity: current + quantity };
+        }
+
+        const totalStock = variants.reduce((total, variant) => total + (parseInt(variant.stock ?? variant.quantity, 10) || 0), 0);
+        const availableSizes = [...new Set(variants
+          .filter(variant => (parseInt(variant.stock ?? variant.quantity, 10) || 0) > 0)
+          .map(variant => variant.size)
+          .filter(Boolean))];
+        transaction.update(ref, {
+          variants,
+          stock: totalStock,
+          quantity: totalStock,
+          inStock: totalStock > 0,
+          active: totalStock > 0 ? true : product.active,
+          sizes: availableSizes,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        const restoredQuantity = items.reduce((total, item) => total + Math.max(1, parseInt(item.quantity, 10) || 1), 0);
+        const stock = (parseInt(product.stock ?? product.quantity, 10) || 0) + restoredQuantity;
+        transaction.update(ref, {
+          stock,
+          quantity: stock,
+          inStock: stock > 0,
+          active: stock > 0 ? true : product.active,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+    }
+
+    transaction.update(orderRef, {
+      status: 'Cancelled',
+      shipmentStatus: 'CANCELLED',
+      cancellationReason: cancellationReason || 'Cancelled',
+      cancelledBy: cancelledBy || 'Customer',
+      cancelledAt: FieldValue.serverTimestamp(),
+      stockRestoredAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    return { alreadyCancelled: false, order };
+  });
+}
+
+// ─── Customer: Cancel an order and restore its inventory ───────────────────
+app.post(['/api/orders/cancel', '/orders/cancel'], requireAuth, async (req, res) => {
+  try {
+    const { orderId, reason } = req.body || {};
+    if (!orderId) return res.status(400).json({ error: 'Order ID is required.' });
+
+    const db = getTrustedFirestore();
+    const orderRef = db.collection('orders').doc(String(orderId));
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) return res.status(404).json({ error: 'Order not found.' });
+    const order = orderDoc.data();
+    const ownsOrder = order.userId === req.user?.uid || (
+      order.userEmail && req.user?.email && String(order.userEmail).toLowerCase() === String(req.user.email).toLowerCase()
+    );
+    if (!req.isAdmin && !ownsOrder) return res.status(403).json({ error: 'You can only cancel your own order.' });
+    if (!req.isAdmin && String(order.status || 'Processing').toLowerCase() !== 'processing') {
+      return res.status(409).json({ error: 'Only processing orders can be cancelled.' });
+    }
+
+    const result = await cancelOrderAndRestoreStock(db, orderRef, {
+      cancelledBy: req.isAdmin ? 'Admin' : 'Customer',
+      cancellationReason: String(reason || 'Cancelled by Customer').trim().slice(0, 500)
+    });
+    return res.json({ success: true, orderId, status: 'Cancelled', stockRestored: !result.alreadyCancelled });
+  } catch (error) {
+    console.error('Customer order cancellation error:', error);
+    return res.status(error.statusCode || 500).json({ error: error.message || 'Unable to cancel order.' });
+  }
+});
+
 // ─── Admin: Update Order Status (Trusted Backend Execution) ────────────────
 app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], requireAdminAuth, async (req, res) => {
   try {
@@ -2813,6 +2938,20 @@ app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], req
 
     if (!orderDoc.exists) {
       return res.status(404).json({ error: `Order #${orderId} not found.` });
+    }
+
+    if (status === 'Cancelled') {
+      const result = await cancelOrderAndRestoreStock(db, orderRef, {
+        cancelledBy: extraPayload?.cancelledBy || req.user?.email || 'Admin',
+        cancellationReason: extraPayload?.cancellationReason || 'Cancelled by Admin'
+      });
+      return res.json({
+        success: true,
+        orderId,
+        status: 'Cancelled',
+        shipmentStatus: 'CANCELLED',
+        stockRestored: !result.alreadyCancelled
+      });
     }
 
     const updateFields = {

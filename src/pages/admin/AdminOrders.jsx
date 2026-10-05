@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminOrders, updateOrderStatus, updateOrderShipment, restoreOrderStock } from '../../services/adminService';
+import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import { fetchAllActiveProducts } from '../../services/productService';
 import { useAdminUI } from '../../context/AdminUIContext';
@@ -205,10 +205,6 @@ export default function AdminOrders() {
     try {
       if (order.waybill) {
         await cancelDelhiveryShipment(order.waybill, finalReason);
-      }
-
-      if (order.items && order.items.length > 0) {
-        await restoreOrderStock(order.items);
       }
 
       await updateOrderStatus(order.id, 'Cancelled', {

@@ -18,7 +18,7 @@ const CATEGORY_FALLBACK_IMAGES = {
   Jeans: '/images/category-rail/jeans-cutout.jpg',
   Trousers: '/images/category-rail/trousers-cutout.jpg',
   Shorts: '/images/category-rail/shorts-cutout.jpg',
-  Accessories: '/images/category-rail/accessories-cutout.jpg',
+  Accessories: '/images/category-rail/accessories-cutout-no-wallet.png',
   Perfumes: '/images/category-rail/perfumes-cutout.jpg',
   'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.jpg'
 };

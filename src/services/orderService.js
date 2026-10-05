@@ -1,6 +1,8 @@
 import { collection, query, where, getDocs, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { cancelDelhiveryShipment } from './delhiveryService';
+import { auth } from '../firebase/firebaseAuth';
+import { getBackendUrl } from '../utils/apiConfig';
 
 export const createOrder = async (orderId, orderData) => {
   const orderRef = doc(db, 'orders', orderId);
@@ -179,14 +181,6 @@ export const getOrderById = async (orderId) => {
 };
 
 export const cancelUserOrder = async (orderId, reason = 'Cancelled by Customer', waybill = null) => {
-  const docRef = doc(db, 'orders', orderId);
-  await updateDoc(docRef, {
-    status: 'Cancelled',
-    cancelledAt: new Date(),
-    cancellationReason: reason,
-    updatedAt: new Date()
-  });
-
   if (waybill) {
     try {
       await cancelDelhiveryShipment(waybill, reason);
@@ -194,6 +188,20 @@ export const cancelUserOrder = async (orderId, reason = 'Cancelled by Customer',
       console.warn('Delhivery cancellation warning:', err);
     }
   }
+
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Please sign in again before cancelling this order.');
+
+  const response = await fetch(`${getBackendUrl()}/api/orders/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ orderId, reason })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to cancel this order.');
 
   return true;
 };

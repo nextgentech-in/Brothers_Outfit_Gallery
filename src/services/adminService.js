@@ -256,6 +256,7 @@ export const getAdminOrders = async () => {
 };
 
 export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
+  let backendFailure = null;
   // 1. First attempt update via trusted backend API (bypasses Firestore client security limits)
   try {
     const backendUrl = getBackendUrl();
@@ -274,10 +275,18 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
       return data;
     } else {
       const errData = await res.json().catch(() => ({}));
-      console.warn('Backend update-status returned non-ok status:', errData.error || res.statusText);
+      backendFailure = errData.error || res.statusText;
+      console.warn('Backend update-status returned non-ok status:', backendFailure);
     }
   } catch (backendErr) {
+    backendFailure = backendErr.message;
     console.warn('Backend update-status attempt failed, falling back to direct Firestore:', backendErr.message);
+  }
+
+  // Cancellation also changes inventory and must only run through the trusted,
+  // transactional endpoint. A browser-only fallback would leave stock incorrect.
+  if (status === 'Cancelled') {
+    throw new Error(backendFailure || 'The secure cancellation service is unavailable. Please try again.');
   }
 
   // 2. Direct Firestore fallback

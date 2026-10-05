@@ -10,17 +10,25 @@ const ACCESSORY_CATEGORIES = [
   { id: 'Watches', label: 'Watches' },
   { id: 'Belts', label: 'Belts' },
   { id: 'Sunglasses', label: 'Sunglasses' },
-  { id: 'Wallets', label: 'Wallets & Bags' },
   { id: 'Caps', label: 'Caps & Hats' },
   { id: 'Perfumes', label: 'Perfumes' },
 ];
+
+const ACCESSORY_CATEGORY_IDS = new Set(['accessories', 'watches', 'belts', 'sunglasses', 'caps', 'hats', 'perfumes', 'fragrances']);
+const NON_ACCESSORY_KEYWORDS = ['kurta', 'shirt', 't-shirt', 'tshirt', 'jeans', 'trouser', 'pants', 'shorts', 'jacket', 'hoodie', 'wallet', 'bag'];
+
+const isAccessoryProduct = (product) => {
+  const category = String(product.categoryId || product.category || '').trim().toLowerCase();
+  const description = [product.name, product.category, product.categoryId, product.subCategory].filter(Boolean).join(' ').toLowerCase();
+  return ACCESSORY_CATEGORY_IDS.has(category) && !NON_ACCESSORY_KEYWORDS.some(keyword => description.includes(keyword));
+};
 
 const ACCESSORIES_SCHEMA = [
   {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     "name": "Men's Accessories | Brother’s Outfit Gallery",
-    "description": "Discover curated men's fashion accessories including watches, leather belts, wallets, caps, sunglasses, and fragrances at Brother’s Outfit Gallery.",
+    "description": "Discover curated men's fashion accessories including watches, leather belts, caps, sunglasses, and fragrances at Brother’s Outfit Gallery.",
     "url": "https://www.brothersoutfitgallery.com/accessories"
   },
   {
@@ -57,13 +65,9 @@ export default function AccessoriesPage() {
         const rawItems = await fetchAllActiveProducts();
         const firestoreItems = rawItems.filter(p => p.active !== false && isProductInStock(p));
 
-        // Filter only items whose category belongs to Accessories
-        const accessoryKeywords = ['accessori', 'watch', 'belt', 'sunglass', 'wallet', 'cap', 'hat', 'perfume', 'bag', 'fragrance', 'apparel spray'];
-        const filteredAccessories = firestoreItems.filter(p => {
-          const cat = (p.categoryId || p.category || '').toLowerCase();
-          const name = (p.name || '').toLowerCase();
-          return accessoryKeywords.some(k => cat.includes(k) || name.includes(k));
-        });
+        // Use the assigned category only. Name matching previously leaked Kurtas and
+        // wallets into this page even when they belong to their own collections.
+        const filteredAccessories = firestoreItems.filter(isAccessoryProduct);
 
         setProducts(filteredAccessories);
       } catch (err) {
@@ -86,9 +90,8 @@ export default function AccessoriesPage() {
     ? products
     : products.filter(p => {
         const cat = (p.categoryId || p.category || '').toLowerCase();
-        const name = (p.name || '').toLowerCase();
         const tabKey = activeTab.toLowerCase();
-        return cat.includes(tabKey) || name.includes(tabKey);
+        return cat === tabKey;
       });
 
   return (

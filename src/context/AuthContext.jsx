@@ -9,10 +9,22 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
 } from 'firebase/auth';
 
 const AuthContext = createContext();
+
+let phoneRecaptchaVerifier = null;
+
+const toIndianE164 = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!/^[6-9]\d{9}$/.test(digits)) {
+    throw new Error('Enter a valid 10-digit Indian mobile number.');
+  }
+  return `+91${digits}`;
+};
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -121,6 +133,45 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function startPhoneSignIn(phone, recaptchaContainerId) {
+    const phoneNumber = toIndianE164(phone);
+    const container = document.getElementById(recaptchaContainerId);
+    if (!container) throw new Error('Phone verification is not ready. Please try again.');
+
+    // Clear a previous challenge before creating a new one, including after a failed attempt.
+    if (phoneRecaptchaVerifier) {
+      phoneRecaptchaVerifier.clear();
+      phoneRecaptchaVerifier = null;
+    }
+    container.replaceChildren();
+
+    phoneRecaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+      size: 'invisible'
+    });
+
+    try {
+      await phoneRecaptchaVerifier.render();
+      return await signInWithPhoneNumber(auth, phoneNumber, phoneRecaptchaVerifier);
+    } catch (error) {
+      phoneRecaptchaVerifier.clear();
+      phoneRecaptchaVerifier = null;
+      throw error;
+    }
+  }
+
+  async function verifyPhoneSignIn(confirmationResult, verificationCode) {
+    if (!confirmationResult) throw new Error('Request a verification code first.');
+    const code = String(verificationCode || '').trim();
+    if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit verification code.');
+
+    const result = await confirmationResult.confirm(code);
+    if (result?.user) {
+      setCurrentUser(result.user);
+      fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
+    }
+    return result;
+  }
+
   // Create or update a profile document in Firestore natively
   async function updateFirestoreProfile(uid, data) {
     const [{ doc, setDoc, serverTimestamp }, { db }] = await Promise.all([
@@ -181,6 +232,8 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     loginWithGoogle,
+    startPhoneSignIn,
+    verifyPhoneSignIn,
     updateFirestoreProfile,
     resetPassword
   };
