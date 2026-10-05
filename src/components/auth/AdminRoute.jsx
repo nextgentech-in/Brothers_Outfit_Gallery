@@ -8,8 +8,13 @@ export default function AdminRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
+  // Wait for the trusted profile/admin-role check before rendering admin pages.
+  if (!userProfile) {
+    return null;
+  }
+
   // Use the isAdmin flag attached to userProfile by AuthContext
-  if (userProfile && !userProfile.isAdmin) {
+  if (!userProfile.isAdmin) {
     return <Navigate to="/" replace />;
   }
   

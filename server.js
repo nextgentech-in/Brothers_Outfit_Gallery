@@ -224,6 +224,17 @@ const ADMIN_EMAILS = [
   process.env.VITE_ADMIN_EMAIL || 'setupatel01@gmail.com',
   'setupatel441@gmail.com'
 ];
+const normalizePhoneNumber = (value) => String(value || '').replace(/\D/g, '').slice(-10);
+const ADMIN_PHONE_NUMBERS = new Set(
+  (process.env.ADMIN_PHONE_NUMBERS || '')
+    .split(',')
+    .map(normalizePhoneNumber)
+    .filter(phone => /^[6-9]\d{9}$/.test(phone))
+);
+const isAdminUser = (user) => Boolean(user && (
+  (user.email && ADMIN_EMAILS.includes(String(user.email).toLowerCase().trim())) ||
+  ADMIN_PHONE_NUMBERS.has(normalizePhoneNumber(user.phone))
+));
 
 const mailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -608,6 +619,7 @@ async function verifyUserToken(idToken) {
       const record = {
         uid: user.localId,
         email: (user.email || '').toLowerCase().trim(),
+        phone: normalizePhoneNumber(user.phoneNumber),
         expiresAt: Date.now() + 10 * 60 * 1000 // 10 min cache
       };
       adminTokenCache.set(tokenHash, record);
@@ -641,7 +653,7 @@ async function requireAdminAuth(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
     const user = await verifyUserToken(token);
-    if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
+    if (isAdminUser(user)) {
       req.user = user;
       req.isAdmin = true;
       return next();
@@ -669,7 +681,7 @@ async function requireAuth(req, res, next) {
     const user = await verifyUserToken(token);
     if (user) {
       req.user = user;
-      req.isAdmin = ADMIN_EMAILS.includes(user.email);
+      req.isAdmin = isAdminUser(user);
       return next();
     }
   }

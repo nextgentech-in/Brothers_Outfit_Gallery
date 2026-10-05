@@ -13,6 +13,12 @@ import {
 const AuthContext = createContext();
 
 let phoneRecaptchaVerifier = null;
+const ADMIN_PHONE_NUMBERS = new Set(
+  (import.meta.env.VITE_ADMIN_PHONE_NUMBERS || '')
+    .split(',')
+    .map(phone => String(phone).replace(/\D/g, '').slice(-10))
+    .filter(phone => /^[6-9]\d{9}$/.test(phone))
+);
 
 const toIndianE164 = (phone) => {
   const digits = String(phone || '').replace(/\D/g, '').slice(-10);
@@ -42,6 +48,7 @@ export function AuthProvider({ children }) {
       const docSnap = await getDoc(docRef);
       let isAdmin = false;
       const effectiveEmail = authUser?.email || auth.currentUser?.email || '';
+      const effectivePhone = String(authUser?.phoneNumber || auth.currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
 
       const adminEmails = [
         import.meta.env.VITE_ADMIN_EMAIL,
@@ -49,7 +56,7 @@ export function AuthProvider({ children }) {
         'setupatel441@gmail.com'
       ];
 
-      if (effectiveEmail && adminEmails.includes(effectiveEmail)) {
+      if ((effectiveEmail && adminEmails.includes(effectiveEmail)) || ADMIN_PHONE_NUMBERS.has(effectivePhone)) {
         isAdmin = true;
       }
 
@@ -78,7 +85,7 @@ export function AuthProvider({ children }) {
           birthdate: '',
           age: '',
           address: { line1: '', city: '', state: '', pincode: '' },
-          provider: authUser?.providerData?.[0]?.providerId || 'google.com',
+          provider: authUser?.providerData?.[0]?.providerId || 'phone',
           createdAt: serverTimestamp()
         };
 

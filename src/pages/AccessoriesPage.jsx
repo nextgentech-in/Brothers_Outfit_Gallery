@@ -10,12 +10,13 @@ const ACCESSORY_CATEGORIES = [
   { id: 'Watches', label: 'Watches' },
   { id: 'Belts', label: 'Belts' },
   { id: 'Sunglasses', label: 'Sunglasses' },
+  { id: 'Wallets', label: 'Wallets & Bags' },
   { id: 'Caps', label: 'Caps & Hats' },
   { id: 'Perfumes', label: 'Perfumes' },
 ];
 
-const ACCESSORY_CATEGORY_IDS = new Set(['accessories', 'watches', 'belts', 'sunglasses', 'caps', 'hats', 'perfumes', 'fragrances']);
-const NON_ACCESSORY_KEYWORDS = ['kurta', 'shirt', 't-shirt', 'tshirt', 'jeans', 'trouser', 'pants', 'shorts', 'jacket', 'hoodie', 'wallet', 'bag'];
+const ACCESSORY_CATEGORY_IDS = new Set(['accessories', 'watches', 'belts', 'sunglasses', 'wallets', 'caps', 'hats', 'perfumes', 'fragrances']);
+const NON_ACCESSORY_KEYWORDS = ['kurta', 'shirt', 't-shirt', 'tshirt', 'jeans', 'trouser', 'pants', 'shorts', 'jacket', 'hoodie'];
 
 const isAccessoryProduct = (product) => {
   const category = String(product.categoryId || product.category || '').trim().toLowerCase();
@@ -28,7 +29,7 @@ const ACCESSORIES_SCHEMA = [
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     "name": "Men's Accessories | Brother’s Outfit Gallery",
-    "description": "Discover curated men's fashion accessories including watches, leather belts, caps, sunglasses, and fragrances at Brother’s Outfit Gallery.",
+    "description": "Discover curated men's fashion accessories including watches, leather belts, wallets, caps, sunglasses, and fragrances at Brother’s Outfit Gallery.",
     "url": "https://www.brothersoutfitgallery.com/accessories"
   },
   {
