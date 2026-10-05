@@ -18,12 +18,13 @@ const CATEGORY_FALLBACK_IMAGES = {
   Jeans: '/images/category-rail/jeans-cutout.jpg',
   Trousers: '/images/category-rail/trousers-cutout.jpg',
   Shorts: '/images/category-rail/shorts-cutout.jpg',
-  Accessories: '/images/category-rail/accessories-cutout-no-wallet.png',
+  Accessories: '/images/category-rail/accessories-cutout.jpg',
   Perfumes: '/images/category-rail/perfumes-cutout.jpg',
   'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.jpg'
 };
 
 const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
+const HIDDEN_CATEGORY_NAMES = new Set(['wallets']);
 
 const getCuratedCategories = () => CURATED_CATEGORY_NAMES.map(name => ({
   name,
@@ -130,7 +131,7 @@ export default function ShopByCategory() {
               productCount: products.length
             };
           })
-          .filter(cat => cat.imageUrl); // Only show categories that have an image source
+          .filter(cat => cat.imageUrl && !HIDDEN_CATEGORY_NAMES.has(cat.name.toLowerCase()));
 
         // Sort by preferred display order
         categoryEntries.sort((a, b) => {
