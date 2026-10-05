@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth } from '../firebase/firebaseAuth';
+import { getBackendUrl } from '../utils/apiConfig';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -13,12 +14,6 @@ import {
 const AuthContext = createContext();
 
 let phoneRecaptchaVerifier = null;
-const ADMIN_PHONE_NUMBERS = new Set(
-  (import.meta.env.VITE_ADMIN_PHONE_NUMBERS || '')
-    .split(',')
-    .map(phone => String(phone).replace(/\D/g, '').slice(-10))
-    .filter(phone => /^[6-9]\d{9}$/.test(phone))
-);
 
 const toIndianE164 = (phone) => {
   const digits = String(phone || '').replace(/\D/g, '').slice(-10);
@@ -48,7 +43,6 @@ export function AuthProvider({ children }) {
       const docSnap = await getDoc(docRef);
       let isAdmin = false;
       const effectiveEmail = authUser?.email || auth.currentUser?.email || '';
-      const effectivePhone = String(authUser?.phoneNumber || auth.currentUser?.phoneNumber || '').replace(/\D/g, '').slice(-10);
 
       const adminEmails = [
         import.meta.env.VITE_ADMIN_EMAIL,
@@ -56,8 +50,23 @@ export function AuthProvider({ children }) {
         'setupatel441@gmail.com'
       ];
 
-      if ((effectiveEmail && adminEmails.includes(effectiveEmail)) || ADMIN_PHONE_NUMBERS.has(effectivePhone)) {
+      if (effectiveEmail && adminEmails.includes(effectiveEmail)) {
         isAdmin = true;
+      }
+
+      // The server evaluates phone-based admin access after token verification.
+      // This keeps the phone allowlist out of the browser and user profiles.
+      if (!isAdmin && authUser) {
+        try {
+          const token = await authUser.getIdToken();
+          const response = await fetch(`${getBackendUrl()}/api/auth/admin-status`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const status = await response.json().catch(() => ({}));
+          isAdmin = response.ok && status.isAdmin === true;
+        } catch {
+          // Deny admin UI access while the trusted role service is unavailable.
+        }
       }
 
       try {

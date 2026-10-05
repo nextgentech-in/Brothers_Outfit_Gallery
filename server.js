@@ -691,6 +691,12 @@ async function requireAuth(req, res, next) {
   });
 }
 
+// Reports only the authenticated caller's role. The phone allowlist remains
+// server-side and is never embedded in the storefront bundle.
+app.get(['/api/auth/admin-status', '/auth/admin-status'], requireAuth, (req, res) => {
+  res.json({ isAdmin: Boolean(req.isAdmin) });
+});
+
 // ─── Server-Side Catalog Cache & Price Verification ─────────────────────────
 let productCatalogCache = { products: null, expiresAt: 0 };
 let couponCatalogCache = { coupons: null, expiresAt: 0 };
