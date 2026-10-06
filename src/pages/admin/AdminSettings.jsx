@@ -19,11 +19,14 @@ export default function AdminSettings() {
     exchangeWindowDays: 2
   });
 
+  const [savedSettings, setSavedSettings] = useState(null);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       const data = await getStoreSettings();
       setSettings(prev => ({ ...prev, ...data }));
+      setSavedSettings(prev => ({ ...prev, ...data }));
       setLoading(false);
     }
     load();
@@ -34,16 +37,27 @@ export default function AdminSettings() {
     setSettings(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
+  const handleSave = async (e, customSettings = null) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const toSave = customSettings || settings;
+    const previous = savedSettings ? { ...savedSettings } : { ...settings };
+
+    // 1. Optimistic UI update
+    showToast('Store settings saved successfully!', 'success');
+    setSavedSettings(toSave);
+
+    // 2. Background update
     try {
-      setSaving(true);
-      await saveStoreSettings(settings);
-      showToast('Store settings saved successfully!', 'success');
+      await saveStoreSettings(toSave);
     } catch (err) {
-      showToast(err.message || 'Failed to save store settings', 'error');
-    } finally {
-      setSaving(false);
+      console.error('Failed to save store settings:', err);
+      // 3. Rollback on failure
+      setSettings(previous);
+      setSavedSettings(previous);
+      showToast(err.message || 'Failed to save store settings', 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleSave(null, toSave)
+      });
     }
   };
 

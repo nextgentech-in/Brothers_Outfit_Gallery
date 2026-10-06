@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
-import { optimizeImage } from '../../utils/imageUtils';
+import { optimizeImage, getThumbnailImageUrl, getProductDetailImageUrl, getZoomImageUrl } from '../../utils/imageUtils';
 import './ProductGallery.css';
 
 export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors, isOutOfStock = false, productName = 'Men’s Wear' }) {
@@ -124,7 +124,14 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
                 aria-label={`View ${productName} image ${idx + 1}`}
                 title={imgColor ? `Color: ${imgColor}` : `View image ${idx + 1}`}
               >
-                <img loading="lazy" decoding="async" src={optimizeImage(thumbUrl, 240)} alt={`${productName} thumbnail ${idx + 1}`} />
+                <img 
+                  loading="lazy" 
+                  decoding="async" 
+                  width="72" 
+                  height="90" 
+                  src={getThumbnailImageUrl(thumbUrl, 180)} 
+                  alt={`${productName} thumbnail ${idx + 1}`} 
+                />
               </button>
             );
           })}
@@ -138,10 +145,8 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
         onTouchEnd={handleTouchEnd}
       >
         <ImageZoom 
-          src={optimizeImage(currentImage, {
-            width: typeof window !== 'undefined' && window.innerWidth < 768 ? 1200 : 1600,
-            quality: 92
-          })} 
+          src={getProductDetailImageUrl(currentImage, typeof window !== 'undefined' && window.innerWidth < 768)}
+          zoomSrc={getZoomImageUrl(currentImage, 1600)}
           alt={`${productName} - ${selectedColor || 'Classic'} View ${safeCurrentIndex + 1} | Brother’s Outfit Gallery`} 
           onClick={() => setLightboxOpen(true)}
         />
@@ -218,7 +223,7 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
       {/* Lightbox Modal */}
       {lightboxOpen && (
         <ImageLightbox 
-          images={displayImages.map(img => optimizeImage(extractUrl(img), { width: 1800, quality: 95 }))} 
+          images={displayImages.map(img => getZoomImageUrl(extractUrl(img), 1600))} 
           currentIndex={safeCurrentIndex}
           onClose={() => setLightboxOpen(false)}
           onNavigate={handleNavigate}

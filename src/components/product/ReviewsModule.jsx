@@ -137,55 +137,97 @@ export default function ReviewsModule({ product }) {
     setPhotos(prev => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // Submit Review to Firestore
-  const handleSubmitReview = async (e) => {
-    e.preventDefault();
+  // Submit Review to Firestore (Optimistic Update)
+  const handleSubmitReview = async (e, customData = null) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!currentUser) {
       setFeedback({ type: 'error', text: 'You must be signed in to submit a review for this product.' });
       return;
     }
-    if (!comment.trim()) {
+
+    const currentComment = customData ? customData.comment : comment;
+    const currentRating = customData ? customData.rating : rating;
+    const currentPhotos = customData ? customData.photos : photos;
+    const currentRecommend = customData ? customData.recommend : recommend;
+    const currentUserName = customData ? customData.userName : userName;
+
+    if (!currentComment.trim()) {
       setFeedback({ type: 'error', text: 'Please write your review thoughts.' });
       return;
     }
 
-    setSubmitting(true);
-    setFeedback(null);
+    // Preserve snapshot for rollback & retry
+    const snapshotData = {
+      comment: currentComment,
+      rating: currentRating,
+      photos: currentPhotos,
+      recommend: currentRecommend,
+      userName: currentUserName
+    };
 
+    const tempId = `temp-${Date.now()}`;
+    const optimisticReview = {
+      id: tempId,
+      productId: product?.id || 'general-product',
+      productName: product?.name || 'Store Product',
+      userName: currentUserName.trim() || currentUser.displayName || 'Verified Customer',
+      rating: Number(currentRating),
+      comment: currentComment.trim(),
+      recommend: Boolean(currentRecommend),
+      images: currentPhotos,
+      verifiedPurchase: true,
+      dateFormatted: 'Just now',
+      isOptimistic: true
+    };
+
+    // 1. Optimistic UI update: display immediately and close form
+    setReviews(prev => [optimisticReview, ...prev]);
+    setShowReviewForm(false);
+    setFeedback({ type: 'success', text: 'Thank you! Your review has been added.' });
+
+    // Reset local form inputs
+    setComment('');
+    setPhotos([]);
+    setRecommend(true);
+    setRating(5);
+
+    // 2. Background Firestore request
     try {
-      const newReview = await submitReview({
+      const realReview = await submitReview({
         productId: product?.id || 'general-product',
         productName: product?.name || 'Store Product',
         productSlug: product?.slug || '',
         userId: currentUser.uid,
-        userName: userName.trim() || currentUser.displayName || 'Verified Customer',
+        userName: currentUserName.trim() || currentUser.displayName || 'Verified Customer',
         userEmail: currentUser.email || '',
-        rating: Number(rating),
-        comment: comment.trim(),
-        recommend: Boolean(recommend),
-        images: photos,
+        rating: Number(currentRating),
+        comment: currentComment.trim(),
+        recommend: Boolean(currentRecommend),
+        images: currentPhotos,
         verifiedPurchase: true
       });
 
-      // Prepend to current reviews
-      setReviews(prev => [newReview, ...prev]);
-      setFeedback({ type: 'success', text: 'Thank you! Your review with photo and recommendation has been published.' });
-      
-      // Reset form
-      setComment('');
-      setPhotos([]);
-      setRecommend(true);
-      setRating(5);
-
-      setTimeout(() => {
-        setShowReviewForm(false);
-        setFeedback(null);
-      }, 2000);
+      // On server success: swap temporary item with persistent server review
+      setReviews(prev => prev.map(r => r.id === tempId ? { ...realReview, isOptimistic: false } : r));
     } catch (err) {
       console.error('Failed to submit review:', err);
-      setFeedback({ type: 'error', text: 'Failed to submit review: ' + err.message });
-    } finally {
-      setSubmitting(false);
+      // 3. Rollback on failure: remove optimistic preview from list
+      setReviews(prev => prev.filter(r => r.id !== tempId));
+
+      // Restore user's draft content back into form
+      setComment(snapshotData.comment);
+      setRating(snapshotData.rating);
+      setPhotos(snapshotData.photos);
+      setRecommend(snapshotData.recommend);
+      setUserName(snapshotData.userName);
+      setShowReviewForm(true);
+
+      // Offer clear error with instant retry option
+      setFeedback({
+        type: 'error',
+        text: `Failed to save review: ${err.message || 'Please check connection'}.`,
+        onRetry: () => handleSubmitReview(null, snapshotData)
+      });
     }
   };
 
@@ -289,11 +331,34 @@ export default function ReviewsModule({ product }) {
                   marginBottom: '16px',
                   fontSize: '13px',
                   fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
                   background: feedback.type === 'success' ? '#f0fdf4' : '#fef2f2',
                   color: feedback.type === 'success' ? '#15803d' : '#dc2626',
                   border: `1px solid ${feedback.type === 'success' ? '#bbf7d0' : '#fecaca'}`
                 }}>
-                  {feedback.text}
+                  <span>{feedback.text}</span>
+                  {feedback.onRetry && (
+                    <button
+                      type="button"
+                      onClick={feedback.onRetry}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '4px',
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Retry
+                    </button>
+                  )}
                 </div>
               )}
 

@@ -7,16 +7,19 @@ export function AdminUIProvider({ children }) {
   const [confirmDialog, setConfirmDialog] = useState(null);
   const confirmResolverRef = useRef(null);
 
-  // Trigger branded toast notification
-  const showToast = useCallback((message, type = 'success', duration = 3500) => {
+  // Trigger branded toast notification with optional retry action callback
+  const showToast = useCallback((message, type = 'success', duration = 3500, action = null) => {
     const id = Date.now() + Math.random().toString(36).substr(2, 5);
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, message, type, action }]);
 
-    if (duration > 0) {
+    const effectiveDuration = action ? Math.max(duration, 7000) : duration;
+
+    if (effectiveDuration > 0) {
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
-      }, duration);
+      }, effectiveDuration);
     }
+    return id;
   }, []);
 
   const removeToast = useCallback((id) => {

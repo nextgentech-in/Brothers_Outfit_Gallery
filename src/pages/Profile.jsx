@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
 import ExchangeRequestModal from '../components/exchange/ExchangeRequestModal';
+import ExchangeApprovalModal from '../components/exchange/ExchangeApprovalModal';
 import { subscribeCustomerExchanges } from '../services/exchangeService';
 import { normalizeShipmentStatus, INTERNAL_STATUS } from '../utils/shipmentStatus';
 import { EXCHANGE_STATUS_METADATA, CUSTOMER_EXCHANGE_STEPS, EXCHANGE_STATUS } from '../utils/exchangeConstants';
@@ -114,10 +115,17 @@ export default function Profile() {
     loadNotifications();
   }, [loadNotifications]);
 
+  const [notificationFeedback, setNotificationFeedback] = useState(null);
+
   const handleDismissNotification = async (notificationId) => {
+    const prevNotifications = [...customerNotifications];
+    // Optimistic removal: remove immediately from UI
+    setCustomerNotifications(prev => prev.filter(n => n.id !== notificationId));
+    setNotificationFeedback(null);
+
     try {
       const token = await currentUser.getIdToken();
-      await fetch(`${getBackendUrl()}/api/notifications/customer/mark-read`, {
+      const res = await fetch(`${getBackendUrl()}/api/notifications/customer/mark-read`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,9 +133,16 @@ export default function Profile() {
         },
         body: JSON.stringify({ notificationId })
       });
-      setCustomerNotifications(prev => prev.filter(n => n.id !== notificationId));
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
     } catch (err) {
       console.warn('Dismiss notification warning:', err);
+      // Rollback on network failure
+      setCustomerNotifications(prevNotifications);
+      setNotificationFeedback({
+        type: 'error',
+        text: 'Failed to dismiss notification. Connection issue.',
+        onRetry: () => handleDismissNotification(notificationId)
+      });
     }
   };
 
@@ -140,6 +155,47 @@ export default function Profile() {
 
   // Exchange Modal State (Driven by new ExchangeRequestModal)
   const [selectedExchangeOrder, setSelectedExchangeOrder] = useState(null);
+
+  // Exchange Approval Notice Popup Modal State
+  const [approvalModalExchange, setApprovalModalExchange] = useState(null);
+
+  // Extract all approved / pickup-ready exchanges for this customer
+  const approvedExchanges = useMemo(() => {
+    return customerExchanges.filter(ex =>
+      [EXCHANGE_STATUS.APPROVED, EXCHANGE_STATUS.REVERSE_PICKUP_PENDING, EXCHANGE_STATUS.REVERSE_PICKUP_CREATED].includes(ex.status) ||
+      String(ex.status || '').toUpperCase() === 'APPROVED' ||
+      String(ex.adminDecision || '').toUpperCase() === 'APPROVED'
+    );
+  }, [customerExchanges]);
+
+  // Auto-show Exchange Approval Popup if an approved exchange hasn't been acknowledged yet
+  useEffect(() => {
+    if (approvedExchanges.length > 0 && !approvalModalExchange) {
+      const unviewed = approvedExchanges.find(ex => {
+        try {
+          const id = ex.id || ex.docId;
+          return localStorage.getItem(`dismissed_exchange_approval_${id}`) !== 'true';
+        } catch {
+          return false;
+        }
+      });
+      if (unviewed) {
+        setApprovalModalExchange(unviewed);
+      }
+    }
+  }, [approvedExchanges, approvalModalExchange]);
+
+  const handleCloseApprovalModal = () => {
+    if (approvalModalExchange) {
+      try {
+        const id = approvalModalExchange.id || approvalModalExchange.docId;
+        localStorage.setItem(`dismissed_exchange_approval_${id}`, 'true');
+      } catch (err) {
+        console.warn('LocalStorage error:', err);
+      }
+    }
+    setApprovalModalExchange(null);
+  };
 
   // Delivery status verification helper
   const isOrderDelivered = useCallback((order) => {
@@ -257,33 +313,43 @@ export default function Profile() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  async function handleSave(e) {
-    e.preventDefault();
+  async function handleSave(e, customData = null) {
+    if (e && e.preventDefault) e.preventDefault();
+    const dataToSave = customData || formData;
+    const prevFormData = { ...formData };
+
     try {
-      setMessage('');
-      setLoading(true);
+      // 1. Optimistic UI update: immediately exit edit mode and show success
+      setMessage({ type: 'success', text: 'PROFILE UPDATED SUCCESSFULLY' });
+      setIsEditing(false);
+
       const addressData = {
-        line1: formData.addressLine,
-        city: formData.city,
-        state: formData.state,
-        pincode: formData.pincode
+        line1: dataToSave.addressLine,
+        city: dataToSave.city,
+        state: dataToSave.state,
+        pincode: dataToSave.pincode
       };
 
+      // 2. Background Firestore update
       await updateFirestoreProfile(currentUser.uid, {
-        fullName: formData.fullName,
-        phone: formData.phone,
-        birthdate: formData.birthdate || '',
-        age: formData.age ? Number(formData.age) : null,
+        fullName: dataToSave.fullName,
+        phone: dataToSave.phone,
+        birthdate: dataToSave.birthdate || '',
+        age: dataToSave.age ? Number(dataToSave.age) : null,
         address: addressData
       });
 
-      setMessage('PROFILE UPDATED SUCCESSFULLY');
-      setIsEditing(false);
-    } catch {
-      setMessage('Failed to update profile.');
-    } finally {
-      setLoading(false);
       setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      // 3. Rollback on failure: restore previous data, reopen edit mode, and provide retry
+      setFormData(prevFormData);
+      setIsEditing(true);
+      setMessage({
+        type: 'error',
+        text: 'Failed to update profile. Your changes were reverted.',
+        onRetry: () => handleSave(null, dataToSave)
+      });
     }
   }
 
@@ -330,6 +396,74 @@ export default function Profile() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {notificationFeedback && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              background: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              fontSize: '13px',
+              fontWeight: 600,
+              marginBottom: '16px'
+            }}>
+              <span>{notificationFeedback.text}</span>
+              {notificationFeedback.onRetry && (
+                <button
+                  type="button"
+                  onClick={notificationFeedback.onRetry}
+                  style={{
+                    background: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Prominent Approved Exchange Notification Banner */}
+          {approvedExchanges.length > 0 && (
+            <div className="profile-approved-exchange-alert">
+              <div className="approved-alert-left">
+                <span className="approved-alert-icon">🎉</span>
+                <div className="approved-alert-text">
+                  <strong>Exchange Request #{approvedExchanges[0].id || approvedExchanges[0].docId} Approved!</strong>
+                  <span>Your exchange request has been approved by admin. Submit proof of exchange on WhatsApp to coordinate replacement.</span>
+                </div>
+              </div>
+              <div className="approved-alert-actions">
+                <button
+                  type="button"
+                  className="btn-alert-view-notice"
+                  onClick={() => setApprovalModalExchange(approvedExchanges[0])}
+                >
+                  View Notice
+                </button>
+                <a
+                  href={`https://wa.me/918460233020?text=${encodeURIComponent(
+                    `Hi Brother's Outfit Gallery Team,\n\nMy Exchange Request #${approvedExchanges[0].id || approvedExchanges[0].docId} for Order #${approvedExchanges[0].orderId} is APPROVED!\n• Item: ${approvedExchanges[0].productName || 'Garment Item'}\n• Replacement: ${approvedExchanges[0].requestedVariant?.size || 'New Size'}\n\nI am submitting the required photo/video proof with tags attached.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-alert-whatsapp"
+                >
+                  📲 Submit Proof
+                </a>
+              </div>
             </div>
           )}
 
@@ -399,9 +533,16 @@ export default function Profile() {
                     
                     // Authoritative exchange lookup for this order
                     const orderExchange = customerExchanges.find(ex => ex.orderId === order.id);
+                    const isOrderExchangeApproved = orderExchange && (
+                      [EXCHANGE_STATUS.APPROVED, EXCHANGE_STATUS.REVERSE_PICKUP_PENDING, EXCHANGE_STATUS.REVERSE_PICKUP_CREATED].includes(orderExchange.status) ||
+                      String(orderExchange.status || '').toUpperCase() === 'APPROVED' ||
+                      String(orderExchange.adminDecision || '').toUpperCase() === 'APPROVED'
+                    );
 
                     const statusClass = isCancelled 
                       ? 'status-cancelled' 
+                      : isOrderExchangeApproved
+                      ? 'status-exchange'
                       : orderExchange
                       ? (orderExchange.status === EXCHANGE_STATUS.REJECTED ? 'status-cancelled' : 'status-exchange')
                       : isDelivered 
@@ -443,7 +584,9 @@ export default function Profile() {
                             </div>
 
                             <span className={`order-status-pill ${statusClass}`}>
-                              {orderExchange 
+                              {isOrderExchangeApproved
+                                ? 'Exchange Approved'
+                                : orderExchange 
                                 ? (EXCHANGE_STATUS_METADATA[orderExchange.status]?.label || orderExchange.status)
                                 : (order.status || 'Processing')}
                             </span>
@@ -734,14 +877,18 @@ export default function Profile() {
               ) : (
                 <div className="customer-exchanges-list">
                   {customerExchanges.map((ex) => {
+                    const isApproved = [EXCHANGE_STATUS.APPROVED, EXCHANGE_STATUS.REVERSE_PICKUP_PENDING, EXCHANGE_STATUS.REVERSE_PICKUP_CREATED].includes(ex.status) ||
+                      String(ex.status || '').toUpperCase() === 'APPROVED' ||
+                      String(ex.adminDecision || '').toUpperCase() === 'APPROVED';
+
                     const meta = EXCHANGE_STATUS_METADATA[ex.status] || {
-                      label: ex.status,
-                      description: '',
-                      badgeClass: 'badge-pending',
-                      step: 1
+                      label: isApproved ? 'Exchange Approved' : ex.status,
+                      description: isApproved ? 'Approved by admin' : '',
+                      badgeClass: isApproved ? 'badge-approved' : 'badge-pending',
+                      step: isApproved ? 2 : 1
                     };
                     const isRejected = ex.status === EXCHANGE_STATUS.REJECTED || ex.status === EXCHANGE_STATUS.QC_REJECTED;
-                    const currentStep = meta.step || 1;
+                    const currentStep = isApproved ? 2 : (meta.step || 1);
 
                     return (
                       <div key={ex.id || ex.docId} className="customer-exchange-card">
@@ -752,8 +899,8 @@ export default function Profile() {
                               Order #{ex.orderId}
                             </span>
                           </div>
-                          <span className={`exchange-status-pill ${meta.badgeClass}`}>
-                            {meta.label}
+                          <span className={`exchange-status-pill ${isApproved ? 'badge-approved' : meta.badgeClass}`}>
+                            {isApproved ? 'Exchange Approved' : meta.label}
                           </span>
                         </div>
 
@@ -828,6 +975,41 @@ export default function Profile() {
                               </div>
                             )}
                             <p className="rejection-subtext">No reverse pickup was created. Please contact our support if you have questions.</p>
+                          </div>
+                        )}
+
+                        {/* Approval Notice Card with WhatsApp proof submission button */}
+                        {isApproved && (
+                          <div className="exchange-approved-card">
+                            <div className="exchange-approved-badge">
+                              <span className="approved-icon" aria-hidden="true">🎉</span>
+                              <div>
+                                <div className="approved-title">Exchange Request Approved!</div>
+                                <div className="approved-subtitle">Your exchange request has been approved by admin</div>
+                              </div>
+                            </div>
+                            <p className="approved-desc">
+                              Your exchange request is approved! Please submit photo/video proof showing original brand tags attached via WhatsApp to coordinate replacement.
+                            </p>
+                            <div className="approved-card-actions">
+                              <a
+                                href={`https://wa.me/918460233020?text=${encodeURIComponent(
+                                  `Hi Brother's Outfit Gallery Team,\n\nMy Exchange Request #${ex.id || ex.docId} for Order #${ex.orderId} is APPROVED!\n• Item: ${ex.productName || 'Garment Item'}\n• Replacement Size: ${ex.requestedVariant?.size || 'New Size'}\n\nI am submitting the required proof of the garment with brand tags attached.`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-submit-proof-wa"
+                              >
+                                <span>📲 Submit Proof of Exchange on WhatsApp</span>
+                              </a>
+                              <button
+                                type="button"
+                                className="btn-view-approval-notice"
+                                onClick={() => setApprovalModalExchange(ex)}
+                              >
+                                View Full Notice
+                              </button>
+                            </div>
                           </div>
                         )}
 
@@ -915,7 +1097,45 @@ export default function Profile() {
                 )}
               </div>
 
-              {message && <div className="profile-message">{message}</div>}
+              {message && (
+                <div
+                  className={`profile-message ${message.type === 'error' ? 'profile-message--error' : ''}`}
+                  style={
+                    message.type === 'error'
+                      ? {
+                          background: '#fef2f2',
+                          color: '#dc2626',
+                          borderColor: '#fecaca',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }
+                      : {}
+                  }
+                >
+                  <span>{typeof message === 'string' ? message : message.text}</span>
+                  {message.onRetry && (
+                    <button
+                      type="button"
+                      onClick={message.onRetry}
+                      style={{
+                        background: '#dc2626',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
 
               {isEditing ? (
                 <form onSubmit={handleSave} className="profile-form">
@@ -1157,6 +1377,13 @@ export default function Profile() {
           });
           setTimeout(() => setOrderFeedback(null), 8000);
         }}
+      />
+
+      {/* Customer Exchange Approval Popup Modal */}
+      <ExchangeApprovalModal
+        isOpen={!!approvalModalExchange}
+        onClose={handleCloseApprovalModal}
+        exchange={approvalModalExchange}
       />
     </div>
   );

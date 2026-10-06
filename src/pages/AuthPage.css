@@ -244,12 +244,11 @@
   text-decoration: none;
 }
 
-/* Responsive */
 @media (max-width: 900px) {
   .auth-image {
     display: none; /* Mobile shifts directly to Single Column form */
   }
   .auth-content {
-    padding: 24px;
+    padding: calc(var(--total-header-height, 96px) + 28px) 20px 60px;
   }
 }

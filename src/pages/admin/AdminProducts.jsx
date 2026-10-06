@@ -47,7 +47,10 @@ export default function AdminProducts() {
       console.error('Failed to toggle trending status:', err);
       // Rollback on error
       setProducts(prev => prev.map(p => p.id === id ? { ...p, isTrending: currentStatus } : p));
-      showToast('Failed to update trending status. Please check your connection.', 'error');
+      showToast('Failed to update trending status. Please check your connection.', 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleToggleTrending(id, currentStatus)
+      });
     } finally {
       setTogglingId(null);
     }
@@ -62,9 +65,22 @@ export default function AdminProducts() {
     });
 
     if (confirmed) {
-      await deactivateProduct(id);
+      const previousProducts = [...products];
+      // Optimistic UI update
+      setProducts(prev => prev.map(p => p.id === id ? { ...p, active: false } : p));
       showToast('Product deactivated successfully.', 'success');
-      fetchProducts();
+
+      try {
+        await deactivateProduct(id);
+      } catch (err) {
+        console.error('Failed to deactivate product:', err);
+        // Rollback on error
+        setProducts(previousProducts);
+        showToast(`Failed to deactivate product: ${err.message || 'Server error'}`, 'error', 7000, {
+          label: 'Retry',
+          onClick: () => handleDeactivate(id)
+        });
+      }
     }
   };
 

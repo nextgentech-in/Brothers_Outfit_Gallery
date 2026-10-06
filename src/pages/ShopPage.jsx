@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { getShopProducts, isProductInStock } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
+import { normalizeToStandardColor } from '../data/colorMaster.js';
 import SEO from '../components/common/SEO';
 import './ShopPage.css';
 
@@ -38,7 +39,21 @@ const PRICE_RANGES = [
   { label: '₹2,000+', min: 2000, max: Infinity },
 ];
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
-const COLORS = ['Black', 'White', 'Blue', 'Grey', 'Beige', 'Brown'];
+const SHOP_FILTER_COLORS = [
+  { id: 'black', name: 'Black', hex: '#000000' },
+  { id: 'white', name: 'White', hex: '#FFFFFF' },
+  { id: 'navy-blue', name: 'Navy Blue', hex: '#1F2A44' },
+  { id: 'rani', name: 'Rani', hex: '#C41242' },
+  { id: 'maroon', name: 'Maroon', hex: '#800020' },
+  { id: 'olive', name: 'Olive', hex: '#556B2F' },
+  { id: 'beige', name: 'Beige', hex: '#D6C3A1' },
+  { id: 'grey', name: 'Grey', hex: '#6B7280' },
+  { id: 'royal-blue', name: 'Blue', hex: '#1E40AF' },
+  { id: 'brown', name: 'Brown', hex: '#5C4033' },
+  { id: 'mustard', name: 'Mustard', hex: '#D97706' },
+  { id: 'sage-green', name: 'Sage', hex: '#9CAEA9' }
+];
+const COLORS = SHOP_FILTER_COLORS.map(c => c.name);
 const SORT_OPTIONS = [
   { label: 'Featured', value: 'featured' },
   { label: 'Newest', value: 'newest' },
@@ -209,13 +224,29 @@ export default function ShopPage() {
       });
     }
 
-    // Multi-Color Filter (checks objects, strings, variants)
+    // Multi-Color Filter (standardized colorId matching + aliases + legacy strings)
     if (selectedColors && selectedColors.length > 0) {
+      const targetStandardIds = new Set(
+        selectedColors.map(clr => {
+          const norm = normalizeToStandardColor(clr);
+          return norm ? norm.id : String(clr).trim().toLowerCase();
+        })
+      );
+
       result = result.filter(p => {
-        const pColors = getProductColors(p).map(c => c.toLowerCase());
-        return selectedColors.some(clr => {
-          const target = clr.toLowerCase();
-          return pColors.some(pc => pc === target || pc.includes(target) || target.includes(pc));
+        const rawColors = getProductColors(p);
+        if (!rawColors || rawColors.length === 0) return false;
+
+        const normalizedProdColors = rawColors
+          .map(rc => normalizeToStandardColor(rc))
+          .filter(Boolean);
+
+        const prodIds = new Set(normalizedProdColors.map(c => c.id));
+        const prodNames = rawColors.map(c => String(c).trim().toLowerCase());
+
+        return Array.from(targetStandardIds).some(targetId => {
+          if (prodIds.has(targetId)) return true;
+          return prodNames.some(pName => pName === targetId || pName.includes(targetId) || targetId.includes(pName));
         });
       });
     }
@@ -541,18 +572,31 @@ export default function ShopPage() {
             )}
           </div>
           <div className="shop-filters__options" role="group" aria-label="Filter by color">
-            {COLORS.map(color => {
-              const isActive = selectedColors.includes(color);
+            {SHOP_FILTER_COLORS.map(colorObj => {
+              const isActive = selectedColors.includes(colorObj.name) || selectedColors.includes(colorObj.id);
               return (
                 <button
-                  key={color}
+                  key={colorObj.id}
                   type="button"
                   className={`shop-filters__chip ${isActive ? 'shop-filters__chip--active' : ''}`}
-                  onClick={() => toggleColor(color)}
+                  onClick={() => toggleColor(colorObj.name)}
                   aria-pressed={isActive}
-                  aria-label={`Color ${color}`}
+                  aria-label={`Color ${colorObj.name}`}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 >
-                  {color} {isActive ? '✓' : ''}
+                  <span
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: colorObj.hex,
+                      border: '1px solid rgba(0, 0, 0, 0.2)',
+                      display: 'inline-block',
+                      flexShrink: 0
+                    }}
+                    aria-hidden="true"
+                  />
+                  <span>{colorObj.name}</span> {isActive ? '✓' : ''}
                 </button>
               );
             })}
@@ -623,10 +667,11 @@ export default function ShopPage() {
           {/* Product Grid or Empty */}
           {filtered.length > 0 ? (
             <div className="shop-grid">
-              {filtered.slice(0, displayLimit).map(product => (
+              {filtered.slice(0, displayLimit).map((product, idx) => (
                 <ProductCard
                   key={product.id}
                   product={product}
+                  priority={idx < 4}
                   onAddToCart={handleAddToCart}
                 />
               ))}

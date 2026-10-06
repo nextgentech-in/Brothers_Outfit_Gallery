@@ -1,8 +1,13 @@
-/* ───────── Wishlist Page Styles ───────── */
 .wishlist-page {
   min-height: 80vh;
   padding: calc(var(--total-header-height, 104px) + 32px) 20px 80px;
   background: var(--color-ivory, #F7F4EE);
+}
+
+@media (max-width: 768px) {
+  .wishlist-page {
+    padding: calc(var(--total-header-height, 96px) + 24px) 16px 80px;
+  }
 }
 
 .wishlist-container {

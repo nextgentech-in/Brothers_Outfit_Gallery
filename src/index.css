@@ -13,7 +13,8 @@
   --color-stone-subtle: #EFECE6;
   --color-accent-gold: #B88A2E;
   --color-accent-gold-hover: #A37926;
-  --color-accent-gold-text: #855E18; /* High-contrast antique gold for text on ivory (>4.7:1 WCAG AA) */
+  --color-accent-gold-text: #855E18;
+  /* High-contrast antique gold for text on ivory (>4.7:1 WCAG AA) */
   --color-accent-gold-light: #F5EBD7;
 
   /* Semantic Color Mappings */
@@ -48,9 +49,17 @@
 
 @media (max-width: 768px) {
   :root {
-    --top-announcement-height: 28px;
-    --navbar-inner-height: 60px;
-    --total-header-height: 88px;
+    --top-announcement-height: 30px;
+    --navbar-inner-height: 64px;
+    --total-header-height: 96px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --top-announcement-height: 34px;
+    --navbar-inner-height: 64px;
+    --total-header-height: 100px;
   }
 }
 
@@ -110,7 +119,9 @@ body {
   -webkit-backdrop-filter: blur(18px) saturate(130%);
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   border-radius: var(--radius-sm);
 }
 
@@ -136,11 +147,17 @@ button {
   cursor: pointer;
 }
 
-ul, ol {
+ul,
+ol {
   list-style: none;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   color: var(--color-heading);
   font-weight: 700;
@@ -186,6 +203,7 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 0;
     transform: translate3d(0, 8px, 0);
   }
+
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0);
@@ -196,6 +214,7 @@ h1, h2, h3, h4, h5, h6 {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -368,6 +387,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ───────── Accessibility: Respect Reduced Motion Preferences ───────── */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

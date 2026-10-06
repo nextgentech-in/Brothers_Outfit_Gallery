@@ -7,6 +7,8 @@ import { isClothingProduct, getAvailableProductSizes } from '../../utils/product
 import { useWishlist } from '../../context/WishlistContext';
 import AuthModal from '../auth/AuthModal';
 import SizeGuideModal from '../common/SizeGuideModal';
+import { flyProductToCart } from '../../utils/cartFlyAnimation';
+import { normalizeToStandardColor } from '../../data/colorMaster.js';
 import './ProductInfo.css';
 
 const COLOR_SWATCHES = [
@@ -14,12 +16,17 @@ const COLOR_SWATCHES = [
   ['maroon', '#7f1d1d'], ['marron', '#7f1d1d'], ['brown', '#8b5e3c'], ['beige', '#d6c3a1'],
   ['khaki', '#b6a26d'], ['pink', '#d58a91'], ['purple', '#77608e'], ['blue', '#35679b'],
   ['green', '#259b4a'], ['olive', '#667a36'], ['yellow', '#d5a321'], ['red', '#bd3f3f'],
-  ['orange', '#d96f29'], ['navy', '#173c6b'], ['cyan', '#59d5de']
+  ['orange', '#d96f29'], ['navy', '#173c6b'], ['cyan', '#59d5de'], ['rani', '#C41242']
 ];
 
 function getColorSwatchStyle({ name, hex }) {
   if (hex && /^#([\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(hex.trim())) {
     return { backgroundColor: hex.trim() };
+  }
+
+  const standard = normalizeToStandardColor(name);
+  if (standard && standard.hex) {
+    return { backgroundColor: standard.hex };
   }
 
   const normalizedName = String(name || '').toLowerCase();
@@ -239,6 +246,12 @@ export default function ProductInfo({ product, onColorChange }) {
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
     const colorToUse = (selectedColor && selectedColor !== 'All') ? selectedColor : (availableColors[0]?.name || productColors[0] || 'Default');
     addToCart(product, sizeToUse, colorToUse, quantity, activeSale);
+
+    // Trigger visual flying animation from main product gallery image to the navbar cart
+    const galleryMainImg = document.querySelector('.product-gallery-main img, .image-zoom-img') || document.querySelector('.product-gallery-section img');
+    const fallbackImg = product.images?.[0]?.url || product.images?.[0] || product.image;
+    flyProductToCart(galleryMainImg, fallbackImg);
+
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
   };

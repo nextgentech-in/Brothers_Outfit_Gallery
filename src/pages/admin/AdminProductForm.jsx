@@ -17,6 +17,9 @@ import {
   convertMeasurementValue,
   convertColumnHeader
 } from '../../components/common/SizeGuideModal';
+import VisualColorSelector from '../../components/admin/VisualColorSelector.jsx';
+import { detectDominantColor } from '../../utils/imageColorDetector.js';
+import { normalizeToStandardColor } from '../../data/colorMaster.js';
 
 const CATEGORY_SIZES_MAP = {
   'Kurta': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
@@ -70,23 +73,6 @@ const COMMON_BATCH_SIZES = {
   'Sunglasses': ['Standard', 'Free Size'],
   'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
 };
-
-const STANDARD_COLORS = [
-  { name: 'Black', hex: '#000000' },
-  { name: 'White', hex: '#ffffff' },
-  { name: 'Navy', hex: '#1e3a8a' },
-  { name: 'Red', hex: '#ef4444' },
-  { name: 'Green', hex: '#22c55e' },
-  { name: 'Blue', hex: '#3b82f6' },
-  { name: 'Grey', hex: '#6b7280' },
-  { name: 'Brown', hex: '#78350f' },
-  { name: 'Beige', hex: '#f5f5dc' },
-  { name: 'Pink', hex: '#ec4899' },
-  { name: 'Yellow', hex: '#eab308' },
-  { name: 'Orange', hex: '#f97316' },
-  { name: 'Purple', hex: '#a855f7' },
-  { name: 'Custom (Type specific name)', hex: '#cccccc' }
-];
 
 // Prebuilt size guide templates per category
 const SIZE_GUIDE_TEMPLATES = {
@@ -261,9 +247,7 @@ export default function AdminProductForm() {
   });
 
   // Ephemeral States
-  const [selectedStandardColor, setSelectedStandardColor] = useState('Black');
-  const [newColorName, setNewColorName] = useState('Black');
-  const [newColorHex, setNewColorHex] = useState('#000000');
+  const [imageColorSuggestion, setImageColorSuggestion] = useState(null);
   const [selectedVariantColor, setSelectedVariantColor] = useState('');
 
   // Customizable Sizes, Bulk Stock & Size-Wise Price States
@@ -314,7 +298,7 @@ export default function AdminProductForm() {
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
             variants: loadedVariants,
-            colors: data.colors || [],
+            colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
             sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
           });
@@ -359,35 +343,79 @@ export default function AdminProductForm() {
     });
   };
 
-  const handleStandardColorChange = (e) => {
-    const selected = e.target.value;
-    setSelectedStandardColor(selected);
+  const handleColorsChange = (updatedColors) => {
+    setFormData(prev => {
+      const prevColors = prev.colors || [];
+      const removedColors = prevColors.filter(c => {
+        const cId = c.id || c.name?.toLowerCase();
+        return !updatedColors.some(u => (u.id || u.name?.toLowerCase()) === cId);
+      });
+      const removedNames = new Set(removedColors.map(c => c.name));
 
-    const matched = STANDARD_COLORS.find(c => c.name === selected);
-    if (matched && matched.name !== 'Custom (Type specific name)') {
-      setNewColorName(matched.name);
-      setNewColorHex(matched.hex);
-    } else {
-      setNewColorName('');
-      setNewColorHex('#cccccc');
+      return {
+        ...prev,
+        colors: updatedColors,
+        variants: prev.variants.filter(v => !removedNames.has(v.color))
+      };
+    });
+  };
+
+  const triggerColorDetectionForFile = async (fileOrUrl) => {
+    if (!fileOrUrl) return;
+    try {
+      const result = await detectDominantColor(fileOrUrl);
+      if (result && result.success && result.standardColor) {
+        setImageColorSuggestion(result);
+        showToast(`Detected color: ${result.standardColor.name} (${result.confidence}% match)`, 'info');
+      } else {
+        setImageColorSuggestion(null);
+        if (result?.error && typeof fileOrUrl !== 'object') {
+          showToast(result.error, 'info');
+        }
+      }
+    } catch (err) {
+      console.warn('Image color detection error:', err);
+      setImageColorSuggestion(null);
     }
   };
 
-  const handleAddColor = () => {
-    if (!newColorName) return;
-    setFormData(prev => ({
-      ...prev,
-      colors: [...prev.colors, { name: newColorName, hex: newColorHex }]
-    }));
-    setNewColorName('');
+  const handleAcceptColorSuggestion = (standardColor) => {
+    if (!standardColor) return;
+    setFormData(prev => {
+      const exists = prev.colors.some(c => (c.id || c.name?.toLowerCase()) === (standardColor.id || standardColor.name?.toLowerCase()));
+      if (exists) return prev;
+      return {
+        ...prev,
+        colors: [...prev.colors, standardColor]
+      };
+    });
+
+    // Auto-tag pending/existing image if untagged
+    setPendingImages(prev => {
+      if (prev.length > 0 && !prev[0].color) {
+        return prev.map((img, i) => i === 0 ? { ...img, color: standardColor.name } : img);
+      }
+      return prev;
+    });
+    setExistingImages(prev => {
+      if (prev.length > 0 && !prev[0].color) {
+        return prev.map((img, i) => i === 0 ? { ...img, color: standardColor.name } : img);
+      }
+      return prev;
+    });
+
+    setImageColorSuggestion(null);
+    showToast(`Added ${standardColor.name} and linked image!`, 'success');
   };
 
-  const handleRemoveColor = (name) => {
-    setFormData(prev => ({
-      ...prev,
-      colors: prev.colors.filter(c => c.name !== name),
-      variants: prev.variants.filter(v => v.color !== name)
-    }));
+  const handleManualDetectFromImage = (specificTarget = null) => {
+    const target = specificTarget || pendingImages[0]?.file || pendingImages[0]?.preview || existingImages[0]?.url;
+    if (!target) {
+      showToast('Please upload an image first to detect color.', 'warning');
+      return;
+    }
+    showToast('Analyzing image colors...', 'info');
+    triggerColorDetectionForFile(target);
   };
 
   // Helper to determine active target colors (or 'Standard' if product has no color variations)
@@ -781,6 +809,9 @@ export default function AdminProductForm() {
         }
         return combined;
       });
+
+      // Auto-analyze uploaded product image for dominant color suggestion (client-side, non-blocking)
+      triggerColorDetectionForFile(newPending[0].file);
     }
 
     // Reset input so the same files can be selected again later
@@ -1011,6 +1042,7 @@ export default function AdminProductForm() {
         });
         setExistingImages([]);
         setPendingImages([]);
+        setImageColorSuggestion(null);
         setError(null);
         setSubmitting(false);
         if (isEdit) navigate('/admin/products/new');
@@ -1395,6 +1427,15 @@ export default function AdminProductForm() {
                     </div>
 
                     <div className="admin-image-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleManualDetectFromImage(img.url)}
+                        className="btn-set-primary"
+                        style={{ background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}
+                        title="Detect dominant color from this image"
+                      >
+                        🎨 Detect Color
+                      </button>
                       {!img.isPrimary && (
                         <button onClick={() => setPrimaryImage('existing', idx)} className="btn-set-primary">Make Primary</button>
                       )}
@@ -1436,6 +1477,15 @@ export default function AdminProductForm() {
                     </div>
 
                     <div className="admin-image-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleManualDetectFromImage(fileObj.file || fileObj.preview)}
+                        className="btn-set-primary"
+                        style={{ background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}
+                        title="Detect dominant color from this image"
+                      >
+                        🎨 Detect Color
+                      </button>
                       {!fileObj.isPrimary && (
                         <button onClick={() => setPrimaryImage('pending', idx)} className="btn-set-primary">Make Primary</button>
                       )}
@@ -1454,32 +1504,18 @@ export default function AdminProductForm() {
             )}
           </section>
 
-          {/* Colors & Variants (Preserved) */}
+          {/* Visual Color Selector Section */}
           <section className="admin-form-section">
-            <h3>Colors</h3>
-            <div className="admin-color-pills">
-              {formData.colors.map(c => (
-                <div key={c.name} className="admin-color-pill">
-                  <span className="color-dot" style={{ background: c.hex }}></span>
-                  {c.name}
-                  <button onClick={() => handleRemoveColor(c.name)}>x</button>
-                </div>
-              ))}
-            </div>
-            <div className="admin-add-color-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-              <select
-                value={selectedStandardColor}
-                onChange={handleStandardColorChange}
-                style={{ width: '100%', padding: '12px', border: '1px solid #e7e5e4', borderRadius: '8px', marginBottom: '8px', background: '#fff', fontSize: '14px' }}
-              >
-                {STANDARD_COLORS.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-              </select>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="text" placeholder="Color Name (e.g. Black)" value={newColorName} onChange={(e) => setNewColorName(e.target.value)} />
-                <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} className="color-picker-input" />
-                <button type="button" className="admin-btn-secondary" onClick={handleAddColor}>ADD</button>
-              </div>
-            </div>
+            <VisualColorSelector
+              selectedColors={formData.colors}
+              onChange={handleColorsChange}
+              imageSuggestion={imageColorSuggestion}
+              onAcceptSuggestion={handleAcceptColorSuggestion}
+              onDismissSuggestion={() => setImageColorSuggestion(null)}
+              onDetectFromImage={() => handleManualDetectFromImage()}
+              hasImages={existingImages.length > 0 || pendingImages.length > 0}
+              showToast={showToast}
+            />
           </section>
 
           {/* Sizes & Inventory Section */}

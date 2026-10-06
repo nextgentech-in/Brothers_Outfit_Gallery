@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
-import { optimizeImage } from '../utils/imageUtils';
+import { optimizeImage, getCardImageUrl } from '../utils/imageUtils';
 import { isClothingProduct, getAvailableProductSizes } from '../utils/productUtils';
+import { flyProductToCart } from '../utils/cartFlyAnimation';
 import SEO from '../components/common/SEO';
 import './WishlistPage.css';
 
@@ -17,10 +18,10 @@ export default function WishlistPage() {
     setSelectedSizes(prev => ({ ...prev, [itemId]: size }));
   };
 
-  const handleMoveToCart = (product) => {
+  const handleMoveToCart = (product, e) => {
     const isClothing = isClothingProduct(product);
     const availableSizes = getAvailableProductSizes(product);
-    
+
     let sizeToUse = selectedSizes[product.id];
     if (!sizeToUse) {
       if (availableSizes.length > 0) {
@@ -31,6 +32,14 @@ export default function WishlistPage() {
     }
 
     addToCart(product, sizeToUse, 'Standard', 1, product.price);
+
+    if (e) {
+      const cardEl = e.currentTarget?.closest('.wishlist-card');
+      const imgEl = cardEl?.querySelector('.wishlist-card-image img') || cardEl?.querySelector('img');
+      const fallbackImg = product.image || (product.images && product.images[0]?.url) || (product.images && product.images[0]);
+      flyProductToCart(imgEl || cardEl || e.currentTarget, fallbackImg);
+    }
+
     removeFromWishlist(product.id);
   };
 
@@ -122,13 +131,16 @@ export default function WishlistPage() {
                   {/* Thumbnail */}
                   <Link to={`/product/${item.slug}`} className="wishlist-card-img-link">
                     <img
-                      src={optimizeImage(item.image, 800)}
+                      src={getCardImageUrl(item.image, 400)}
                       alt={item.name}
                       className="wishlist-card-img"
+                      width="300"
+                      height="375"
                       loading="lazy"
+                      decoding="async"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
-                        e.currentTarget.src = '/images/hero.png';
+                        e.currentTarget.src = '/images/product-tshirt-black.png';
                       }}
                     />
                     {hasDiscount && (
@@ -186,7 +198,7 @@ export default function WishlistPage() {
                       <button
                         type="button"
                         className="wishlist-btn-add"
-                        onClick={() => handleMoveToCart(item)}
+                        onClick={(e) => handleMoveToCart(item, e)}
                       >
                         Move to Cart
                       </button>

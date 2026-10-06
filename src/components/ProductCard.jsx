@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
+import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { getAvailableProductSizes } from '../utils/productUtils';
+import { flyProductToCart } from '../utils/cartFlyAnimation';
 import AuthModal from './auth/AuthModal';
 import './ProductCard.css';
 
@@ -72,7 +73,7 @@ function useCountdown(endDateStr) {
   return remaining;
 }
 
-function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false }) {
+function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = false, priority = false }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -153,6 +154,13 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
     } else {
       contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default', 1, displayPrice);
     }
+
+    // Trigger visual flying animation from this card's image to the navbar cart
+    const cardEl = e.currentTarget?.closest('.product-card');
+    const imgEl = cardEl?.querySelector('.product-card__image');
+    const fallbackImg = imagesList[activeImgIdx] || imagesList[0] || product.image;
+    flyProductToCart(imgEl || cardEl || e.currentTarget, fallbackImg);
+
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 1500);
   };
@@ -239,16 +247,19 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
       >
         <Link to={`/product/${product.slug}`} className="product-card__image-link">
           <img
-            src={optimizeImage(imagesList[activeImgIdx] || imagesList[0], 800)}
-            srcSet={getOptimizedImageSrcSet(imagesList[activeImgIdx] || imagesList[0])}
-            sizes="(max-width: 480px) 50vw, (max-width: 1024px) 33vw, 320px"
+            src={getCardImageUrl(imagesList[activeImgIdx] || imagesList[0], 480)}
+            srcSet={getOptimizedImageSrcSet(imagesList[activeImgIdx] || imagesList[0], [320, 480, 640])}
+            sizes="(max-width: 480px) 48vw, (max-width: 1024px) 32vw, 290px"
             alt={`${product.name} - View ${activeImgIdx + 1}`}
             className="product-card__image"
-            loading="lazy"
+            width="480"
+            height="600"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             decoding="async"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = '/images/hero.png';
+              e.currentTarget.src = '/images/product-tshirt-black.png';
             }}
           />
         </Link>

@@ -14,6 +14,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  addDoc,
   serverTimestamp,
   onSnapshot,
   orderBy,
@@ -56,6 +57,7 @@ async function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
+  headers['x-admin-request'] = 'true';
   return headers;
 }
 
@@ -391,13 +393,14 @@ export async function approveExchangeRequest(exchangeId, extraPayload = {}, fall
     const response = await fetch(`${backendUrl}/api/exchanges/admin/approve`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ exchangeId, ...extraPayload })
+      body: JSON.stringify({ exchangeId, fallbackDocId, ...extraPayload })
     });
 
     backendData = await parseResponseJson(response);
     if (response.ok && backendData?.success) {
       return backendData;
     }
+    console.warn('Backend returned non-success response, running direct Firestore update:', backendData?.error || response.status);
   } catch (err) {
     console.warn('Backend approve call failed, falling back to direct Firestore update:', err.message);
   }
@@ -410,20 +413,18 @@ export async function approveExchangeRequest(exchangeId, extraPayload = {}, fall
     const existingHistory = Array.isArray(existingData.history) ? existingData.history : [];
 
     const nextStatus = 'APPROVED';
-    const pickupRef = `PU-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
     const newHistoryEntry = {
       status: nextStatus,
       timestamp: new Date().toISOString(),
       actor: auth.currentUser?.email || 'Admin',
-      note: 'Exchange request approved by Admin. Reverse pickup scheduled.'
+      note: 'Exchange request approved by Admin.'
     };
 
     const updatePayload = {
       status: nextStatus,
+      adminDecision: 'APPROVED',
       approvedAt: serverTimestamp(),
-      reversePickupAwb: existingData.reversePickupAwb || pickupRef,
-      pickupReference: pickupRef,
       history: [...existingHistory, newHistoryEntry],
       updatedAt: serverTimestamp(),
       ...extraPayload
@@ -443,15 +444,34 @@ export async function approveExchangeRequest(exchangeId, extraPayload = {}, fall
       }
     }
 
+    // Add in-app customer notification for real-time customer awareness
+    const targetUserId = existingData.userId || existingData.userUid;
+    if (targetUserId) {
+      try {
+        await addDoc(collection(db, 'customerNotifications'), {
+          userId: targetUserId,
+          title: 'Exchange Request Approved! 🎉',
+          message: `Your exchange request #${exchangeId} has been approved by admin.`,
+          type: 'EXCHANGE_APPROVED',
+          exchangeId: exchangeId,
+          orderId: existingData.orderId || '',
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      } catch (notifErr) {
+        console.warn('Could not create customerNotification document:', notifErr.message);
+      }
+    }
+
     return {
       success: true,
       exchangeId,
       status: nextStatus,
-      reversePickupAwb: updatePayload.reversePickupAwb,
-      message: 'Exchange approved successfully. Reverse pickup reference generated.'
+      message: 'Exchange approved successfully.'
     };
   } catch (fsErr) {
-    throw new Error(backendData?.error || fsErr.message || 'Failed to approve exchange request.');
+    console.error('Direct Firestore approval error:', fsErr);
+    throw new Error(fsErr.message || backendData?.error || 'Failed to approve exchange request.');
   }
 }
 

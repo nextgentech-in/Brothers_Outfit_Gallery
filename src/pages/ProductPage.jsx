@@ -19,7 +19,7 @@ export default function ProductPage() {
           return parsed.data.find(p => p.slug === slug || p.id === slug) || null;
         }
       }
-    } catch {}
+    } catch { }
     return null;
   });
   const [loading, setLoading] = useState(() => !product);
@@ -44,7 +44,7 @@ export default function ProductPage() {
           cachedProd = parsed.data.find(p => p.slug === slug || p.id === slug) || null;
         }
       }
-    } catch {}
+    } catch { }
 
     if (cachedProd) {
       setProduct(cachedProd);
@@ -107,8 +107,8 @@ export default function ProductPage() {
 
   // Pre-bake images array ensuring a main image is pushed if images doesn't exist logically
   // Primary image is strictly first (index 0)
-  let rawImages = product.images && product.images.length > 0 
-    ? [...product.images] 
+  let rawImages = product.images && product.images.length > 0
+    ? [...product.images]
     : [product.thumbnailUrl || product.image || '/images/hero.png'];
 
   const primaryTarget = product.thumbnailUrl || null;
@@ -136,11 +136,11 @@ export default function ProductPage() {
 
   const productName = product.title || product.name || 'Men’s Fashion Wear';
   const productPrice = Number(product.discountPrice || product.price || 0);
-  const rawDescription = product.description 
+  const rawDescription = product.description
     ? product.description.replace(/<[^>]*>/g, '').trim().slice(0, 160)
     : `Shop ${productName} at Brother’s Outfit Gallery. Premium men’s fashion in Himatnagar, Gujarat. Express shipping across India and store pickup.`;
-  
-  const productImages = allImages.map(img => 
+
+  const productImages = allImages.map(img =>
     typeof img === 'object' && img?.url ? img.url : (typeof img === 'string' ? img : '')
   ).filter(Boolean);
 
@@ -167,8 +167,8 @@ export default function ProductPage() {
         "price": productPrice,
         "priceValidUntil": "2026-12-31",
         "itemCondition": "https://schema.org/NewCondition",
-        "availability": isProductInStock(product) 
-          ? "https://schema.org/InStock" 
+        "availability": isProductInStock(product)
+          ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",
         "seller": {
           "@type": "Organization",
@@ -240,8 +240,8 @@ export default function ProductPage() {
 
         <div className="product-main-grid">
           <div className="product-gallery-section">
-            <ProductGallery 
-              images={allImages} 
+            <ProductGallery
+              images={allImages}
               selectedColor={selectedColor}
               selectedColorIndex={selectedColorIndex}
               totalColors={totalColors}
@@ -249,10 +249,10 @@ export default function ProductPage() {
               productName={productName}
             />
           </div>
-          
+
           <div className="product-info-section">
-            <ProductInfo 
-              product={product} 
+            <ProductInfo
+              product={product}
               onColorChange={(colorName, colorIndex) => {
                 if (colorName) setSelectedColor(colorName);
                 if (colorIndex !== undefined) setSelectedColorIndex(colorIndex);

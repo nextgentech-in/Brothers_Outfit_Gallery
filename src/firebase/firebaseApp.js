@@ -2,10 +2,7 @@ import { getApp, getApps, initializeApp } from 'firebase/app';
 
 // Firebase web identifiers are intentionally public. Keep the API key in the
 // deployment environment so it can be rotated and domain/API restricted.
-const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-if (!firebaseApiKey) {
-  throw new Error('Missing VITE_FIREBASE_API_KEY. Configure the Firebase web app before starting the client.');
-}
+const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyB7HF5zw63Rt2sxj2BiIGx3AgPZTqoxgvw';
 
 const rawAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'brothersoutfitgallary.firebaseapp.com';
 const rawProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'brothersoutfitgallary';

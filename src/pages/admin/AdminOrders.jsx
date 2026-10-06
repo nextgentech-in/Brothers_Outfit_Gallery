@@ -109,10 +109,16 @@ export default function AdminOrders() {
       await fetchOrders();
     } catch (err) {
       console.error('Failed to change order status:', err);
-      showToast(`Failed to update status: ${err.message}`, 'error', 5000);
       // Revert optimistic update on failure
       setOrders(previousOrders);
-      await fetchOrders();
+      if (selectedOrder && selectedOrder.id === orderId) {
+        const prevSelected = previousOrders.find(o => o.id === orderId);
+        if (prevSelected) setSelectedOrder(prevSelected);
+      }
+      showToast(`Failed to update status: ${err.message}`, 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleStatusChange(orderId, newStatus)
+      });
     }
   };
 

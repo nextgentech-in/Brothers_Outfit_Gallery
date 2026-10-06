@@ -1,7 +1,8 @@
 /* ───────── HomePage Layout ───────── */
 .home-page {
-  /* Clears both the announcement bar and fixed navigation on every viewport. */
-  padding-top: var(--total-header-height);
+  /* Hero begins directly after the navbar with exact 0px gap */
+  padding-top: var(--total-header-height, 97px);
+  margin-top: 0;
   background: transparent;
   min-height: 100vh;
 }

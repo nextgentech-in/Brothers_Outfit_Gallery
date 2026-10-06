@@ -112,7 +112,7 @@ export const WishlistProvider = ({ children }) => {
     setWishlistItems([]);
     try {
       localStorage.removeItem('brothers_wishlist');
-    } catch {}
+    } catch { }
   }, []);
 
   return (

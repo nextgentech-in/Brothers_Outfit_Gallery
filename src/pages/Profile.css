@@ -2366,3 +2366,203 @@
 .exchange-product-title-link:hover .open-ext-arrow {
   transform: translate(2px, -2px);
 }
+
+/* Customer Profile: Approved Exchange Alert Banner */
+.profile-approved-exchange-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  color: #ffffff;
+  padding: 14px 18px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 14px rgba(6, 95, 70, 0.25);
+  border: 1px solid #10b981;
+  animation: fadeInAlert 0.3s ease-out;
+}
+
+@keyframes fadeInAlert {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.approved-alert-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.approved-alert-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.approved-alert-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.approved-alert-text strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #a7f3d0;
+}
+
+.approved-alert-text span {
+  font-size: 12.5px;
+  color: #ecfdf5;
+  line-height: 1.4;
+}
+
+.approved-alert-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.btn-alert-view-notice {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-alert-view-notice:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.btn-alert-whatsapp {
+  background: #25D366;
+  color: #ffffff;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(37, 211, 102, 0.4);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-alert-whatsapp:hover {
+  background: #20bd5a;
+  transform: translateY(-1px);
+}
+
+/* Card-level Approved Box in Exchanges List */
+.exchange-approved-card {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.12) 100%);
+  border: 1px solid #10b981;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 14px 0;
+}
+
+.exchange-approved-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.exchange-approved-badge .approved-icon {
+  font-size: 22px;
+}
+
+.exchange-approved-badge .approved-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #065f46;
+}
+
+.exchange-approved-badge .approved-subtitle {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #047857;
+}
+
+.exchange-approved-card .approved-desc {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.approved-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-submit-proof-wa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #25D366;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-submit-proof-wa:hover {
+  background: #20bd5a;
+  transform: translateY(-1px);
+  color: #ffffff;
+}
+
+.btn-view-approval-notice {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-view-approval-notice:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+@media (max-width: 640px) {
+  .profile-approved-exchange-alert {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .approved-alert-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .approved-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .btn-submit-proof-wa,
+  .btn-view-approval-notice {
+    text-align: center;
+    justify-content: center;
+  }
+}

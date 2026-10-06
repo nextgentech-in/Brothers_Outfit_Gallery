@@ -6,12 +6,12 @@
 .checkout-page-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 110px 20px 60px;
+  padding: calc(var(--total-header-height, 104px) + 24px) 20px 60px;
 }
 
 @media (max-width: 768px) {
   .checkout-page-container {
-    padding: calc(var(--total-header-height, 88px) + 16px) 14px 40px;
+    padding: calc(var(--total-header-height, 96px) + 24px) 14px 40px;
   }
 }
 

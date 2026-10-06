@@ -143,13 +143,13 @@ export default function Login() {
                   <form onSubmit={handleResetPassword} className="auth-form">
                     <div className="form-group">
                       <label>Email Address</label>
-                      <input 
-                        type="email" 
-                        className="form-input" 
-                        value={resetEmail} 
-                        onChange={(e) => setResetEmail(e.target.value)} 
+                      <input
+                        type="email"
+                        className="form-input"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
                         placeholder="yourname@example.com"
-                        required 
+                        required
                       />
                     </div>
                     <button disabled={loadingReset} type="submit" className="btn-auth-primary">
@@ -173,9 +173,9 @@ export default function Login() {
                   <h1 className="auth-title">WELCOME BACK</h1>
                   <p className="auth-subtitle">Sign in to continue shopping.</p>
                 </div>
-                
+
                 {error && <div className="auth-error">{error}</div>}
-                
+
                 {!phoneConfirmation ? (
                   <form onSubmit={handlePhoneCodeRequest} className="auth-form auth-phone-form">
                     <div className="form-group">

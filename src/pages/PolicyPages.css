@@ -1,8 +1,13 @@
-/* ───────── Shared Policy Pages Styles ───────── */
 .policy-page {
   min-height: 80vh;
   padding: calc(var(--total-header-height, 104px) + 32px) 20px 80px;
   background: var(--color-bg-alt, #f8fafc);
+}
+
+@media (max-width: 768px) {
+  .policy-page {
+    padding: calc(var(--total-header-height, 96px) + 24px) 16px 60px;
+  }
 }
 
 .policy-container {

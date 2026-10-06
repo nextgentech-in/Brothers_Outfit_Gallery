@@ -77,6 +77,26 @@
   word-break: break-word;
 }
 
+.admin-toast-action-btn {
+  background: #ffffff;
+  color: #0f172a;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.admin-toast-action-btn:hover {
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
 .admin-toast-close {
   background: none;
   border: none;

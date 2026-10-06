@@ -5,9 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
 import { validateCoupon } from '../services/couponService';
 import { invalidateProductCache } from '../services/productService';
-import { getBackendUrl } from '../utils/apiConfig';
 import AuthModal from '../components/auth/AuthModal';
 import PhoneOtpModal from '../components/checkout/PhoneOtpModal';
+import { getThumbnailImageUrl } from '../utils/imageUtils';
+import { getBackendUrl } from '../utils/apiConfig';
 import SEO from '../components/common/SEO';
 import './CheckoutPage.css';
 
@@ -273,37 +274,43 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
-    if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.email || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
-      return setError('Please fill in all required shipping address fields.');
-    }
+    try {
+      if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.email || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
+        return setError('Please fill in all required shipping address fields.');
+      }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingAddress.email.trim())) {
-      return setError('Please enter a valid email address to place your order.');
-    }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingAddress.email.trim())) {
+        return setError('Please enter a valid email address to place your order.');
+      }
 
-    const cleanInputPhone = String(shippingAddress.phone).replace(/\D/g, '').slice(-10);
-    if (!/^[6-9]\d{9}$/.test(cleanInputPhone)) {
-      return setError('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
-    }
+      const cleanInputPhone = String(shippingAddress.phone).replace(/\D/g, '').slice(-10);
+      if (!/^[6-9]\d{9}$/.test(cleanInputPhone)) {
+        return setError('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
+      }
 
-    if (delhiveryStatus && !delhiveryStatus.serviceable) {
-      return setError('Cannot place order: Please enter a valid and serviceable PIN code.');
-    }
+      if (delhiveryStatus && !delhiveryStatus.serviceable) {
+        return setError('Cannot place order: Please enter a valid and serviceable PIN code.');
+      }
 
-    if (!currentUser) {
-      setAuthModalOpen(true);
-      return;
-    }
+      if (!currentUser) {
+        setAuthModalOpen(true);
+        return;
+      }
 
-    // Check if phone number needs verification with OTP
-    if (!isPhoneVerified) {
-      setError(null);
-      setOtpTriggerSource('place_order');
-      setPhoneOtpModalOpen(true);
-      return;
-    }
+      // Check if phone number needs verification with OTP
+      if (!isPhoneVerified) {
+        setError(null);
+        setOtpTriggerSource('place_order');
+        setPhoneOtpModalOpen(true);
+        return;
+      }
 
-    await executeOrderPlacement(shippingAddress.phone);
+      await executeOrderPlacement(shippingAddress.phone);
+    } catch (err) {
+      console.error('handlePlaceOrder error:', err);
+      setError(err.message || 'Failed to place order. Please try again.');
+      setLoading(false);
+    }
   };
 
   const handlePhoneVerified = async (confirmedPhone) => {
@@ -320,7 +327,7 @@ export default function CheckoutPage() {
         phone: confirmedPhone,
         phoneVerified: true,
         phoneVerifiedAt: new Date().toISOString()
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     // If verification was triggered by "Place Order" button, continue immediately to checkout
@@ -341,11 +348,11 @@ export default function CheckoutPage() {
     setLoading(true);
     setError(null);
 
-    const backendUrl = getBackendUrl();
+    try {
+      const backendUrl = getBackendUrl();
 
-    if (paymentMethod === 'cod') {
-      // Cash on Delivery flow
-      try {
+      if (paymentMethod === 'cod') {
+        // Cash on Delivery flow
         const { orderId: newOrderId } = await createSecureOrder('cod', finalPhone);
 
         // Save delivery info to user profile
@@ -360,7 +367,7 @@ export default function CheckoutPage() {
               state: shippingAddress.state,
               pincode: shippingAddress.pincode
             }
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         try {
@@ -369,17 +376,12 @@ export default function CheckoutPage() {
         invalidateProductCache();
         clearCart();
         navigate(`/order-confirmation/${newOrderId}`);
-      } catch (err) {
-        setError(`Failed to place COD order: ${err.message}`);
-        setLoading(false);
+        return;
       }
-      return;
-    }
 
 
 
-    // Razorpay Flow
-    try {
+      // Razorpay Flow
       const isGatewayLoaded = await ensureRazorpayLoaded();
       if (!isGatewayLoaded || !window.Razorpay) {
         throw new Error('Payment gateway is initializing. Please check your internet connection and try again.');
@@ -464,7 +466,7 @@ export default function CheckoutPage() {
                   state: shippingAddress.state,
                   pincode: shippingAddress.pincode
                 }
-              }).catch(() => {});
+              }).catch(() => { });
             }
 
             try {
@@ -523,408 +525,408 @@ export default function CheckoutPage() {
 
         {error && <div className="checkout-error-banner">{error}</div>}
 
-      <form onSubmit={handlePlaceOrder} className="checkout-grid">
-        {/* Left Column: Shipping Address */}
-        <div className="checkout-address-section">
-          <h3>1. Delivery Address</h3>
-          <div className="checkout-form-group">
-            <label>Full Name *</label>
-            <input
-              type="text"
-              name="fullName"
-              value={shippingAddress.fullName}
-              onChange={handleInputChange}
-              required
-              placeholder="Full Name"
-            />
-          </div>
-
-          {/* Phone Number with OTP Verification */}
-          <div className="checkout-form-group">
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-              <span>Phone Number *</span>
-              {isPhoneVerified ? (
-                <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: '700',
-                  color: '#15803d',
-                  background: '#dcfce7',
-                  border: '1px solid #86efac',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '3px'
-                }}>
-                  ✓ Verified
-                </span>
-              ) : (
-                <span style={{
-                  fontSize: '0.72rem',
-                  color: '#b45309',
-                  background: '#fef3c7',
-                  border: '1px solid #fde68a',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontWeight: '600'
-                }}>
-                  Verification Required
-                </span>
-              )}
-            </label>
-
-            <div className="checkout-phone-input-row">
+        <form onSubmit={handlePlaceOrder} className="checkout-grid">
+          {/* Left Column: Shipping Address */}
+          <div className="checkout-address-section">
+            <h3>1. Delivery Address</h3>
+            <div className="checkout-form-group">
+              <label>Full Name *</label>
               <input
-                type="tel"
-                name="phone"
-                value={shippingAddress.phone}
+                type="text"
+                name="fullName"
+                value={shippingAddress.fullName}
                 onChange={handleInputChange}
                 required
-                disabled={isPhoneVerified}
-                placeholder="10-digit mobile number"
-                className="checkout-phone-input"
-                style={{
-                  backgroundColor: isPhoneVerified ? '#f8fafc' : '#ffffff',
-                  borderColor: isPhoneVerified ? '#86efac' : undefined
-                }}
+                placeholder="Full Name"
               />
-              {!isPhoneVerified ? (
-                <button
-                  type="button"
-                  onClick={handleVerifyPhoneInline}
-                  className="checkout-verify-btn"
-                >
-                  Verify via OTP
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVerifiedPhone(null);
-                    setPhoneFeedback(null);
+            </div>
+
+            {/* Phone Number with OTP Verification */}
+            <div className="checkout-form-group">
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <span>Phone Number *</span>
+                {isPhoneVerified ? (
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    color: '#15803d',
+                    background: '#dcfce7',
+                    border: '1px solid #86efac',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}>
+                    ✓ Verified
+                  </span>
+                ) : (
+                  <span style={{
+                    fontSize: '0.72rem',
+                    color: '#b45309',
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontWeight: '600'
+                  }}>
+                    Verification Required
+                  </span>
+                )}
+              </label>
+
+              <div className="checkout-phone-input-row">
+                <input
+                  type="tel"
+                  name="phone"
+                  value={shippingAddress.phone}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isPhoneVerified}
+                  placeholder="10-digit mobile number"
+                  className="checkout-phone-input"
+                  style={{
+                    backgroundColor: isPhoneVerified ? '#f8fafc' : '#ffffff',
+                    borderColor: isPhoneVerified ? '#86efac' : undefined
                   }}
-                  className="checkout-change-phone-btn"
-                >
-                  Change
-                </button>
+                />
+                {!isPhoneVerified ? (
+                  <button
+                    type="button"
+                    onClick={handleVerifyPhoneInline}
+                    className="checkout-verify-btn"
+                  >
+                    Verify via OTP
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVerifiedPhone(null);
+                      setPhoneFeedback(null);
+                    }}
+                    className="checkout-change-phone-btn"
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+
+              {phoneFeedback && (
+                <div style={{
+                  fontSize: '0.78rem',
+                  marginTop: '4px',
+                  color: phoneFeedback.type === 'error' ? '#dc2626' : '#15803d',
+                  fontWeight: '600'
+                }}>
+                  {phoneFeedback.message}
+                </div>
               )}
             </div>
 
-            {phoneFeedback && (
-              <div style={{
-                fontSize: '0.78rem',
-                marginTop: '4px',
-                color: phoneFeedback.type === 'error' ? '#dc2626' : '#15803d',
-                fontWeight: '600'
-              }}>
-                {phoneFeedback.message}
-              </div>
-            )}
-          </div>
-
-          {/* Email Address */}
-          <div className="checkout-form-group">
-            <label>Email *</label>
-            <input
-              type="email"
-              name="email"
-              value={shippingAddress.email}
-              onChange={handleInputChange}
-              required
-              placeholder="email@example.com"
-            />
-          </div>
-
-          <div className="checkout-form-group">
-            <label>Address Line *</label>
-            <input
-              type="text"
-              name="addressLine"
-              value={shippingAddress.addressLine}
-              onChange={handleInputChange}
-              required
-              placeholder="House/Flat No, Street, Area"
-            />
-          </div>
-
-          {/* City and State */}
-          <div className="checkout-form-row">
-            <div className="checkout-form-group" style={{ position: 'relative' }}>
-              <label>City / Place *</label>
+            {/* Email Address */}
+            <div className="checkout-form-group">
+              <label>Email *</label>
               <input
-                type="text"
-                name="city"
-                value={shippingAddress.city}
+                type="email"
+                name="email"
+                value={shippingAddress.email}
                 onChange={handleInputChange}
                 required
-                placeholder="Type City or Area..."
+                placeholder="email@example.com"
               />
-              {searchingPlace && (
-                <span className="place-search-status" role="status">Finding locations…</span>
-              )}
-              {placeSuggestions.length > 0 && (
-                <div className="place-suggestions-dropdown">
-                  <div className="suggestions-header">Click to select PIN code & location:</div>
-                  {placeSuggestions.map((s, idx) => (
-                    <button
-                      type="button"
-                      key={idx} 
-                      className="suggestion-item"
-                      onClick={() => handleSelectPlaceSuggestion(s)}
-                    >
-                      <strong>📍 {s.area || s.city} ({s.pincode})</strong>
-                      <span>{s.city}, {s.state}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             <div className="checkout-form-group">
-              <label>State *</label>
+              <label>Address Line *</label>
               <input
                 type="text"
-                name="state"
-                value={shippingAddress.state}
+                name="addressLine"
+                value={shippingAddress.addressLine}
                 onChange={handleInputChange}
                 required
-                placeholder="State"
+                placeholder="House/Flat No, Street, Area"
               />
             </div>
-          </div>
 
-          {/* Pincode */}
-          <div className="checkout-form-group">
-            <label>Pincode *</label>
-            <input
-              type="text"
-              name="pincode"
-              value={shippingAddress.pincode}
-              onChange={handleInputChange}
-              required
-              maxLength={6}
-              placeholder="380001"
-            />
-          </div>
-
-          {/* Delhivery Express Serviceability Badge */}
-          {checkingPincode && (
-            <div className="delhivery-status-banner checking">
-              <span>🔄 Checking Delhivery express courier serviceability...</span>
-            </div>
-          )}
-          {!checkingPincode && delhiveryStatus && (
-            <div className={`delhivery-status-banner ${delhiveryStatus.serviceable ? 'success' : 'warning'}`}>
-              <div className="delhivery-badge-header">
-                <strong>📦 Delhivery Express Courier Coverage</strong>
-                {delhiveryStatus.serviceable ? (
-                  <span className="badge-available">✓ Serviceable</span>
-                ) : (
-                  <span className="badge-unavailable">⚠ Standard Shipping</span>
-                )}
-              </div>
-              <p style={{ marginTop: '4px' }}>
-                {delhiveryStatus.serviceable
-                  ? `🚚 Fast Doorstep Delivery Available! Expected Arrival: ${delhiveryStatus.estimatedDeliveryDate ? delhiveryStatus.estimatedDeliveryDate : (delhiveryStatus.estimatedDays || '2-4 Days')}.`
-                  : 'Pincode not directly covered by Delhivery Express; standard delivery will apply.'}
-              </p>
-            </div>
-          )}
-
-          {/* Free Shipping Banner */}
-          <div className={`free-shipping-bar ${cartSubtotal >= 1000 ? 'unlocked' : 'pending'}`} style={{
-            marginTop: '16px',
-            padding: '10px 14px',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: '700',
-            background: cartSubtotal >= 1000 ? '#f0fdf4' : '#fffbeb',
-            color: cartSubtotal >= 1000 ? '#15803d' : '#b45309',
-            border: `1px solid ${cartSubtotal >= 1000 ? '#bbf7d0' : '#fde68a'}`
-          }}>
-            {cartSubtotal >= 1000 ? (
-              <span>🎉 Congratulations! You unlocked FREE Delivery (Order over ₹1,000)!</span>
-            ) : (
-              <span>🚚 Add ₹{(1000 - cartSubtotal).toLocaleString('en-IN')} more for FREE Express Shipping!</span>
-            )}
-          </div>
-
-
-
-          <h3 style={{ marginTop: '32px' }}>2. Select Payment Method</h3>
-          <div className="payment-options">
-            <label className={`payment-option ${paymentMethod === 'razorpay' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="razorpay"
-                checked={paymentMethod === 'razorpay'}
-                onChange={() => setPaymentMethod('razorpay')}
-              />
-              <div>
-                <strong>💳 Online Payment (Razorpay)</strong>
-                <p>Pay securely via UPI, Google Pay, PhonePe, Cards, or Net Banking.</p>
-              </div>
-            </label>
-
-            <label className={`payment-option ${paymentMethod === 'cod' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="cod"
-                checked={paymentMethod === 'cod'}
-                onChange={() => setPaymentMethod('cod')}
-              />
-              <div>
-                <strong>💵 Cash on Delivery (COD)</strong>
-                <p>Pay cash when your order is delivered to your doorstep.</p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        {/* Right Column: Order Summary */}
-        <div className="checkout-summary-section">
-          <h3>Order Items ({cartItems.length})</h3>
-          <div className="checkout-items-list">
-            {cartItems.map((item) => (
-              <div key={item.cartItemId} className="checkout-item">
-                <img src={item.image} alt={item.name} className="checkout-item-thumb" />
-                <div className="checkout-item-details">
-                  <strong>{item.name}</strong>
-                  <span>Size: {typeof item.size === 'object' && item.size !== null ? (item.size.name || item.size.size || 'One Size') : (item.size || 'One Size')} | Qty: {item.quantity}</span>
-                  <span className="checkout-item-price">₹{item.price * item.quantity}</span>
-                </div>
-
-              </div>
-            ))}
-          </div>
-
-          {/* Coupon Code Section */}
-          <div className="checkout-coupon-card" style={{ margin: '18px 0', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#1e293b' }}>
-              Have a Discount Coupon?
-            </div>
-            {!appliedCoupon ? (
-              <div style={{ display: 'flex', gap: '8px' }}>
+            {/* City and State */}
+            <div className="checkout-form-row">
+              <div className="checkout-form-group" style={{ position: 'relative' }}>
+                <label>City / Place *</label>
                 <input
                   type="text"
-                  placeholder="Enter code (e.g. BROTHERS10)"
-                  value={couponInput}
-                  onChange={(e) => {
-                    setCouponInput(e.target.value.toUpperCase());
-                    if (couponFeedback) setCouponFeedback(null);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '10px 12px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontFamily: 'inherit',
-                    textTransform: 'uppercase',
-                    fontWeight: 600
-                  }}
+                  name="city"
+                  value={shippingAddress.city}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="Type City or Area..."
                 />
-                <button
-                  type="button"
-                  onClick={handleCheckoutApplyCoupon}
-                  disabled={couponChecking || !couponInput.trim()}
-                  style={{
-                    padding: '10px 18px',
-                    background: '#0f172a',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    letterSpacing: '1px',
-                    cursor: couponChecking ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {couponChecking ? '...' : 'APPLY'}
-                </button>
+                {searchingPlace && (
+                  <span className="place-search-status" role="status">Finding locations…</span>
+                )}
+                {placeSuggestions.length > 0 && (
+                  <div className="place-suggestions-dropdown">
+                    <div className="suggestions-header">Click to select PIN code & location:</div>
+                    {placeSuggestions.map((s, idx) => (
+                      <button
+                        type="button"
+                        key={idx}
+                        className="suggestion-item"
+                        onClick={() => handleSelectPlaceSuggestion(s)}
+                      >
+                        <strong>📍 {s.area || s.city} ({s.pincode})</strong>
+                        <span>{s.city}, {s.state}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '10px 14px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                <div>
-                  <div style={{ fontSize: '13px', color: '#15803d', fontWeight: 700 }}>
-                    ✓ Coupon "{appliedCoupon.coupon?.code}" Active
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#166534' }}>
-                    Saving ₹{couponDiscount.toLocaleString('en-IN')} on this order
-                  </div>
+
+              <div className="checkout-form-group">
+                <label>State *</label>
+                <input
+                  type="text"
+                  name="state"
+                  value={shippingAddress.state}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="State"
+                />
+              </div>
+            </div>
+
+            {/* Pincode */}
+            <div className="checkout-form-group">
+              <label>Pincode *</label>
+              <input
+                type="text"
+                name="pincode"
+                value={shippingAddress.pincode}
+                onChange={handleInputChange}
+                required
+                maxLength={6}
+                placeholder="380001"
+              />
+            </div>
+
+            {/* Delhivery Express Serviceability Badge */}
+            {checkingPincode && (
+              <div className="delhivery-status-banner checking">
+                <span>🔄 Checking Delhivery express courier serviceability...</span>
+              </div>
+            )}
+            {!checkingPincode && delhiveryStatus && (
+              <div className={`delhivery-status-banner ${delhiveryStatus.serviceable ? 'success' : 'warning'}`}>
+                <div className="delhivery-badge-header">
+                  <strong>📦 Delhivery Express Courier Coverage</strong>
+                  {delhiveryStatus.serviceable ? (
+                    <span className="badge-available">✓ Serviceable</span>
+                  ) : (
+                    <span className="badge-unavailable">⚠ Standard Shipping</span>
+                  )}
                 </div>
-                <button 
-                  type="button" 
-                  onClick={handleCheckoutRemoveCoupon} 
-                  style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-                >
-                  Remove
-                </button>
+                <p style={{ marginTop: '4px' }}>
+                  {delhiveryStatus.serviceable
+                    ? `🚚 Fast Doorstep Delivery Available! Expected Arrival: ${delhiveryStatus.estimatedDeliveryDate ? delhiveryStatus.estimatedDeliveryDate : (delhiveryStatus.estimatedDays || '2-4 Days')}.`
+                    : 'Pincode not directly covered by Delhivery Express; standard delivery will apply.'}
+                </p>
               </div>
             )}
 
-            {couponFeedback && (
-              <div style={{
-                marginTop: '8px',
-                fontSize: '12px',
-                fontWeight: 600,
-                color: couponFeedback.type === 'success' ? '#15803d' : '#dc2626'
-              }}>
-                {couponFeedback.text}
-              </div>
-            )}
+            {/* Free Shipping Banner */}
+            <div className={`free-shipping-bar ${cartSubtotal >= 1000 ? 'unlocked' : 'pending'}`} style={{
+              marginTop: '16px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: '700',
+              background: cartSubtotal >= 1000 ? '#f0fdf4' : '#fffbeb',
+              color: cartSubtotal >= 1000 ? '#15803d' : '#b45309',
+              border: `1px solid ${cartSubtotal >= 1000 ? '#bbf7d0' : '#fde68a'}`
+            }}>
+              {cartSubtotal >= 1000 ? (
+                <span>🎉 Congratulations! You unlocked FREE Delivery (Order over ₹1,000)!</span>
+              ) : (
+                <span>🚚 Add ₹{(1000 - cartSubtotal).toLocaleString('en-IN')} more for FREE Express Shipping!</span>
+              )}
+            </div>
+
+
+
+            <h3 style={{ marginTop: '32px' }}>2. Select Payment Method</h3>
+            <div className="payment-options">
+              <label className={`payment-option ${paymentMethod === 'razorpay' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="razorpay"
+                  checked={paymentMethod === 'razorpay'}
+                  onChange={() => setPaymentMethod('razorpay')}
+                />
+                <div>
+                  <strong>💳 Online Payment (Razorpay)</strong>
+                  <p>Pay securely via UPI, Google Pay, PhonePe, Cards, or Net Banking.</p>
+                </div>
+              </label>
+
+              <label className={`payment-option ${paymentMethod === 'cod' ? 'active' : ''}`} style={{ cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="cod"
+                  checked={paymentMethod === 'cod'}
+                  onChange={() => setPaymentMethod('cod')}
+                />
+                <div>
+                  <strong>💵 Cash on Delivery (COD)</strong>
+                  <p>Pay cash when your order is delivered to your doorstep.</p>
+                </div>
+              </label>
+            </div>
           </div>
 
-          <div className="checkout-totals">
-            <div className="summary-row"><span>Subtotal</span><span>₹{cartSubtotal.toLocaleString('en-IN')}</span></div>
-            {discount > 0 && <div className="summary-row discount"><span>Auto Tier Discount</span><span>-₹{discount.toLocaleString('en-IN')}</span></div>}
-            {appliedCoupon && (
-              <div className="summary-row discount" style={{ color: '#16a34a' }}>
-                <span>Coupon ({appliedCoupon.coupon?.code})</span>
-                <span>-₹{couponDiscount.toLocaleString('en-IN')}</span>
+          {/* Right Column: Order Summary */}
+          <div className="checkout-summary-section">
+            <h3>Order Items ({cartItems.length})</h3>
+            <div className="checkout-items-list">
+              {cartItems.map((item) => (
+                <div key={item.cartItemId} className="checkout-item">
+                  <img src={getThumbnailImageUrl(item.image, 120)} alt={item.name} className="checkout-item-thumb" width="48" height="60" loading="lazy" decoding="async" />
+                  <div className="checkout-item-details">
+                    <strong>{item.name}</strong>
+                    <span>Size: {typeof item.size === 'object' && item.size !== null ? (item.size.name || item.size.size || 'One Size') : (item.size || 'One Size')} | Qty: {item.quantity}</span>
+                    <span className="checkout-item-price">₹{item.price * item.quantity}</span>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+
+            {/* Coupon Code Section */}
+            <div className="checkout-coupon-card" style={{ margin: '18px 0', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: '#1e293b' }}>
+                Have a Discount Coupon?
               </div>
-            )}
-            <div className="summary-row"><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span></div>
-            <div className="summary-divider"></div>
-            <div className="summary-row total"><span>Total Amount</span><span>₹{finalTotal.toLocaleString('en-IN')}</span></div>
+              {!appliedCoupon ? (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Enter code (e.g. BROTHERS10)"
+                    value={couponInput}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase());
+                      if (couponFeedback) setCouponFeedback(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontFamily: 'inherit',
+                      textTransform: 'uppercase',
+                      fontWeight: 600
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCheckoutApplyCoupon}
+                    disabled={couponChecking || !couponInput.trim()}
+                    style={{
+                      padding: '10px 18px',
+                      background: '#0f172a',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      letterSpacing: '1px',
+                      cursor: couponChecking ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {couponChecking ? '...' : 'APPLY'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0fdf4', padding: '10px 14px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#15803d', fontWeight: 700 }}>
+                      ✓ Coupon "{appliedCoupon.coupon?.code}" Active
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#166534' }}>
+                      Saving ₹{couponDiscount.toLocaleString('en-IN')} on this order
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCheckoutRemoveCoupon}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '12px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {couponFeedback && (
+                <div style={{
+                  marginTop: '8px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: couponFeedback.type === 'success' ? '#15803d' : '#dc2626'
+                }}>
+                  {couponFeedback.text}
+                </div>
+              )}
+            </div>
+
+            <div className="checkout-totals">
+              <div className="summary-row"><span>Subtotal</span><span>₹{cartSubtotal.toLocaleString('en-IN')}</span></div>
+              {discount > 0 && <div className="summary-row discount"><span>Auto Tier Discount</span><span>-₹{discount.toLocaleString('en-IN')}</span></div>}
+              {appliedCoupon && (
+                <div className="summary-row discount" style={{ color: '#16a34a' }}>
+                  <span>Coupon ({appliedCoupon.coupon?.code})</span>
+                  <span>-₹{couponDiscount.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              <div className="summary-row"><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span></div>
+              <div className="summary-divider"></div>
+              <div className="summary-row total"><span>Total Amount</span><span>₹{finalTotal.toLocaleString('en-IN')}</span></div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-pay-now"
+            >
+              {loading ? 'Processing...' : (paymentMethod === 'razorpay' ? `Pay ₹${finalTotal.toLocaleString('en-IN')} Securely` : `Place Order (Cash on Delivery) • ₹${finalTotal.toLocaleString('en-IN')}`)}
+            </button>
           </div>
+        </form>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-pay-now"
-          >
-            {loading ? 'Processing...' : (paymentMethod === 'razorpay' ? `Pay ₹${finalTotal.toLocaleString('en-IN')} Securely` : `Place Order (Cash on Delivery) • ₹${finalTotal.toLocaleString('en-IN')}`)}
-          </button>
-        </div>
-      </form>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          onSuccess={() => handlePlaceOrder()}
+          initialTab="signup"
+          message="Please create an account or sign in to place your order."
+        />
 
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={() => handlePlaceOrder()}
-        initialTab="signup"
-        message="Please create an account or sign in to place your order."
-      />
-
-      <PhoneOtpModal
-        isOpen={phoneOtpModalOpen}
-        phone={shippingAddress.phone}
-        onClose={() => setPhoneOtpModalOpen(false)}
-        onSuccess={handlePhoneVerified}
-        title={otpTriggerSource === 'inline' ? "Verify Phone Number" : "Verify Phone to Complete Order"}
-        submitText={otpTriggerSource === 'inline' ? "Verify Number" : (paymentMethod === 'razorpay' ? `Verify & Pay ₹${finalTotal.toLocaleString('en-IN')}` : 'Verify & Place Order (COD)')}
-        onChangePhone={() => {
-          setPhoneOtpModalOpen(false);
-          const phoneInput = document.querySelector('input[name="phone"]');
-          if (phoneInput) {
-            phoneInput.focus();
-            phoneInput.select();
-          }
-        }}
-      />
+        <PhoneOtpModal
+          isOpen={phoneOtpModalOpen}
+          phone={shippingAddress.phone}
+          onClose={() => setPhoneOtpModalOpen(false)}
+          onSuccess={handlePhoneVerified}
+          title={otpTriggerSource === 'inline' ? "Verify Phone Number" : "Verify Phone to Complete Order"}
+          submitText={otpTriggerSource === 'inline' ? "Verify Number" : (paymentMethod === 'razorpay' ? `Verify & Pay ₹${finalTotal.toLocaleString('en-IN')}` : 'Verify & Place Order (COD)')}
+          onChangePhone={() => {
+            setPhoneOtpModalOpen(false);
+            const phoneInput = document.querySelector('input[name="phone"]');
+            if (phoneInput) {
+              phoneInput.focus();
+              phoneInput.select();
+            }
+          }}
+        />
       </div>
     </div>
   );

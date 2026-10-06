@@ -239,6 +239,31 @@
   }
 }
 
+/* Cart Icon Bounce on Flying Item Arrival */
+.navbar__cart-btn.cart-icon-bounce,
+[data-cart-target="true"].cart-icon-bounce,
+.cart-icon-bounce .navbar__cart-icon {
+  animation: cartIconBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes cartIconBounce {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.28);
+  }
+  65% {
+    transform: scale(0.92);
+  }
+  85% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* Hamburger - mobile only */
 .navbar__hamburger {
   display: none;

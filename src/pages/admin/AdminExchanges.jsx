@@ -52,6 +52,9 @@ export default function AdminExchanges() {
   // Action loading state
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
+  // Success approval popup modal state
+  const [successModal, setSuccessModal] = useState({ open: false, exchange: null });
+
   // Preload catalog products for variant stock checking
   useEffect(() => {
     let isMounted = true;
@@ -137,10 +140,10 @@ export default function AdminExchanges() {
 
   // ─── Actions ─────────────────────────────────────────────────────────────
 
-  // 1. Approve Exchange (Triggers Delhivery Reverse Pickup)
+  // 1. Approve Exchange (No reverse pickup request to Delhivery)
   const handleApprove = (ex) => {
     const stockInfo = getRequestedVariantStock(ex);
-    let confirmMsg = `Approve Exchange #${ex.id} for Order #${ex.orderId}? Delhivery Reverse Pickup will be scheduled immediately.`;
+    let confirmMsg = `Approve Exchange #${ex.id} for Order #${ex.orderId}? The exchange will be marked as Approved and the customer will be notified on their profile.`;
     if (stockInfo && stockInfo.found && !stockInfo.inStock) {
       confirmMsg += `\n\n⚠️ INVENTORY WARNING: Requested replacement size ${ex.requestedVariant?.size} has 0 stock in catalog!`;
     }
@@ -148,17 +151,29 @@ export default function AdminExchanges() {
     showConfirm({
       title: 'Approve Exchange Request',
       message: confirmMsg,
-      confirmText: 'Approve & Create Reverse Pickup',
+      confirmText: 'Approve Exchange',
       confirmVariant: 'primary',
       onConfirm: async () => {
         setActionLoadingId(ex.id);
         try {
-          const res = await approveExchangeRequest(ex.id, {}, ex.docId);
-          if (res.reversePickupAwb) {
-            showToast(`✓ Exchange #${ex.id} approved! Pickup scheduled (AWB: ${res.reversePickupAwb})`, 'success');
-          } else {
-            showToast(`✓ Exchange #${ex.id} approved successfully!`, 'success');
-          }
+          await approveExchangeRequest(ex.id, {}, ex.docId);
+          showToast(`✓ Exchange #${ex.id} approved successfully!`, 'success');
+          // Optimistically update local exchanges state immediately
+          setExchanges(prev => prev.map(item => {
+            if ((item.id || item.docId) === (ex.id || ex.docId)) {
+              return {
+                ...item,
+                status: 'APPROVED',
+                adminDecision: 'APPROVED'
+              };
+            }
+            return item;
+          }));
+          // Open Exchange Successful Popup Modal
+          setSuccessModal({
+            open: true,
+            exchange: { ...ex, status: 'APPROVED', adminDecision: 'APPROVED' }
+          });
         } catch (err) {
           showToast(`Approval failed: ${err.message}`, 'error');
         } finally {
@@ -213,17 +228,26 @@ export default function AdminExchanges() {
     }
   };
 
-  // 4. Update Status (Received, QC, etc.)
+  // 4. Update Status (Received, QC, etc.) - Optimistic UI
   const handleUpdateStatus = async (ex, nextStatus, extraPayload = {}) => {
-    setActionLoadingId(ex.id);
+    const previousExchanges = [...exchanges];
+    const meta = EXCHANGE_STATUS_METADATA[nextStatus];
+
+    // 1. Optimistic UI update
+    setExchanges(prev => prev.map(item => (item.id === ex.id || item.docId === ex.docId) ? { ...item, status: nextStatus, ...extraPayload } : item));
+    showToast(`Status updated to: ${meta?.label || nextStatus}`, 'success');
+
+    // 2. Background update
     try {
       await updateExchangeStatus(ex.id, nextStatus, extraPayload, ex.docId);
-      const meta = EXCHANGE_STATUS_METADATA[nextStatus];
-      showToast(`Status updated to: ${meta?.label || nextStatus}`, 'success');
     } catch (err) {
-      showToast(`Update failed: ${err.message}`, 'error');
-    } finally {
-      setActionLoadingId(null);
+      console.error('Failed to update exchange status:', err);
+      // 3. Rollback on failure
+      setExchanges(previousExchanges);
+      showToast(`Update failed: ${err.message}`, 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleUpdateStatus(ex, nextStatus, extraPayload)
+      });
     }
   };
 
@@ -262,7 +286,7 @@ export default function AdminExchanges() {
         <div>
           <h1 className="admin-page-title">Exchange Management</h1>
           <p className="admin-page-subtitle">
-            Secure Exchange-Only Workflow • Delhivery Reverse Pickup Logistics
+            Secure Exchange-Only Workflow • Review, Approval & Replacement Fulfillment
           </p>
         </div>
       </div>
@@ -278,7 +302,7 @@ export default function AdminExchanges() {
           <div className="metric-value">{metrics.pending}</div>
         </div>
         <div className="metric-box" onClick={() => setStatusFilter('APPROVED')}>
-          <div className="metric-label">Pickup Scheduled</div>
+          <div className="metric-label">Approved</div>
           <div className="metric-value">{metrics.approved}</div>
         </div>
         <div className="metric-box" onClick={() => setStatusFilter('QC')}>
@@ -305,7 +329,7 @@ export default function AdminExchanges() {
             Pending Review ({metrics.pending})
           </button>
           <button className={`filter-tab ${statusFilter === 'APPROVED' ? 'active' : ''}`} onClick={() => setStatusFilter('APPROVED')}>
-            Reverse Pickup ({metrics.approved})
+            Approved ({metrics.approved})
           </button>
           <button className={`filter-tab ${statusFilter === 'QC' ? 'active' : ''}`} onClick={() => setStatusFilter('QC')}>
             Hub & QC ({metrics.inTransitOrQC})
@@ -484,6 +508,10 @@ export default function AdminExchanges() {
                           </div>
                           <div className="logistics-sub">{ex.reversePickupStatus || 'Scheduled with Delhivery'}</div>
                         </div>
+                      ) : (ex.status === 'APPROVED' || ex.status === EXCHANGE_STATUS.APPROVED) ? (
+                        <span className="pickup-pending-tag" style={{ background: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' }}>
+                          ✓ Approved
+                        </span>
                       ) : ex.status === EXCHANGE_STATUS.REVERSE_PICKUP_PENDING ? (
                         <span className="pickup-pending-tag">⚠️ Pickup Failed</span>
                       ) : (
@@ -508,7 +536,7 @@ export default function AdminExchanges() {
                               className="btn-admin-approve"
                               onClick={() => handleApprove(ex)}
                               disabled={isLoading}
-                              title="Approve exchange and schedule Delhivery reverse pickup"
+                              title="Approve exchange request"
                             >
                               ✓ Approve
                             </button>
@@ -537,15 +565,16 @@ export default function AdminExchanges() {
                           </button>
                         )}
 
-                        {/* PICKUP IN PROGRESS */}
-                        {ex.status === EXCHANGE_STATUS.REVERSE_PICKUP_CREATED && (
+                        {/* APPROVED / PICKUP IN PROGRESS */}
+                        {([EXCHANGE_STATUS.APPROVED, 'APPROVED', EXCHANGE_STATUS.REVERSE_PICKUP_CREATED].includes(ex.status)) && (
                           <button
                             type="button"
                             className="btn-admin-next"
-                            onClick={() => handleUpdateStatus(ex, EXCHANGE_STATUS.PICKED_UP)}
+                            onClick={() => handleUpdateStatus(ex, EXCHANGE_STATUS.RECEIVED)}
                             disabled={isLoading}
+                            title="Mark item received at warehouse hub"
                           >
-                            Mark Picked Up
+                            Mark Received at Hub
                           </button>
                         )}
 
@@ -772,12 +801,18 @@ export default function AdminExchanges() {
                 )}
               </div>
 
-              {/* Delhivery Reverse Pickup Logistics */}
+              {/* Logistics Details */}
               <div className="drawer-section">
                 <div className="drawer-section-title">Logistics Details</div>
                 <div className="drawer-logistics-box">
-                  <div><strong>Reverse Pickup AWB:</strong> {selectedExchange.reversePickupAwb || 'Not scheduled yet'}</div>
-                  <div><strong>Reverse Pickup Status:</strong> {selectedExchange.reversePickupStatus || 'Pending'}</div>
+                  {selectedExchange.reversePickupAwb ? (
+                    <>
+                      <div><strong>Reverse Pickup AWB:</strong> {selectedExchange.reversePickupAwb}</div>
+                      <div><strong>Reverse Pickup Status:</strong> {selectedExchange.reversePickupStatus || 'Pending'}</div>
+                    </>
+                  ) : (
+                    <div><strong>Reverse Pickup:</strong> {selectedExchange.status === EXCHANGE_STATUS.APPROVED ? 'Approved (No courier request)' : 'Not requested'}</div>
+                  )}
                   {selectedExchange.replacementAwb && (
                     <div><strong>Replacement Shipment AWB:</strong> {selectedExchange.replacementAwb}</div>
                   )}
@@ -817,7 +852,7 @@ export default function AdminExchanges() {
                       handleApprove(selectedExchange);
                     }}
                   >
-                    ✓ Approve & Schedule Reverse Pickup
+                    ✓ Approve Exchange
                   </button>
                   <button
                     type="button"
@@ -829,6 +864,16 @@ export default function AdminExchanges() {
                     ✕ Reject Exchange
                   </button>
                 </>
+              )}
+
+              {selectedExchange.status === EXCHANGE_STATUS.APPROVED && (
+                <button
+                  type="button"
+                  className="btn-admin-action"
+                  onClick={() => handleUpdateStatus(selectedExchange.id, EXCHANGE_STATUS.RECEIVED_AT_HUB, 'Item received at warehouse')}
+                >
+                  📥 Mark Received at Hub
+                </button>
               )}
 
               {selectedExchange.status === EXCHANGE_STATUS.REVERSE_PICKUP_PENDING && (
@@ -960,6 +1005,75 @@ export default function AdminExchanges() {
                   Mark Replacement Shipped
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 3. Success Popup Modal */}
+      {successModal.open && successModal.exchange && createPortal(
+        <div className="admin-modal-overlay" onClick={() => setSuccessModal({ open: false, exchange: null })}>
+          <div className="admin-modal-content exchange-success-popup" onClick={(e) => e.stopPropagation()}>
+            <div className="exchange-success-header">
+              <div className="exchange-success-icon-badge">🎉</div>
+              <div>
+                <span className="exchange-success-kicker">EXCHANGE UPDATED</span>
+                <h2 className="exchange-success-title">Exchange Approved Successfully!</h2>
+              </div>
+            </div>
+
+            <div className="exchange-success-body">
+              <div className="exchange-success-details-card">
+                <div className="success-detail-row">
+                  <span className="label">Exchange ID:</span>
+                  <span className="value font-mono">#{successModal.exchange.id}</span>
+                </div>
+                <div className="success-detail-row">
+                  <span className="label">Order ID:</span>
+                  <span className="value font-mono">#{successModal.exchange.orderId}</span>
+                </div>
+                <div className="success-detail-row">
+                  <span className="label">Product:</span>
+                  <span className="value">{successModal.exchange.productName || 'Garment Item'}</span>
+                </div>
+                <div className="success-detail-row">
+                  <span className="label">Requested Size:</span>
+                  <span className="value font-bold">{successModal.exchange.requestedVariant?.size || 'New Size'}</span>
+                </div>
+                <div className="success-detail-row">
+                  <span className="label">Status:</span>
+                  <span className="status-badge-approved">✓ APPROVED</span>
+                </div>
+              </div>
+
+              <div className="exchange-success-notice">
+                <div className="notice-icon">ℹ️</div>
+                <p>
+                  <strong>Reverse Pickup:</strong> Not requested to Delhivery courier.<br />
+                  <strong>Customer Notification:</strong> The exchange is marked as Approved. The customer will now see it as Approved on their Exchange / Profile page.
+                </p>
+              </div>
+            </div>
+
+            <div className="exchange-success-footer">
+              <button
+                type="button"
+                className="btn-success-view-approved"
+                onClick={() => {
+                  setStatusFilter('APPROVED');
+                  setSuccessModal({ open: false, exchange: null });
+                }}
+              >
+                View in Approved Tab →
+              </button>
+              <button
+                type="button"
+                className="btn-success-done"
+                onClick={() => setSuccessModal({ open: false, exchange: null })}
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>,

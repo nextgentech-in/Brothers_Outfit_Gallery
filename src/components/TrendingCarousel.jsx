@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
+import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../utils/imageUtils';
 import trendingItems from '../data/trendingData';
 import './TrendingCarousel.css';
 
@@ -102,16 +102,18 @@ export default function TrendingCarousel({ trendingConfig }) {
               )}
               <div className="trending__card-image-wrap">
                 <img
-                  src={optimizeImage(item.image, 800)}
-                  srcSet={getOptimizedImageSrcSet(item.image)}
+                  src={getCardImageUrl(item.image, 480)}
+                  srcSet={getOptimizedImageSrcSet(item.image, [320, 480, 640])}
                   sizes="(max-width: 768px) 78vw, 340px"
                   alt={item.title}
                   className="trending__card-image"
+                  width="340"
+                  height="425"
                   loading="lazy"
                   decoding="async"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = '/images/hero.png';
+                    e.currentTarget.src = '/images/product-tshirt-black.png';
                   }}
                 />
                 <div className="trending__card-overlay" />

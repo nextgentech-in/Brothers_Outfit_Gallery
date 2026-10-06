@@ -25,6 +25,7 @@ const announcements = [
 ];
 
 export default function Navbar() {
+  const navRef = useRef(null);
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -143,6 +144,31 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Measure exact rendered navbar height and set CSS property for 0px seamless gap
+  useEffect(() => {
+    const updateNavHeight = () => {
+      if (navRef.current) {
+        const height = navRef.current.offsetHeight;
+        if (height > 0) {
+          document.documentElement.style.setProperty('--total-header-height', `${height}px`);
+        }
+      }
+    };
+
+    updateNavHeight();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined' && navRef.current) {
+      ro = new ResizeObserver(updateNavHeight);
+      ro.observe(navRef.current);
+    }
+    window.addEventListener('resize', updateNavHeight);
+
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', updateNavHeight);
+    };
+  }, []);
+
 
   useEffect(() => {
     if (searchOpen && searchInputRef.current) {
@@ -175,7 +201,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`}>
+      <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`} ref={navRef}>
         {/* Luxury Top Announcement Bar */}
         <div className="top-announcement-bar">
           <Link to={announcements[announcementIdx].link} className="top-announcement-bar__link">
@@ -256,11 +282,13 @@ export default function Navbar() {
             {/* Cart - opens MiniCartDrawer */}
             <button
               type="button"
-              className="navbar__icon-btn"
+              id="navbar-cart-button"
+              data-cart-target="true"
+              className="navbar__icon-btn navbar__cart-btn"
               onClick={openCartDrawer}
               aria-label="Shopping Cart"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="navbar__cart-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
                 <line x1="3" y1="6" x2="21" y2="6" />
                 <path d="M16 10a4 4 0 0 1-8 0" />
@@ -373,7 +401,10 @@ export default function Navbar() {
                             <img
                               src={optimizeImage(product.images[0], { width: 90, quality: 75 })}
                               alt={product.name}
+                              width="40"
+                              height="50"
                               loading="lazy"
+                              decoding="async"
                             />
                           ) : (
                             <div className="search-result-placeholder">

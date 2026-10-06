@@ -1,53 +1,137 @@
 import { getBackendUrl } from './apiConfig';
 
 /**
- * Optimizes an ImageKit URL by appending transformation parameters.
- * Automatically converts to WebP/AVIF (f-auto) and compresses (q-80).
- * 
- * @param {string} url - The original image URL
- * @param {number} width - The desired width in pixels
- * @returns {string} - The optimized URL
+ * Strips existing ImageKit transformation parameters so transformations don't clash.
  */
-export const optimizeImage = (input, optionsOrWidth = 800) => {
+function cleanImageKitUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  // Remove ?tr=... or &tr=... query parameters
+  let cleaned = rawUrl.replace(/[?&]tr=[^&]*/g, '');
+  // Clean dangling ? or &
+  cleaned = cleaned.replace(/\?&/, '?').replace(/[?&]$/, '');
+  // Also handle path-based transformations /tr:w-.../
+  cleaned = cleaned.replace(/\/tr:[^/]+/, '');
+  return cleaned;
+}
+
+/**
+ * Universal ImageKit delivery transformation engine.
+ * Delivers tailored resolution, automatic modern format (AVIF/WebP),
+ * progressive scan, and crisp textile retention without quality loss.
+ *
+ * @param {Object} params
+ * @param {string|Object} params.url - Image URL or product image object
+ * @param {number} [params.width=480] - Render width in pixels
+ * @param {number} [params.height] - Optional target height in pixels
+ * @param {number} [params.quality=82] - Compression quality (80-85 is visual sweet spot)
+ * @param {string} [params.format='auto'] - Output format ('auto' for browser-negotiated AVIF/WebP)
+ * @param {number} [params.dpr] - Device pixel ratio (1, 1.5, 2)
+ * @param {boolean} [params.progressive=true] - Progressive JPEG/interlaced WebP delivery
+ * @returns {string} Optimized URL
+ */
+export const getProductImageUrl = ({
+  url: input,
+  width = 480,
+  height,
+  quality = 82,
+  format = 'auto',
+  dpr,
+  progressive = true
+} = {}) => {
   if (!input) return '/images/brothers-storefront.jpg';
-  const url = (typeof input === 'object' && input !== null)
+  const rawUrl = (typeof input === 'object' && input !== null)
     ? (input.url || input.thumbnailUrl || input.path || '')
     : String(input);
 
-  if (!url || typeof url !== 'string' || url === '[object Object]') {
+  if (!rawUrl || typeof rawUrl !== 'string' || rawUrl === '[object Object]') {
     return '/images/brothers-storefront.jpg';
   }
 
-  let width = 800;
-  let quality = 88;
+  // Preserve local SVG or data URLs without modification
+  if (rawUrl.startsWith('data:') || rawUrl.endsWith('.svg')) {
+    return rawUrl;
+  }
+
+  if (rawUrl.includes('ik.imagekit.io')) {
+    const baseUrl = cleanImageKitUrl(rawUrl);
+    const trParts = [];
+
+    if (width) trParts.push(`w-${Math.round(width)}`);
+    if (height) trParts.push(`h-${Math.round(height)}`);
+    if (quality) trParts.push(`q-${Math.min(95, Math.max(60, Math.round(quality)))}`);
+    if (format) trParts.push(`f-${format}`);
+    if (dpr && dpr > 1) trParts.push(`dpr-${dpr}`);
+    if (progressive) trParts.push('pr-true');
+
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${sep}tr=${trParts.join(',')}`;
+  }
+
+  return rawUrl;
+};
+
+/**
+ * Optimizes an ImageKit URL by appending transformation parameters.
+ * Backward-compatible with signature optimizeImage(url, optionsOrWidth).
+ */
+export const optimizeImage = (input, optionsOrWidth = 480) => {
+  let width = 480;
+  let quality = 82;
+  let height = undefined;
+  let dpr = undefined;
+
   if (typeof optionsOrWidth === 'number') {
     width = optionsOrWidth;
   } else if (typeof optionsOrWidth === 'object' && optionsOrWidth !== null) {
     if (optionsOrWidth.width) width = optionsOrWidth.width;
+    if (optionsOrWidth.height) height = optionsOrWidth.height;
     if (optionsOrWidth.quality) quality = optionsOrWidth.quality;
+    if (optionsOrWidth.dpr) dpr = optionsOrWidth.dpr;
   }
 
-  if (url.includes('ik.imagekit.io')) {
-    if (url.includes('tr=')) return url;
-    const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}tr=w-${width},f-auto,q-${quality},pr-true`;
-  }
-  return url;
+  return getProductImageUrl({
+    url: input,
+    width,
+    height,
+    quality,
+    dpr
+  });
 };
+
+/**
+ * Optimized URL helpers for specific UI surfaces
+ */
+export const getCardImageUrl = (input, width = 480) =>
+  getProductImageUrl({ url: input, width, quality: 82 });
+
+export const getThumbnailImageUrl = (input, width = 180) =>
+  getProductImageUrl({ url: input, width, quality: 80 });
+
+export const getProductDetailImageUrl = (input, isMobile = false) =>
+  getProductImageUrl({
+    url: input,
+    width: isMobile ? 850 : 1100,
+    quality: 85
+  });
+
+export const getZoomImageUrl = (input, width = 1600) =>
+  getProductImageUrl({ url: input, width, quality: 88 });
 
 /**
  * Creates responsive ImageKit sources so the browser downloads only the image
  * size needed by the current card instead of a full product original.
  */
-export const getOptimizedImageSrcSet = (input, widths = [320, 480, 640, 960], quality = 82) => {
+export const getOptimizedImageSrcSet = (input, widths = [320, 480, 640, 800], quality = 82) => {
   const url = (typeof input === 'object' && input !== null)
     ? (input.url || input.thumbnailUrl || input.path || '')
     : String(input || '');
 
-  if (!url.includes('ik.imagekit.io') || url.includes('tr=')) return undefined;
+  if (!url.includes('ik.imagekit.io')) return undefined;
+
+  const baseUrl = cleanImageKitUrl(url);
 
   return widths
-    .map(width => `${optimizeImage(url, { width, quality })} ${width}w`)
+    .map(width => `${getProductImageUrl({ url: baseUrl, width, quality })} ${width}w`)
     .join(', ');
 };
 

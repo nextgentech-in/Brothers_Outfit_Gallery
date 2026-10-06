@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { optimizeImage } from '../utils/imageUtils';
+import { optimizeImage, getOptimizedImageSrcSet } from '../utils/imageUtils';
 import TrustBar from './TrustBar';
 import './Hero.css';
 
@@ -57,13 +57,18 @@ export default function Hero({ heroConfig: propConfig }) {
         {/* Background Image with Auto Optimization & Robust Error Fallback */}
         <div className="hero__image-wrap">
           <picture>
-            {mobileBanner && mobileBanner !== bannerImage && (
-              <source media="(max-width: 640px)" srcSet={optimizeImage(mobileBanner, 800)} />
-            )}
+            <source 
+              media="(max-width: 640px)" 
+              srcSet={optimizeImage(mobileBanner, { width: 750, quality: 82 })} 
+            />
             <img
-              src={optimizeImage(bannerImage, 1920)}
+              src={optimizeImage(bannerImage, { width: 1440, quality: 84 })}
+              srcSet={getOptimizedImageSrcSet(bannerImage, [750, 1080, 1440, 1920], 84)}
+              sizes="100vw"
               alt="Brother's Outfit Gallery - Premium Men's Fashion & Clothing Store in Himatnagar"
               className="hero__image"
+              width="1440"
+              height="800"
               loading="eager"
               fetchPriority="high"
               onError={(e) => {

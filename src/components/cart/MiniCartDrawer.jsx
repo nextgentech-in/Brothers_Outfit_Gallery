@@ -48,9 +48,9 @@ export default function MiniCartDrawer() {
 
   return (
     <div className="mini-cart-overlay" onClick={closeCartDrawer} role="dialog" aria-modal="true" aria-label="Shopping Cart Drawer">
-      <div 
-        ref={drawerRef} 
-        className="mini-cart-drawer" 
+      <div
+        ref={drawerRef}
+        className="mini-cart-drawer"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -59,9 +59,9 @@ export default function MiniCartDrawer() {
             <h2 className="mini-cart-title">YOUR BAG</h2>
             <span className="mini-cart-count">({totalItems} {totalItems === 1 ? 'ITEM' : 'ITEMS'})</span>
           </div>
-          <button 
-            type="button" 
-            className="mini-cart-close-btn" 
+          <button
+            type="button"
+            className="mini-cart-close-btn"
             onClick={closeCartDrawer}
             aria-label="Close cart drawer"
           >
@@ -79,8 +79,8 @@ export default function MiniCartDrawer() {
             </span>
           )}
           <div className="shipping-progress-track">
-            <div 
-              className="shipping-progress-fill" 
+            <div
+              className="shipping-progress-fill"
               style={{ width: `${freeShippingProgress}%` }}
             />
           </div>
@@ -99,8 +99,8 @@ export default function MiniCartDrawer() {
               </div>
               <h3>Your bag is empty</h3>
               <p>Looks like you haven't added anything to your cart yet.</p>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="mini-cart-shop-btn"
                 onClick={() => { closeCartDrawer(); navigate('/shop'); }}
               >
@@ -111,14 +111,14 @@ export default function MiniCartDrawer() {
             <div className="mini-cart-items">
               {cartItems.map((item) => (
                 <div key={item.cartItemId} className="mini-cart-item">
-                  <Link 
-                    to={`/product/${item.slug}`} 
+                  <Link
+                    to={`/product/${item.slug}`}
                     onClick={closeCartDrawer}
                     className="mini-cart-item-img-link"
                   >
-                    <img 
-                      src={optimizeImage(item.image, 160)} 
-                      alt={item.name} 
+                    <img
+                      src={optimizeImage(item.image, 160)}
+                      alt={item.name}
                       className="mini-cart-item-img"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
@@ -129,15 +129,15 @@ export default function MiniCartDrawer() {
 
                   <div className="mini-cart-item-details">
                     <div className="mini-cart-item-top">
-                      <Link 
-                        to={`/product/${item.slug}`} 
+                      <Link
+                        to={`/product/${item.slug}`}
                         onClick={closeCartDrawer}
                         className="mini-cart-item-name"
                       >
                         {item.name}
                       </Link>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="mini-cart-item-remove"
                         onClick={() => removeFromCart(item.cartItemId)}
                         aria-label={`Remove ${item.name} from cart`}
@@ -159,8 +159,8 @@ export default function MiniCartDrawer() {
 
                     <div className="mini-cart-item-bottom">
                       <div className="mini-cart-qty-ctrl">
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
                           disabled={item.quantity <= 1}
                           aria-label="Decrease quantity"
@@ -168,8 +168,8 @@ export default function MiniCartDrawer() {
                           −
                         </button>
                         <span>{item.quantity}</span>
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
                           disabled={item.quantity >= (item.stock || 99)}
                           aria-label="Increase quantity"
@@ -198,16 +198,16 @@ export default function MiniCartDrawer() {
             </div>
             <p className="mini-cart-tax-notice">Taxes and shipping calculated at checkout</p>
 
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="mini-cart-checkout-btn"
               onClick={handleCheckout}
             >
               PROCEED TO CHECKOUT • ₹{cartSubtotal.toLocaleString('en-IN')}
             </button>
 
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="mini-cart-view-cart-btn"
               onClick={handleViewCart}
             >

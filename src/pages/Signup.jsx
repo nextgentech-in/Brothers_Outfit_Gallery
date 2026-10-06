@@ -40,7 +40,7 @@ export default function Signup() {
       setError('');
       setLoadingEmail(true);
       const userCredential = await signup(formData.email.trim(), formData.password);
-      
+
       // Store basic name and email without forcing lengthy address form upfront
       await updateFirestoreProfile(userCredential.user.uid, {
         fullName: formData.fullName.trim(),
@@ -75,59 +75,59 @@ export default function Signup() {
               <h1 className="auth-title">CREATE YOUR ACCOUNT</h1>
               <p className="auth-subtitle">Join Brothers Outfit Gallery and start shopping.</p>
             </div>
-            
+
             {error && <div className="auth-error">{error}</div>}
-            
+
             <form onSubmit={handleSubmit} className="auth-form">
               <div className="form-group">
                 <label>Full Name *</label>
-                <input 
-                  type="text" 
-                  name="fullName" 
-                  className="form-input" 
-                  value={formData.fullName} 
-                  onChange={handleChange} 
+                <input
+                  type="text"
+                  name="fullName"
+                  className="form-input"
+                  value={formData.fullName}
+                  onChange={handleChange}
                   placeholder="Your full name"
-                  required 
+                  required
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Email Address *</label>
-                <input 
-                  type="email" 
-                  name="email" 
-                  className="form-input" 
-                  value={formData.email} 
-                  onChange={handleChange} 
+                <input
+                  type="email"
+                  name="email"
+                  className="form-input"
+                  value={formData.email}
+                  onChange={handleChange}
                   placeholder="name@example.com"
-                  required 
+                  required
                 />
               </div>
 
               <div className="form-row">
                 <div className="form-group">
                   <label>Password *</label>
-                  <input 
-                    type="password" 
-                    name="password" 
-                    className="form-input" 
-                    value={formData.password} 
-                    onChange={handleChange} 
+                  <input
+                    type="password"
+                    name="password"
+                    className="form-input"
+                    value={formData.password}
+                    onChange={handleChange}
                     placeholder="At least 6 chars"
-                    required 
+                    required
                   />
                 </div>
                 <div className="form-group">
                   <label>Confirm Password *</label>
-                  <input 
-                    type="password" 
-                    name="confirmPassword" 
-                    className="form-input" 
-                    value={formData.confirmPassword} 
-                    onChange={handleChange} 
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    className="form-input"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
                     placeholder="Re-type password"
-                    required 
+                    required
                   />
                 </div>
               </div>

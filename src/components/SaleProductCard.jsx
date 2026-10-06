@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import OfferCountdown from './OfferCountdown';
-import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
+import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../utils/imageUtils';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { getAvailableProductSizes } from '../utils/productUtils';
+import { flyProductToCart } from '../utils/cartFlyAnimation';
 import AuthModal from './auth/AuthModal';
 import './SaleProductCard.css';
 
-export default function SaleProductCard({ product, onAddToCart, onOfferExpire }) {
+export default function SaleProductCard({ product, onAddToCart, onOfferExpire, priority = false }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
@@ -58,6 +59,13 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
     } else {
       contextAddToCart(product, sizeToUse, product.colors?.[0] || 'Default', 1, salePrice);
     }
+
+    // Trigger visual flying animation from this card's image to the navbar cart
+    const cardEl = e.currentTarget?.closest('.sale-product-card') || e.currentTarget?.closest('.product-card');
+    const imgEl = cardEl?.querySelector('.sale-product-card__image, .product-card__image, img');
+    const fallbackImg = product.image || (product.images && product.images[0]?.url) || (product.images && product.images[0]);
+    flyProductToCart(imgEl || cardEl || e.currentTarget, fallbackImg);
+
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 1500);
   };
@@ -113,16 +121,19 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire })
       <div className="sale-card__image-wrap">
         <Link to={`/product/${product.slug}`} style={{ display: 'block', width: '100%', height: '100%' }}>
           <img
-            src={optimizeImage(product.image || product.thumbnailUrl, 800)}
-            srcSet={getOptimizedImageSrcSet(product.image || product.thumbnailUrl)}
-            sizes="(max-width: 480px) 50vw, (max-width: 1024px) 33vw, 320px"
+            src={getCardImageUrl(product.image || product.thumbnailUrl, 480)}
+            srcSet={getOptimizedImageSrcSet(product.image || product.thumbnailUrl, [320, 480, 640])}
+            sizes="(max-width: 480px) 48vw, (max-width: 1024px) 32vw, 290px"
             alt={product.name}
             className="sale-card__image"
-            loading="lazy"
+            width="480"
+            height="600"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             decoding="async"
             onError={(e) => {
               e.currentTarget.onerror = null;
-              e.currentTarget.src = '/images/hero.png';
+              e.currentTarget.src = '/images/product-tshirt-black.png';
             }}
           />
         </Link>

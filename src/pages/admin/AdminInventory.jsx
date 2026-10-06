@@ -55,19 +55,29 @@ export default function AdminInventory() {
   };
 
   const handleSaveStock = async (product) => {
+    // 1. Optimistic UI update: immediately mark as saved
+    setDirtyProductIds(prev => {
+      const next = new Set(prev);
+      next.delete(product.id);
+      return next;
+    });
+    showToast(`Inventory for "${product.name}" saved!`, 'success');
+
+    // 2. Background update
     try {
-      setSavingId(product.id);
       await updateProductVariantStock(product.id, product.variants || [], product.stock || 0);
+    } catch (err) {
+      console.error('Failed to save inventory stock:', err);
+      // 3. Rollback on failure: mark as dirty again and offer retry
       setDirtyProductIds(prev => {
         const next = new Set(prev);
-        next.delete(product.id);
+        next.add(product.id);
         return next;
       });
-      showToast(`Inventory for "${product.name}" saved!`, 'success');
-    } catch (err) {
-      showToast(err.message || 'Failed to save inventory', 'error');
-    } finally {
-      setSavingId(null);
+      showToast(err.message || 'Failed to save inventory', 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleSaveStock(product)
+      });
     }
   };
 
@@ -98,7 +108,10 @@ export default function AdminInventory() {
       setDirtyProductIds(new Set());
       showToast(`Successfully updated ${modifiedProducts.length} product(s)!`, 'success');
     } catch (err) {
-      showToast(err.message || 'Failed to bulk save inventory', 'error');
+      showToast(err.message || 'Failed to bulk save inventory', 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleBulkSave()
+      });
     } finally {
       setIsBulkSaving(false);
     }

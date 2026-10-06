@@ -7,6 +7,8 @@
   overflow: hidden;
   display: flex;
   align-items: center;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 /* Background Image */
@@ -380,7 +382,8 @@
   .hero {
     height: auto;
     min-height: 540px;
-    padding-top: var(--total-header-height, 88px);
+    margin: 0;
+    padding-top: 0;
   }
 
   .hero__content {

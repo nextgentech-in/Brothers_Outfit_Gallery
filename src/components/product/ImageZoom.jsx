@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import './ImageZoom.css';
 
-export default function ImageZoom({ src, alt, onClick }) {
+export default function ImageZoom({ src, zoomSrc, alt, onClick }) {
   const [zoomStyle, setZoomStyle] = useState({ display: 'none' });
   const containerRef = useRef(null);
 
@@ -25,7 +25,7 @@ export default function ImageZoom({ src, alt, onClick }) {
 
     setZoomStyle({
       display: 'block',
-      backgroundImage: `url(${src})`,
+      backgroundImage: `url(${zoomSrc || src})`,
       backgroundPosition: `${xPercent}% ${yPercent}%`,
       left: `${x}px`,
       top: `${y}px`
