@@ -244,6 +244,85 @@
   text-decoration: none;
 }
 
+/* Mobile-only phone input styling */
+.phone-input-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+
+.phone-input-wrapper:focus-within {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+.phone-country-prefix {
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.phone-input-field {
+  border: none !important;
+  box-shadow: none !important;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 12px 14px !important;
+}
+
+.otp-large-input {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  letter-spacing: 8px !important;
+  text-align: center;
+  padding: 14px !important;
+  border: 2px solid #0f172a !important;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+.auth-help-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.otp-resend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.cooldown-text {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.dot-sep {
+  color: #cbd5e1;
+}
+
 @media (max-width: 900px) {
   .auth-image {
     display: none; /* Mobile shifts directly to Single Column form */

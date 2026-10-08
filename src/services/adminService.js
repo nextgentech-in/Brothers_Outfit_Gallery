@@ -78,19 +78,74 @@ export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
   };
 };
 
-// Admin fetching all products without active filters
-export const getAdminProducts = async () => {
-  // Pagination or complex queries can be added here
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => {
-    const data = d.data();
-    return {
-      id: d.id,
-      ...data,
-      ...(data.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide) } : {})
-    };
-  });
+const ADMIN_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes cache for fast admin page navigation
+let adminProductsCache = null;
+let adminProductsCacheTimestamp = 0;
+let inFlightAdminFetch = null;
+
+export const getCachedAdminProducts = () => {
+  const now = Date.now();
+  if (adminProductsCache && (now - adminProductsCacheTimestamp < ADMIN_CACHE_TTL_MS)) {
+    return adminProductsCache;
+  }
+  try {
+    const raw = sessionStorage.getItem('bo_admin_products_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.timestamp && (now - parsed.timestamp < ADMIN_CACHE_TTL_MS) && Array.isArray(parsed.data)) {
+        adminProductsCache = parsed.data;
+        adminProductsCacheTimestamp = parsed.timestamp;
+        return adminProductsCache;
+      }
+    }
+  } catch {}
+  return null;
+};
+
+export const invalidateAdminProductsCache = () => {
+  adminProductsCache = null;
+  adminProductsCacheTimestamp = 0;
+  inFlightAdminFetch = null;
+  try {
+    sessionStorage.removeItem('bo_admin_products_cache');
+  } catch {}
+};
+
+// Admin fetching all products with instant cache & background sync capability
+export const getAdminProducts = async (forceRefresh = false) => {
+  if (!forceRefresh) {
+    const cached = getCachedAdminProducts();
+    if (cached) return cached;
+  }
+  if (inFlightAdminFetch) return inFlightAdminFetch;
+
+  inFlightAdminFetch = (async () => {
+    try {
+      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => {
+        const item = d.data();
+        return {
+          id: d.id,
+          ...item,
+          ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
+        };
+      });
+      adminProductsCache = data;
+      adminProductsCacheTimestamp = Date.now();
+      try {
+        sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+          timestamp: adminProductsCacheTimestamp,
+          data
+        }));
+      } catch {}
+      return data;
+    } finally {
+      inFlightAdminFetch = null;
+    }
+  })();
+
+  return inFlightAdminFetch;
 };
 
 export const getAdminProductById = async (id) => {
@@ -162,6 +217,7 @@ export const createProduct = async (productData, preGeneratedId = null) => {
   };
   await setDoc(newRef, payload);
   invalidateProductCache();
+  invalidateAdminProductsCache();
   return { id: newRef.id, name: uniqueName, slug: uniqueSlug };
 };
 
@@ -185,6 +241,7 @@ export const updateProduct = async (id, productData) => {
   };
   await updateDoc(docRef, payload);
   invalidateProductCache();
+  invalidateAdminProductsCache();
   return { id, name: uniqueName, slug: uniqueSlug };
 };
 
@@ -193,6 +250,7 @@ export const deactivateProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
   await updateDoc(docRef, { active: false, updatedAt: serverTimestamp() });
   invalidateProductCache();
+  invalidateAdminProductsCache();
 };
 
 // Toggle Trending Status
@@ -200,6 +258,7 @@ export const toggleProductTrending = async (id, isTrending) => {
   const docRef = doc(db, PRODUCTS, id);
   await updateDoc(docRef, { isTrending, updatedAt: serverTimestamp() });
   invalidateProductCache();
+  invalidateAdminProductsCache();
 };
 
 // Hard Delete
@@ -207,6 +266,7 @@ export const deleteProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
   await deleteDoc(docRef);
   invalidateProductCache();
+  invalidateAdminProductsCache();
 };
 
 // Simple Stats Method
@@ -345,6 +405,21 @@ export const updateProductVariantStock = async (productId, variants, totalStock)
     stock: totalStock,
     updatedAt: serverTimestamp()
   });
+
+  // Sync admin products cache in memory and session storage
+  if (adminProductsCache && Array.isArray(adminProductsCache)) {
+    adminProductsCache = adminProductsCache.map(p =>
+      p.id === productId ? { ...p, variants, stock: totalStock } : p
+    );
+    try {
+      sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+        timestamp: adminProductsCacheTimestamp || Date.now(),
+        data: adminProductsCache
+      }));
+    } catch {}
+  }
+  // Keep storefront inventory in sync
+  invalidateProductCache();
 };
 
 export const restoreOrderStock = async (items = []) => {
