@@ -6,7 +6,6 @@ import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { getAvailableProductSizes } from '../utils/productUtils';
 import { flyProductToCart } from '../utils/cartFlyAnimation';
-import AuthModal from './auth/AuthModal';
 import './ProductCard.css';
 
 
@@ -79,7 +78,6 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   const { addToCart: contextAddToCart, buyNowDirect } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist() || {};
   const [selectedSize, setSelectedSize] = useState(null);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
   const totalStock = product.variants?.length > 0
     ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock ?? v.quantity, 10) || 0), 0)
@@ -179,12 +177,6 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
     if (needsSizeSelection) {
       setSizePrompt(true);
       setTimeout(() => setSizePrompt(false), 3000);
-      return;
-    }
-
-    // Require account creation/login before navigating to checkout
-    if (!currentUser) {
-      setAuthModalOpen(true);
       return;
     }
 
@@ -432,14 +424,6 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
           )}
         </div>
       </div>
-
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={executeBuyNow}
-        initialTab="signup"
-        message="Please create an account or sign in to complete your purchase."
-      />
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct, getAvailableProductSizes } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
-import AuthModal from '../auth/AuthModal';
 import SizeGuideModal from '../common/SizeGuideModal';
 import { flyProductToCart } from '../../utils/cartFlyAnimation';
 import { normalizeToStandardColor } from '../../data/colorMaster.js';
@@ -122,7 +121,6 @@ export default function ProductInfo({ product, onColorChange }) {
   const [selectedColor, setSelectedColor] = useState('All');
   const [selectedSize, setSelectedSize] = useState(() => defaultFrontVariant?.size || null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [deliveryPincode, setDeliveryPincode] = useState('');
@@ -272,16 +270,6 @@ export default function ProductInfo({ product, onColorChange }) {
       return;
     }
 
-    // Require account creation/login before navigating to checkout
-    if (!currentUser) {
-      setAuthModalOpen(true);
-      return;
-    }
-
-    executeBuyNow();
-  };
-
-  const onAuthSuccess = () => {
     executeBuyNow();
   };
 
@@ -679,15 +667,6 @@ export default function ProductInfo({ product, onColorChange }) {
         category={product.categoryId || product.category || 'Shirts'}
         customSizeGuide={product.sizeGuide}
         onSelectSize={(size) => setSelectedSize(size)}
-      />
-
-      {/* Account Login / Signup Modal on Buy Now */}
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={onAuthSuccess}
-        initialTab="signup"
-        message="Please create an account or sign in to proceed with your order."
       />
     </div>
   );

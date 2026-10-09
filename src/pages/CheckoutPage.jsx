@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { checkPincodeServiceability, lookupPincodeByPlace } from '../services/delhiveryService';
 import { validateCoupon } from '../services/couponService';
 import { invalidateProductCache } from '../services/productService';
-import AuthModal from '../components/auth/AuthModal';
+import { auth } from '../firebase/firebaseAuth';
 import PhoneOtpModal from '../components/checkout/PhoneOtpModal';
 import { getThumbnailImageUrl } from '../utils/imageUtils';
 import { getBackendUrl } from '../utils/apiConfig';
@@ -22,7 +22,6 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null);
   const [delhiveryStatus, setDelhiveryStatus] = useState(null);
   const [checkingPincode, setCheckingPincode] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [phoneOtpModalOpen, setPhoneOtpModalOpen] = useState(false);
   const [verifiedPhone, setVerifiedPhone] = useState(null);
   const [otpTriggerSource, setOtpTriggerSource] = useState('place_order'); // 'inline' | 'place_order'
@@ -80,8 +79,21 @@ export default function CheckoutPage() {
   // The server derives every price and writes the order. The browser only sends
   // product identifiers and customer-entered delivery details.
   const createSecureOrder = async (method, activePhone, payment = null) => {
-    const idToken = await currentUser?.getIdToken();
-    if (!idToken) throw new Error('Please sign in again before placing your order.');
+    let activeUser = currentUser || auth.currentUser;
+    if (!activeUser) {
+      try {
+        const { signInAnonymously } = await import('firebase/auth');
+        const cred = await signInAnonymously(auth);
+        activeUser = cred.user;
+      } catch (err) {
+        console.warn('Anonymous sign-in fallback on create order:', err);
+      }
+    }
+    const idToken = await activeUser?.getIdToken();
+    if (!idToken) throw new Error('Please verify your mobile number before placing your order.');
+
+    const cleanActivePhone = String(activePhone || shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+    const finalEmail = (shippingAddress.email || '').toLowerCase().trim();
 
     const response = await fetch(`${getBackendUrl()}/api/orders/create`, {
       method: 'POST',
@@ -95,8 +107,8 @@ export default function CheckoutPage() {
         couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
         shippingAddress: {
           ...shippingAddress,
-          phone: activePhone,
-          email: shippingAddress.email.toLowerCase().trim()
+          phone: cleanActivePhone,
+          email: finalEmail
         },
         items: cartItems.map(item => ({
           id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
@@ -276,11 +288,11 @@ export default function CheckoutPage() {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     try {
       if (!shippingAddress.fullName || !shippingAddress.phone || !shippingAddress.email || !shippingAddress.addressLine || !shippingAddress.city || !shippingAddress.pincode) {
-        return setError('Please fill in all required shipping address fields.');
+        return setError('Please fill in all required delivery address fields (Full Name, Mobile Number, Email Address, Address, City, Pincode).');
       }
 
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingAddress.email.trim())) {
-        return setError('Please enter a valid email address to place your order.');
+        return setError('Please enter a valid email address (e.g. name@example.com).');
       }
 
       const cleanInputPhone = String(shippingAddress.phone).replace(/\D/g, '').slice(-10);
@@ -292,12 +304,8 @@ export default function CheckoutPage() {
         return setError('Cannot place order: Please enter a valid and serviceable PIN code.');
       }
 
-      if (!currentUser) {
-        setAuthModalOpen(true);
-        return;
-      }
-
-      // Check if phone number needs verification with OTP
+      // Check if phone number needs verification with OTP.
+      // For COD order (and general order placement), login/verification opens ONLY with mobile no!
       if (!isPhoneVerified) {
         setError(null);
         setOtpTriggerSource('place_order');
@@ -313,7 +321,7 @@ export default function CheckoutPage() {
     }
   };
 
-  const handlePhoneVerified = async (confirmedPhone) => {
+  const handlePhoneVerified = async (confirmedPhone, authenticatedUser = null) => {
     setVerifiedPhone(confirmedPhone);
     setPhoneOtpModalOpen(false);
     setPhoneFeedback({
@@ -321,12 +329,23 @@ export default function CheckoutPage() {
       message: '✓ Mobile number verified successfully.'
     });
 
-    // Save verified phone to Firestore user profile in background
-    if (currentUser && updateFirestoreProfile) {
-      updateFirestoreProfile(currentUser.uid, {
+    const activeUser = authenticatedUser || currentUser || auth.currentUser;
+
+    // Automatically create / update customer account in Firestore using all details from this page
+    if (activeUser && updateFirestoreProfile) {
+      updateFirestoreProfile(activeUser.uid, {
+        fullName: shippingAddress.fullName || '',
+        email: shippingAddress.email || '',
         phone: confirmedPhone,
         phoneVerified: true,
-        phoneVerifiedAt: new Date().toISOString()
+        phoneVerifiedAt: new Date().toISOString(),
+        address: {
+          line1: shippingAddress.addressLine || '',
+          city: shippingAddress.city || '',
+          state: shippingAddress.state || '',
+          pincode: shippingAddress.pincode || ''
+        },
+        provider: 'phone'
       }).catch(() => { });
     }
 
@@ -337,13 +356,6 @@ export default function CheckoutPage() {
   };
 
   const executeOrderPlacement = async (activePhone = null) => {
-    if (!currentUser) {
-      setError('Please sign in to your Brothers Outfit account to complete checkout.');
-      setAuthModalOpen(true);
-      setLoading(false);
-      return;
-    }
-
     const finalPhone = activePhone || shippingAddress.phone;
     setLoading(true);
     setError(null);
@@ -355,10 +367,12 @@ export default function CheckoutPage() {
         // Cash on Delivery flow
         const { orderId: newOrderId } = await createSecureOrder('cod', finalPhone);
 
-        // Save delivery info to user profile
-        if (currentUser && updateFirestoreProfile) {
-          updateFirestoreProfile(currentUser.uid, {
+        // Save complete delivery info to user profile
+        const activeUser = currentUser || auth.currentUser;
+        if (activeUser && updateFirestoreProfile) {
+          updateFirestoreProfile(activeUser.uid, {
             fullName: shippingAddress.fullName,
+            email: shippingAddress.email,
             phone: finalPhone,
             phoneVerified: true,
             address: {
@@ -366,7 +380,8 @@ export default function CheckoutPage() {
               city: shippingAddress.city,
               state: shippingAddress.state,
               pincode: shippingAddress.pincode
-            }
+            },
+            provider: 'phone'
           }).catch(() => { });
         }
 
@@ -626,14 +641,14 @@ export default function CheckoutPage() {
 
             {/* Email Address */}
             <div className="checkout-form-group">
-              <label>Email *</label>
+              <label>Email Address *</label>
               <input
                 type="email"
                 name="email"
                 value={shippingAddress.email}
                 onChange={handleInputChange}
                 required
-                placeholder="email@example.com"
+                placeholder="name@example.com"
               />
             </div>
 
@@ -903,20 +918,13 @@ export default function CheckoutPage() {
           </div>
         </form>
 
-        <AuthModal
-          isOpen={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
-          onSuccess={() => handlePlaceOrder()}
-          initialTab="signup"
-          message="Please create an account or sign in to place your order."
-        />
-
         <PhoneOtpModal
           isOpen={phoneOtpModalOpen}
           phone={shippingAddress.phone}
           onClose={() => setPhoneOtpModalOpen(false)}
           onSuccess={handlePhoneVerified}
-          title={otpTriggerSource === 'inline' ? "Verify Phone Number" : "Verify Phone to Complete Order"}
+          title={otpTriggerSource === 'inline' ? "Verify Mobile Number" : (paymentMethod === 'cod' ? "Login & Verify to Place COD Order" : "Verify Mobile Number to Complete Order")}
+          subtitle={paymentMethod === 'cod' ? "Enter the 6-digit OTP code sent via SMS to verify your mobile number and place your Cash on Delivery order." : null}
           submitText={otpTriggerSource === 'inline' ? "Verify Number" : (paymentMethod === 'razorpay' ? `Verify & Pay ₹${finalTotal.toLocaleString('en-IN')}` : 'Verify & Place Order (COD)')}
           onChangePhone={() => {
             setPhoneOtpModalOpen(false);

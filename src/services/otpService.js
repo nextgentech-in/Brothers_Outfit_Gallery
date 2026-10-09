@@ -185,10 +185,23 @@ export async function verifyPhoneOtp(phone, otp) {
     throw new Error(data.error || 'Incorrect or expired verification code.');
   }
 
+  // Ensure Firebase user exists so that getIdToken() works for createSecureOrder
+  let authUser = auth.currentUser;
+  if (!authUser) {
+    try {
+      const { signInAnonymously } = await import('firebase/auth');
+      const cred = await signInAnonymously(auth);
+      authUser = cred.user;
+    } catch (anonErr) {
+      console.warn('[OTP] Anonymous sign-in fallback error:', anonErr);
+    }
+  }
+
   return {
     success: true,
     verified: true,
-    provider: 'backend'
+    provider: 'backend',
+    user: authUser
   };
 }
 

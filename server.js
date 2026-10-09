@@ -1170,6 +1170,27 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       return res.json({ success: true, orderId, duplicate: true });
     }
 
+    // Automatically create or update customer account profile from checkout details
+    try {
+      const userRef = db.collection('users').doc(req.user.uid);
+      await userRef.set({
+        fullName: address.fullName,
+        phone: address.phone,
+        email: address.email,
+        phoneVerified: true,
+        address: {
+          line1: address.addressLine,
+          city: address.city,
+          state: address.state,
+          pincode: address.pincode
+        },
+        provider: 'phone',
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    } catch (profileErr) {
+      console.warn('Customer profile creation warning:', profileErr.message);
+    }
+
     await db.collection('notifications').doc(orderId).set({
       type: 'NEW_ORDER',
       orderId,
