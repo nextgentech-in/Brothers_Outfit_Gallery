@@ -7,6 +7,8 @@
     "dev": "concurrently \"node server.js\" \"vite\"",
     "build": "vite build",
     "lint": "oxlint",
+    "test:pos-sync": "node --test test/posSync.test.js",
+    "migrate:pos-sync": "node scripts/backfill-pos-integration.js",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -22,6 +22,7 @@ import {
   isValidExchangeTransition,
   DEFAULT_EXCHANGE_WINDOW_DAYS
 } from './src/utils/exchangeConstants.js';
+import { registerPosSyncRoutes } from './src/server/posSync.js';
 
 // Basic .env parsing for local dev without requiring dotenv package
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -702,6 +703,284 @@ app.get(['/api/auth/admin-status', '/auth/admin-status'], requireAuth, (req, res
   res.json({ isAdmin: Boolean(req.isAdmin) });
 });
 
+registerPosSyncRoutes(app, {
+  getDb: getTrustedFirestore,
+  FieldValue,
+  invalidateProductCache: () => {
+    productCatalogCache = { products: null, expiresAt: 0 };
+  }
+});
+
+// Admin catalog writes use the same SKU reservation registry as POS imports.
+// This closes the race where a newly-created website SKU could otherwise be
+// attached to a later POS product before the next legacy backfill.
+app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminAuth, async (req, res) => {
+  try {
+    const productId = String(req.body?.productId || '').trim();
+    const requestId = String(req.body?.requestId || '').trim();
+    const productData = req.body?.productData;
+    const create = req.body?.create === true;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/.test(productId) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId) || !productData || typeof productData !== 'object' || Array.isArray(productData)) {
+      return res.status(422).json({ error: 'Valid productId, requestId, and productData values are required.' });
+    }
+    const variants = Array.isArray(productData.variants) ? productData.variants : [];
+    const rawSkus = [productData.sku, ...variants.map(variant => variant?.sku)].map(value => String(value || '').trim()).filter(Boolean);
+    if (rawSkus.length < 1 || variants.some(variant => !String(variant?.sku || '').trim())) {
+      return res.status(422).json({ error: 'The product and every sellable variant must have a SKU.' });
+    }
+    const normalizedSkus = rawSkus.map(value => value.toLowerCase());
+    if (new Set(normalizedSkus).size !== normalizedSkus.length) {
+      return res.status(409).json({ error: 'Product and variant SKUs must be unique.' });
+    }
+
+    const db = getTrustedFirestore();
+    const catalog = await db.collection('products').get();
+    const requestedSlug = String(productData.slug || '').trim().toLowerCase();
+    for (const doc of catalog.docs) {
+      if (doc.id === productId) continue;
+      const existing = doc.data();
+      if (requestedSlug && String(existing.slug || '').trim().toLowerCase() === requestedSlug) {
+        return res.status(409).json({ error: `Slug ${productData.slug} is already assigned to another product.` });
+      }
+      const existingSkus = [existing.sku, ...(Array.isArray(existing.variants) ? existing.variants.map(variant => variant?.sku) : [])]
+        .map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+      const conflict = normalizedSkus.find(sku => existingSkus.includes(sku));
+      if (conflict) return res.status(409).json({ error: `SKU ${rawSkus[normalizedSkus.indexOf(conflict)]} is already assigned to another product.` });
+    }
+
+    const productRef = db.collection('products').doc(productId);
+    await db.runTransaction(async transaction => {
+      const existingProduct = await transaction.get(productRef);
+      if (create && existingProduct.exists) {
+        const conflict = new Error('Product ID is already in use.');
+        conflict.statusCode = 409;
+        throw conflict;
+      }
+      if (!create && !existingProduct.exists) {
+        const missing = new Error('Product not found.');
+        missing.statusCode = 404;
+        throw missing;
+      }
+      const oldData = existingProduct.exists ? existingProduct.data() : {};
+      const oldSkus = [oldData.sku, ...(Array.isArray(oldData.variants) ? oldData.variants.map(variant => variant?.sku) : [])]
+        .map(value => String(value || '').trim()).filter(Boolean);
+      if (!create) {
+        const oldSet = [...new Set(oldSkus.map(value => value.toLowerCase()))].sort();
+        const newSet = [...new Set(normalizedSkus)].sort();
+        if (JSON.stringify(oldSet) !== JSON.stringify(newSet)) {
+          const identityConflict = new Error('Changing product or variant SKUs is not supported after creation because the POS contract has no product-update feed. Create a new product or perform a coordinated migration.');
+          identityConflict.statusCode = 409;
+          throw identityConflict;
+        }
+      }
+      const allNormalized = [...new Set([...oldSkus, ...rawSkus].map(value => value.toLowerCase()))];
+      const mappingRefs = allNormalized.map(sku => db.collection('productSkuMappings').doc(crypto.createHash('sha256').update(sku).digest('hex')));
+      const mappingSnaps = [];
+      for (const ref of mappingRefs) mappingSnaps.push(await transaction.get(ref));
+      const oldSlug = String(oldData.slug || '').trim().toLowerCase();
+      const newSlug = String(productData.slug || '').trim().toLowerCase();
+      if (!newSlug) {
+        const invalidSlug = new Error('Product slug is required.');
+        invalidSlug.statusCode = 422;
+        throw invalidSlug;
+      }
+      const newSlugRef = db.collection('productSlugMappings').doc(crypto.createHash('sha256').update(newSlug).digest('hex'));
+      const oldSlugRef = oldSlug ? db.collection('productSlugMappings').doc(crypto.createHash('sha256').update(oldSlug).digest('hex')) : null;
+      const newSlugSnap = await transaction.get(newSlugRef);
+      const oldSlugSnap = oldSlugRef && oldSlugRef.path !== newSlugRef.path ? await transaction.get(oldSlugRef) : newSlugSnap;
+      if (newSlugSnap.exists && newSlugSnap.data().productId !== productId) {
+        const slugConflict = new Error(`Slug ${productData.slug} is already reserved by another product.`);
+        slugConflict.statusCode = 409;
+        throw slugConflict;
+      }
+      mappingSnaps.forEach((snapshot, index) => {
+        if (snapshot.exists && snapshot.data().productId !== productId && normalizedSkus.includes(allNormalized[index])) {
+          const conflict = new Error(`SKU ${allNormalized[index]} is already reserved by another product.`);
+          conflict.statusCode = 409;
+          throw conflict;
+        }
+      });
+
+      const { webProductId: _ignoredWebId, integrationOrigin: _ignoredOrigin, integrationCreatedAt: _ignoredIntegrationCreatedAt, createdAt: _ignoredCreatedAt, updatedAt: _ignoredUpdatedAt, ...editableData } = productData;
+      const identity = existingProduct.exists ? {
+        webProductId: oldData.webProductId || productId,
+        integrationOrigin: oldData.integrationOrigin || 'website',
+        integrationCreatedAt: oldData.integrationCreatedAt || oldData.createdAt || FieldValue.serverTimestamp(),
+        createdAt: oldData.createdAt || FieldValue.serverTimestamp()
+      } : {
+        webProductId: productId,
+        integrationOrigin: 'website',
+        integrationCreatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp()
+      };
+      if (existingProduct.exists) {
+        const previousVariants = Array.isArray(oldData.variants) ? oldData.variants : [];
+        const nextVariants = Array.isArray(editableData.variants) ? editableData.variants : [];
+        if (previousVariants.length > 0) {
+          const previousBySku = new Map(previousVariants.map(variant => [String(variant.sku || '').trim().toLowerCase(), variant]));
+          nextVariants.forEach((variant, index) => {
+            const previous = previousBySku.get(String(variant.sku || '').trim().toLowerCase());
+            const before = Number(previous?.stock ?? previous?.quantity ?? 0);
+            const after = Number(variant.stock ?? variant.quantity ?? 0);
+            if (!Number.isSafeInteger(after) || after < 0) {
+              const invalid = new Error(`Variant ${variant.sku} has invalid stock.`);
+              invalid.statusCode = 422;
+              throw invalid;
+            }
+            const delta = after - before;
+            if (delta !== 0) {
+              const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-edit|${index}|${variant.sku}`).digest('hex')}`;
+              transaction.create(db.collection('stockMovements').doc(movementId), {
+                movementId, productId, webProductId: identity.webProductId, sku: variant.sku,
+                size: variant.size || 'One Size', color: variant.color || editableData.primaryColor || 'Standard',
+                deltaChange: delta, source: 'website', reason: 'admin_adjustment', externalReference: requestId,
+                stockAfter: after, createdAt: FieldValue.serverTimestamp()
+              });
+            }
+          });
+        } else {
+          const before = Number(oldData.stock ?? oldData.quantity ?? 0);
+          const after = Number(editableData.stock ?? editableData.quantity ?? before);
+          const delta = after - before;
+          if (delta !== 0) {
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-edit`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId, productId, webProductId: identity.webProductId, sku: editableData.sku || oldData.sku || '',
+              size: 'One Size', color: editableData.primaryColor || oldData.primaryColor || 'Standard',
+              deltaChange: delta, source: 'website', reason: 'admin_adjustment', externalReference: requestId,
+              stockAfter: after, createdAt: FieldValue.serverTimestamp()
+            });
+          }
+        }
+      }
+      transaction.set(productRef, { ...editableData, ...identity, updatedAt: FieldValue.serverTimestamp() }, { merge: !create });
+      transaction.set(newSlugRef, { normalizedSlug: newSlug, slug: productData.slug, productId, webProductId: identity.webProductId, updatedAt: FieldValue.serverTimestamp() });
+      if (oldSlugRef && oldSlugRef.path !== newSlugRef.path && oldSlugSnap.exists && oldSlugSnap.data().productId === productId) transaction.delete(oldSlugRef);
+
+      for (let index = 0; index < mappingRefs.length; index += 1) {
+        const sku = allNormalized[index];
+        if (normalizedSkus.includes(sku)) {
+          const displaySku = rawSkus[normalizedSkus.indexOf(sku)];
+          transaction.set(mappingRefs[index], { normalizedSku: sku, sku: displaySku, productId, webProductId: identity.webProductId, updatedAt: FieldValue.serverTimestamp() });
+        } else if (mappingSnaps[index].exists && mappingSnaps[index].data().productId === productId) {
+          transaction.delete(mappingRefs[index]);
+        }
+      }
+    });
+    productCatalogCache = { products: null, expiresAt: 0 };
+    return res.status(create ? 201 : 200).json({ success: true, id: productId });
+  } catch (error) {
+    console.error('Admin product upsert failed:', error.message);
+    return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Unable to save product.' });
+  }
+});
+
+app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth, async (req, res) => {
+  try {
+    const productId = String(req.body?.productId || '').trim();
+    const requestId = String(req.body?.requestId || '').trim();
+    const requestedVariants = req.body?.variants;
+    const requestedTotal = req.body?.totalStock;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/.test(productId) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId)) {
+      return res.status(422).json({ error: 'Valid productId and requestId values are required.' });
+    }
+    if (!Array.isArray(requestedVariants) || requestedVariants.length > 100 || !Number.isSafeInteger(requestedTotal) || requestedTotal < 0) {
+      return res.status(422).json({ error: 'variants and a non-negative integer totalStock are required.' });
+    }
+    const db = getTrustedFirestore();
+    const productRef = db.collection('products').doc(productId);
+    await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(productRef);
+      if (!snapshot.exists) {
+        const missing = new Error('Product not found.');
+        missing.statusCode = 404;
+        throw missing;
+      }
+      const product = snapshot.data();
+      const existingVariants = Array.isArray(product.variants) ? product.variants : [];
+      if (existingVariants.length > 0) {
+        const requestedBySku = new Map(requestedVariants.map(variant => [String(variant?.sku || '').trim().toLowerCase(), variant]));
+        const existingSkus = existingVariants.map(variant => String(variant?.sku || '').trim().toLowerCase());
+        if (requestedBySku.size !== existingVariants.length || existingSkus.some(sku => !sku || !requestedBySku.has(sku))) {
+          const mismatch = new Error('Inventory updates cannot add, remove, or remap variants. Edit product identity separately.');
+          mismatch.statusCode = 409;
+          throw mismatch;
+        }
+        const updatedVariants = existingVariants.map((variant, index) => {
+          const target = requestedBySku.get(String(variant.sku).trim().toLowerCase());
+          const targetStock = Number(target?.stock);
+          if (!Number.isSafeInteger(targetStock) || targetStock < 0) {
+            const invalid = new Error(`Variant ${variant.sku} has invalid stock.`);
+            invalid.statusCode = 422;
+            throw invalid;
+          }
+          const previousStock = Number(variant.stock ?? variant.quantity ?? 0);
+          const delta = targetStock - previousStock;
+          if (delta !== 0) {
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|${index}|${variant.sku}`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId,
+              productId,
+              webProductId: product.webProductId || productId,
+              sku: variant.sku,
+              size: variant.size || 'One Size',
+              color: variant.color || product.primaryColor || 'Standard',
+              deltaChange: delta,
+              source: 'website',
+              reason: 'admin_adjustment',
+              externalReference: requestId,
+              stockAfter: targetStock,
+              createdAt: FieldValue.serverTimestamp()
+            });
+          }
+          return { ...variant, stock: targetStock, quantity: targetStock };
+        });
+        const calculatedTotal = updatedVariants.reduce((sum, variant) => sum + Number(variant.stock), 0);
+        if (calculatedTotal !== requestedTotal) {
+          const mismatch = new Error('totalStock does not equal the variant stock sum.');
+          mismatch.statusCode = 422;
+          throw mismatch;
+        }
+        transaction.update(productRef, {
+          variants: updatedVariants,
+          stock: calculatedTotal,
+          quantity: calculatedTotal,
+          inStock: calculatedTotal > 0,
+          active: calculatedTotal > 0 ? true : product.active,
+          sizes: [...new Set(updatedVariants.filter(variant => variant.stock > 0).map(variant => variant.size).filter(Boolean))],
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        const previousStock = Number(product.stock ?? product.quantity ?? 0);
+        const delta = requestedTotal - previousStock;
+        if (delta !== 0) {
+          const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product`).digest('hex')}`;
+          transaction.create(db.collection('stockMovements').doc(movementId), {
+            movementId,
+            productId,
+            webProductId: product.webProductId || productId,
+            sku: product.sku || '',
+            size: 'One Size',
+            color: product.primaryColor || 'Standard',
+            deltaChange: delta,
+            source: 'website',
+            reason: 'admin_adjustment',
+            externalReference: requestId,
+            stockAfter: requestedTotal,
+            createdAt: FieldValue.serverTimestamp()
+          });
+        }
+        transaction.update(productRef, { stock: requestedTotal, quantity: requestedTotal, inStock: requestedTotal > 0, active: requestedTotal > 0 ? true : product.active, updatedAt: FieldValue.serverTimestamp() });
+      }
+    });
+    productCatalogCache = { products: null, expiresAt: 0 };
+    return res.json({ success: true, productId });
+  } catch (error) {
+    console.error('Admin inventory update failed:', error.message);
+    return res.status(error.statusCode || (error.code === 6 ? 409 : 500)).json({ error: error.statusCode ? error.message : (error.code === 6 ? 'This inventory request was already applied.' : 'Unable to update inventory.') });
+  }
+});
+
 // ─── Server-Side Catalog Cache & Price Verification ─────────────────────────
 let productCatalogCache = { products: null, expiresAt: 0 };
 let couponCatalogCache = { coupons: null, expiresAt: 0 };
@@ -1116,7 +1395,7 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
   if (!checkSensitiveRateLimit(req, res, 10)) return;
 
   try {
-    const { items, couponCode, shippingAddress, paymentMethod, payment } = req.body;
+    const { items, couponCode, shippingAddress, paymentMethod, payment, checkout_id: checkoutIdInput } = req.body;
     const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
     if (!['cod', 'razorpay'].includes(normalizedPaymentMethod)) {
       return res.status(400).json({ error: 'Unsupported payment method.' });
@@ -1132,9 +1411,13 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       paymentDetails = await verifyRazorpayPayment(payment || {}, calculation.finalTotal);
     }
 
+    const checkoutId = String(checkoutIdInput || '').trim();
+    if (normalizedPaymentMethod === 'cod' && !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(checkoutId)) {
+      return res.status(422).json({ error: 'A stable checkout_id is required for cash-on-delivery retry safety.' });
+    }
     const orderId = paymentDetails
       ? `ORD-${paymentDetails.paymentId.replace(/[^A-Za-z0-9_-]/g, '')}`
-      : `ORD-${crypto.randomUUID()}`;
+      : `ORD-COD-${crypto.createHash('sha256').update(`${req.user.uid}|${checkoutId}`).digest('hex').slice(0, 32)}`;
     const db = getTrustedFirestore();
     const orderRef = db.collection('orders').doc(orderId);
     const order = {
@@ -1158,17 +1441,139 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       updatedAt: FieldValue.serverTimestamp(),
       createdBy: 'secure-server'
     };
+    const requestFingerprint = crypto.createHash('sha256').update(JSON.stringify({
+      userId: req.user.uid,
+      paymentMethod: normalizedPaymentMethod,
+      paymentId: paymentDetails?.paymentId || null,
+      checkoutId: normalizedPaymentMethod === 'cod' ? checkoutId : null,
+      address,
+      items: calculation.items,
+      totalAmount: calculation.finalTotal
+    })).digest('hex');
 
-    try {
-      await orderRef.create(order);
-    } catch (error) {
-      if (error.code !== 6) throw error; // ALREADY_EXISTS is safe idempotency for payment retries.
-      const existing = await orderRef.get();
-      if (!existing.exists || existing.data().userId !== req.user.uid) {
-        throw new Error('This payment has already been associated with another order.');
+    const transactionResult = await db.runTransaction(async transaction => {
+      const existingOrder = await transaction.get(orderRef);
+      if (existingOrder.exists) {
+        if (existingOrder.data().userId !== req.user.uid || existingOrder.data().requestFingerprint !== requestFingerprint) {
+          const conflict = new Error('This payment has already been associated with another order.');
+          conflict.statusCode = 409;
+          throw conflict;
+        }
+        return { duplicate: true };
       }
-      return res.json({ success: true, orderId, duplicate: true });
-    }
+
+      const productRefs = new Map();
+      for (const item of calculation.items) {
+        const productId = String(item.productId || item.id || '');
+        if (!productId) {
+          const invalid = new Error('An ordered item is missing its product identity.');
+          invalid.statusCode = 409;
+          throw invalid;
+        }
+        if (!productRefs.has(productId)) productRefs.set(productId, db.collection('products').doc(productId));
+      }
+
+      const working = new Map();
+      for (const [productId, productRef] of productRefs) {
+        const snapshot = await transaction.get(productRef);
+        if (!snapshot.exists) {
+          const missing = new Error('One or more products are no longer available. Please refresh your cart.');
+          missing.statusCode = 409;
+          throw missing;
+        }
+        working.set(productId, { ref: productRef, data: snapshot.data() });
+      }
+
+      calculation.items.forEach((item, itemIndex) => {
+        const productId = String(item.productId || item.id);
+        const state = working.get(productId);
+        const product = state.data;
+        const quantity = Math.max(1, Number.parseInt(item.quantity, 10) || 1);
+        const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+        let sku = product.sku || '';
+        let size = item.size || item.selectedSize || 'One Size';
+        let color = item.color || item.selectedColor || product.primaryColor || 'Standard';
+        let stockAfter;
+
+        if (variants.length > 0) {
+          const wantedSize = String(size).trim().toLowerCase();
+          const wantedColor = String(color).trim().toLowerCase();
+          let variantIndex = variants.findIndex(variant => {
+            const variantSize = String(variant.size || '').trim().toLowerCase();
+            const variantColor = String(variant.color || 'standard').trim().toLowerCase();
+            return variantSize === wantedSize && (variantColor === wantedColor || variantColor === 'standard' || variantColor === 'default');
+          });
+          if (variantIndex < 0) variantIndex = variants.findIndex(variant => String(variant.size || '').trim().toLowerCase() === wantedSize);
+          if (variantIndex < 0) {
+            const mismatch = new Error(`The selected variant for ${product.name || 'an item'} no longer exists.`);
+            mismatch.statusCode = 409;
+            throw mismatch;
+          }
+          const variant = variants[variantIndex];
+          const current = Number.parseInt(variant.stock ?? variant.quantity, 10) || 0;
+          if (current < quantity) {
+            const shortage = new Error(`${product.name || 'An item'} does not have enough stock available.`);
+            shortage.statusCode = 409;
+            throw shortage;
+          }
+          stockAfter = current - quantity;
+          sku = variant.sku || sku;
+          size = variant.size || size;
+          color = variant.color || color;
+          variants[variantIndex] = { ...variant, stock: stockAfter, quantity: stockAfter };
+          const totalStock = variants.reduce((sum, variantItem) => sum + (Number.parseInt(variantItem.stock ?? variantItem.quantity, 10) || 0), 0);
+          state.data = {
+            ...product,
+            variants,
+            stock: totalStock,
+            quantity: totalStock,
+            inStock: totalStock > 0,
+            active: totalStock > 0 ? true : product.active,
+            sizes: [...new Set(variants.filter(variantItem => (Number.parseInt(variantItem.stock ?? variantItem.quantity, 10) || 0) > 0).map(variantItem => variantItem.size))]
+          };
+        } else {
+          const current = Number.parseInt(product.stock ?? product.quantity, 10) || 0;
+          if (current < quantity) {
+            const shortage = new Error(`${product.name || 'An item'} does not have enough stock available.`);
+            shortage.statusCode = 409;
+            throw shortage;
+          }
+          stockAfter = current - quantity;
+          state.data = { ...product, stock: stockAfter, quantity: stockAfter, inStock: stockAfter > 0, active: stockAfter > 0 ? true : product.active };
+        }
+
+        const movementId = `web_${crypto.createHash('sha256').update(`${orderId}|${itemIndex}|deduction`).digest('hex')}`;
+        transaction.create(db.collection('stockMovements').doc(movementId), {
+          movementId,
+          productId,
+          webProductId: product.webProductId || productId,
+          sku,
+          size,
+          color,
+          deltaChange: -quantity,
+          source: 'website',
+          reason: 'online_order',
+          orderId,
+          externalReference: orderId,
+          stockAfter,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      });
+
+      for (const state of working.values()) {
+        transaction.update(state.ref, { ...state.data, updatedAt: FieldValue.serverTimestamp() });
+      }
+      transaction.create(orderRef, {
+        ...order,
+        requestFingerprint,
+        checkoutId: normalizedPaymentMethod === 'cod' ? checkoutId : null,
+        inventoryDeducted: true,
+        inventoryDeductedAt: FieldValue.serverTimestamp()
+      });
+      return { duplicate: false };
+    });
+
+    if (transactionResult.duplicate) return res.json({ success: true, orderId, duplicate: true });
 
     // Automatically create or update customer account profile from checkout details
     try {
@@ -1202,106 +1607,12 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       createdAt: FieldValue.serverTimestamp()
     });
 
-    // ─── Stock Decrement & 0-Quantity Store Visibility Update ───────────
-    // For each ordered item, decrement the matching variant stock and product-level total stock.
-    // When stock reaches 0, set inStock: false and active: false so product is not visible in the store.
-    try {
-      for (const item of calculation.items) {
-        const prodId = item.productId || item.id;
-        let productRef = prodId ? db.collection('products').doc(prodId) : null;
-        let productSnap = productRef ? await productRef.get() : null;
-
-        // Fallback: look up by slug if doc ID wasn't found directly
-        if ((!productSnap || !productSnap.exists) && item.slug) {
-          const qSnap = await db.collection('products').where('slug', '==', item.slug).limit(1).get();
-          if (!qSnap.empty) {
-            productSnap = qSnap.docs[0];
-            productRef = productSnap.ref;
-          }
-        }
-
-        if (!productSnap || !productSnap.exists) continue;
-
-        const productData = productSnap.data();
-        const variants = Array.isArray(productData.variants) ? [...productData.variants] : [];
-        const orderedQty = Math.max(1, parseInt(item.quantity, 10) || 1);
-        const orderedSize = item.size || item.selectedSize || null;
-        const orderedColor = item.color || item.selectedColor || null;
-
-        if (variants.length > 0) {
-          const cleanSize = orderedSize ? String(orderedSize).trim().toLowerCase() : null;
-          const cleanColor = orderedColor ? String(orderedColor).trim().toLowerCase() : null;
-
-          // Find matching variant by size + color
-          let matchIdx = -1;
-          if (cleanSize) {
-            matchIdx = variants.findIndex(v => {
-              const vSize = String(v.size || '').trim().toLowerCase();
-              if (vSize !== cleanSize) return false;
-              if (!cleanColor) return true;
-              const vCol = String(v.color || '').trim().toLowerCase();
-              return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
-            });
-            // Fallback: match by size only
-            if (matchIdx < 0) {
-              matchIdx = variants.findIndex(v => String(v.size || '').trim().toLowerCase() === cleanSize);
-            }
-          }
-
-          // Fallback: if no size or not found, use first variant
-          if (matchIdx < 0) {
-            matchIdx = 0;
-          }
-
-          if (matchIdx >= 0 && matchIdx < variants.length) {
-            const currentStock = parseInt(variants[matchIdx].stock ?? variants[matchIdx].quantity, 10) || 0;
-            const updatedVarStock = Math.max(0, currentStock - orderedQty);
-            variants[matchIdx] = {
-              ...variants[matchIdx],
-              stock: updatedVarStock,
-              quantity: updatedVarStock
-            };
-          }
-
-          // Recalculate total product stock across all variants
-          const newTotalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock ?? v.quantity, 10) || 0), 0);
-          const hasRemainingStock = newTotalStock > 0;
-          const availableSizesList = [...new Set(variants.filter(v => (parseInt(v.stock ?? v.quantity, 10) || 0) > 0).map(v => v.size))].filter(Boolean);
-
-          await productRef.update({
-            variants: variants,
-            stock: Math.max(0, newTotalStock),
-            quantity: Math.max(0, newTotalStock),
-            inStock: hasRemainingStock,
-            active: hasRemainingStock, // If quantity 0, not visible on store
-            sizes: availableSizesList, // Only available sizes remain
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        } else {
-          // No variants — decrement product-level stock directly
-          const currentStock = parseInt(productData.stock ?? productData.quantity, 10) || 0;
-          const newStock = Math.max(0, currentStock - orderedQty);
-          const hasRemainingStock = newStock > 0;
-
-          await productRef.update({
-            stock: newStock,
-            quantity: newStock,
-            inStock: hasRemainingStock,
-            active: hasRemainingStock, // If quantity 0, not visible on store
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        }
-      }
-      // Invalidate server product cache so next request reflects new stock
-      productCatalogCache = { products: null, expiresAt: 0 };
-    } catch (stockErr) {
-      console.warn('Stock decrement and visibility update warning (order still valid):', stockErr.message);
-    }
+    productCatalogCache = { products: null, expiresAt: 0 };
 
     res.status(201).json({ success: true, orderId, totalAmount: calculation.finalTotal });
   } catch (error) {
     console.error('Secure order creation failed:', error.message);
-    res.status(400).json({ error: error.message || 'Unable to create order.' });
+    res.status(error.statusCode || 400).json({ error: error.message || 'Unable to create order.' });
   }
 });
 
@@ -2885,12 +3196,16 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
       return { alreadyCancelled: true, order };
     }
 
+    // Explicit false means a failed/pre-reservation order never changed inventory.
+    // Legacy orders predate the marker and are treated as deducted because the old
+    // checkout path always decremented them after creation.
+    const shouldRestoreInventory = order.inventoryDeducted !== false;
     const productItems = new Map();
-    for (const item of Array.isArray(order.items) ? order.items : []) {
+    for (const [itemIndex, item] of (Array.isArray(order.items) ? order.items : []).entries()) {
       const productId = item?.productId || item?.id;
       if (!productId) continue;
       const items = productItems.get(String(productId)) || [];
-      items.push(item);
+      items.push({ item, itemIndex });
       productItems.set(String(productId), items);
     }
 
@@ -2901,12 +3216,17 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
     }));
 
     for (const { ref, items, snapshot } of productSnapshots) {
-      if (!snapshot.exists) continue;
+      if (!shouldRestoreInventory) continue;
+      if (!snapshot.exists) {
+        const missing = new Error(`Cannot restore inventory because product ${ref.id} no longer exists.`);
+        missing.statusCode = 409;
+        throw missing;
+      }
       const product = snapshot.data();
       const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
 
       if (variants.length > 0) {
-        for (const item of items) {
+        for (const { item, itemIndex } of items) {
           const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
           const size = String(item.size || item.selectedSize || '').trim().toLowerCase();
           const color = String(item.color || item.selectedColor || '').trim().toLowerCase();
@@ -2918,10 +3238,33 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
           if (index < 0 && size) {
             index = variants.findIndex(variant => String(variant.size || '').trim().toLowerCase() === size);
           }
-          // Match the checkout fallback for older orders that do not retain a size.
-          if (index < 0) index = 0;
+          // A single legacy variant is unambiguous; otherwise never restore into
+          // an arbitrary size/color because that would corrupt shared inventory.
+          if (index < 0 && variants.length === 1) index = 0;
+          if (index < 0) {
+            const mismatch = new Error(`Cannot restore ${product.name || ref.id}: the ordered variant no longer matches the catalog.`);
+            mismatch.statusCode = 409;
+            throw mismatch;
+          }
           const current = parseInt(variants[index].stock ?? variants[index].quantity, 10) || 0;
-          variants[index] = { ...variants[index], stock: current + quantity, quantity: current + quantity };
+          const stockAfter = current + quantity;
+          variants[index] = { ...variants[index], stock: stockAfter, quantity: stockAfter };
+          const movementId = `web_${crypto.createHash('sha256').update(`${orderRef.id}|${itemIndex}|cancellation`).digest('hex')}`;
+          transaction.create(db.collection('stockMovements').doc(movementId), {
+            movementId,
+            productId: ref.id,
+            webProductId: product.webProductId || ref.id,
+            sku: variants[index].sku || product.sku || '',
+            size: variants[index].size || item.size || item.selectedSize || 'One Size',
+            color: variants[index].color || item.color || item.selectedColor || product.primaryColor || 'Standard',
+            deltaChange: quantity,
+            source: 'website',
+            reason: 'order_cancelled',
+            orderId: orderRef.id,
+            externalReference: orderRef.id,
+            stockAfter,
+            createdAt: FieldValue.serverTimestamp()
+          });
         }
 
         const totalStock = variants.reduce((total, variant) => total + (parseInt(variant.stock ?? variant.quantity, 10) || 0), 0);
@@ -2939,8 +3282,27 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
           updatedAt: FieldValue.serverTimestamp()
         });
       } else {
-        const restoredQuantity = items.reduce((total, item) => total + Math.max(1, parseInt(item.quantity, 10) || 1), 0);
-        const stock = (parseInt(product.stock ?? product.quantity, 10) || 0) + restoredQuantity;
+        let stock = parseInt(product.stock ?? product.quantity, 10) || 0;
+        for (const { item, itemIndex } of items) {
+          const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+          stock += quantity;
+          const movementId = `web_${crypto.createHash('sha256').update(`${orderRef.id}|${itemIndex}|cancellation`).digest('hex')}`;
+          transaction.create(db.collection('stockMovements').doc(movementId), {
+            movementId,
+            productId: ref.id,
+            webProductId: product.webProductId || ref.id,
+            sku: product.sku || '',
+            size: item.size || item.selectedSize || 'One Size',
+            color: item.color || item.selectedColor || product.primaryColor || 'Standard',
+            deltaChange: quantity,
+            source: 'website',
+            reason: 'order_cancelled',
+            orderId: orderRef.id,
+            externalReference: orderRef.id,
+            stockAfter: stock,
+            createdAt: FieldValue.serverTimestamp()
+          });
+        }
         transaction.update(ref, {
           stock,
           quantity: stock,
@@ -2958,6 +3320,7 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
       cancelledBy: cancelledBy || 'Customer',
       cancelledAt: FieldValue.serverTimestamp(),
       stockRestoredAt: FieldValue.serverTimestamp(),
+      inventoryRestored: shouldRestoreInventory,
       updatedAt: FieldValue.serverTimestamp()
     });
     return { alreadyCancelled: false, order };

@@ -17,6 +17,7 @@ export default function CheckoutPage() {
   const { cartItems, cartSubtotal, clearCart, appliedCoupon, applyCoupon, removeCoupon } = useCart();
   const { currentUser, userProfile, updateFirestoreProfile } = useAuth();
   const navigate = useNavigate();
+  const [checkoutAttemptId] = useState(() => globalThis.crypto.randomUUID());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -102,6 +103,7 @@ export default function CheckoutPage() {
         'Authorization': `Bearer ${idToken}`
       },
       body: JSON.stringify({
+        checkout_id: checkoutAttemptId,
         paymentMethod: method,
         payment,
         couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,

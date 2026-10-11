@@ -5,6 +5,19 @@ import { invalidateProductCache } from './productService';
 
 const PRODUCTS = 'products';
 
+async function saveProductThroughServer(productId, productData, create) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required to save products.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/products/upsert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ productId, productData, create, requestId: globalThis.crypto.randomUUID() })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to save product.');
+  return data;
+}
+
 // Delete a single image from ImageKit (authenticated admin only)
 export const deleteProductImage = async (fileId) => {
   if (!fileId) return;
@@ -209,13 +222,15 @@ export const createProduct = async (productData, preGeneratedId = null) => {
   const newRef = preGeneratedId ? doc(db, PRODUCTS, preGeneratedId) : doc(collection(db, PRODUCTS));
   const payload = {
     ...productData,
+    // The Firestore document ID is the durable website-side integration ID.
+    // It is generated before the write, so it is stable across edits and sync retries.
+    webProductId: productData.webProductId || newRef.id,
+    integrationOrigin: productData.integrationOrigin || 'website',
     name: uniqueName || productData.name,
     slug: uniqueSlug || productData.slug,
     ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   };
-  await setDoc(newRef, payload);
+  await saveProductThroughServer(newRef.id, payload, true);
   invalidateProductCache();
   invalidateAdminProductsCache();
   return { id: newRef.id, name: uniqueName, slug: uniqueSlug };
@@ -237,9 +252,8 @@ export const updateProduct = async (id, productData) => {
     ...(uniqueName ? { name: uniqueName } : {}),
     ...(uniqueSlug ? { slug: uniqueSlug } : {}),
     ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
-    updatedAt: serverTimestamp(),
   };
-  await updateDoc(docRef, payload);
+  await saveProductThroughServer(docRef.id, payload, false);
   invalidateProductCache();
   invalidateAdminProductsCache();
   return { id, name: uniqueName, slug: uniqueSlug };
@@ -399,12 +413,20 @@ export const getAdminCustomers = async () => {
 
 // ─── ADMIN: INVENTORY ─────────────────────────────────────────────────────────
 export const updateProductVariantStock = async (productId, variants, totalStock) => {
-  const docRef = doc(db, PRODUCTS, productId);
-  await updateDoc(docRef, {
-    variants: variants,
-    stock: totalStock,
-    updatedAt: serverTimestamp()
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required to update inventory.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/inventory/set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      productId,
+      variants,
+      totalStock,
+      requestId: globalThis.crypto.randomUUID()
+    })
   });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to update inventory.');
 
   // Sync admin products cache in memory and session storage
   if (adminProductsCache && Array.isArray(adminProductsCache)) {
