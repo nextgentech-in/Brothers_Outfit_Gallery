@@ -212,6 +212,19 @@ const SIZE_GUIDE_TEMPLATES = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+const normalizeSkuPart = (value, fallback = '') => String(value || fallback)
+  .trim()
+  .toUpperCase()
+  .replace(/[^A-Z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+const buildVariantSku = (productSku, color, size, fallbackProductId = '') => {
+  const base = normalizeSkuPart(productSku) || `PRD-${normalizeSkuPart(fallbackProductId, 'NEW')}`;
+  const colorPart = normalizeSkuPart(color, 'STANDARD');
+  const sizePart = normalizeSkuPart(size, 'ONE-SIZE');
+  return `${base}-${colorPart}-${sizePart}`;
+};
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -339,6 +352,12 @@ export default function AdminProductForm() {
       if (name === 'name' && !isEdit) {
         updated.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       }
+      if (name === 'sku' && !isEdit) {
+        updated.variants = prev.variants.map(variant => ({
+          ...variant,
+          sku: buildVariantSku(value, variant.color, variant.size, productId)
+        }));
+      }
       return updated;
     });
   };
@@ -452,7 +471,7 @@ export default function AdminProductForm() {
             id: `${colName}-${cleanSize}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             color: colName,
             size: cleanSize,
-            sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${cleanSize.replace(/[^a-zA-Z0-9]/g, '')}`,
+            sku: buildVariantSku(prev.sku, colName, cleanSize, productId),
             stock: parseInt(stock, 10) || 0,
             price: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || ''),
             salePrice: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || '')
@@ -489,7 +508,7 @@ export default function AdminProductForm() {
               id: `${colName}-${sz}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               color: colName,
               size: sz,
-              sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${sz.replace(/[^a-zA-Z0-9]/g, '')}`,
+              sku: buildVariantSku(prev.sku, colName, sz, productId),
               stock: parseInt(batchStock, 10) || 0,
               price: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || ''),
               salePrice: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || '')
@@ -881,6 +900,8 @@ export default function AdminProductForm() {
   const handleSave = async (saveAndNew = false) => {
     // Validations
     if (!formData.name) return setError("Name is required.");
+    const productSku = String(formData.sku || '').trim();
+    if (!productSku) return setError("Product SKU is required. Enter a unique SKU such as SHT-BLK-001.");
     const mrp = parseFloat(formData.mrp);
     const sale = parseFloat(formData.salePrice);
     if (!mrp || mrp <= 0) return setError("MRP must be > 0.");
@@ -893,6 +914,20 @@ export default function AdminProductForm() {
 
     for (let v of formData.variants) {
       if (v.stock < 0) return setError("Variant stock cannot be negative.");
+    }
+
+    const skuCandidates = [
+      productSku,
+      ...formData.variants.map(variant => isEdit
+        ? String(variant.sku || '').trim()
+        : buildVariantSku(productSku, variant.color, variant.size, productId))
+    ];
+    if (skuCandidates.some(sku => !sku)) {
+      return setError("Every product variant must have a SKU.");
+    }
+    const normalizedSkuCandidates = skuCandidates.map(sku => sku.toLowerCase());
+    if (new Set(normalizedSkuCandidates).size !== normalizedSkuCandidates.length) {
+      return setError("Product and variant SKUs must be unique. Check duplicate color/size variants.");
     }
 
     setSubmitting(true);
@@ -970,6 +1005,7 @@ export default function AdminProductForm() {
         const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
+          sku: isEdit ? String(v.sku || '').trim() : buildVariantSku(productSku, v.color, v.size, productId),
           price: vPrice,
           salePrice: vPrice,
           stock: parseInt(v.stock, 10) || 0,
@@ -992,6 +1028,7 @@ export default function AdminProductForm() {
 
       const payload = {
         ...formData,
+        sku: productSku,
         sizeGuide: sanitizeSizeGuideForFirestore(formData.sizeGuide),
         mrp: mrp,
         salePrice: finalFrontPrice,
@@ -1232,7 +1269,18 @@ export default function AdminProductForm() {
               </div>
               <div className="admin-form-group">
                 <label>SKU (Stock Keeping Unit)</label>
-                <input type="text" name="sku" value={formData.sku} onChange={handleChange} placeholder="e.g. SHT-BLK-001" />
+                <input
+                  type="text"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  placeholder="e.g. SHT-BLK-001"
+                  readOnly={isEdit}
+                  title={isEdit ? 'SKU identity cannot be changed after product creation.' : 'Use a unique SKU; variant SKUs are generated from it.'}
+                />
+                <small style={{ color: '#64748b' }}>
+                  {isEdit ? 'SKU is locked after publishing.' : 'Must be unique. Variant SKUs update automatically.'}
+                </small>
               </div>
               <div className="admin-form-group">
                 <label>Slug (URL Friendly)</label>

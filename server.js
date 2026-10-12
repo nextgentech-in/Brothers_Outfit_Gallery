@@ -725,7 +725,7 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
     }
     const variants = Array.isArray(productData.variants) ? productData.variants : [];
     const rawSkus = [productData.sku, ...variants.map(variant => variant?.sku)].map(value => String(value || '').trim()).filter(Boolean);
-    if (rawSkus.length < 1 || variants.some(variant => !String(variant?.sku || '').trim())) {
+    if (!String(productData.sku || '').trim() || variants.some(variant => !String(variant?.sku || '').trim())) {
       return res.status(422).json({ error: 'The product and every sellable variant must have a SKU.' });
     }
     const normalizedSkus = rawSkus.map(value => value.toLowerCase());
