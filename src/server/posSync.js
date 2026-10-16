@@ -3,6 +3,9 @@ import crypto from 'crypto';
 const MAX_PRODUCT_BATCH = 25;
 const MAX_STOCK_BATCH = 100;
 const PAGE_SIZE_MAX = 100;
+const MAX_IMAGES_PER_PRODUCT = 20;
+const MAX_BASE64_IMAGE_BYTES = 512_000;
+const MAX_IMAGE_URL_LENGTH = 2048;
 const POS_RATE_LIMIT_PER_MINUTE = 60;
 const posRateBuckets = new Map();
 
@@ -93,6 +96,43 @@ function decodeCursor(raw, feed) {
   }
 }
 
+function validateImages(rawImages, prefix) {
+  if (!rawImages || !Array.isArray(rawImages)) return [];
+  if (rawImages.length > MAX_IMAGES_PER_PRODUCT) {
+    throw new PosSyncError(422, `${prefix}.images must contain at most ${MAX_IMAGES_PER_PRODUCT} items.`, 'validation_error');
+  }
+  return rawImages.map((img, index) => {
+    const ip = `${prefix}.images[${index}]`;
+    const entry = typeof img === 'string' ? { url: img } : img;
+    if (!entry || typeof entry !== 'object' || typeof entry.url !== 'string' || !entry.url.trim()) {
+      throw new PosSyncError(422, `${ip}.url is required and must be a non-empty string.`, 'validation_error');
+    }
+    const url = entry.url.trim();
+    const isBase64 = url.startsWith('data:image/');
+    const isUrl = /^https?:\/\//i.test(url);
+    if (!isBase64 && !isUrl) {
+      throw new PosSyncError(422, `${ip}.url must be an https:// URL or a data:image/ base64 string.`, 'validation_error');
+    }
+    if (isBase64) {
+      const commaIndex = url.indexOf(',');
+      if (commaIndex < 0) throw new PosSyncError(422, `${ip}.url is not a valid base64 data URL.`, 'validation_error');
+      const rawBase64 = url.slice(commaIndex + 1);
+      const byteLength = Math.ceil(rawBase64.length * 3 / 4);
+      if (byteLength > MAX_BASE64_IMAGE_BYTES) {
+        throw new PosSyncError(422, `${ip}.url base64 image exceeds ${Math.round(MAX_BASE64_IMAGE_BYTES / 1024)}KB limit.`, 'validation_error');
+      }
+    } else if (url.length > MAX_IMAGE_URL_LENGTH) {
+      throw new PosSyncError(422, `${ip}.url exceeds ${MAX_IMAGE_URL_LENGTH} character limit.`, 'validation_error');
+    }
+    return {
+      url,
+      name: String(entry.name || '').trim().slice(0, 200) || undefined,
+      color: String(entry.color || '').trim().slice(0, 80) || undefined,
+      isPrimary: Boolean(entry.is_cover || entry.isPrimary)
+    };
+  });
+}
+
 function validateProduct(raw, productIndex) {
   const prefix = `products[${productIndex}]`;
   const webProductId = identifier(raw?.web_product_id, `${prefix}.web_product_id`);
@@ -107,6 +147,7 @@ function validateProduct(raw, productIndex) {
   if (!Array.isArray(raw?.sizes) || raw.sizes.length < 1 || raw.sizes.length > 50) {
     throw new PosSyncError(422, `${prefix}.sizes must contain between 1 and 50 variants.`, 'validation_error');
   }
+  const images = validateImages(raw?.images, prefix);
   const seenSkus = new Set();
   const seenVariants = new Set();
   const variants = raw.sizes.map((variant, variantIndex) => {
@@ -143,8 +184,40 @@ function validateProduct(raw, productIndex) {
     description: canonicalText(raw?.description, `${prefix}.description`, { required: false, max: 5000 }),
     mrp,
     salePrice,
+    images,
     variants
   };
+}
+
+function validateProductForUpdate(raw, productIndex) {
+  const prefix = `products[${productIndex}]`;
+  const webProductId = identifier(raw?.web_product_id, `${prefix}.web_product_id`);
+  const name = canonicalText(raw?.product_name, `${prefix}.product_name`, { required: false, max: 200 });
+  const category = canonicalText(raw?.category, `${prefix}.category`, { required: false, max: 100 });
+  const subCategory = canonicalText(raw?.sub_category, `${prefix}.sub_category`, { required: false, max: 100 });
+  const color = canonicalText(raw?.color, `${prefix}.color`, { required: false, max: 80 });
+  const mrp = raw?.mrp != null ? money(raw.mrp, `${prefix}.mrp`) : undefined;
+  const salePrice = raw?.sale_price != null ? money(raw.sale_price, `${prefix}.sale_price`) : undefined;
+  if (mrp != null && salePrice != null && salePrice > mrp) {
+    throw new PosSyncError(422, `${prefix}.sale_price cannot exceed mrp.`, 'validation_error');
+  }
+  const images = validateImages(raw?.images, prefix);
+  const description = canonicalText(raw?.description, `${prefix}.description`, { required: false, max: 5000 });
+  let variants = undefined;
+  if (Array.isArray(raw?.sizes) && raw.sizes.length > 0) {
+    if (raw.sizes.length > 50) {
+      throw new PosSyncError(422, `${prefix}.sizes must contain at most 50 variants.`, 'validation_error');
+    }
+    variants = raw.sizes.map((variant, variantIndex) => {
+      const vp = `${prefix}.sizes[${variantIndex}]`;
+      return {
+        size: canonicalText(variant?.size, `${vp}.size`, { required: false, max: 40 }),
+        sku: canonicalText(variant?.sku, `${vp}.sku`, { max: 100 }),
+        price: variant?.price != null ? money(variant.price, `${vp}.price`) : undefined
+      };
+    });
+  }
+  return { webProductId, name, category, subCategory, color, mrp, salePrice, description, images, variants };
 }
 
 function validateProductsPayload(body) {
@@ -229,7 +302,18 @@ function posRateLimit(req, res, next) {
   next();
 }
 
+function extractImageUrls(product) {
+  const images = Array.isArray(product.images) ? product.images : [];
+  return images.map(img => {
+    if (typeof img === 'string') return img;
+    if (typeof img === 'object' && img !== null && typeof img.url === 'string') return img.url;
+    return null;
+  }).filter(Boolean);
+}
+
 function productToWire(id, product) {
+  const imageUrls = extractImageUrls(product);
+  const coverImage = imageUrls[0] || product.thumbnailUrl || product.image || null;
   return {
     web_product_id: product.webProductId || id,
     product_name: product.name || '',
@@ -242,6 +326,8 @@ function productToWire(id, product) {
     description: product.description || product.shortDescription || '',
     mrp: Number(product.mrp ?? product.compareAtPrice ?? product.price ?? 0),
     sale_price: Number(product.salePrice ?? product.price ?? 0),
+    images: imageUrls,
+    image_url: coverImage,
     sizes: (Array.isArray(product.variants) ? product.variants : []).map(variant => ({
       size: variant.size || 'One Size',
       stock: Number(variant.stock ?? variant.quantity ?? 0),
@@ -414,6 +500,8 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
 
         const totalStock = product.variants.reduce((sum, variant) => sum + variant.stock, 0);
         const availableSizes = [...new Set(product.variants.filter(v => v.stock > 0).map(v => v.size))];
+        const coverImg = product.images.find(img => img.isPrimary) || product.images[0];
+        const coverUrl = coverImg?.url || '/images/hero.png';
         transaction.create(productRef, {
           webProductId: product.webProductId,
           integrationOrigin: 'pos',
@@ -442,9 +530,9 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           allSizes: [...new Set(product.variants.map(v => v.size))],
           active: true,
           inStock: totalStock > 0,
-          images: [],
-          image: '/images/hero.png',
-          thumbnailUrl: '/images/hero.png',
+          images: product.images,
+          image: coverUrl,
+          thumbnailUrl: coverUrl,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
           integrationCreatedAt: FieldValue.serverTimestamp()
@@ -464,6 +552,63 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     res.json({ success: true, message: 'Products published successfully', created_count: createdCount });
   }));
 
+  // ── PUT /api/pos/products — POS Edits → Website ─────────────────────────
+  app.put('/api/pos/products', apiHandler(async (req, res, correlationId) => {
+    if (!req.body || !Array.isArray(req.body.products) || req.body.products.length < 1 || req.body.products.length > MAX_PRODUCT_BATCH) {
+      throw new PosSyncError(422, `products must contain between 1 and ${MAX_PRODUCT_BATCH} items.`, 'validation_error');
+    }
+    const updates = req.body.products.map(validateProductForUpdate);
+    const db = getDb();
+    let updatedCount = 0;
+
+    for (const update of updates) {
+      const productRef = await findProductRef(db, update.webProductId);
+      if (!productRef) throw new PosSyncError(409, `Unknown web_product_id ${update.webProductId}.`, 'unknown_product');
+
+      await db.runTransaction(async transaction => {
+        const snap = await transaction.get(productRef);
+        if (!snap.exists) throw new PosSyncError(409, `Product ${update.webProductId} no longer exists.`, 'unknown_product');
+        const existing = snap.data();
+        const patch = {};
+        if (update.name) { patch.name = update.name; }
+        if (update.category) { patch.category = update.category; patch.categoryId = update.category; patch.categoryKey = normalizeKey(update.category); }
+        if (update.subCategory) { patch.subCategory = update.subCategory; patch.subCategoryKey = normalizeKey(update.subCategory); }
+        if (update.color) { patch.primaryColor = update.color; patch.colors = [{ name: update.color }]; }
+        if (update.mrp != null) { patch.mrp = update.mrp; patch.compareAtPrice = update.mrp; }
+        if (update.salePrice != null) { patch.salePrice = update.salePrice; patch.price = update.salePrice; }
+        if (update.description) { patch.description = update.description; patch.shortDescription = update.description.slice(0, 240); }
+        if (update.images.length > 0) {
+          patch.images = update.images;
+          const cover = update.images.find(img => img.isPrimary) || update.images[0];
+          patch.image = cover?.url || existing.image;
+          patch.thumbnailUrl = cover?.url || existing.thumbnailUrl;
+        }
+        if (update.variants) {
+          const existingVariants = Array.isArray(existing.variants) ? existing.variants : [];
+          const updatedVariants = existingVariants.map(ev => {
+            const match = update.variants.find(uv => normalizeKey(uv.sku) === normalizeKey(ev.sku));
+            if (!match) return ev;
+            const patched = { ...ev };
+            if (match.price != null) { patched.price = match.price; patched.salePrice = match.price; }
+            if (match.size) patched.size = match.size;
+            return patched;
+          });
+          patch.variants = updatedVariants;
+        }
+        if (patch.mrp != null && patch.salePrice == null && existing.salePrice > patch.mrp) {
+          throw new PosSyncError(422, `Updated mrp would be below existing sale_price for ${update.webProductId}.`, 'validation_error');
+        }
+        patch.updatedAt = FieldValue.serverTimestamp();
+        transaction.update(productRef, patch);
+      });
+      updatedCount += 1;
+    }
+
+    invalidateProductCache();
+    console.info('[POS Sync] products updated', { correlationId, received: updates.length, updated: updatedCount });
+    res.json({ success: true, message: 'Products updated successfully', updated_count: updatedCount });
+  }));
+
   app.get('/api/pos/products-sync', apiHandler(async (req, res) => {
     const since = parseIsoTimestamp(req.query.since, { optional: true });
     const cursor = decodeCursor(req.query.cursor, 'products');
@@ -474,7 +619,9 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     const snapshot = await getDb().collection('products').get();
     const eligible = snapshot.docs.map(doc => {
       const product = doc.data();
-      return { id: doc.id, product, timeMs: timestampMillis(product.integrationCreatedAt || product.createdAt) };
+      const createdMs = timestampMillis(product.integrationCreatedAt || product.createdAt);
+      const updatedMs = timestampMillis(product.updatedAt);
+      return { id: doc.id, product, timeMs: Math.max(createdMs, updatedMs) };
     }).filter(record => isWebsiteProductFeedEligible(record.product) && record.timeMs <= upperMs && compareTuple(record, { afterMs, afterId }))
       .sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id));
     const page = eligible.slice(0, limit);
@@ -577,11 +724,14 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
 
 export const posSyncInternals = {
   validateProductsPayload,
+  validateProductForUpdate,
+  validateImages,
   validateStockPayload,
   parseIsoTimestamp,
   encodeCursor,
   decodeCursor,
   productToWire,
+  extractImageUrls,
   timestampMillis,
   isValidPosToken,
   stockEventFingerprint,

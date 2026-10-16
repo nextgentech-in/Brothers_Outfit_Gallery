@@ -196,6 +196,8 @@ function sanitizeValue(val) {
 
 // Media uploads go directly to ImageKit/Firebase, so API JSON never needs to be
 // huge. A tight limit reduces memory-exhaustion and slow-body abuse.
+// POS product payloads may include base64 images, so /api/pos/ gets a higher limit.
+app.use('/api/pos', express.json({ limit: '10mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 100 }));
 
