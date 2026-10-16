@@ -388,10 +388,48 @@ export default function AdminSettings() {
                 )}
               </div>
 
+              {/* Quick Multiline Textarea for instant editing */}
+              <div className="admin-form-group" style={{ marginTop: '20px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ margin: 0 }}>Quick Edit All Offers (One offer per line)</label>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>Type or paste lines below</span>
+                </div>
+                <textarea
+                  rows="4"
+                  value={
+                    Array.isArray(currentOffersConfig.items)
+                      ? currentOffersConfig.items.map(i => typeof i === 'string' ? i : (i.text || '')).join('\n')
+                      : ''
+                  }
+                  onChange={(e) => {
+                    const lines = e.target.value.split('\n');
+                    const newItems = lines.map((line, idx) => {
+                      const existing = currentOffersConfig.items?.[idx];
+                      const isWa = String(line).toLowerCase().includes('whatsapp');
+                      return {
+                        id: existing?.id || `offer-${idx + 1}`,
+                        text: line,
+                        icon: existing?.icon || (isWa ? 'whatsapp' : 'discount'),
+                        link: existing?.link || (isWa ? 'https://wa.me/917737225825' : '')
+                      };
+                    });
+                    setSettings(prev => ({
+                      ...prev,
+                      offersConfig: {
+                        ...(prev.offersConfig || DEFAULT_OFFERS_CONFIG),
+                        items: newItems
+                      }
+                    }));
+                  }}
+                  placeholder="Type each offer on a separate line"
+                  style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.5, padding: '12px', boxSizing: 'border-box' }}
+                />
+              </div>
+
               {/* Offer Items Editor */}
               <div className="admin-form-group" style={{ marginTop: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <label style={{ margin: 0 }}>Active Offer Lines ({currentOffersConfig.items?.length || 0})</label>
+                  <label style={{ margin: 0 }}>Fine-Tune Items & Icons ({currentOffersConfig.items?.length || 0})</label>
                   <button
                     type="button"
                     onClick={handleAddOfferItem}

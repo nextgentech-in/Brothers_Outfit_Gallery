@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
@@ -42,6 +43,12 @@ if (fs.existsSync(envPath)) {
 const app = express();
 const port = process.env.PORT || 3001;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+
+// HTTP Compression for high-throughput and minimal latency
+app.use(compression({
+  threshold: 1024,
+  level: 6
+}));
 
 // Vercel adds one trusted proxy hop. Outside Vercel, never trust a caller-
 // supplied X-Forwarded-For header when applying abuse limits.
@@ -2094,6 +2101,9 @@ function getEstimatedDeliveryDate(transitDays = 3) {
   return d.toLocaleDateString('en-IN', options);
 }
 
+const pincodeCheckCache = new Map();
+const pincodeLookupCache = new Map();
+
 // ─── Delhivery One: Check Pincode Serviceability ─────────────────────────
 app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (req, res) => {
   const { pincode } = req.body;
@@ -2104,6 +2114,12 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
   // Known invalid dummy pincodes
   if (/^000|^999|000000|123456|999999/.test(pincode)) {
     return res.json({ serviceable: false, pincode, error: 'Invalid PIN code. Please enter a valid Indian postal code.' });
+  }
+
+  // Instant In-Memory Cache (1 hour TTL)
+  const cached = pincodeCheckCache.get(pincode);
+  if (cached && (Date.now() - cached.ts < 3600000)) {
+    return res.json(cached.data);
   }
 
   try {
@@ -2132,10 +2148,10 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
         const match = deliveryCodes.find(item => item.postal_code?.pin == pincode);
 
         if (match) {
-          const pinData = match.postal_code;
+          const pinData = match.postal_code || {};
           const cod = pinData.cod === 'Y';
           const prepaid = pinData.pre_paid === 'Y';
-          return res.json({
+          const result = {
             serviceable: true,
             pincode,
             city: pinData.district || pinData.city || 'Gujarat Hub',
@@ -2145,7 +2161,9 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
             prepaidAvailable: prepaid,
             estimatedDays: '2 - 4 Business Days',
             estimatedDeliveryDate: getEstimatedDeliveryDate(3)
-          });
+          };
+          pincodeCheckCache.set(pincode, { ts: Date.now(), data: result });
+          return res.json(result);
         }
       }
     } catch (dErr) {
@@ -2159,7 +2177,7 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
         const postData = await postResponse.json();
         if (postData && postData[0] && postData[0].Status === 'Success' && postData[0].PostOffice && postData[0].PostOffice.length > 0) {
           const po = postData[0].PostOffice[0];
-          return res.json({
+          const result = {
             serviceable: true,
             pincode,
             city: po.District || po.Block || po.Name,
@@ -2169,20 +2187,23 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
             prepaidAvailable: true,
             estimatedDays: '2 - 4 Business Days',
             estimatedDeliveryDate: getEstimatedDeliveryDate(3)
-          });
+          };
+          pincodeCheckCache.set(pincode, { ts: Date.now(), data: result });
+          return res.json(result);
         }
       }
     } catch (pErr) {
       console.warn('India Post API call warning:', pErr.message);
     }
 
-
     // 3. If neither Delhivery nor India Post recognizes the pincode, it is invalid!
-    return res.json({
+    const invalidResult = {
       serviceable: false,
       pincode,
       error: `Invalid PIN Code: ${pincode} does not exist or is not serviceable for delivery.`
-    });
+    };
+    pincodeCheckCache.set(pincode, { ts: Date.now(), data: invalidResult });
+    return res.json(invalidResult);
   } catch (error) {
     console.error('Pincode serviceability check error:', error);
     res.status(500).json({ serviceable: false, error: 'Serviceability check failed.' });
@@ -2196,6 +2217,12 @@ app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-b
     return res.status(400).json({ suggestions: [] });
   }
 
+  const normalizedPlace = place.trim().toLowerCase();
+  const cached = pincodeLookupCache.get(normalizedPlace);
+  if (cached && (Date.now() - cached.ts < 86400000)) {
+    return res.json(cached.data);
+  }
+
   try {
     const postResponse = await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(place.trim())}`);
     if (postResponse.ok) {
@@ -2207,7 +2234,9 @@ app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-b
           city: po.District || po.Block || po.Name,
           state: po.State
         }));
-        return res.json({ suggestions });
+        const responseData = { suggestions };
+        pincodeLookupCache.set(normalizedPlace, { ts: Date.now(), data: responseData });
+        return res.json(responseData);
       }
     }
     res.json({ suggestions: [] });

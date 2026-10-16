@@ -257,6 +257,17 @@ export default function AdminProductForm() {
     subCategory: '',
     gsl: '',
     sizeGuide: { enabled: false, unit: 'in', columns: [], rows: [] },
+    offersConfig: {
+      enabled: true,
+      useCustomOffers: false,
+      title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+      items: [
+        'Buy 2 & Get Flat Rs. 300 OFF',
+        'Buy 4 & get Flat Rs. 1250 OFF',
+        'Enjoy an Additional 5% OFF on prepaid orders!',
+        'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+      ]
+    },
   });
 
   // Ephemeral States
@@ -314,6 +325,29 @@ export default function AdminProductForm() {
             colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
             sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
+            offersConfig: data.offersConfig ? {
+              enabled: data.offersConfig.enabled !== false,
+              useCustomOffers: !!data.offersConfig.useCustomOffers,
+              title: data.offersConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+              items: Array.isArray(data.offersConfig.items)
+                ? data.offersConfig.items.map(i => typeof i === 'string' ? i : (i.text || ''))
+                : [
+                    'Buy 2 & Get Flat Rs. 300 OFF',
+                    'Buy 4 & get Flat Rs. 1250 OFF',
+                    'Enjoy an Additional 5% OFF on prepaid orders!',
+                    'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+                  ]
+            } : {
+              enabled: true,
+              useCustomOffers: false,
+              title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+              items: [
+                'Buy 2 & Get Flat Rs. 300 OFF',
+                'Buy 4 & get Flat Rs. 1250 OFF',
+                'Enjoy an Additional 5% OFF on prepaid orders!',
+                'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+              ]
+            },
           });
 
           if (data.categoryId) {
@@ -2206,23 +2240,201 @@ export default function AdminProductForm() {
           </section>
 
           <section className="admin-form-section">
-            <h3>Limited-Time Sale Offer</h3>
-            <label className="admin-checkbox-param">
-              <input type="checkbox" name="offerEnabled" checked={formData.offerEnabled} onChange={handleChange} />
-              Enable Limited-Time Offer?
-            </label>
-            {formData.offerEnabled && (
-              <div className="admin-form-row">
-                <div className="admin-form-group">
-                  <label>Offer Start Date</label>
-                  <input type="datetime-local" name="offerStartAt" value={formData.offerStartAt} onChange={handleChange} />
+            <h3>Promotional Offers & Special Discounts</h3>
+
+            {/* Product Page Promotional Offers Box */}
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.offersConfig?.enabled !== false}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData(prev => ({
+                      ...prev,
+                      offersConfig: {
+                        ...(prev.offersConfig || {}),
+                        enabled: checked
+                      }
+                    }));
+                  }}
+                  style={{ width: '18px', height: '18px', accentColor: '#0f172a' }}
+                />
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', display: 'block' }}>
+                    Show "Offers For You" Box on this Product Page
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    Displays the high-converting promo banner below the price.
+                  </span>
                 </div>
-                <div className="admin-form-group">
-                  <label>Offer End Date</label>
-                  <input type="datetime-local" name="offerEndAt" value={formData.offerEndAt} onChange={handleChange} />
-                </div>
+              </label>
+            </div>
+
+            {formData.offersConfig?.enabled !== false && (
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '16px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!formData.offersConfig?.useCustomOffers}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData(prev => ({
+                        ...prev,
+                        offersConfig: {
+                          ...(prev.offersConfig || {}),
+                          useCustomOffers: checked
+                        }
+                      }));
+                    }}
+                    style={{ width: '18px', height: '18px', accentColor: '#0f172a' }}
+                  />
+                  <div>
+                    <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a', display: 'block' }}>
+                      Customize Offer Text for THIS product (Override store global offers)
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      When unchecked, this product uses the global store offers configured in Store Settings.
+                    </span>
+                  </div>
+                </label>
+
+                {formData.offersConfig?.useCustomOffers && (
+                  <div style={{ background: '#ffffff', padding: '20px', borderRadius: '10px', border: '1.5px solid #cbd5e1' }}>
+                    <div className="admin-form-group">
+                      <label>Offer Box Banner Header</label>
+                      <input
+                        type="text"
+                        value={formData.offersConfig?.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            offersConfig: {
+                              ...(prev.offersConfig || {}),
+                              title: val
+                            }
+                          }));
+                        }}
+                        placeholder="e.g. OFFERS FOR YOU – SHOP MORE, SAVE MORE!"
+                      />
+                    </div>
+
+                    <div className="admin-form-group" style={{ marginTop: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label style={{ margin: 0 }}>Offer Text Lines (One offer per line)</label>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cur = Array.isArray(formData.offersConfig?.items) ? formData.offersConfig.items.map(i => typeof i === 'string' ? i : i.text) : [];
+                              cur.push('International Orders? WhatsApp Us on +91 77372 25825 for Assistance!');
+                              setFormData(prev => ({
+                                ...prev,
+                                offersConfig: {
+                                  ...(prev.offersConfig || {}),
+                                  items: cur
+                                }
+                              }));
+                            }}
+                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            + WhatsApp Line
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                offersConfig: {
+                                  ...(prev.offersConfig || {}),
+                                  items: [
+                                    'Buy 2 & Get Flat Rs. 300 OFF',
+                                    'Buy 4 & get Flat Rs. 1250 OFF',
+                                    'Enjoy an Additional 5% OFF on prepaid orders!',
+                                    'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+                                  ]
+                                }
+                              }));
+                            }}
+                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            ↺ Default Lines
+                          </button>
+                        </div>
+                      </div>
+
+                      <textarea
+                        rows="5"
+                        value={
+                          Array.isArray(formData.offersConfig?.items)
+                            ? formData.offersConfig.items.map(i => typeof i === 'string' ? i : (i.text || '')).join('\n')
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const lines = e.target.value.split('\n');
+                          setFormData(prev => ({
+                            ...prev,
+                            offersConfig: {
+                              ...(prev.offersConfig || {}),
+                              items: lines
+                            }
+                          }));
+                        }}
+                        placeholder="Type each offer on a separate line&#10;e.g.&#10;Buy 2 & Get Flat Rs. 300 OFF&#10;Buy 4 & get Flat Rs. 1250 OFF&#10;Enjoy an Additional 5% OFF on prepaid orders!"
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.5, padding: '12px' }}
+                      />
+                      <span style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                        💡 Each line you type above becomes an offer row with its own icon in the box. WhatsApp lines automatically get the green WhatsApp icon!
+                      </span>
+                    </div>
+
+                    {/* Live Preview */}
+                    <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                        Live Customer Preview:
+                      </div>
+                      <div style={{ maxWidth: '480px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', background: '#ffffff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                        <div style={{ background: '#111111', color: '#ffffff', fontSize: '12px', fontWeight: '800', letterSpacing: '0.6px', padding: '9px 14px', textTransform: 'uppercase' }}>
+                          {formData.offersConfig?.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+                        </div>
+                        <div style={{ padding: '4px 14px' }}>
+                          {(Array.isArray(formData.offersConfig?.items) ? formData.offersConfig.items : []).filter(line => String(line || '').trim()).map((line, idx) => {
+                            const isWa = String(line).toLowerCase().includes('whatsapp');
+                            return (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: idx !== formData.offersConfig.items.length - 1 ? '1px dashed #e5e7eb' : 'none' }}>
+                                <span style={{ fontSize: '14px' }}>{isWa ? '💬' : '🏷️'}</span>
+                                <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#1f2937' }}>{typeof line === 'string' ? line : (line.text || '')}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Limited-Time Countdown Option */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '16px' }}>
+              <label className="admin-checkbox-param">
+                <input type="checkbox" name="offerEnabled" checked={formData.offerEnabled} onChange={handleChange} />
+                Enable Limited-Time Countdown Timer Banner?
+              </label>
+              {formData.offerEnabled && (
+                <div className="admin-form-row" style={{ marginTop: '12px' }}>
+                  <div className="admin-form-group">
+                    <label>Offer Start Date</label>
+                    <input type="datetime-local" name="offerStartAt" value={formData.offerStartAt} onChange={handleChange} />
+                  </div>
+                  <div className="admin-form-group">
+                    <label>Offer End Date</label>
+                    <input type="datetime-local" name="offerEndAt" value={formData.offerEndAt} onChange={handleChange} />
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
         </div>
 

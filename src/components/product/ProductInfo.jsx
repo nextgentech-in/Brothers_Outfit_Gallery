@@ -361,20 +361,30 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
 
       {/* Offers Box (Shop More, Save More) - Fully Customizable & Category Targeted */}
       {(() => {
-        if (!offersConfig || offersConfig.enabled === false) return null;
-        const cats = offersConfig.categories || ['all'];
-        const isAll = cats.length === 0 || cats.includes('all') || cats.includes('All');
-        if (!isAll) {
-          const pCat = String(product.category || product.categoryId || '').trim().toLowerCase();
-          const pSubCat = String(product.subCategory || '').trim().toLowerCase();
-          const match = cats.some(c => {
-            const lower = String(c).trim().toLowerCase();
-            return lower === pCat || lower === pSubCat || (lower && pCat.includes(lower));
-          });
-          if (!match) return null;
+        // Priority: Product-specific custom offers > Store global offersConfig
+        const prodCustom = (product.offersConfig && (product.offersConfig.useCustomOffers || product.offersConfig.items?.length > 0))
+          ? product.offersConfig
+          : (Array.isArray(product.customOffers) && product.customOffers.length > 0
+            ? { enabled: true, title: product.offersTitle || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!', items: product.customOffers }
+            : null);
+        const effectiveConfig = prodCustom || offersConfig;
+
+        if (!effectiveConfig || effectiveConfig.enabled === false) return null;
+        if (!prodCustom) {
+          const cats = effectiveConfig.categories || ['all'];
+          const isAll = cats.length === 0 || cats.includes('all') || cats.includes('All');
+          if (!isAll) {
+            const pCat = String(product.category || product.categoryId || '').trim().toLowerCase();
+            const pSubCat = String(product.subCategory || '').trim().toLowerCase();
+            const match = cats.some(c => {
+              const lower = String(c).trim().toLowerCase();
+              return lower === pCat || lower === pSubCat || (lower && pCat.includes(lower));
+            });
+            if (!match) return null;
+          }
         }
 
-        const items = (offersConfig.items || []).filter(item => {
+        const items = (effectiveConfig.items || []).filter(item => {
           const t = typeof item === 'string' ? item : item?.text;
           return Boolean(t && String(t).trim());
         });
@@ -383,7 +393,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         return (
           <div className="product-offers-container" aria-label="Special Offers">
             <div className="product-offers-banner">
-              {offersConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+              {effectiveConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
             </div>
             <div className="product-offers-content">
               {items.map((item, idx) => {
