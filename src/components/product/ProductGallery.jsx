@@ -39,14 +39,20 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
 
     const target = String(selectedColor).trim().toLowerCase();
     const colorMatched = validImages.filter(img => isColorMatch(img, target));
+    const generalImages = validImages.filter(img => isGeneralImage(img));
 
-    // When a specific color is chosen, show strictly that color's images
+    // When a specific color is chosen, include color-matched images + untagged/general images
     if (colorMatched.length > 0) {
-      return colorMatched;
+      const combined = [...colorMatched];
+      generalImages.forEach(genImg => {
+        if (!combined.some(c => extractUrl(c) === extractUrl(genImg))) {
+          combined.push(genImg);
+        }
+      });
+      return combined;
     }
 
     // Fallback if no images found for this specific color: show general images or all
-    const generalImages = validImages.filter(img => isGeneralImage(img));
     if (generalImages.length > 0) {
       return generalImages;
     }

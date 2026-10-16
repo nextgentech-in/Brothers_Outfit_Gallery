@@ -24,11 +24,8 @@ export default function ProductPage() {
     return null;
   });
   const [loading, setLoading] = useState(() => !product);
-  const [selectedColor, setSelectedColor] = useState(() => {
-    const firstCol = product?.colors?.[0];
-    return firstCol ? (firstCol.name || firstCol) : 'Black';
-  });
-  const [selectedColorIndex, setSelectedColorIndex] = useState(0);
+  const [selectedColor, setSelectedColor] = useState('All');
+  const [selectedColorIndex, setSelectedColorIndex] = useState(-1);
   const [offersConfig, setOffersConfig] = useState(() => {
     try {
       const cached = sessionStorage.getItem('bo_offers_config');
@@ -73,22 +70,20 @@ export default function ProductPage() {
     if (cachedProd) {
       setProduct(cachedProd);
       setLoading(false);
-      const firstCol = cachedProd?.colors?.[0];
-      setSelectedColor(firstCol ? (firstCol.name || firstCol) : 'Black');
+      setSelectedColor('All');
     } else {
       setProduct(null);
       setLoading(true);
     }
 
-    setSelectedColorIndex(0);
+    setSelectedColorIndex(-1);
 
     const fetchProduct = async () => {
       try {
         const prod = await getProductBySlug(slug);
         if (isCurrent && prod) {
           setProduct(prod);
-          const firstCol = prod?.colors?.[0];
-          setSelectedColor(firstCol ? (firstCol.name || firstCol) : 'Black');
+          setSelectedColor('All');
         }
       } catch (error) {
         console.error("Error fetching product:", error);
@@ -261,10 +256,6 @@ export default function ProductPage() {
             {product.title || product.name}
           </span>
         </nav>
-
-        <div className="product-top-banner">
-          <span>🚚 Free Express Shipping Across India</span>
-        </div>
 
         <div className="product-main-grid">
           <div className="product-gallery-section">
