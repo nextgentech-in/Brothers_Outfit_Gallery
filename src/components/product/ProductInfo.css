@@ -585,3 +585,126 @@
     cursor: not-allowed;
   }
 }
+
+
+/* ───────── Product Page Offers Box (Customizable) ───────── */
+.product-offers-container {
+  margin: 16px 0 24px;
+  border-radius: 10px;
+  border: 1.5px solid #e5e7eb;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.product-offers-banner {
+  background: #111111;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 10px 16px;
+  text-align: left;
+  text-transform: uppercase;
+  font-family: var(--font-heading, inherit);
+  display: flex;
+  align-items: center;
+}
+
+.product-offers-content {
+  padding: 4px 16px;
+}
+
+.product-offer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px dashed #e5e7eb;
+  transition: all 0.15s ease;
+}
+
+.product-offers-content > *:last-child .product-offer-row,
+.product-offers-content > .product-offer-row:last-child {
+  border-bottom: none;
+}
+
+.product-offer-link-wrapper {
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+.product-offer-link-wrapper:hover .product-offer-text {
+  color: var(--color-accent-gold-text, #855E18);
+  text-decoration: underline;
+}
+
+.product-offer-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.product-offer-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.45;
+}
+
+/* ───────── Delivery & Confidence Badges (After Shipping Policy) ───────── */
+.product-confidence-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.confidence-card {
+  background: #ffffff;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-stone, #D9D3C7);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.confidence-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.confidence-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.confidence-card-icon {
+  font-size: 14px;
+}
+
+.confidence-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-charcoal, #111111);
+}
+
+.confidence-card-desc {
+  font-size: 11.5px;
+  color: #6B665C;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .product-confidence-cards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}

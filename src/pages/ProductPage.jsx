@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProductBySlug, isProductInStock } from '../services/productService';
+import { getStoreSettings, DEFAULT_OFFERS_CONFIG } from '../services/adminService';
 import ProductGallery from '../components/product/ProductGallery';
 import ProductInfo from '../components/product/ProductInfo';
 import ReviewsModule from '../components/product/ReviewsModule';
@@ -28,6 +29,29 @@ export default function ProductPage() {
     return firstCol ? (firstCol.name || firstCol) : 'Black';
   });
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
+  const [offersConfig, setOffersConfig] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('bo_offers_config');
+      if (cached) return JSON.parse(cached);
+    } catch { }
+    return DEFAULT_OFFERS_CONFIG;
+  });
+
+  // Fetch offersConfig & store settings
+  useEffect(() => {
+    let isCurrent = true;
+    getStoreSettings().then(settings => {
+      if (isCurrent && settings?.offersConfig) {
+        setOffersConfig(settings.offersConfig);
+        try {
+          sessionStorage.setItem('bo_offers_config', JSON.stringify(settings.offersConfig));
+        } catch { }
+      }
+    }).catch(err => {
+      console.warn('Could not load store settings:', err);
+    });
+    return () => { isCurrent = false; };
+  }, []);
 
   // Fetch product from Firebase (SWR background refresh)
   useEffect(() => {
@@ -238,6 +262,10 @@ export default function ProductPage() {
           </span>
         </nav>
 
+        <div className="product-top-banner">
+          <span>🚚 Free Express Shipping Across India</span>
+        </div>
+
         <div className="product-main-grid">
           <div className="product-gallery-section">
             <ProductGallery
@@ -253,6 +281,7 @@ export default function ProductPage() {
           <div className="product-info-section">
             <ProductInfo
               product={product}
+              offersConfig={offersConfig}
               onColorChange={(colorName, colorIndex) => {
                 if (colorName) setSelectedColor(colorName);
                 if (colorIndex !== undefined) setSelectedColorIndex(colorIndex);

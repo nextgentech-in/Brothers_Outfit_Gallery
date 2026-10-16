@@ -74,7 +74,7 @@ function MiniCountdown({ targetDate }) {
   );
 }
 
-export default function ProductInfo({ product, onColorChange }) {
+export default function ProductInfo({ product, onColorChange, offersConfig }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { isInWishlist, toggleWishlist } = useWishlist() || {};
@@ -359,6 +359,90 @@ export default function ProductInfo({ product, onColorChange }) {
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
 
+      {/* Offers Box (Shop More, Save More) - Fully Customizable & Category Targeted */}
+      {(() => {
+        if (!offersConfig || offersConfig.enabled === false) return null;
+        const cats = offersConfig.categories || ['all'];
+        const isAll = cats.length === 0 || cats.includes('all') || cats.includes('All');
+        if (!isAll) {
+          const pCat = String(product.category || product.categoryId || '').trim().toLowerCase();
+          const pSubCat = String(product.subCategory || '').trim().toLowerCase();
+          const match = cats.some(c => {
+            const lower = String(c).trim().toLowerCase();
+            return lower === pCat || lower === pSubCat || (lower && pCat.includes(lower));
+          });
+          if (!match) return null;
+        }
+
+        const items = (offersConfig.items || []).filter(item => {
+          const t = typeof item === 'string' ? item : item?.text;
+          return Boolean(t && String(t).trim());
+        });
+        if (items.length === 0) return null;
+
+        return (
+          <div className="product-offers-container" aria-label="Special Offers">
+            <div className="product-offers-banner">
+              {offersConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+            </div>
+            <div className="product-offers-content">
+              {items.map((item, idx) => {
+                const text = typeof item === 'string' ? item : item.text;
+                const icon = typeof item === 'object' ? (item.icon || 'discount') : 'discount';
+                const link = typeof item === 'object' ? item.link : null;
+
+                const rowContent = (
+                  <div className="product-offer-row" key={idx}>
+                    <span className="product-offer-icon" aria-hidden="true">
+                      {icon === 'whatsapp' ? (
+                        <svg className="offer-svg-whatsapp" viewBox="0 0 24 24" width="18" height="18" fill="none">
+                          <path fill="#25D366" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.04 14.69 2 12.04 2Z" />
+                          <path fill="#ffffff" d="M17.52 14.33C17.22 14.18 15.75 13.45 15.48 13.35C15.21 13.25 15.01 13.2 14.81 13.5C14.61 13.8 14.04 14.47 13.86 14.67C13.69 14.87 13.51 14.9 13.21 14.75C12.91 14.6 11.95 14.28 10.81 13.26C9.92 12.47 9.32 11.5 9.14 11.2C8.97 10.9 9.12 10.74 9.27 10.59C9.41 10.46 9.57 10.24 9.72 10.07C9.87 9.9 9.92 9.77 10.02 9.57C10.12 9.37 10.07 9.2 10 9.05C9.92 8.9 9.32 7.43 9.07 6.83C8.83 6.25 8.58 6.33 8.4 6.32H7.83C7.63 6.32 7.3 6.39 7.03 6.69C6.75 6.99 6 7.69 6 9.13C6 10.57 7.05 11.96 7.2 12.16C7.35 12.36 9.27 15.31 12.21 16.58C12.91 16.88 13.46 17.06 13.88 17.2C14.58 17.42 15.22 17.39 15.72 17.31C16.28 17.23 17.44 16.61 17.68 15.93C17.93 15.26 17.93 14.68 17.85 14.56C17.78 14.43 17.62 14.38 17.52 14.33Z" />
+                        </svg>
+                      ) : icon === 'shipping' ? (
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#B88A2E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="1" y="3" width="15" height="13"></rect>
+                          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                        </svg>
+                      ) : icon === 'star' ? (
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="#B88A2E" stroke="#B88A2E" strokeWidth="1">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#B88A2E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" strokeDasharray="3 3"></circle>
+                          <path d="m9 15 6-6"></path>
+                          <circle cx="9.5" cy="9.5" r=".5" fill="#B88A2E"></circle>
+                          <circle cx="14.5" cy="14.5" r=".5" fill="#B88A2E"></circle>
+                        </svg>
+                      )}
+                    </span>
+                    <span className="product-offer-text">{text}</span>
+                  </div>
+                );
+
+                if (link && String(link).trim()) {
+                  return (
+                    <a
+                      key={idx}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="product-offer-link-wrapper"
+                    >
+                      {rowContent}
+                    </a>
+                  );
+                }
+                return rowContent;
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Color Selection: Show buttons if in-stock colors exist */}
       {inStockColors.length > 0 && !inStockColors.every(c => c.name === 'Standard' || c.name === 'Default') && (
         <div className="product-selector-group">
@@ -534,26 +618,6 @@ export default function ProductInfo({ product, onColorChange }) {
         {inWishlist ? 'SAVED TO WISHLIST ✓' : 'SAVE TO WISHLIST'}
       </button>
 
-      {/* Delivery & Purchase Confidence Badges */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>Delhivery Express</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>Estimated 2-4 business days across India</div>
-        </div>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>48H Replacement</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>For damaged/defective items with unboxing video</div>
-        </div>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>100% Genuine</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>Direct from Himatnagar flagship store</div>
-        </div>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>Free Shipping</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>On all prepaid & COD orders above ₹999</div>
-        </div>
-      </div>
-
       <div className="delivery-checker">
         <h4 className="checker-title">Check Delhivery Express Serviceability</h4>
         <form className="checker-form" onSubmit={handleDeliveryCheck}>
@@ -624,6 +688,41 @@ export default function ProductInfo({ product, onColorChange }) {
             Standard delivery takes 2-4 business days via Delhivery Express. We offer <strong>exchange or replacement only in the case of damaged or defective items</strong> received. To initiate an exchange, contact us on WhatsApp (+91 84602 33020) with package unboxing video/photo proof within 48 hours of delivery. General returns or refunds are not accepted.
           </div>
         </details>
+      </div>
+
+      {/* Delivery & Purchase Confidence Badges (Moved right after Shipping & Exchange Policy) */}
+      <div className="product-confidence-cards">
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">🚚</span>
+            <span className="confidence-card-title">Delhivery Express</span>
+          </div>
+          <div className="confidence-card-desc">Estimated 2-4 business days across India</div>
+        </div>
+
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">🔄</span>
+            <span className="confidence-card-title">48H Replacement</span>
+          </div>
+          <div className="confidence-card-desc">For damaged/defective items with unboxing video</div>
+        </div>
+
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">✨</span>
+            <span className="confidence-card-title">100% Genuine</span>
+          </div>
+          <div className="confidence-card-desc">Direct from Himatnagar flagship store</div>
+        </div>
+
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">📦</span>
+            <span className="confidence-card-title">Free Shipping</span>
+          </div>
+          <div className="confidence-card-desc">On all prepaid & COD orders above ₹999</div>
+        </div>
       </div>
 
       {/* Mobile Sticky Bottom Purchase Bar */}

@@ -526,10 +526,49 @@ export const deleteCoupon = async (id) => {
 };
 
 // ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
+export const DEFAULT_OFFERS_CONFIG = {
+  enabled: true,
+  title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+  categories: ['all'],
+  items: [
+    {
+      id: 'offer-1',
+      text: 'Buy 2 & Get Flat Rs. 300 OFF',
+      icon: 'discount',
+      link: ''
+    },
+    {
+      id: 'offer-2',
+      text: 'Buy 4 & get Flat Rs. 1250 OFF',
+      icon: 'discount',
+      link: ''
+    },
+    {
+      id: 'offer-3',
+      text: 'Enjoy an Additional 5% OFF on prepaid orders!',
+      icon: 'discount',
+      link: ''
+    },
+    {
+      id: 'offer-4',
+      text: 'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!',
+      icon: 'whatsapp',
+      link: 'https://wa.me/917737225825'
+    }
+  ]
+};
+
 export const getStoreSettings = async () => {
   try {
     const snap = await getDoc(doc(db, 'settings', 'store'));
-    return snap.exists() ? snap.data() : {
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        ...data,
+        offersConfig: data.offersConfig || DEFAULT_OFFERS_CONFIG
+      };
+    }
+    return {
       storeName: "Brothers Outfit Gallery",
       phone: "+91 84602 33020",
       email: "brothersoutfitgallery@gmail.com",
@@ -537,10 +576,14 @@ export const getStoreSettings = async () => {
       whatsappNumber: "918460233020",
       freeShippingMin: 1500,
       autoDiscountThreshold: 2000,
-      autoDiscountAmount: 250
+      autoDiscountAmount: 250,
+      exchangeWindowDays: 2,
+      offersConfig: DEFAULT_OFFERS_CONFIG
     };
   } catch (err) {
-    return {};
+    return {
+      offersConfig: DEFAULT_OFFERS_CONFIG
+    };
   }
 };
 
