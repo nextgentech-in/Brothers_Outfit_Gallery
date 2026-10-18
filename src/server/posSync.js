@@ -231,7 +231,8 @@ function validateProductsPayload(body) {
     const idKey = normalizeKey(product.webProductId);
     if (ids.has(idKey)) throw new PosSyncError(422, `Duplicate web_product_id in batch: ${product.webProductId}`, 'validation_error');
     ids.add(idKey);
-    for (const sku of [product.sku, ...product.variants.map(v => v.sku)]) {
+    const productSkus = new Set([product.sku, ...product.variants.map(v => v.sku)].filter(Boolean));
+    for (const sku of productSkus) {
       const skuKey = normalizeKey(sku);
       if (skus.has(skuKey)) throw new PosSyncError(422, `Duplicate SKU in batch: ${sku}`, 'validation_error');
       skus.add(skuKey);
@@ -344,7 +345,7 @@ function compareTuple(record, cursor) {
 function productIdentityHash(product) {
   return stableHash(JSON.stringify({
     webProductId: product.webProductId,
-    skus: [product.sku, ...product.variants.map(variant => variant.sku)].map(normalizeKey).sort()
+    skus: [...new Set([product.sku, ...product.variants.map(variant => variant.sku)].filter(Boolean))].map(normalizeKey).sort()
   }));
 }
 
@@ -371,7 +372,16 @@ function applyPosStockDelta(product, productId, item) {
   const variantIndex = variants.findIndex(variant => normalizeKey(variant.sku) === normalizeKey(item.sku));
   if (variantIndex < 0) throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
   const variant = variants[variantIndex];
-  if (normalizeKey(variant.size) !== normalizeKey(item.size) || normalizeKey(variant.color || product.primaryColor || 'Standard') !== normalizeKey(item.color)) {
+  const varSize = normalizeKey(variant.size);
+  const itemSize = normalizeKey(item.size);
+  const sizeMatches = !varSize || !itemSize || varSize === itemSize;
+
+  const varColor = normalizeKey(variant.color || product.primaryColor || '');
+  const itemColor = normalizeKey(item.color || '');
+  const isDefaultColor = (c) => !c || c === 'standard' || c === 'default' || c === 'all colors';
+  const colorMatches = isDefaultColor(varColor) || isDefaultColor(itemColor) || varColor === itemColor;
+
+  if (!sizeMatches || !colorMatches) {
     throw new PosSyncError(409, `SKU ${item.sku} does not match the supplied size/color.`, 'variant_mismatch');
   }
   const before = Number(variant.stock ?? variant.quantity ?? 0);
@@ -438,10 +448,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       if (data.slug) occupiedSlugs.add(normalizeKey(data.slug));
       for (const sku of [data.sku, ...(Array.isArray(data.variants) ? data.variants.map(v => v.sku) : [])].filter(Boolean)) {
         const key = normalizeKey(sku);
-        if (legacySkuOwners.has(key) && legacySkuOwners.get(key) !== doc.id) {
-          throw new PosSyncError(409, `Legacy catalog has duplicate SKU ${sku}; run mapping reconciliation first.`, 'legacy_sku_conflict');
+        if (!legacySkuOwners.has(key)) {
+          legacySkuOwners.set(key, doc.id);
+        } else if (legacySkuOwners.get(key) !== doc.id) {
+          legacySkuOwners.set(key, '__MULTIPLE_LEGACY__');
         }
-        legacySkuOwners.set(key, doc.id);
       }
     }
     for (const doc of slugReservations.docs) {
@@ -467,7 +478,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         const productId = `pos_${stableHash(product.webProductId).slice(0, 24)}`;
         const productRef = db.collection('products').doc(productId);
         const slugRef = db.collection('productSlugMappings').doc(stableHash(normalizeKey(product.resolvedSlug)));
-        const allSkus = [product.sku, ...product.variants.map(v => v.sku)];
+        const allSkus = [...new Set([product.sku, ...product.variants.map(v => v.sku)].filter(Boolean))];
         const skuRefs = allSkus.map(sku => db.collection('productSkuMappings').doc(stableHash(normalizeKey(sku))));
         const mappingSnap = await transaction.get(mappingRef);
         const productSnap = await transaction.get(productRef);
@@ -488,11 +499,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           continue; // Duplicate create is intentionally a no-op; never reset live stock or website edits.
         }
         if (productSnap.exists) throw new PosSyncError(409, `Generated product mapping for ${product.webProductId} is already occupied.`, 'identity_conflict');
-        if (slugSnap.exists && slugSnap.data().productId !== productId) throw new PosSyncError(409, `Slug ${product.resolvedSlug} was concurrently reserved by another product. Retry the batch to select another suffix.`, 'slug_conflict');
+        if (slugSnap.exists && slugSnap.data().productId !== productId) throw new PosSyncError(409, `Slug ${product.resolvedSlug} was concurrently reserved by another product. Retry the batch to [...]`);
         for (let index = 0; index < skuSnaps.length; index += 1) {
           const normalizedSku = normalizeKey(allSkus[index]);
           const legacyOwner = legacySkuOwners.get(normalizedSku);
-          if (legacyOwner && legacyOwner !== productId) throw new PosSyncError(409, `SKU ${allSkus[index]} is already assigned to another product.`, 'sku_conflict');
+          if (legacyOwner && legacyOwner !== productId && legacyOwner !== '__MULTIPLE_LEGACY__') throw new PosSyncError(409, `SKU ${allSkus[index]} is already assigned to another product.`, 'sku_conflict');
           if (skuSnaps[index].exists && skuSnaps[index].data().productId !== productId) {
             throw new PosSyncError(409, `SKU ${allSkus[index]} is already assigned to another product.`, 'sku_conflict');
           }
@@ -538,10 +549,10 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           integrationCreatedAt: FieldValue.serverTimestamp()
         });
         transaction.create(mappingRef, { webProductId: product.webProductId, productId, origin: 'pos', identityHash: immutableIdentity, createdAt: FieldValue.serverTimestamp() });
-        transaction.set(slugRef, { normalizedSlug: normalizeKey(product.resolvedSlug), slug: product.resolvedSlug, productId, webProductId: product.webProductId, createdAt: FieldValue.serverTimestamp() });
-        skuRefs.forEach((ref, index) => transaction.create(ref, { normalizedSku: normalizeKey(allSkus[index]), sku: allSkus[index], productId, webProductId: product.webProductId, createdAt: FieldValue.serverTimestamp() }));
+        transaction.set(slugRef, { normalizedSlug: normalizeKey(product.resolvedSlug), slug: product.resolvedSlug, productId, webProductId: product.webProductId, createdAt: FieldValue.serverTimes[...]
+        skuRefs.forEach((ref, index) => transaction.create(ref, { normalizedSku: normalizeKey(allSkus[index]), sku: allSkus[index], productId, webProductId: product.webProductId, createdAt: Field[...]
         const taxonomyRef = db.collection('posTaxonomy').doc(stableHash(`${normalizeKey(product.category)}|${normalizeKey(product.subCategory)}`));
-        transaction.set(taxonomyRef, { category: product.category, categoryKey: normalizeKey(product.category), subCategory: product.subCategory, subCategoryKey: normalizeKey(product.subCategory), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        transaction.set(taxonomyRef, { category: product.category, categoryKey: normalizeKey(product.category), subCategory: product.subCategory, subCategoryKey: normalizeKey(product.subCategory)[...]
         localCreatedCount += 1;
       }
       return localCreatedCount;
@@ -628,7 +639,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     const hasMore = eligible.length > page.length;
     const last = page.at(-1);
     const nextCursor = hasMore && last ? encodeCursor({ v: 1, feed: 'products', upperMs, afterMs: last.timeMs, afterId: last.id }) : null;
-    res.json({ success: true, server_time: new Date(upperMs).toISOString(), new_products: page.map(record => productToWire(record.id, record.product)), has_more: hasMore, next_cursor: nextCursor });
+    res.json({ success: true, server_time: new Date(upperMs).toISOString(), new_products: page.map(record => productToWire(record.id, record.product)), has_more: hasMore, next_cursor: nextCursor [...]
   }));
 
   app.post('/api/pos/stock-sync', apiHandler(async (req, res, correlationId) => {
@@ -638,7 +649,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     for (const item of payload.items) {
       const productRef = await findProductRef(db, item.webProductId);
       if (!productRef) throw new PosSyncError(409, `Unknown web_product_id ${item.webProductId}.`, 'unknown_product');
-      resolved.push({ item, productRef, eventRef: db.collection('posStockEvents').doc(stableHash(item.eventId)), movementRef: db.collection('stockMovements').doc(`pos_${stableHash(item.eventId)}`) });
+      resolved.push({ item, productRef, eventRef: db.collection('posStockEvents').doc(stableHash(item.eventId)), movementRef: db.collection('stockMovements').doc(`pos_${stableHash(item.eventId)}`[...]
     }
 
     const { updatedCount, duplicateCount, reconciliation } = await db.runTransaction(async transaction => {
@@ -669,11 +680,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (!working?.snap.exists) throw new PosSyncError(409, `Product ${item.webProductId} no longer exists.`, 'unknown_product');
         const { updatedProduct, stockAfter: after, discrepancy } = applyPosStockDelta(working.data, working.snap.id, item);
         working.data = updatedProduct;
-        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, deltaChange: item.deltaChange, finalStock: item.finalStock, websiteStockAfter: after, discrepancy, syncTimestamp: payload.syncTimestamp, acceptedAt: FieldValue.serverTimestamp() });
-        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, source: 'pos', reason: item.deltaChange < 0 ? 'offline_sale' : 'pos_stock_inward', externalReference: item.eventId, syncId: payload.syncId, stockAfter: after, createdAt: FieldValue.serverTimestamp() });
+        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, deltaChange: item.deltaChange, finalStock:[...]
+        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, d[...]
         if (discrepancy !== 0) {
           const discrepancyRef = db.collection('posReconciliationDiscrepancies').doc(stableHash(item.eventId));
-          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: after, discrepancy, status: 'open', createdAt: FieldValue.serverTimestamp() });
+          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: [...]
           localReconciliation.push({ event_id: item.eventId, sku: item.sku, pos_final_stock: item.finalStock, website_stock_after_delta: after, discrepancy });
         }
         localUpdatedCount += 1;
