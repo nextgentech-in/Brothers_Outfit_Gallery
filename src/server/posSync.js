@@ -350,7 +350,7 @@ function productIdentityHash(product) {
 }
 
 function isWebsiteProductFeedEligible(product) {
-  return product.integrationOrigin !== 'pos' && product.active !== false;
+  return product.active !== false;
 }
 
 function stockEventFingerprint(item) {
@@ -496,10 +496,10 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           if (existing.productId !== productId || existing.identityHash !== immutableIdentity) {
             throw new PosSyncError(409, `web_product_id ${product.webProductId} conflicts with its existing SKU mapping.`, 'identity_conflict');
           }
-          continue; // Duplicate create is intentionally a no-op; never reset live stock or website edits.
+          continue;
         }
         if (productSnap.exists) throw new PosSyncError(409, `Generated product mapping for ${product.webProductId} is already occupied.`, 'identity_conflict');
-        if (slugSnap.exists && slugSnap.data().productId !== productId) throw new PosSyncError(409, `Slug ${product.resolvedSlug} was concurrently reserved by another product. Retry the batch to [...]`);
+        if (slugSnap.exists && slugSnap.data().productId !== productId) throw new PosSyncError(409, `Slug ${product.resolvedSlug} was concurrently reserved by another product. Retry the batch to avoid collisions.`, 'slug_conflict');
         for (let index = 0; index < skuSnaps.length; index += 1) {
           const normalizedSku = normalizeKey(allSkus[index]);
           const legacyOwner = legacySkuOwners.get(normalizedSku);
@@ -549,10 +549,10 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           integrationCreatedAt: FieldValue.serverTimestamp()
         });
         transaction.create(mappingRef, { webProductId: product.webProductId, productId, origin: 'pos', identityHash: immutableIdentity, createdAt: FieldValue.serverTimestamp() });
-        transaction.set(slugRef, { normalizedSlug: normalizeKey(product.resolvedSlug), slug: product.resolvedSlug, productId, webProductId: product.webProductId, createdAt: FieldValue.serverTimes[...]
-        skuRefs.forEach((ref, index) => transaction.create(ref, { normalizedSku: normalizeKey(allSkus[index]), sku: allSkus[index], productId, webProductId: product.webProductId, createdAt: Field[...]
+        transaction.set(slugRef, { normalizedSlug: normalizeKey(product.resolvedSlug), slug: product.resolvedSlug, productId, webProductId: product.webProductId, createdAt: FieldValue.serverTimestamp() });
+        skuRefs.forEach((ref, index) => transaction.create(ref, { normalizedSku: normalizeKey(allSkus[index]), sku: allSkus[index], productId, webProductId: product.webProductId, createdAt: FieldValue.serverTimestamp() }));
         const taxonomyRef = db.collection('posTaxonomy').doc(stableHash(`${normalizeKey(product.category)}|${normalizeKey(product.subCategory)}`));
-        transaction.set(taxonomyRef, { category: product.category, categoryKey: normalizeKey(product.category), subCategory: product.subCategory, subCategoryKey: normalizeKey(product.subCategory)[...]
+        transaction.set(taxonomyRef, { category: product.category, categoryKey: normalizeKey(product.category), subCategory: product.subCategory, subCategoryKey: normalizeKey(product.subCategory), createdAt: FieldValue.serverTimestamp() });
         localCreatedCount += 1;
       }
       return localCreatedCount;
@@ -563,7 +563,6 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     res.json({ success: true, message: 'Products published successfully', created_count: createdCount });
   }));
 
-  // ── PUT /api/pos/products — POS Edits → Website ─────────────────────────
   app.put('/api/pos/products', apiHandler(async (req, res, correlationId) => {
     if (!req.body || !Array.isArray(req.body.products) || req.body.products.length < 1 || req.body.products.length > MAX_PRODUCT_BATCH) {
       throw new PosSyncError(422, `products must contain between 1 and ${MAX_PRODUCT_BATCH} items.`, 'validation_error');
@@ -639,7 +638,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     const hasMore = eligible.length > page.length;
     const last = page.at(-1);
     const nextCursor = hasMore && last ? encodeCursor({ v: 1, feed: 'products', upperMs, afterMs: last.timeMs, afterId: last.id }) : null;
-    res.json({ success: true, server_time: new Date(upperMs).toISOString(), new_products: page.map(record => productToWire(record.id, record.product)), has_more: hasMore, next_cursor: nextCursor [...]
+    res.json({ success: true, server_time: new Date(upperMs).toISOString(), new_products: page.map(record => productToWire(record.id, record.product)), has_more: hasMore, next_cursor: nextCursor });
   }));
 
   app.post('/api/pos/stock-sync', apiHandler(async (req, res, correlationId) => {
@@ -649,7 +648,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     for (const item of payload.items) {
       const productRef = await findProductRef(db, item.webProductId);
       if (!productRef) throw new PosSyncError(409, `Unknown web_product_id ${item.webProductId}.`, 'unknown_product');
-      resolved.push({ item, productRef, eventRef: db.collection('posStockEvents').doc(stableHash(item.eventId)), movementRef: db.collection('stockMovements').doc(`pos_${stableHash(item.eventId)}`[...]
+      resolved.push({
+        item,
+        productRef,
+        eventRef: db.collection('posStockEvents').doc(stableHash(item.eventId)),
+        movementRef: db.collection('stockMovements').doc(`pos_${stableHash(item.eventId)}`)
+      });
     }
 
     const { updatedCount, duplicateCount, reconciliation } = await db.runTransaction(async transaction => {
@@ -667,8 +671,6 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       for (let index = 0; index < resolved.length; index += 1) {
         const entry = resolved[index];
         const item = entry.item;
-        // event_id is the durable item identity. sync_id groups an upload attempt,
-        // but is intentionally excluded so an event can be retried in a later batch.
         const fingerprint = stockEventFingerprint(item);
         const existingEvent = eventSnaps[index];
         if (existingEvent.exists) {
@@ -680,11 +682,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (!working?.snap.exists) throw new PosSyncError(409, `Product ${item.webProductId} no longer exists.`, 'unknown_product');
         const { updatedProduct, stockAfter: after, discrepancy } = applyPosStockDelta(working.data, working.snap.id, item);
         working.data = updatedProduct;
-        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, deltaChange: item.deltaChange, finalStock:[...]
-        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, d[...]
+        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, finalStock: item.finalStock, createdAt: FieldValue.serverTimestamp() });
+        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, stockAfter: after, source: 'pos', createdAt: FieldValue.serverTimestamp() });
         if (discrepancy !== 0) {
           const discrepancyRef = db.collection('posReconciliationDiscrepancies').doc(stableHash(item.eventId));
-          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: [...]
+          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: after, discrepancy, createdAt: FieldValue.serverTimestamp() });
           localReconciliation.push({ event_id: item.eventId, sku: item.sku, pos_final_stock: item.finalStock, website_stock_after_delta: after, discrepancy });
         }
         localUpdatedCount += 1;
