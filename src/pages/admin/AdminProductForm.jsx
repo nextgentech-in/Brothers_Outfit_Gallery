@@ -1069,6 +1069,7 @@ export default function AdminProductForm() {
 
       const calculatedStock = normalizedVariants.reduce((acc, v) => acc + (v.stock || 0), 0);
       const inStockSizes = [...new Set(normalizedVariants.filter(v => (v.stock || 0) > 0).map(v => v.size))].filter(Boolean);
+      const allSizes = [...new Set(normalizedVariants.map(v => v.size))].filter(Boolean);
       // Sanitize offersConfig for saving
       const cleanOffersItems = Array.isArray(formData.offersConfig?.items)
         ? formData.offersConfig.items
