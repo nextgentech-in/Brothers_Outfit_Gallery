@@ -720,6 +720,25 @@ registerPosSyncRoutes(app, {
   }
 });
 
+// Admin Store Settings endpoint
+app.post(['/api/admin/settings', '/admin/settings'], requireAdminAuth, async (req, res) => {
+  try {
+    const settings = req.body?.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(422).json({ error: 'Valid settings object is required.' });
+    }
+    const db = getTrustedFirestore();
+    await db.collection('settings').doc('store').set({
+      ...settings,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to save store settings:', err);
+    return res.status(500).json({ error: 'Failed to save store settings.' });
+  }
+});
+
 // Admin catalog writes use the same SKU reservation registry as POS imports.
 // This closes the race where a newly-created website SKU could otherwise be
 // attached to a later POS product before the next legacy backfill.

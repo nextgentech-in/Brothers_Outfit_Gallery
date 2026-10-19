@@ -361,15 +361,25 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
 
       {/* Offers Box (Shop More, Save More) - Fully Customizable & Category Targeted */}
       {(() => {
-        // Priority: Product-specific custom offers > Store global offersConfig
-        const prodCustom = (product.offersConfig && (product.offersConfig.useCustomOffers || product.offersConfig.items?.length > 0))
-          ? product.offersConfig
-          : (Array.isArray(product.customOffers) && product.customOffers.length > 0
-            ? { enabled: true, title: product.offersTitle || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!', items: product.customOffers }
-            : null);
-        const effectiveConfig = prodCustom || offersConfig;
+        // 1. If offers are explicitly disabled on this product, hide the box completely
+        if (product.offersConfig && product.offersConfig.enabled === false) return null;
 
+        // 2. Priority: Specific product custom offers (ONLY if useCustomOffers is explicitly enabled) > Store global offersConfig
+        const hasProductCustomOffers = Boolean(
+          (product.offersConfig?.useCustomOffers && Array.isArray(product.offersConfig?.items) && product.offersConfig.items.some(i => String(typeof i === 'string' ? i : i?.text || '').trim())) ||
+          (Array.isArray(product.customOffers) && product.customOffers.some(i => String(typeof i === 'string' ? i : i?.text || '').trim()))
+        );
+
+        const prodCustom = hasProductCustomOffers
+          ? (product.offersConfig?.useCustomOffers
+              ? product.offersConfig
+              : { enabled: true, title: product.offersTitle || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!', items: product.customOffers })
+          : null;
+
+        const effectiveConfig = prodCustom || offersConfig;
         if (!effectiveConfig || effectiveConfig.enabled === false) return null;
+
+        // 3. Category targeting check (only applies to store global offers)
         if (!prodCustom) {
           const cats = effectiveConfig.categories || ['all'];
           const isAll = cats.length === 0 || cats.includes('all') || cats.includes('All');
@@ -378,13 +388,14 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
             const pSubCat = String(product.subCategory || '').trim().toLowerCase();
             const match = cats.some(c => {
               const lower = String(c).trim().toLowerCase();
-              return lower === pCat || lower === pSubCat || (lower && pCat.includes(lower));
+              return lower === pCat || lower === pSubCat || (lower && (pCat.includes(lower) || lower.includes(pCat)));
             });
             if (!match) return null;
           }
         }
 
-        const items = (effectiveConfig.items || []).filter(item => {
+        const rawItems = effectiveConfig.items || [];
+        const items = (Array.isArray(rawItems) ? rawItems : []).filter(item => {
           const t = typeof item === 'string' ? item : item?.text;
           return Boolean(t && String(t).trim());
         });
@@ -397,9 +408,29 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
             </div>
             <div className="product-offers-content">
               {items.map((item, idx) => {
-                const text = typeof item === 'string' ? item : item.text;
-                const icon = typeof item === 'object' ? (item.icon || 'discount') : 'discount';
-                const link = typeof item === 'object' ? item.link : null;
+                let text = typeof item === 'string' ? item : (item.text || '');
+                // Ensure About Us phone number is used everywhere
+                text = text.replace(/77372\s*25825/g, '84602 33020');
+
+                const lowerText = text.toLowerCase();
+                const isWa = lowerText.includes('whatsapp') || lowerText.includes('wa.me');
+                const isShipping = lowerText.includes('shipping') || lowerText.includes('delivery');
+                const isDiscount = lowerText.includes('off') || lowerText.includes('discount') || lowerText.includes('%');
+
+                let icon = typeof item === 'object' && item.icon ? item.icon : null;
+                if (!icon) {
+                  if (isWa) icon = 'whatsapp';
+                  else if (isShipping) icon = 'shipping';
+                  else if (isDiscount) icon = 'discount';
+                  else icon = 'discount';
+                }
+
+                let link = typeof item === 'object' && item.link ? item.link : null;
+                if (link) {
+                  link = link.replace(/7737225825/g, '918460233020');
+                } else if (isWa) {
+                  link = `https://wa.me/918460233020?text=${encodeURIComponent(`Hi Brothers Outfit! I have a question regarding: ${product.name || 'this item'}`)}`;
+                }
 
                 const rowContent = (
                   <div className="product-offer-row" key={idx}>

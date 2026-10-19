@@ -1436,3 +1436,74 @@ test('extractImageUrls handles mixed array of strings and objects', () => {
   assert.equal(urls[0], 'https://cdn.example.com/str.jpg');
   assert.equal(urls[1], 'https://cdn.example.com/obj.jpg');
 });
+
+test('Product with base SKU identical to variant SKU is deduplicated and accepted', async () => {
+  const product = {
+    web_product_id: 'W-POS-DEDUP-1',
+    product_name: 'Single Variant Product',
+    category: 'Caps',
+    sku: 'CAP-FREE',
+    slug: 'single-variant-cap',
+    color: 'Black',
+    mrp: 999,
+    sale_price: 499,
+    sizes: [
+      { size: 'Free Size', stock: 10, price: 499, sku: 'CAP-FREE' }
+    ]
+  };
+  const res = await api('/api/pos/products', { method: 'POST', body: { products: [product] } });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.created_count, 1);
+});
+
+test('Non-blocking legacy catalog duplicates allow new POS product, and lenient color matching applies', async () => {
+  await sharedDb.collection('products').doc('legacy_prod_1').set({
+    name: 'Legacy 1',
+    integrationOrigin: 'website',
+    sku: 'LEGACY-DUP-SKU',
+    slug: 'legacy-1',
+    variants: [{ size: 'M', sku: 'LEGACY-DUP-SKU', stock: 5 }]
+  });
+  await sharedDb.collection('products').doc('legacy_prod_2').set({
+    name: 'Legacy 2',
+    integrationOrigin: 'website',
+    sku: 'LEGACY-DUP-SKU',
+    slug: 'legacy-2',
+    variants: [{ size: 'L', sku: 'LEGACY-DUP-SKU', stock: 5 }]
+  });
+
+  const newProduct = {
+    web_product_id: 'W-POS-LEGACY-TOLERANT',
+    product_name: 'Lenient Color Product',
+    category: 'Shirts',
+    sku: 'SHIRT-LENIENT',
+    slug: 'lenient-color-product',
+    color: 'Standard',
+    mrp: 1200,
+    sale_price: 899,
+    sizes: [
+      { size: 'M', stock: 10, price: 899, sku: 'SHIRT-LENIENT-M' }
+    ]
+  };
+  const resCreate = await api('/api/pos/products', { method: 'POST', body: { products: [newProduct] } });
+  assert.equal(resCreate.status, 200);
+  assert.equal(resCreate.body.created_count, 1);
+
+  const stockPayload = {
+    sync_id: 'SYNC-LENIENT-1',
+    sync_timestamp: '2026-10-11T12:00:00.000Z',
+    items: [{
+      event_id: 'EVT-LENIENT-SALE',
+      web_product_id: 'W-POS-LEGACY-TOLERANT',
+      sku: 'SHIRT-LENIENT-M',
+      size: 'M',
+      color: 'Default',
+      delta_change: -1,
+      final_stock: 9
+    }]
+  };
+  const resStock = await api('/api/pos/stock-sync', { method: 'POST', body: stockPayload });
+  assert.equal(resStock.status, 200);
+  assert.equal(resStock.body.updated_count, 1);
+});
+

@@ -350,7 +350,7 @@ function productIdentityHash(product) {
 }
 
 function isWebsiteProductFeedEligible(product) {
-  return product.active !== false;
+  return product.integrationOrigin !== 'pos' && product.active !== false;
 }
 
 function stockEventFingerprint(item) {
@@ -682,11 +682,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (!working?.snap.exists) throw new PosSyncError(409, `Product ${item.webProductId} no longer exists.`, 'unknown_product');
         const { updatedProduct, stockAfter: after, discrepancy } = applyPosStockDelta(working.data, working.snap.id, item);
         working.data = updatedProduct;
-        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, finalStock: item.finalStock, createdAt: FieldValue.serverTimestamp() });
-        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, stockAfter: after, source: 'pos', createdAt: FieldValue.serverTimestamp() });
+        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, deltaChange: item.deltaChange, finalStock: item.finalStock, websiteStockAfter: after, discrepancy, syncTimestamp: payload.syncTimestamp, acceptedAt: FieldValue.serverTimestamp() });
+        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, source: 'pos', reason: item.deltaChange < 0 ? 'offline_sale' : 'pos_stock_inward', externalReference: item.eventId, syncId: payload.syncId, stockAfter: after, createdAt: FieldValue.serverTimestamp() });
         if (discrepancy !== 0) {
           const discrepancyRef = db.collection('posReconciliationDiscrepancies').doc(stableHash(item.eventId));
-          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: after, discrepancy, createdAt: FieldValue.serverTimestamp() });
+          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: after, discrepancy, status: 'open', createdAt: FieldValue.serverTimestamp() });
           localReconciliation.push({ event_id: item.eventId, sku: item.sku, pos_final_stock: item.finalStock, website_stock_after_delta: after, discrepancy });
         }
         localUpdatedCount += 1;

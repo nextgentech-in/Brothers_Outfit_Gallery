@@ -265,7 +265,7 @@ export default function AdminProductForm() {
         'Buy 2 & Get Flat Rs. 300 OFF',
         'Buy 4 & get Flat Rs. 1250 OFF',
         'Enjoy an Additional 5% OFF on prepaid orders!',
-        'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+        'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
       ]
     },
   });
@@ -330,13 +330,24 @@ export default function AdminProductForm() {
               useCustomOffers: !!data.offersConfig.useCustomOffers,
               title: data.offersConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
               items: Array.isArray(data.offersConfig.items)
-                ? data.offersConfig.items.map(i => typeof i === 'string' ? i : (i.text || ''))
+                ? data.offersConfig.items.map(i => {
+                    const str = typeof i === 'string' ? i : (i.text || '');
+                    return str.replace(/77372\s*25825/g, '84602 33020');
+                  })
                 : [
                     'Buy 2 & Get Flat Rs. 300 OFF',
                     'Buy 4 & get Flat Rs. 1250 OFF',
                     'Enjoy an Additional 5% OFF on prepaid orders!',
-                    'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+                    'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
                   ]
+            } : (Array.isArray(data.customOffers) && data.customOffers.length > 0 ? {
+              enabled: true,
+              useCustomOffers: true,
+              title: data.offersTitle || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+              items: data.customOffers.map(i => {
+                const str = typeof i === 'string' ? i : (i.text || '');
+                return str.replace(/77372\s*25825/g, '84602 33020');
+              })
             } : {
               enabled: true,
               useCustomOffers: false,
@@ -345,9 +356,9 @@ export default function AdminProductForm() {
                 'Buy 2 & Get Flat Rs. 300 OFF',
                 'Buy 4 & get Flat Rs. 1250 OFF',
                 'Enjoy an Additional 5% OFF on prepaid orders!',
-                'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+                'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
               ]
-            },
+            }),
           });
 
           if (data.categoryId) {
@@ -1058,10 +1069,25 @@ export default function AdminProductForm() {
 
       const calculatedStock = normalizedVariants.reduce((acc, v) => acc + (v.stock || 0), 0);
       const inStockSizes = [...new Set(normalizedVariants.filter(v => (v.stock || 0) > 0).map(v => v.size))].filter(Boolean);
-      const allSizes = [...new Set(normalizedVariants.map(v => v.size))].filter(Boolean);
+      // Sanitize offersConfig for saving
+      const cleanOffersItems = Array.isArray(formData.offersConfig?.items)
+        ? formData.offersConfig.items
+            .map(i => (typeof i === 'string' ? i : (i?.text || '')).trim())
+            .filter(Boolean)
+        : [];
+
+      const sanitizedOffersConfig = {
+        enabled: formData.offersConfig?.enabled !== false,
+        useCustomOffers: Boolean(formData.offersConfig?.useCustomOffers),
+        title: String(formData.offersConfig?.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!').trim(),
+        items: cleanOffersItems
+      };
 
       const payload = {
         ...formData,
+        offersConfig: sanitizedOffersConfig,
+        customOffers: sanitizedOffersConfig.useCustomOffers ? cleanOffersItems : [],
+        offersTitle: sanitizedOffersConfig.title,
         sku: productSku,
         sizeGuide: sanitizeSizeGuideForFirestore(formData.sizeGuide),
         mrp: mrp,
@@ -2328,7 +2354,7 @@ export default function AdminProductForm() {
                             type="button"
                             onClick={() => {
                               const cur = Array.isArray(formData.offersConfig?.items) ? formData.offersConfig.items.map(i => typeof i === 'string' ? i : i.text) : [];
-                              cur.push('International Orders? WhatsApp Us on +91 77372 25825 for Assistance!');
+                              cur.push('International Orders? WhatsApp Us on +91 84602 33020 for Assistance!');
                               setFormData(prev => ({
                                 ...prev,
                                 offersConfig: {
@@ -2352,7 +2378,7 @@ export default function AdminProductForm() {
                                     'Buy 2 & Get Flat Rs. 300 OFF',
                                     'Buy 4 & get Flat Rs. 1250 OFF',
                                     'Enjoy an Additional 5% OFF on prepaid orders!',
-                                    'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!'
+                                    'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
                                   ]
                                 }
                               }));

@@ -50,9 +50,29 @@ export default function AdminSettings() {
           getCategories()
         ]);
 
+        const rawStoreOffers = storeData?.offersConfig || {};
+        const sanitizedItems = Array.isArray(rawStoreOffers.items)
+          ? rawStoreOffers.items.map(item => {
+              if (typeof item === 'string') {
+                const text = item.replace(/77372\s*25825/g, '84602 33020');
+                const isWa = text.toLowerCase().includes('whatsapp');
+                return {
+                  id: `offer-${Math.random().toString(36).slice(2, 7)}`,
+                  text,
+                  icon: isWa ? 'whatsapp' : 'discount',
+                  link: isWa ? 'https://wa.me/918460233020' : ''
+                };
+              }
+              const text = String(item.text || '').replace(/77372\s*25825/g, '84602 33020');
+              const link = String(item.link || '').replace(/7737225825/g, '918460233020');
+              return { ...item, text, link };
+            })
+          : DEFAULT_OFFERS_CONFIG.items;
+
         const mergedOffersConfig = {
           ...DEFAULT_OFFERS_CONFIG,
-          ...(storeData?.offersConfig || {})
+          ...rawStoreOffers,
+          items: sanitizedItems
         };
 
         setSettings(prev => ({
@@ -208,6 +228,9 @@ export default function AdminSettings() {
       await saveStoreSettings(toSave);
       try {
         sessionStorage.setItem('bo_offers_config', JSON.stringify(toSave.offersConfig));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('bo_offers_updated', { detail: toSave.offersConfig }));
+        }
       } catch {}
     } catch (err) {
       console.error('Failed to save store settings:', err);
@@ -410,7 +433,7 @@ export default function AdminSettings() {
                         id: existing?.id || `offer-${idx + 1}`,
                         text: line,
                         icon: existing?.icon || (isWa ? 'whatsapp' : 'discount'),
-                        link: existing?.link || (isWa ? 'https://wa.me/917737225825' : '')
+                        link: existing?.link ? existing.link.replace(/7737225825/g, '918460233020') : (isWa ? 'https://wa.me/918460233020' : '')
                       };
                     });
                     setSettings(prev => ({
@@ -526,7 +549,7 @@ export default function AdminSettings() {
                           type="text"
                           value={item.link || ''}
                           onChange={(e) => handleOfferItemChange(idx, 'link', e.target.value)}
-                          placeholder="e.g. https://wa.me/917737225825 or leave empty"
+                          placeholder="e.g. https://wa.me/918460233020 or leave empty"
                           style={{
                             flex: 1,
                             padding: '6px 10px',

@@ -47,7 +47,16 @@ export default function ProductPage() {
     }).catch(err => {
       console.warn('Could not load store settings:', err);
     });
-    return () => { isCurrent = false; };
+
+    const handleOffersUpdated = (e) => {
+      if (e?.detail) setOffersConfig(e.detail);
+    };
+    window.addEventListener('bo_offers_updated', handleOffersUpdated);
+
+    return () => {
+      isCurrent = false;
+      window.removeEventListener('bo_offers_updated', handleOffersUpdated);
+    };
   }, []);
 
   // Fetch product from Firebase (SWR background refresh)

@@ -551,9 +551,9 @@ export const DEFAULT_OFFERS_CONFIG = {
     },
     {
       id: 'offer-4',
-      text: 'International Orders? WhatsApp Us on +91 77372 25825 for Assistance!',
+      text: 'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!',
       icon: 'whatsapp',
-      link: 'https://wa.me/917737225825'
+      link: 'https://wa.me/918460233020'
     }
   ]
 };
@@ -563,9 +563,26 @@ export const getStoreSettings = async () => {
     const snap = await getDoc(doc(db, 'settings', 'store'));
     if (snap.exists()) {
       const data = snap.data();
+      const rawOffers = data.offersConfig || DEFAULT_OFFERS_CONFIG;
+      const sanitizedItems = Array.isArray(rawOffers.items)
+        ? rawOffers.items.map(item => {
+            if (typeof item === 'string') {
+              return item.replace(/77372\s*25825/g, '84602 33020');
+            }
+            return {
+              ...item,
+              text: String(item.text || '').replace(/77372\s*25825/g, '84602 33020'),
+              link: String(item.link || '').replace(/7737225825/g, '918460233020')
+            };
+          })
+        : DEFAULT_OFFERS_CONFIG.items;
+
       return {
         ...data,
-        offersConfig: data.offersConfig || DEFAULT_OFFERS_CONFIG
+        offersConfig: {
+          ...rawOffers,
+          items: sanitizedItems
+        }
       };
     }
     return {
@@ -588,6 +605,22 @@ export const getStoreSettings = async () => {
 };
 
 export const saveStoreSettings = async (settingsData) => {
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (token) {
+      const response = await fetch(`${getBackendUrl()}/api/admin/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ settings: settingsData })
+      });
+      if (response.ok) {
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Server settings save fallback to client Firestore:', err);
+  }
+
   await setDoc(doc(db, 'settings', 'store'), {
     ...settingsData,
     updatedAt: serverTimestamp()
