@@ -675,6 +675,34 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     res.json({ success: true, message: 'Products updated successfully', updated_count: updatedCount });
   }));
 
+  app.delete('/api/pos/products', apiHandler(async (req, res, correlationId) => {
+    const rawIds = Array.isArray(req.body?.web_product_ids)
+      ? req.body.web_product_ids
+      : (req.body?.web_product_id ? [req.body.web_product_id] : (req.query?.id ? [req.query.id] : []));
+
+    if (!Array.isArray(rawIds) || rawIds.length === 0) {
+      throw new PosSyncError(422, 'web_product_ids must be a non-empty array of product IDs.', 'validation_error');
+    }
+
+    const db = getDb();
+    let deletedCount = 0;
+    for (const rawId of rawIds) {
+      const productRef = await findProductRef(db, String(rawId).trim());
+      if (productRef) {
+        await productRef.update({
+          active: false,
+          isDeleted: true,
+          deletedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        deletedCount += 1;
+      }
+    }
+    invalidateProductCache();
+    console.info('[POS Sync] products deleted', { correlationId, requested: rawIds.length, deleted: deletedCount });
+    res.json({ success: true, message: 'Products deactivated/deleted successfully', deleted_count: deletedCount });
+  }));
+
   app.get('/api/pos/products-sync', apiHandler(async (req, res) => {
     const since = parseIsoTimestamp(req.query.since, { optional: true });
     const cursor = decodeCursor(req.query.cursor, 'products');
@@ -690,11 +718,27 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       return { id: doc.id, product, timeMs: Math.max(createdMs, updatedMs) };
     }).filter(record => isWebsiteProductFeedEligible(record.product) && record.timeMs <= upperMs && compareTuple(record, { afterMs, afterId }))
       .sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id));
+
+    const deletedProductIds = snapshot.docs.map(doc => {
+      const product = doc.data();
+      const updatedMs = timestampMillis(product.updatedAt || product.deletedAt);
+      const isDel = product.isDeleted === true || product.active === false;
+      return { webProductId: product.webProductId || doc.id, isDel, timeMs: updatedMs };
+    }).filter(record => record.isDel && record.timeMs > afterMs && record.timeMs <= upperMs)
+      .map(record => record.webProductId);
+
     const page = eligible.slice(0, limit);
     const hasMore = eligible.length > page.length;
     const last = page.at(-1);
     const nextCursor = hasMore && last ? encodeCursor({ v: 1, feed: 'products', upperMs, afterMs: last.timeMs, afterId: last.id }) : null;
-    res.json({ success: true, server_time: new Date(upperMs).toISOString(), new_products: page.map(record => productToWire(record.id, record.product)), has_more: hasMore, next_cursor: nextCursor });
+    res.json({
+      success: true,
+      server_time: new Date(upperMs).toISOString(),
+      new_products: page.map(record => productToWire(record.id, record.product)),
+      deleted_product_ids: deletedProductIds,
+      has_more: hasMore,
+      next_cursor: nextCursor
+    });
   }));
 
   app.post('/api/pos/stock-sync', apiHandler(async (req, res, correlationId) => {
