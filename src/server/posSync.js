@@ -328,6 +328,11 @@ function extractImageUrls(product) {
 function productToWire(id, product) {
   const imageUrls = extractImageUrls(product);
   const coverImage = imageUrls[0] || product.thumbnailUrl || product.image || null;
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const calculatedStock = variants.length > 0
+    ? variants.reduce((sum, v) => sum + Number(v.stock ?? v.quantity ?? 0), 0)
+    : Number(product.stock ?? product.quantity ?? 0);
+
   return {
     web_product_id: product.webProductId || id,
     product_name: product.name || '',
@@ -340,11 +345,17 @@ function productToWire(id, product) {
     description: product.description || product.shortDescription || '',
     mrp: Number(product.mrp ?? product.compareAtPrice ?? product.price ?? 0),
     sale_price: Number(product.salePrice ?? product.price ?? 0),
+    stock: calculatedStock,
+    quantity: calculatedStock,
+    opening_stock: calculatedStock,
     images: imageUrls,
     image_url: coverImage,
-    sizes: (Array.isArray(product.variants) ? product.variants : []).map(variant => ({
+    sizes: variants.map(variant => ({
       size: variant.size || 'One Size',
+      color: variant.color || product.primaryColor || product.colors?.[0]?.name || product.colors?.[0] || 'Standard',
       stock: Number(variant.stock ?? variant.quantity ?? 0),
+      quantity: Number(variant.stock ?? variant.quantity ?? 0),
+      opening_stock: Number(variant.stock ?? variant.quantity ?? 0),
       price: Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0),
       sku: variant.sku || product.sku || ''
     }))

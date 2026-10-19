@@ -885,6 +885,33 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
             });
           }
         }
+      } else {
+        const nextVariants = Array.isArray(editableData.variants) ? editableData.variants : [];
+        if (nextVariants.length > 0) {
+          nextVariants.forEach((variant, index) => {
+            const initialQty = Number(variant.stock ?? variant.quantity ?? 0);
+            if (initialQty > 0) {
+              const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-create|${index}|${variant.sku}`).digest('hex')}`;
+              transaction.create(db.collection('stockMovements').doc(movementId), {
+                movementId, productId, webProductId: identity.webProductId, sku: variant.sku,
+                size: variant.size || 'One Size', color: variant.color || editableData.primaryColor || 'Standard',
+                deltaChange: initialQty, source: 'website', reason: 'product_created', externalReference: requestId,
+                stockAfter: initialQty, createdAt: FieldValue.serverTimestamp()
+              });
+            }
+          });
+        } else {
+          const initialQty = Number(editableData.stock ?? editableData.quantity ?? 0);
+          if (initialQty > 0) {
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-create`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId, productId, webProductId: identity.webProductId, sku: editableData.sku || '',
+              size: 'One Size', color: editableData.primaryColor || 'Standard',
+              deltaChange: initialQty, source: 'website', reason: 'product_created', externalReference: requestId,
+              stockAfter: initialQty, createdAt: FieldValue.serverTimestamp()
+            });
+          }
+        }
       }
       transaction.set(productRef, { ...editableData, ...identity, updatedAt: FieldValue.serverTimestamp() }, { merge: !create });
       transaction.set(newSlugRef, { normalizedSlug: newSlug, slug: productData.slug, productId, webProductId: identity.webProductId, updatedAt: FieldValue.serverTimestamp() });

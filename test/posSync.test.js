@@ -1401,6 +1401,11 @@ test('productToWire includes images and image_url', () => {
   assert.equal(wire.images.length, 2);
   assert.equal(wire.images[0], 'https://cdn.example.com/a.jpg');
   assert.equal(wire.image_url, 'https://cdn.example.com/a.jpg');
+  assert.equal(wire.stock, 5);
+  assert.equal(wire.quantity, 5);
+  assert.equal(wire.opening_stock, 5);
+  assert.equal(wire.sizes[0].stock, 5);
+  assert.equal(wire.sizes[0].opening_stock, 5);
 });
 
 test('productToWire handles product with no images', () => {
