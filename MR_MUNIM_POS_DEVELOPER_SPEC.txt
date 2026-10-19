@@ -86,6 +86,57 @@ Notes for POS Developer:
 - `images`: Can be https:// URLs OR base64 data URLs ("data:image/..."). The website backend automatically streams base64 images into ImageKit CDN.
 - If re-sending an already published product with matching SKUs, it returns `created_count: 0` without overwriting custom website edits or resetting stock.
 
+--------------------------------------------------------------------------------
+FIELD REFERENCE FOR ADDING A PRODUCT (POST /api/pos/products):
+--------------------------------------------------------------------------------
+A. MANDATORY PARENT PRODUCT FIELDS:
+  1. `web_product_id` (String, required)
+     - Unique product ID in POS database (e.g. "POS_ITEM_2028" or "1025").
+     - Allowed characters: Letters, numbers, dot, underscore, colon, hyphen.
+  2. `product_name` (String, required)
+     - Full display title of the product (e.g. "Next Rose Attar 2028").
+     - Max 200 characters.
+  3. `category` (String, required)
+     - Product category (e.g. "Attar", "Shirts", "Kurta", "Jeans", "Perfume").
+     - Max 100 characters.
+  4. `sku` (String, required)
+     - Base / master product SKU code (e.g. "ATTAR-2028").
+     - Max 100 characters.
+  5. `mrp` (Number, required)
+     - Maximum Retail Price (e.g. 300 or 1499.00). Must be >= `sale_price`.
+  6. `sale_price` (Number, required)
+     - Website selling price / discounted price (e.g. 250 or 999.00).
+  7. `sizes` (Array of Objects, required)
+     - List of sellable size/color variants. Must contain between 1 and 50 items.
+
+B. OPTIONAL PARENT PRODUCT FIELDS:
+  8. `sub_category` (String, optional)
+     - Fit type or sub-category (e.g. "Roll-on", "Formal", "Oversized Fit").
+  9. `color` (String, optional)
+     - Main color name (e.g. "Rose", "Black", "Off White"). Defaults to "Standard".
+  10. `description` (String, optional)
+     - Detailed description or sales pitch (max 5000 characters).
+  11. `gsl_spec` (String, optional)
+     - Fabric or material specification (e.g. "180 GSM Pure Cotton", "Pure Attar Oil").
+  12. `slug` (String, optional)
+     - URL slug (e.g. "next-rose-attar-2028"). Auto-generated from name if omitted.
+  13. `images` (Array of Objects, optional)
+     - Array of up to 20 image objects. If omitted, uses website fallback cover.
+     - Each image object contains:
+       * `url`: (String, required) Either an https:// link or Base64 data:image/... string.
+       * `isPrimary`: (Boolean, optional) Set to true for the main storefront cover image.
+
+C. MANDATORY VARIANT FIELDS (Inside each item in `sizes` array):
+  1. `size` (String, required)
+     - Size name or measure (e.g. "6ML", "12ML", "S", "M", "L", "XL", "38", "Free Size").
+  2. `sku` (String, required)
+     - UNIQUE SKU code for this specific variant (e.g. "ATTAR-2028-6ML").
+     - Every size variant MUST have a distinct SKU.
+  3. `stock` (Integer, required)
+     - Initial available shelf quantity (must be an integer >= 0).
+  4. `price` (Number, required)
+     - Selling price for this specific variant (usually matches parent `sale_price`).
+
 
 --------------------------------------------------------------------------------
 ENDPOINT 2: UPDATE / EDIT EXISTING PRODUCTS FROM POS TO WEBSITE
