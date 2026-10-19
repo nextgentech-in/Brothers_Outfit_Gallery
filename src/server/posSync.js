@@ -124,12 +124,15 @@ function validateImages(rawImages, prefix) {
     } else if (url.length > MAX_IMAGE_URL_LENGTH) {
       throw new PosSyncError(422, `${ip}.url exceeds ${MAX_IMAGE_URL_LENGTH} character limit.`, 'validation_error');
     }
-    return {
+    const imageObj = {
       url,
-      name: String(entry.name || '').trim().slice(0, 200) || undefined,
-      color: String(entry.color || '').trim().slice(0, 80) || undefined,
       isPrimary: Boolean(entry.is_cover || entry.isPrimary)
     };
+    const imgName = String(entry.name || '').trim().slice(0, 200);
+    if (imgName) imageObj.name = imgName;
+    const imgColor = String(entry.color || '').trim().slice(0, 80);
+    if (imgColor) imageObj.color = imgColor;
+    return imageObj;
   });
 }
 
@@ -414,8 +417,8 @@ function apiHandler(handler) {
       await handler(req, res, correlationId);
     } catch (error) {
       const status = error instanceof PosSyncError ? error.status : 500;
-      const safeMessage = status === 500 ? 'Unexpected POS synchronization failure.' : error.message;
-      console.error('[POS Sync]', { correlationId, endpoint: req.path, status, code: error.code || 'unexpected_error', message: error.message });
+      const safeMessage = status === 500 ? (error.message ? `POS synchronization error: ${error.message}` : 'Unexpected POS synchronization failure.') : error.message;
+      console.error('[POS Sync]', { correlationId, endpoint: req.path, status, code: error.code || 'unexpected_error', message: error.message, stack: error.stack });
       res.status(status).json({ success: false, error: safeMessage, code: error.code || 'unexpected_error', correlation_id: correlationId, ...(error.details ? { details: error.details } : {}) });
     }
   };

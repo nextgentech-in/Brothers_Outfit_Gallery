@@ -600,6 +600,11 @@ function getTrustedFirestore() {
       initializeAdminApp({ credential: cert(serviceAccount) });
     }
     adminFirestoreDb = getAdminFirestore();
+    try {
+      adminFirestoreDb.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      // In case settings were already initialized
+    }
     return adminFirestoreDb;
   } catch (error) {
     console.error('Firebase Admin initialization failed:', error);
