@@ -1,0 +1,302 @@
+================================================================================
+MR. MUNIM POS ➔ BROTHERS OUTFIT GALLERY (WEBSITE)
+INTEGRATION & DEVELOPER IMPLEMENTATION SPECIFICATION
+================================================================================
+
+1. API CONFIGURATION & CREDENTIALS
+--------------------------------------------------------------------------------
+Base URL:
+  https://www.brothersoutfitgallery.com
+
+Required Request Headers (Every Request):
+  Authorization: Bearer ee33921811cd0fa33a0bcf056a21665a25472aeafa84cda10396323c5c37afffc55c420a827fbc461a5d74d652741df2
+  Content-Type: application/json
+
+Rate Limits & Payload Boundaries:
+  - 60 requests per minute per token.
+  - Max product batch: 25 items per request.
+  - Max stock batch: 100 items per request.
+  - Max variants per product: 50 variants.
+
+
+================================================================================
+2. RECOMMENDED SYNC SEQUENCE (WHEN "SYNC NOW" OR AUTO-TIMER RUNS)
+================================================================================
+Run the sync in this exact order:
+  Step 1: Push new POS products         ➔ POST   /api/pos/products
+  Step 2: Push edited POS products      ➔ PUT    /api/pos/products
+  Step 3: Push deleted POS products     ➔ DELETE /api/pos/products
+  Step 4: Push offline sales & inward   ➔ POST   /api/pos/stock-sync
+  Step 5: Pull website new/deleted prods➔ GET    /api/pos/products-sync?since=<LAST_TIME>
+  Step 6: Pull online customer orders   ➔ GET    /api/pos/stock-changes?since=<LAST_TIME>
+
+
+================================================================================
+3. ENDPOINT DETAILS & SAMPLE PAYLOADS
+================================================================================
+
+--------------------------------------------------------------------------------
+ENDPOINT 1: PUBLISH NEW PRODUCTS FROM POS TO WEBSITE
+--------------------------------------------------------------------------------
+Method: POST
+URL:    /api/pos/products
+
+Payload:
+{
+  "products": [
+    {
+      "web_product_id": "POS_ITEM_2028",
+      "product_name": "Next Rose Attar 2028",
+      "category": "Attar",
+      "sub_category": "Roll-on",
+      "sku": "ATTAR-2028",
+      "slug": "next-rose-attar-2028",
+      "gsl_spec": "Concentrated Perfume Oil",
+      "color": "Standard",
+      "description": "Long-lasting fragrance roll-on attar.",
+      "mrp": 300,
+      "sale_price": 250,
+      "images": [
+        {
+          "url": "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
+          "isPrimary": true
+        }
+      ],
+      "sizes": [
+        {
+          "size": "6ML",
+          "sku": "ATTAR-2028-6ML",
+          "stock": 25,
+          "price": 250
+        }
+      ]
+    }
+  ]
+}
+
+Success Response (200 OK):
+{
+  "success": true,
+  "message": "Products published successfully",
+  "created_count": 1
+}
+
+Notes for POS Developer:
+- `web_product_id`: The permanent ID in your POS database.
+- `images`: Can be https:// URLs OR base64 data URLs ("data:image/..."). The website backend automatically streams base64 images into ImageKit CDN.
+- If re-sending an already published product with matching SKUs, it returns `created_count: 0` without overwriting custom website edits or resetting stock.
+
+
+--------------------------------------------------------------------------------
+ENDPOINT 2: UPDATE / EDIT EXISTING PRODUCTS FROM POS TO WEBSITE
+--------------------------------------------------------------------------------
+Method: PUT
+URL:    /api/pos/products
+
+Payload:
+{
+  "products": [
+    {
+      "web_product_id": "POS_ITEM_2028",
+      "product_name": "Next Rose Attar 2028 (Special Edition)",
+      "mrp": 350,
+      "sale_price": 280,
+      "description": "Updated formulation with premium rose extracts.",
+      "sizes": [
+        {
+          "sku": "ATTAR-2028-6ML",
+          "price": 280
+        }
+      ]
+    }
+  ]
+}
+
+Success Response (200 OK):
+{
+  "success": true,
+  "message": "Products updated successfully",
+  "updated_count": 1
+}
+
+Notes for POS Developer:
+- Pass only the fields you want to update.
+- Existing variant stock quantities are PRESERVED across product updates.
+
+
+--------------------------------------------------------------------------------
+ENDPOINT 3: DELETE / ARCHIVE PRODUCTS FROM POS TO WEBSITE
+--------------------------------------------------------------------------------
+Method: DELETE
+URL:    /api/pos/products
+
+Payload:
+{
+  "web_product_ids": [
+    "POS_ITEM_2028"
+  ]
+}
+
+Success Response (200 OK):
+{
+  "success": true,
+  "message": "Products deactivated/deleted successfully",
+  "deleted_count": 1
+}
+
+Notes for POS Developer:
+- Soft-deletes/deactivates the product on the website.
+- The product is immediately hidden from customer search, shop pages, and catalog.
+
+
+--------------------------------------------------------------------------------
+ENDPOINT 4: PUSH OFFLINE SALES & RESTOCK INWARD FROM POS TO WEBSITE
+--------------------------------------------------------------------------------
+Method: POST
+URL:    /api/pos/stock-sync
+
+Payload:
+{
+  "sync_id": "SYNC_STORE_20261019_114500",
+  "sync_timestamp": "2026-10-19T11:45:00.000Z",
+  "items": [
+    {
+      "event_id": "EVT_INV_1025_LINE_1",
+      "web_product_id": "POS_ITEM_2028",
+      "sku": "ATTAR-2028-6ML",
+      "size": "6ML",
+      "color": "Standard",
+      "delta_change": -1,
+      "final_stock": 24
+    },
+    {
+      "event_id": "EVT_RESTOCK_PO_89",
+      "web_product_id": "POS_ITEM_2028",
+      "sku": "ATTAR-2028-6ML",
+      "size": "6ML",
+      "color": "Standard",
+      "delta_change": 10,
+      "final_stock": 34
+    }
+  ]
+}
+
+Success Response (200 OK):
+{
+  "success": true,
+  "message": "Stock updated successfully",
+  "updated_count": 2,
+  "duplicate_count": 0,
+  "reconciliation": []
+}
+
+Notes for POS Developer:
+- `delta_change`: Use NEGATIVE integer for offline retail sales (e.g., -1, -2).
+                  Use POSITIVE integer for inward stock / supplier arrivals (e.g., +10).
+- `final_stock`: The resulting physical count on your shelf after the event.
+- `event_id`: MUST be unique per sale/movement item. If your internet disconnects and you retry, sending the same `event_id` is safe (idempotent no-op).
+
+
+--------------------------------------------------------------------------------
+ENDPOINT 5: DOWNLOAD NEW & DELETED WEBSITE PRODUCTS TO POS
+--------------------------------------------------------------------------------
+Method: GET
+URL:    /api/pos/products-sync?since=2026-10-19T00:00:00.000Z&limit=100
+
+(Omit `since` query parameter on the very first sync to fetch entire website catalog).
+
+Success Response (200 OK):
+{
+  "success": true,
+  "server_time": "2026-10-19T11:50:00.000Z",
+  "new_products": [
+    {
+      "web_product_id": "YR3V8qNRHpFpikYkIJZG",
+      "product_name": "Premium Formal Shirt",
+      "category": "Shirts",
+      "sub_category": "Formal",
+      "sku": "1433",
+      "slug": "shirt",
+      "color": "Off White",
+      "mrp": 1500,
+      "sale_price": 1200,
+      "image_url": "https://ik.imagekit.io/brothersoutfit/sample.jpg",
+      "images": [
+        "https://ik.imagekit.io/brothersoutfit/sample.jpg"
+      ],
+      "sizes": [
+        { "size": "M", "sku": "1433-OFF-WHITE-M", "stock": 10, "price": 1200 },
+        { "size": "L", "sku": "1433-OFF-WHITE-L", "stock": 10, "price": 1200 }
+      ]
+    }
+  ],
+  "deleted_product_ids": [
+    "OLD_DISCONTINUED_PROD_ID"
+  ],
+  "has_more": false,
+  "next_cursor": null
+}
+
+Action for POS Developer:
+- Upsert `new_products` into your local database.
+- Archive / mark inactive any product IDs in `deleted_product_ids`.
+- Store returned `server_time` locally and use it as `since` in your next sync request.
+
+
+--------------------------------------------------------------------------------
+ENDPOINT 6: DOWNLOAD ONLINE STOREFRONT ORDERS (TO DEDUCT LOCAL POS STOCK)
+--------------------------------------------------------------------------------
+Method: GET
+URL:    /api/pos/stock-changes?since=2026-10-19T00:00:00.000Z&limit=100
+
+Success Response (200 OK):
+{
+  "success": true,
+  "server_time": "2026-10-19T11:50:00.000Z",
+  "stock_changes": [
+    {
+      "movement_id": "web_order_BOG1025",
+      "web_product_id": "YR3V8qNRHpFpikYkIJZG",
+      "sku": "1433-OFF-WHITE-M",
+      "size": "M",
+      "color": "Off White",
+      "current_website_stock": 9,
+      "deducted_qty": 1,
+      "delta_change": -1,
+      "reason": "online_order",
+      "order_id": "BOG1025",
+      "created_at": "2026-10-19T11:40:00.000Z"
+    }
+  ],
+  "has_more": false,
+  "next_cursor": null
+}
+
+Action for POS Developer:
+- When a customer purchases on the website, this feed reports the deduction.
+- Deduct `deducted_qty` from your local POS stock to keep store inventory in sync.
+
+
+================================================================================
+4. KEY VALIDATION RULES & ERROR CODES
+================================================================================
+HTTP 200: Success.
+HTTP 401: Unauthorized (token missing or wrong).
+HTTP 409: Business Conflict:
+  - `sku_conflict`: A variant SKU is already assigned to another product.
+  - `unknown_product`: The supplied `web_product_id` does not exist.
+  - `variant_mismatch`: The SKU does not match the size/color in catalog.
+  - `insufficient_stock`: The offline sale would make inventory negative.
+HTTP 422: Validation Error:
+  - Missing required fields, invalid number, or bad timestamp format.
+HTTP 429: Rate limit exceeded (wait 60 seconds).
+
+
+================================================================================
+5. RECOMMENDED AUTOMATION IN ELECTRON POS APP
+================================================================================
+Instead of requiring shop staff to remember to press "Sync Now" manually:
+1. Trigger a background sync on startup.
+2. Trigger an automated timer (e.g., `setInterval(syncAll, 5 * 60 * 1000)` every 5 minutes).
+3. Trigger sync immediately after printing an invoice or saving a new product.
+================================================================================
