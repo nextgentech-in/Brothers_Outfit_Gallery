@@ -436,11 +436,61 @@ async function findProductRef(db, webProductId) {
   return match.empty ? null : match.docs[0].ref;
 }
 
+export async function uploadBase64ToImageKit(base64Data, filenamePrefix = 'pos') {
+  if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:image/')) return null;
+  const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
+  if (!privateKey) return null;
+  try {
+    const formData = new FormData();
+    formData.append('file', base64Data);
+    formData.append('fileName', `${filenamePrefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`);
+    formData.append('folder', '/products');
+
+    const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const res = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+      method: 'POST',
+      headers: { Authorization: authHeader },
+      body: formData,
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      console.warn('[POS Sync] ImageKit upload returned', res.status);
+      return null;
+    }
+    const data = await res.json();
+    return data.url || null;
+  } catch (err) {
+    console.warn('[POS Sync] ImageKit upload failed:', err.message);
+    return null;
+  }
+}
+
+async function sanitizeProductBase64Images(images, prefix) {
+  if (!Array.isArray(images)) return;
+  for (const img of images) {
+    if (img && typeof img.url === 'string' && img.url.startsWith('data:image/')) {
+      const uploadedUrl = await uploadBase64ToImageKit(img.url, prefix);
+      if (uploadedUrl) {
+        img.url = uploadedUrl;
+      } else if (img.url.length > 50_000) {
+        // Fallback for oversized base64 to avoid Firestore 1MB document limit
+        img.url = '/images/hero.png';
+      }
+    }
+  }
+}
+
 export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProductCache = () => {} }) {
   app.use('/api/pos', requirePosToken, posRateLimit);
 
   app.post('/api/pos/products', apiHandler(async (req, res, correlationId) => {
     const products = validateProductsPayload(req.body);
+    for (const product of products) {
+      await sanitizeProductBase64Images(product.images, product.slug || 'pos');
+    }
     const db = getDb();
     const catalog = await db.collection('products').get();
     const slugReservations = await db.collection('productSlugMappings').get();
@@ -571,6 +621,9 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       throw new PosSyncError(422, `products must contain between 1 and ${MAX_PRODUCT_BATCH} items.`, 'validation_error');
     }
     const updates = req.body.products.map(validateProductForUpdate);
+    for (const update of updates) {
+      await sanitizeProductBase64Images(update.images, `update-${update.webProductId || 'pos'}`);
+    }
     const db = getDb();
     let updatedCount = 0;
 
@@ -753,5 +806,7 @@ export const posSyncInternals = {
   stockEventFingerprint,
   applyPosStockDelta,
   productIdentityHash,
-  isWebsiteProductFeedEligible
+  isWebsiteProductFeedEligible,
+  uploadBase64ToImageKit,
+  sanitizeProductBase64Images
 };
