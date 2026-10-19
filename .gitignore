@@ -29,3 +29,6 @@ dist-ssr
 .env.production
 .mcp.json
 
+# Local POS specification files
+MR_MUNIM_FULL_AUTOMATION_SPEC.txt
+

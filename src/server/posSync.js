@@ -249,27 +249,37 @@ function validateProductsPayload(body) {
 }
 
 function validateStockPayload(body) {
-  const syncId = identifier(body?.sync_id, 'sync_id');
-  const syncTimestamp = parseIsoTimestamp(body?.sync_timestamp, { optional: false, field: 'sync_timestamp' });
+  const syncId = body?.sync_id ? identifier(body.sync_id, 'sync_id') : `SYNC-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const syncTimestamp = parseIsoTimestamp(body?.sync_timestamp, { optional: true, field: 'sync_timestamp' }) || new Date();
   if (!Array.isArray(body?.items) || body.items.length < 1 || body.items.length > MAX_STOCK_BATCH) {
     throw new PosSyncError(422, `items must contain between 1 and ${MAX_STOCK_BATCH} items.`, 'validation_error');
   }
   const eventIds = new Set();
   const items = body.items.map((raw, index) => {
     const prefix = `items[${index}]`;
-    const item = {
-      eventId: identifier(raw?.event_id, `${prefix}.event_id`),
-      webProductId: identifier(raw?.web_product_id, `${prefix}.web_product_id`),
-      sku: canonicalText(raw?.sku, `${prefix}.sku`, { max: 100 }),
-      size: canonicalText(raw?.size, `${prefix}.size`, { max: 40 }),
-      color: canonicalText(raw?.color, `${prefix}.color`, { max: 80 }),
-      deltaChange: integer(raw?.delta_change, `${prefix}.delta_change`),
-      finalStock: integer(raw?.final_stock, `${prefix}.final_stock`, { min: 0 })
+    const eventId = raw?.event_id ? identifier(raw.event_id, `${prefix}.event_id`) : `EVT-${Date.now()}-${index}-${crypto.randomBytes(3).toString('hex')}`;
+    const webProductId = String(raw?.web_product_id || raw?.productId || raw?.product_id || raw?.id || raw?.sku || '').trim();
+    const sku = canonicalText(raw?.sku || raw?.variant_sku || webProductId, `${prefix}.sku`, { max: 100 });
+    const size = canonicalText(raw?.size || '', `${prefix}.size`, { required: false, max: 40 });
+    const color = canonicalText(raw?.color || '', `${prefix}.color`, { required: false, max: 80 });
+    let deltaChange = raw?.delta_change != null ? integer(raw.delta_change, `${prefix}.delta_change`) : null;
+    let finalStock = raw?.final_stock != null ? integer(raw.final_stock, `${prefix}.final_stock`, { min: 0 }) : (raw?.stock != null ? integer(raw.stock, `${prefix}.stock`, { min: 0 }) : null);
+
+    if (deltaChange == null && finalStock == null) {
+      throw new PosSyncError(422, `${prefix} must provide either delta_change or final_stock/stock.`, 'validation_error');
+    }
+
+    if (eventIds.has(eventId)) throw new PosSyncError(422, `Duplicate event_id in batch: ${eventId}`, 'validation_error');
+    eventIds.add(eventId);
+    return {
+      eventId,
+      webProductId: webProductId || sku,
+      sku,
+      size,
+      color,
+      deltaChange,
+      finalStock
     };
-    if (item.deltaChange === 0) throw new PosSyncError(422, `${prefix}.delta_change cannot be zero.`, 'validation_error');
-    if (eventIds.has(item.eventId)) throw new PosSyncError(422, `Duplicate event_id in batch: ${item.eventId}`, 'validation_error');
-    eventIds.add(item.eventId);
-    return item;
   });
   return { syncId, syncTimestamp, items };
 }
@@ -368,12 +378,46 @@ function stockEventFingerprint(item) {
 }
 
 function applyPosStockDelta(product, productId, item) {
-  if ((product.webProductId || productId) !== item.webProductId) {
+  const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+
+  // Verify product association:
+  // If item.webProductId is supplied, it can be the product's webProductId, productId, parent SKU,
+  // or one of the variant SKUs belonging to this product.
+  const normItemWebId = normalizeKey(item.webProductId);
+  const normProdWebId = normalizeKey(product.webProductId);
+  const normProdId = normalizeKey(productId);
+  const normProdSku = normalizeKey(product.sku);
+  const normItemSku = normalizeKey(item.sku);
+
+  const isAssociated = !normItemWebId ||
+    normItemWebId === normProdWebId ||
+    normItemWebId === normProdId ||
+    normItemWebId === normProdSku ||
+    variants.some(v => normalizeKey(v.sku) === normItemWebId || normalizeKey(v.sku) === normItemSku);
+
+  if (!isAssociated) {
     throw new PosSyncError(409, `web_product_id ${item.webProductId} does not match the resolved product.`, 'identity_conflict');
   }
-  const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
-  const variantIndex = variants.findIndex(variant => normalizeKey(variant.sku) === normalizeKey(item.sku));
-  if (variantIndex < 0) throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
+
+  // Find matching variant
+  let variantIndex = variants.findIndex(v => normalizeKey(v.sku) === normItemSku);
+  if (variantIndex < 0 && normItemWebId) {
+    variantIndex = variants.findIndex(v => normalizeKey(v.sku) === normItemWebId);
+  }
+  // Only fall back to size if item.sku matches the parent product SKU, webProductId, or is empty
+  if (variantIndex < 0 && (normItemSku === normProdSku || normItemSku === normProdWebId || !normItemSku)) {
+    if (item.size) {
+      const normSize = normalizeKey(item.size);
+      variantIndex = variants.findIndex(v => normalizeKey(v.size) === normSize);
+    }
+    if (variantIndex < 0 && variants.length === 1) {
+      variantIndex = 0;
+    }
+  }
+  if (variantIndex < 0) {
+    throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
+  }
+
   const variant = variants[variantIndex];
   const varSize = normalizeKey(variant.size);
   const itemSize = normalizeKey(item.size);
@@ -387,16 +431,37 @@ function applyPosStockDelta(product, productId, item) {
   if (!sizeMatches || !colorMatches) {
     throw new PosSyncError(409, `SKU ${item.sku} does not match the supplied size/color.`, 'variant_mismatch');
   }
+
   const before = Number(variant.stock ?? variant.quantity ?? 0);
-  const after = before + item.deltaChange;
+
+  // Compute delta and final stock flexibly
+  let delta = item.deltaChange;
+  let targetFinal = item.finalStock;
+
+  if (delta == null && targetFinal != null) {
+    delta = targetFinal - before;
+  } else if (targetFinal == null && delta != null) {
+    targetFinal = before + delta;
+  }
+  if (delta == null) {
+    delta = 0;
+  }
+  if (targetFinal == null) {
+    targetFinal = before + delta;
+  }
+
+  const after = before + delta;
   if (!Number.isSafeInteger(before) || after < 0) {
     throw new PosSyncError(409, `Stock event ${item.eventId} would make ${item.sku} negative. Manual reconciliation is required.`, 'insufficient_stock');
   }
+
   variants[variantIndex] = { ...variant, stock: after, quantity: after };
   const totalStock = variants.reduce((sum, candidate) => sum + Number(candidate.stock ?? candidate.quantity ?? 0), 0);
   return {
     stockAfter: after,
-    discrepancy: item.finalStock - after,
+    discrepancy: targetFinal - after,
+    deltaChange: delta,
+    finalStock: targetFinal,
     updatedProduct: {
       ...product,
       variants,
@@ -424,16 +489,59 @@ function apiHandler(handler) {
   };
 }
 
-async function findProductRef(db, webProductId) {
-  const mappingRef = db.collection('posProductMappings').doc(stableHash(normalizeKey(webProductId)));
-  const mapping = await mappingRef.get();
-  if (mapping.exists) return db.collection('products').doc(mapping.data().productId);
-  const direct = db.collection('products').doc(webProductId);
-  const directSnap = await direct.get();
-  if (directSnap.exists && (directSnap.data().webProductId || directSnap.id) === webProductId) return direct;
-  const match = await db.collection('products').where('webProductId', '==', webProductId).limit(2).get();
-  if (match.size > 1) throw new PosSyncError(409, `Multiple website products map to ${webProductId}.`, 'identity_conflict');
-  return match.empty ? null : match.docs[0].ref;
+async function findProductRef(db, webProductId, itemSku = '') {
+  const normId = normalizeKey(webProductId);
+  const normSku = normalizeKey(itemSku);
+
+  // 1. Direct posProductMappings doc
+  if (normId) {
+    const mappingRef = db.collection('posProductMappings').doc(stableHash(normId));
+    const mapping = await mappingRef.get();
+    if (mapping.exists) return db.collection('products').doc(mapping.data().productId);
+
+    // 2. Direct products doc by ID
+    const direct = db.collection('products').doc(webProductId);
+    const directSnap = await direct.get();
+    if (directSnap.exists && (directSnap.data().webProductId || directSnap.id) === webProductId) return direct;
+
+    // 3. Query products by webProductId field
+    const match = await db.collection('products').where('webProductId', '==', webProductId).limit(2).get();
+    if (match.size === 1) return match.docs[0].ref;
+    if (match.size > 1) throw new PosSyncError(409, `Multiple website products map to ${webProductId}.`, 'identity_conflict');
+  }
+
+  // 4. Query productSkuMappings by SKU or webProductId
+  for (const candidate of [normSku, normId].filter(Boolean)) {
+    const skuRef = db.collection('productSkuMappings').doc(stableHash(candidate));
+    const skuSnap = await skuRef.get();
+    if (skuSnap.exists && skuSnap.data().productId) {
+      return db.collection('products').doc(skuSnap.data().productId);
+    }
+  }
+
+  // 5. Query products by parent sku field
+  for (const candidate of [webProductId, itemSku].filter(Boolean)) {
+    const skuMatch = await db.collection('products').where('sku', '==', candidate).limit(2).get();
+    if (skuMatch.size >= 1) return skuMatch.docs[0].ref;
+  }
+
+  // 6. Deep scan catalog as fallback (for products with un-indexed variant SKUs or item codes)
+  const allProds = await db.collection('products').get();
+  for (const doc of allProds.docs) {
+    const data = doc.data();
+    if (normId && normalizeKey(data.webProductId) === normId) return doc.ref;
+    if (normId && normalizeKey(data.sku) === normId) return doc.ref;
+    if (normSku && normalizeKey(data.sku) === normSku) return doc.ref;
+    if (Array.isArray(data.variants)) {
+      const hasVariant = data.variants.some(v => {
+        const vSku = normalizeKey(v.sku);
+        return (normSku && vSku === normSku) || (normId && vSku === normId);
+      });
+      if (hasVariant) return doc.ref;
+    }
+  }
+
+  return null;
 }
 
 export async function uploadBase64ToImageKit(base64Data, filenamePrefix = 'pos') {
@@ -741,12 +849,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     });
   }));
 
-  app.post('/api/pos/stock-sync', apiHandler(async (req, res, correlationId) => {
+  const handleStockSyncPost = apiHandler(async (req, res, correlationId) => {
     const payload = validateStockPayload(req.body);
     const db = getDb();
     const resolved = [];
     for (const item of payload.items) {
-      const productRef = await findProductRef(db, item.webProductId);
+      const productRef = await findProductRef(db, item.webProductId, item.sku);
       if (!productRef) throw new PosSyncError(409, `Unknown web_product_id ${item.webProductId}.`, 'unknown_product');
       resolved.push({
         item,
@@ -780,14 +888,14 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         }
         const working = workingProducts.get(entry.productRef.path);
         if (!working?.snap.exists) throw new PosSyncError(409, `Product ${item.webProductId} no longer exists.`, 'unknown_product');
-        const { updatedProduct, stockAfter: after, discrepancy } = applyPosStockDelta(working.data, working.snap.id, item);
+        const { updatedProduct, stockAfter: after, discrepancy, deltaChange: effectiveDelta, finalStock: effectiveFinal } = applyPosStockDelta(working.data, working.snap.id, item);
         working.data = updatedProduct;
-        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, deltaChange: item.deltaChange, finalStock: item.finalStock, websiteStockAfter: after, discrepancy, syncTimestamp: payload.syncTimestamp, acceptedAt: FieldValue.serverTimestamp() });
-        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: item.deltaChange, source: 'pos', reason: item.deltaChange < 0 ? 'offline_sale' : 'pos_stock_inward', externalReference: item.eventId, syncId: payload.syncId, stockAfter: after, createdAt: FieldValue.serverTimestamp() });
+        transaction.create(entry.eventRef, { eventId: item.eventId, syncId: payload.syncId, fingerprint, webProductId: item.webProductId, sku: item.sku, deltaChange: effectiveDelta, finalStock: effectiveFinal, websiteStockAfter: after, discrepancy, syncTimestamp: payload.syncTimestamp, acceptedAt: FieldValue.serverTimestamp() });
+        transaction.create(entry.movementRef, { movementId: entry.movementRef.id, productId: working.snap.id, webProductId: item.webProductId, sku: item.sku, size: item.size, color: item.color, deltaChange: effectiveDelta, source: 'pos', reason: effectiveDelta < 0 ? 'offline_sale' : 'pos_stock_inward', externalReference: item.eventId, syncId: payload.syncId, stockAfter: after, createdAt: FieldValue.serverTimestamp() });
         if (discrepancy !== 0) {
           const discrepancyRef = db.collection('posReconciliationDiscrepancies').doc(stableHash(item.eventId));
-          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: item.finalStock, websiteStockAfterDelta: after, discrepancy, status: 'open', createdAt: FieldValue.serverTimestamp() });
-          localReconciliation.push({ event_id: item.eventId, sku: item.sku, pos_final_stock: item.finalStock, website_stock_after_delta: after, discrepancy });
+          transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: effectiveFinal, websiteStockAfterDelta: after, discrepancy, status: 'open', createdAt: FieldValue.serverTimestamp() });
+          localReconciliation.push({ event_id: item.eventId, sku: item.sku, pos_final_stock: effectiveFinal, website_stock_after_delta: after, discrepancy });
         }
         localUpdatedCount += 1;
       }
@@ -801,16 +909,45 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     invalidateProductCache();
     console.info('[POS Sync] stock accepted', { correlationId, syncId: payload.syncId, updated: updatedCount, duplicates: duplicateCount, discrepancies: reconciliation.length });
     res.json({ success: true, message: 'Stock updated successfully', updated_count: updatedCount, duplicate_count: duplicateCount, reconciliation });
-  }));
+  });
 
-  app.get('/api/pos/stock-changes', apiHandler(async (req, res) => {
+  app.post('/api/pos/stock-sync', handleStockSyncPost);
+  app.post('/api/pos/stock-changes', handleStockSyncPost);
+
+  const handleStockChangesGet = apiHandler(async (req, res) => {
+    const db = getDb();
+    const targetSku = req.query.sku || req.query.variant_sku;
+    const targetWebId = req.query.web_product_id || req.query.product_id;
+    if (targetSku || targetWebId) {
+      const productRef = await findProductRef(db, targetWebId, targetSku);
+      if (!productRef) {
+        return res.status(404).json({ success: false, error: 'Product not found', code: 'not_found' });
+      }
+      const snap = await productRef.get();
+      if (!snap.exists) {
+        return res.status(404).json({ success: false, error: 'Product not found', code: 'not_found' });
+      }
+      const p = snap.data();
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const matched = variants.find(v => normalizeKey(v.sku) === normalizeKey(targetSku)) || variants[0];
+      return res.json({
+        success: true,
+        web_product_id: p.webProductId || snap.id,
+        sku: matched?.sku || p.sku,
+        size: matched?.size || null,
+        stock: Number(matched?.stock ?? p.stock ?? 0),
+        total_product_stock: Number(p.stock ?? 0),
+        in_stock: Boolean(p.inStock ?? (p.stock > 0))
+      });
+    }
+
     const since = parseIsoTimestamp(req.query.since, { optional: true });
     const cursor = decodeCursor(req.query.cursor, 'stock');
     const limit = Math.min(PAGE_SIZE_MAX, Math.max(1, Number.parseInt(req.query.limit || '100', 10) || 100));
     const upperMs = cursor?.upperMs ?? Date.now();
     const afterMs = cursor?.afterMs ?? (since?.getTime() ?? 0);
     const afterId = cursor?.afterId ?? '';
-    const snapshot = await getDb().collection('stockMovements').where('source', '==', 'website').get();
+    const snapshot = await db.collection('stockMovements').where('source', '==', 'website').get();
     const eligible = snapshot.docs.map(doc => ({ id: doc.id, movement: doc.data(), timeMs: timestampMillis(doc.data().createdAt) }))
       .filter(record => record.timeMs <= upperMs && compareTuple(record, { afterMs, afterId }))
       .sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id));
@@ -832,7 +969,10 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       created_at: new Date(timeMs).toISOString()
     }));
     res.json({ success: true, server_time: new Date(upperMs).toISOString(), stock_changes: stockChanges, has_more: hasMore, next_cursor: nextCursor });
-  }));
+  });
+
+  app.get('/api/pos/stock-changes', handleStockChangesGet);
+  app.get('/api/pos/stock-sync', handleStockChangesGet);
 }
 
 export const posSyncInternals = {

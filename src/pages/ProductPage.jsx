@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProductBySlug, isProductInStock } from '../services/productService';
+import { getProductBySlug, isProductInStock, subscribeToProduct } from '../services/productService';
 import { getStoreSettings, DEFAULT_OFFERS_CONFIG } from '../services/adminService';
 import ProductGallery from '../components/product/ProductGallery';
 import ProductInfo from '../components/product/ProductInfo';
@@ -33,6 +33,7 @@ export default function ProductPage() {
     } catch { }
     return DEFAULT_OFFERS_CONFIG;
   });
+  const unsubscribeSnapshotRef = useRef(null);
 
   // Fetch offersConfig & store settings
   useEffect(() => {
@@ -59,10 +60,15 @@ export default function ProductPage() {
     };
   }, []);
 
-  // Fetch product from Firebase (SWR background refresh)
+  // Fetch product from Firebase (SWR background refresh + real-time stock subscription)
   useEffect(() => {
     window.scrollTo(0, 0);
     let isCurrent = true;
+
+    if (unsubscribeSnapshotRef.current) {
+      unsubscribeSnapshotRef.current();
+      unsubscribeSnapshotRef.current = null;
+    }
 
     // Check cache synchronously on slug change to avoid displaying previous product
     let cachedProd = null;
@@ -80,6 +86,13 @@ export default function ProductPage() {
       setProduct(cachedProd);
       setLoading(false);
       setSelectedColor('All');
+
+      // Attach real-time Firestore listener immediately if we have doc id
+      if (cachedProd.id) {
+        unsubscribeSnapshotRef.current = subscribeToProduct(cachedProd.id, (fresh) => {
+          if (isCurrent && fresh) setProduct(fresh);
+        });
+      }
     } else {
       setProduct(null);
       setLoading(true);
@@ -89,10 +102,17 @@ export default function ProductPage() {
 
     const fetchProduct = async () => {
       try {
-        const prod = await getProductBySlug(slug);
+        // forceRefresh = true ensures we bypass stale session cache and get real-time stock
+        const prod = await getProductBySlug(slug, true);
         if (isCurrent && prod) {
           setProduct(prod);
           setSelectedColor('All');
+
+          if (!unsubscribeSnapshotRef.current && prod.id) {
+            unsubscribeSnapshotRef.current = subscribeToProduct(prod.id, (fresh) => {
+              if (isCurrent && fresh) setProduct(fresh);
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching product:", error);
@@ -102,8 +122,18 @@ export default function ProductPage() {
     };
     fetchProduct();
 
+    const handleProductsUpdated = () => {
+      fetchProduct();
+    };
+    window.addEventListener('bo_products_updated', handleProductsUpdated);
+
     return () => {
       isCurrent = false;
+      window.removeEventListener('bo_products_updated', handleProductsUpdated);
+      if (unsubscribeSnapshotRef.current) {
+        unsubscribeSnapshotRef.current();
+        unsubscribeSnapshotRef.current = null;
+      }
     };
   }, [slug]);
 

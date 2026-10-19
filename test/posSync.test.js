@@ -1507,3 +1507,91 @@ test('Non-blocking legacy catalog duplicates allow new POS product, and lenient 
   assert.equal(resStock.body.updated_count, 1);
 });
 
+test('POS arbitrary ID resolution and stock transition 10 -> 5 -> 0', async () => {
+  // 1. Create a product with initial stock 10
+  const product = {
+    web_product_id: 'W-TEST-KURTA',
+    product_name: 'Traditional Kurta Test',
+    category: 'Kurta',
+    sku: 'KURA-TEST',
+    slug: 'traditional-kurta-test',
+    color: 'Off White',
+    mrp: 999,
+    sale_price: 699,
+    sizes: [
+      { size: '40', stock: 10, price: 699, sku: 'KURA-TEST-40' }
+    ]
+  };
+  const createRes = await api('/api/pos/products', { method: 'POST', body: { products: [product] } });
+  assert.equal(createRes.status, 200);
+
+  // 2. POS sends stock update from 10 to 5 using arbitrary POS item code '00680' in web_product_id
+  const syncTo5 = {
+    sync_id: 'SYNC-TRANS-1',
+    sync_timestamp: '2026-10-19T14:00:00.000Z',
+    items: [{
+      event_id: 'EVT-TRANS-1',
+      web_product_id: '00680', // POS internal item code
+      sku: 'KURA-TEST-40',
+      size: '40',
+      color: 'Off White',
+      delta_change: -5,
+      final_stock: 5
+    }]
+  };
+  const resTo5 = await api('/api/pos/stock-sync', { method: 'POST', body: syncTo5 });
+  assert.equal(resTo5.status, 200);
+  assert.equal(resTo5.body.updated_count, 1);
+
+  // Verify stock in feed
+  const checkStock5 = await api('/api/pos/stock-sync?sku=KURA-TEST-40');
+  assert.equal(checkStock5.status, 200);
+  assert.equal(checkStock5.body.stock, 5);
+  assert.equal(checkStock5.body.in_stock, true);
+
+  // 3. POS sends stock update to 0 via aliased POST /api/pos/stock-changes
+  const syncTo0 = {
+    sync_id: 'SYNC-TRANS-2',
+    sync_timestamp: '2026-10-19T14:05:00.000Z',
+    items: [{
+      event_id: 'EVT-TRANS-2',
+      web_product_id: '00680',
+      sku: 'KURA-TEST-40',
+      size: '40',
+      delta_change: -5,
+      final_stock: 0
+    }]
+  };
+  const resTo0 = await api('/api/pos/stock-changes', { method: 'POST', body: syncTo0 });
+  assert.equal(resTo0.status, 200);
+  assert.equal(resTo0.body.updated_count, 1);
+
+  // Verify stock reached 0
+  const checkStock0 = await api('/api/pos/stock-sync?sku=KURA-TEST-40');
+  assert.equal(checkStock0.status, 200);
+  assert.equal(checkStock0.body.stock, 0);
+  assert.equal(checkStock0.body.in_stock, false);
+
+  // 4. POS restocks via absolute stock (final_stock: 8, no delta_change)
+  const restockAbsolute = {
+    sync_id: 'SYNC-TRANS-3',
+    sync_timestamp: '2026-10-19T14:10:00.000Z',
+    items: [{
+      event_id: 'EVT-TRANS-3',
+      web_product_id: '00680',
+      sku: 'KURA-TEST-40',
+      size: '40',
+      final_stock: 8
+    }]
+  };
+  const resRestock = await api('/api/pos/stock-sync', { method: 'POST', body: restockAbsolute });
+  assert.equal(resRestock.status, 200);
+  assert.equal(resRestock.body.updated_count, 1);
+
+  const checkStock8 = await api('/api/pos/stock-sync?sku=KURA-TEST-40');
+  assert.equal(checkStock8.status, 200);
+  assert.equal(checkStock8.body.stock, 8);
+  assert.equal(checkStock8.body.in_stock, true);
+});
+
+
