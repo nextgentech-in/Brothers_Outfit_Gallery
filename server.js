@@ -1080,6 +1080,134 @@ async function fetchCouponsFromFirestore() {
   return couponCatalogCache.coupons || [];
 }
 
+// ─── POS Status & Monitoring for Website Admin Panel ────────────────────────
+app.get(['/api/admin/pos/status', '/admin/pos/status'], requireAdminAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    
+    // 1. Get latest sync event
+    let lastSync = null;
+    try {
+      const eventsSnap = await db.collection('posStockEvents').orderBy('acceptedAt', 'desc').limit(1).get();
+      if (!eventsSnap.empty) {
+        const ev = eventsSnap.docs[0].data();
+        const date = ev.acceptedAt?.toDate ? ev.acceptedAt.toDate() : (ev.syncTimestamp ? new Date(ev.syncTimestamp) : null);
+        lastSync = {
+          syncId: ev.syncId || null,
+          timestamp: date ? date.toISOString() : null,
+          timeMs: date ? date.getTime() : null
+        };
+      }
+    } catch (e) {
+      console.warn('[Admin POS Status] Note on latest sync event:', e.message);
+    }
+
+    // 2. Get recent movements
+    let recentMovements = [];
+    try {
+      const movSnap = await db.collection('stockMovements').orderBy('createdAt', 'desc').limit(25).get();
+      recentMovements = movSnap.docs.map(doc => {
+        const data = doc.data();
+        const date = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        return {
+          id: doc.id,
+          sku: data.sku || 'N/A',
+          size: data.size || '',
+          color: data.color || '',
+          deltaChange: Number(data.deltaChange || 0),
+          stockAfter: Number(data.stockAfter || 0),
+          source: data.source || 'pos',
+          reason: data.reason || 'offline_sale',
+          createdAt: date ? date.toISOString() : null
+        };
+      });
+    } catch (e) {
+      console.warn('[Admin POS Status] Note on stock movements:', e.message);
+    }
+
+    // 3. Get open discrepancies
+    let discrepancies = [];
+    try {
+      const discSnap = await db.collection('posReconciliationDiscrepancies').limit(25).get();
+      discrepancies = discSnap.docs.map(doc => {
+        const data = doc.data();
+        const date = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        return {
+          id: doc.id,
+          sku: data.sku || '',
+          webProductId: data.webProductId || '',
+          posFinalStock: Number(data.posFinalStock ?? 0),
+          websiteStockAfterDelta: Number(data.websiteStockAfterDelta ?? 0),
+          discrepancy: Number(data.discrepancy ?? 0),
+          createdAt: date ? date.toISOString() : null
+        };
+      });
+    } catch (e) {
+      console.warn('[Admin POS Status] Note on discrepancies:', e.message);
+    }
+
+    return res.json({
+      success: true,
+      lastSync,
+      recentMovements,
+      discrepancies,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Admin POS Status] Error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch POS sync status.' });
+  }
+});
+
+// POS Reconcile Inventory Action
+app.post(['/api/admin/pos/reconcile', '/admin/pos/reconcile'], requireAdminAuth, async (req, res) => {
+  try {
+    productCatalogCache = { products: null, expiresAt: 0 };
+    
+    const db = getTrustedFirestore();
+    const productsSnap = await db.collection('products').get();
+    let reconciledCount = 0;
+    
+    const batchWrites = [];
+    for (const doc of productsSnap.docs) {
+      const data = doc.data();
+      if (Array.isArray(data.variants) && data.variants.length > 0) {
+        const computedStock = data.variants.reduce((acc, v) => acc + (Number(v.stock ?? v.quantity ?? 0) || 0), 0);
+        const inStock = computedStock > 0;
+        const availableSizes = [...new Set(data.variants.filter(v => Number(v.stock ?? v.quantity ?? 0) > 0).map(v => v.size))].filter(Boolean);
+        const allSizes = [...new Set(data.variants.map(v => v.size))].filter(Boolean);
+        
+        if (data.stock !== computedStock || data.inStock !== inStock) {
+          batchWrites.push(
+            doc.ref.update({
+              stock: computedStock,
+              quantity: computedStock,
+              inStock,
+              sizes: availableSizes.length > 0 ? availableSizes : allSizes,
+              updatedAt: FieldValue.serverTimestamp()
+            })
+          );
+          reconciledCount++;
+        }
+      }
+    }
+    
+    if (batchWrites.length > 0) {
+      await Promise.all(batchWrites);
+    }
+
+    return res.json({
+      success: true,
+      message: `Reconciliation complete. ${reconciledCount} product stock records re-aligned, and website catalog cache cleared.`,
+      reconciledProducts: reconciledCount,
+      reconciledAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Admin POS Reconcile] Error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to reconcile inventory.' });
+  }
+});
+
 async function calculateServerOrderTotal(items, couponCode) {
   if (!Array.isArray(items) || items.length === 0 || items.length > 30) {
     throw new Error('Cart must contain between 1 and 30 items.');

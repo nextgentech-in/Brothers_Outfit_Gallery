@@ -705,3 +705,28 @@ export const seedDemoProducts = async () => {
   const newRef2 = doc(collection(db, PRODUCTS));
   await setDoc(newRef2, dummyProduct2);
 };
+
+// ─── POS Sync Monitoring & Reconciliation ────────────────────────────────────
+export const getPosSyncStatus = async () => {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication required.');
+  const res = await fetch(`${getBackendUrl()}/api/admin/pos/status`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch POS sync status.');
+  return data;
+};
+
+export const reconcilePosInventory = async () => {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication required.');
+  const res = await fetch(`${getBackendUrl()}/api/admin/pos/reconcile`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to reconcile inventory.');
+  invalidateProductCache();
+  return data;
+};
