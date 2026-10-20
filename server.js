@@ -1135,12 +1135,14 @@ app.get(['/api/admin/pos/status', '/admin/pos/status'], requireAdminAuth, async 
     // 2. Get recent movements
     let recentMovements = [];
     try {
-      const movSnap = await db.collection('stockMovements').orderBy('createdAt', 'desc').limit(25).get();
+      const movSnap = await db.collection('stockMovements').orderBy('createdAt', 'desc').limit(100).get();
       recentMovements = movSnap.docs.map(doc => {
         const data = doc.data();
         const date = data.createdAt?.toDate ? data.createdAt.toDate() : null;
         return {
           id: doc.id,
+          productId: data.productId || '',
+          webProductId: data.webProductId || '',
           sku: data.sku || 'N/A',
           size: data.size || '',
           color: data.color || '',
@@ -1148,6 +1150,7 @@ app.get(['/api/admin/pos/status', '/admin/pos/status'], requireAdminAuth, async 
           stockAfter: Number(data.stockAfter || 0),
           source: data.source || 'pos',
           reason: data.reason || 'offline_sale',
+          externalReference: data.externalReference || data.orderId || '',
           createdAt: date ? date.toISOString() : null
         };
       });
