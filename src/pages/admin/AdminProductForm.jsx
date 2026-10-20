@@ -7,7 +7,8 @@ import {
   deleteProductImage,
   generateProductId,
   sanitizeSizeGuideForFirestore,
-  normalizeSizeGuideFromFirestore
+  normalizeSizeGuideFromFirestore,
+  getAdminProducts
 } from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import { invalidateProductCache } from '../../services/productService';
@@ -31,6 +32,8 @@ const CATEGORY_SIZES_MAP = {
   'Jackets': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
   'Hoodies': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
   'Ethnic Wear': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
+  'Vest': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', 'Free Size'],
+  'Underwear': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', '28', '30', '32', '34', '36', '38', '40'],
   'Perfumes': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
   'Slippers': ['6', '7', '8', '9', '10', '11', 'Custom'],
   'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
@@ -38,6 +41,7 @@ const CATEGORY_SIZES_MAP = {
   'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
   'Caps': ['Free Size', 'Adjustable', 'S/M', 'L/XL', 'Snapback', 'Standard'],
   'Sunglasses': ['Standard', 'Free Size', 'Medium (54mm)', 'Large (58mm)', 'Small (50mm)'],
+  'DEFAULT': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', 'Free Size']
 };
 
 const SUB_CATEGORY_MAP = {
@@ -50,6 +54,8 @@ const SUB_CATEGORY_MAP = {
   'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
   'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
   'Ethnic Wear': ['Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
+  'Vest': ['Plain', 'Lining', 'Coloring'],
+  'Underwear': ['Long Trunk', 'Mini Trunk', 'Brief'],
   'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
   'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
   'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
@@ -61,6 +67,8 @@ const SUB_CATEGORY_MAP = {
 
 const COMMON_BATCH_SIZES = {
   'Kurta': ['36', '38', '40', '42', '44', '46'],
+  'Vest': ['S', 'M', 'L', 'XL', 'XXL'],
+  'Underwear': ['S', 'M', 'L', 'XL', 'XXL'],
   'Perfumes': ['30ml', '50ml', '100ml'],
   'Jeans': ['30', '32', '34', '36', '38'],
   'Trousers': ['30', '32', '34', '36', '38'],
@@ -73,6 +81,27 @@ const COMMON_BATCH_SIZES = {
   'Sunglasses': ['Standard', 'Free Size'],
   'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
 };
+
+const BASE_CATEGORIES = [
+  'Kurta',
+  'Shirts',
+  'T-Shirts',
+  'Jeans',
+  'Trousers',
+  'Shorts',
+  'Jackets',
+  'Hoodies',
+  'Ethnic Wear',
+  'Vest',
+  'Underwear',
+  'Perfumes',
+  'Wallets',
+  'Slippers',
+  'Watches',
+  'Belts',
+  'Caps',
+  'Sunglasses'
+];
 
 // Prebuilt size guide templates per category
 const SIZE_GUIDE_TEMPLATES = {
@@ -199,6 +228,28 @@ const SIZE_GUIDE_TEMPLATES = {
       ['40"-42"', '', ''],
     ]
   },
+  'Vest': {
+    columns: ['Size', 'Chest (in)', 'Length (in)'],
+    rows: [
+      ['S (80cm)', '32', '26'],
+      ['M (85cm)', '34', '27'],
+      ['L (90cm)', '36', '28'],
+      ['XL (95cm)', '38', '29'],
+      ['XXL (100cm)', '40', '30'],
+      ['3XL (105cm)', '42', '31'],
+    ]
+  },
+  'Underwear': {
+    columns: ['Size', 'Waist (in)', 'Waist (cm)'],
+    rows: [
+      ['S (75cm)', '28-30', '70-75'],
+      ['M (80cm)', '30-32', '75-80'],
+      ['L (85cm)', '32-34', '80-85'],
+      ['XL (90cm)', '34-36', '85-90'],
+      ['XXL (95cm)', '36-38', '90-95'],
+      ['3XL (100cm)', '38-40', '95-100'],
+    ]
+  },
   'DEFAULT': {
     columns: ['Size', 'Measurement 1', 'Measurement 2'],
     rows: [
@@ -297,6 +348,31 @@ export default function AdminProductForm() {
   const [uploadTargetColor, setUploadTargetColor] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
 
+  // Custom Category & Sub-Category States
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
+  const [isCustomSubCategory, setIsCustomSubCategory] = useState(false);
+  const [customSubCategoryInput, setCustomSubCategoryInput] = useState('');
+  const [availableCategories, setAvailableCategories] = useState(BASE_CATEGORIES);
+
+  // Load existing catalog categories so custom ones show in selector
+  useEffect(() => {
+    getAdminProducts().then(prods => {
+      if (Array.isArray(prods)) {
+        const extraCats = new Set();
+        prods.forEach(p => {
+          const c = (p.categoryId || p.category || '').trim();
+          if (c && !BASE_CATEGORIES.some(b => b.toLowerCase() === c.toLowerCase())) {
+            extraCats.add(c);
+          }
+        });
+        if (extraCats.size > 0) {
+          setAvailableCategories([...BASE_CATEGORIES, ...Array.from(extraCats)]);
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (isEdit) {
       getAdminProductById(id).then(data => {
@@ -315,8 +391,29 @@ export default function AdminProductForm() {
             }
           }
 
+          const prodCat = data.categoryId || data.category || 'Shirts';
+          const isKnownCat = BASE_CATEGORIES.some(b => b.toLowerCase() === prodCat.toLowerCase());
+          if (!isKnownCat && prodCat) {
+            setIsCustomCategory(true);
+            setCustomCategoryInput(prodCat);
+          } else {
+            setIsCustomCategory(false);
+            setCustomCategoryInput('');
+          }
+
+          const knownSubs = SUB_CATEGORY_MAP[prodCat] || [];
+          const isKnownSub = knownSubs.some(s => s.toLowerCase() === (data.subCategory || '').toLowerCase());
+          if (data.subCategory && !isKnownSub) {
+            setIsCustomSubCategory(true);
+            setCustomSubCategoryInput(data.subCategory);
+          } else {
+            setIsCustomSubCategory(false);
+            setCustomSubCategoryInput('');
+          }
+
           setFormData({
             ...data,
+            categoryId: prodCat,
             subCategory: data.subCategory || '',
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
@@ -1084,8 +1181,18 @@ export default function AdminProductForm() {
         items: cleanOffersItems
       };
 
+      const finalCategory = (isCustomCategory ? customCategoryInput.trim() : formData.categoryId) || 'Shirts';
+      const finalSubCategory = (isCustomSubCategory ? customSubCategoryInput.trim() : (formData.subCategory || '')).trim();
+      const finalCategoryKey = finalCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const finalSubCategoryKey = finalSubCategory ? finalSubCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
+
       const payload = {
         ...formData,
+        categoryId: finalCategory,
+        category: finalCategory,
+        categoryKey: finalCategoryKey,
+        subCategory: finalSubCategory,
+        subCategoryKey: finalSubCategoryKey,
         offersConfig: sanitizedOffersConfig,
         customOffers: sanitizedOffersConfig.useCustomOffers ? cleanOffersItems : [],
         offersTitle: sanitizedOffersConfig.title,
@@ -1117,6 +1224,10 @@ export default function AdminProductForm() {
       if (saveAndNew) {
         showToast(`Product "${result?.name || formData.name}" created! Ready to add next product.`, 'success');
         setProductId(generateProductId());
+        setIsCustomCategory(false);
+        setCustomCategoryInput('');
+        setIsCustomSubCategory(false);
+        setCustomSubCategoryInput('');
         setFormData({
           name: '',
           slug: '',
@@ -1347,39 +1458,178 @@ export default function AdminProductForm() {
                 <label>Slug (URL Friendly)</label>
                 <input type="text" name="slug" value={formData.slug} onChange={handleChange} />
               </div>
+              {/* Category */}
               <div className="admin-form-group">
-                <label>Category</label>
-                <select name="categoryId" value={formData.categoryId} onChange={handleChange}>
-                  <option value="Kurta">Kurta</option>
-                  <option value="Shirts">Shirts</option>
-                  <option value="T-Shirts">T-Shirts</option>
-                  <option value="Jeans">Jeans</option>
-                  <option value="Trousers">Trousers</option>
-                  <option value="Shorts">Shorts</option>
-                  <option value="Jackets">Jackets</option>
-                  <option value="Hoodies">Hoodies</option>
-                  <option value="Ethnic Wear">Ethnic Wear</option>
-                  <option value="Perfumes">Perfumes</option>
-                  <option value="Wallets">Wallets</option>
-                  <option value="Slippers">Slippers</option>
-                  <option value="Watches">Watches</option>
-                  <option value="Belts">Belts</option>
-                  <option value="Caps">Caps / Hats</option>
-                  <option value="Sunglasses">Sunglasses</option>
-                </select>
+                <div className="admin-field-header">
+                  <label style={{ margin: 0 }}>Category *</label>
+                  {!isCustomCategory ? (
+                    <button
+                      type="button"
+                      className="admin-toggle-custom-btn"
+                      onClick={() => {
+                        setIsCustomCategory(true);
+                        setCustomCategoryInput('');
+                        setIsCustomSubCategory(false);
+                      }}
+                    >
+                      + Custom Category
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="admin-toggle-custom-btn"
+                      onClick={() => {
+                        setIsCustomCategory(false);
+                        setCustomCategoryInput('');
+                        setFormData(prev => ({ ...prev, categoryId: 'Shirts', category: 'Shirts' }));
+                      }}
+                    >
+                      ✕ Choose From List
+                    </button>
+                  )}
+                </div>
+
+                {!isCustomCategory ? (
+                  <select
+                    name="categoryId"
+                    value={formData.categoryId}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomCategory(true);
+                        setCustomCategoryInput('');
+                        setIsCustomSubCategory(false);
+                      } else {
+                        handleChange(e);
+                        setFormData(prev => ({
+                          ...prev,
+                          categoryId: e.target.value,
+                          category: e.target.value,
+                          subCategory: ''
+                        }));
+                        setIsCustomSubCategory(false);
+                      }
+                    }}
+                  >
+                    {availableCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="__custom__">+ Custom Category...</option>
+                  </select>
+                ) : (
+                  <div className="admin-custom-input-group">
+                    <input
+                      type="text"
+                      placeholder="Enter custom category (e.g. Vest, Underwear, Gym Wear)"
+                      value={customCategoryInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomCategoryInput(val);
+                        setFormData(prev => ({ ...prev, categoryId: val, category: val }));
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="admin-custom-cancel-btn"
+                      onClick={() => {
+                        setIsCustomCategory(false);
+                        setCustomCategoryInput('');
+                        setFormData(prev => ({ ...prev, categoryId: 'Shirts', category: 'Shirts' }));
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
+
               {/* Sub-Category */}
-              {SUB_CATEGORY_MAP[formData.categoryId] && (
-                <div className="admin-form-group">
-                  <label>Sub-Category / Fit Type</label>
-                  <select name="subCategory" value={formData.subCategory || ''} onChange={handleChange}>
+              <div className="admin-form-group">
+                <div className="admin-field-header">
+                  <label style={{ margin: 0 }}>Sub-Category / Fit Type</label>
+                  {SUB_CATEGORY_MAP[formData.categoryId] && (
+                    !isCustomSubCategory ? (
+                      <button
+                        type="button"
+                        className="admin-toggle-custom-btn"
+                        onClick={() => {
+                          setIsCustomSubCategory(true);
+                          setCustomSubCategoryInput(formData.subCategory || '');
+                        }}
+                      >
+                        + Custom Sub-Category
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="admin-toggle-custom-btn"
+                        onClick={() => {
+                          setIsCustomSubCategory(false);
+                          setCustomSubCategoryInput('');
+                          setFormData(prev => ({ ...prev, subCategory: '' }));
+                        }}
+                      >
+                        ✕ Choose From List
+                      </button>
+                    )
+                  )}
+                </div>
+
+                {SUB_CATEGORY_MAP[formData.categoryId] && !isCustomSubCategory ? (
+                  <select
+                    name="subCategory"
+                    value={formData.subCategory || ''}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomSubCategory(true);
+                        setCustomSubCategoryInput('');
+                        setFormData(prev => ({ ...prev, subCategory: '' }));
+                      } else {
+                        handleChange(e);
+                      }
+                    }}
+                  >
                     <option value="">— Select Sub-Category —</option>
                     {SUB_CATEGORY_MAP[formData.categoryId].map(sub => (
                       <option key={sub} value={sub}>{sub}</option>
                     ))}
+                    <option value="__custom__">+ Custom Sub-Category...</option>
                   </select>
-                </div>
-              )}
+                ) : (
+                  <div className="admin-custom-input-group">
+                    <input
+                      type="text"
+                      name="subCategory"
+                      placeholder={
+                        formData.categoryId === 'Vest'
+                          ? 'e.g. Plain, Lining, Coloring or custom type'
+                          : formData.categoryId === 'Underwear'
+                          ? 'e.g. Long Trunk, Mini Trunk, Brief or custom type'
+                          : 'Enter custom sub-category or fit type'
+                      }
+                      value={formData.subCategory || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomSubCategoryInput(val);
+                        handleChange(e);
+                      }}
+                    />
+                    {SUB_CATEGORY_MAP[formData.categoryId] && (
+                      <button
+                        type="button"
+                        className="admin-custom-cancel-btn"
+                        onClick={() => {
+                          setIsCustomSubCategory(false);
+                          setCustomSubCategoryInput('');
+                          setFormData(prev => ({ ...prev, subCategory: '' }));
+                        }}
+                      >
+                        Choose From List
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             {/* GSL Field for Shirts and T-Shirts */}
             {(formData.categoryId === 'T-Shirts' || formData.categoryId === 'Shirts') && (

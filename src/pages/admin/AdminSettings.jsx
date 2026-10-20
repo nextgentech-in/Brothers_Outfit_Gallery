@@ -14,6 +14,8 @@ const FALLBACK_CATEGORIES = [
   'Jackets',
   'Hoodies',
   'Ethnic Wear',
+  'Vest',
+  'Underwear',
   'Perfumes',
   'Accessories',
   'Watches',

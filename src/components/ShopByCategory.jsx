@@ -6,7 +6,7 @@ import './ShopByCategory.css';
 // Preferred display order — categories not listed here appear at the end alphabetically
 const CATEGORY_DISPLAY_ORDER = [
   'Kurta', 'Shirts', 'T-Shirts', 'Jeans', 'Trousers', 'Shorts',
-  'Jackets', 'Hoodies', 'Accessories', 'Perfumes', 'Slippers',
+  'Jackets', 'Hoodies', 'Vest', 'Underwear', 'Accessories', 'Perfumes', 'Slippers',
   'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Ethnic Wear'
 ];
 

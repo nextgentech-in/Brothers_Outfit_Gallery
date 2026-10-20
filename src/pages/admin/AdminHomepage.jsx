@@ -13,7 +13,7 @@ const PRESET_BANNERS = [
 
 const DEFAULT_CATEGORIES = [
   'Kurta', 'Shirts', 'T-Shirts', 'Jeans', 'Trousers', 'Shorts',
-  'Jackets', 'Hoodies', 'Ethnic Wear', 'Perfumes', 'Slippers',
+  'Jackets', 'Hoodies', 'Vest', 'Underwear', 'Ethnic Wear', 'Perfumes', 'Slippers',
   'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Accessories'
 ];
 
