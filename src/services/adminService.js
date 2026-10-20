@@ -143,7 +143,7 @@ export const getAdminProducts = async (forceRefresh = false) => {
           ...item,
           ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
         };
-      });
+      }).filter(p => p.isDeleted !== true);
       adminProductsCache = data;
       adminProductsCacheTimestamp = Date.now();
       try {
@@ -278,7 +278,12 @@ export const toggleProductTrending = async (id, isTrending) => {
 // Hard Delete
 export const deleteProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
-  await deleteDoc(docRef);
+  await updateDoc(docRef, {
+    active: false,
+    isDeleted: true,
+    deletedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
   invalidateProductCache();
   invalidateAdminProductsCache();
 };
