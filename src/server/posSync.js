@@ -45,10 +45,13 @@ function money(value, field, { allowZero = false } = {}) {
 }
 
 function integer(value, field, { min = Number.MIN_SAFE_INTEGER } = {}) {
-  if (!Number.isSafeInteger(value) || value < min) {
+  // Coerce strings and floats from MySQL/POS clients (e.g. "10", 10.0, "0")
+  const parsed = typeof value === 'string' ? Number(value) : value;
+  const coerced = Number.isFinite(parsed) ? Math.trunc(parsed) : parsed;
+  if (!Number.isSafeInteger(coerced) || coerced < min) {
     throw new PosSyncError(422, `${field} must be an integer${min > Number.MIN_SAFE_INTEGER ? ` greater than or equal to ${min}` : ''}.`, 'validation_error');
   }
-  return value;
+  return coerced;
 }
 
 function parseIsoTimestamp(value, { optional = true, field = 'since' } = {}) {
