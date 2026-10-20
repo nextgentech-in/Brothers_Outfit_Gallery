@@ -1080,7 +1080,10 @@ async function fetchProductsFromFirestore() {
     if (res.ok) {
       const data = await res.json();
       const products = (data.documents || []).map(parseFirestoreDoc).filter(Boolean);
-      productCatalogCache = { products, expiresAt: Date.now() + 60 * 1000 };
+      // 5-second TTL: POS stock pushes reflect on the website within 5 s.
+      // The cache is also force-cleared immediately by invalidateProductCache()
+      // after every POS stock-sync write.
+      productCatalogCache = { products, expiresAt: Date.now() + 5 * 1000 };
       return products;
     }
   } catch (err) {

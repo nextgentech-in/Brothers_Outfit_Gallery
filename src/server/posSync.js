@@ -875,10 +875,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       });
     }
 
-    const { updatedCount, duplicateCount, reconciliation } = await db.runTransaction(async transaction => {
+    const { updatedCount, duplicateCount, reconciliation, stockLevels } = await db.runTransaction(async transaction => {
       let localUpdatedCount = 0;
       let localDuplicateCount = 0;
       const localReconciliation = [];
+      const localStockLevels = [];
       const eventSnaps = [];
       const productSnaps = new Map();
       for (const entry of resolved) eventSnaps.push(await transaction.get(entry.eventRef));
@@ -895,6 +896,20 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (existingEvent.exists) {
           if (existingEvent.data().fingerprint !== fingerprint) throw new PosSyncError(409, `event_id ${item.eventId} was already used with different data.`, 'inconsistent_replay');
           localDuplicateCount += 1;
+          // Still report current stock for duplicates so POS can re-confirm
+          const working = workingProducts.get(entry.productRef.path);
+          if (working?.snap.exists) {
+            const variants = Array.isArray(working.data.variants) ? working.data.variants : [];
+            const matchedVariant = variants.find(v => normalizeKey(v.sku) === normalizeKey(item.sku));
+            localStockLevels.push({
+              event_id: item.eventId,
+              sku: item.sku,
+              web_product_id: item.webProductId,
+              website_stock: Number(matchedVariant?.stock ?? matchedVariant?.quantity ?? working.data.stock ?? 0),
+              total_product_stock: Number(working.data.stock ?? 0),
+              is_duplicate: true
+            });
+          }
           continue;
         }
         const working = workingProducts.get(entry.productRef.path);
@@ -908,23 +923,122 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           transaction.set(discrepancyRef, { eventId: item.eventId, syncId: payload.syncId, webProductId: item.webProductId, sku: item.sku, posFinalStock: effectiveFinal, websiteStockAfterDelta: after, discrepancy, status: 'open', createdAt: FieldValue.serverTimestamp() });
           localReconciliation.push({ event_id: item.eventId, sku: item.sku, pos_final_stock: effectiveFinal, website_stock_after_delta: after, discrepancy });
         }
+        // Compute total product stock from the mutated working copy
+        const totalStockAfter = (Array.isArray(updatedProduct.variants) ? updatedProduct.variants : [])
+          .reduce((sum, v) => sum + Number(v.stock ?? v.quantity ?? 0), 0);
+        localStockLevels.push({
+          event_id: item.eventId,
+          sku: item.sku,
+          web_product_id: item.webProductId,
+          website_stock: after,
+          total_product_stock: totalStockAfter,
+          is_duplicate: false
+        });
         localUpdatedCount += 1;
       }
       for (const entry of resolved) {
         const working = workingProducts.get(entry.productRef.path);
         if (working) transaction.update(entry.productRef, { ...working.data, updatedAt: FieldValue.serverTimestamp() });
       }
-      return { updatedCount: localUpdatedCount, duplicateCount: localDuplicateCount, reconciliation: localReconciliation };
+      return { updatedCount: localUpdatedCount, duplicateCount: localDuplicateCount, reconciliation: localReconciliation, stockLevels: localStockLevels };
     });
 
     invalidateProductCache();
     console.info('[POS Sync] stock accepted', { correlationId, syncId: payload.syncId, updated: updatedCount, duplicates: duplicateCount, discrepancies: reconciliation.length });
-    res.json({ success: true, message: 'Stock updated successfully', updated_count: updatedCount, duplicate_count: duplicateCount, reconciliation });
+    res.json({ success: true, message: 'Stock updated successfully', updated_count: updatedCount, duplicate_count: duplicateCount, reconciliation, stock_levels: stockLevels });
   });
 
   app.post('/api/pos/stock-sync', handleStockSyncPost);
   app.post('/api/pos/stock-changes', handleStockSyncPost);
 
+  // ── GET /api/pos/stock-snapshot ──────────────────────────────────────────────
+  // Returns the current live Firestore stock for every POS-linked product.
+  // POS can call this after any sync to confirm the authoritative website stock
+  // and detect any divergence from its local SQLite records.
+  app.get('/api/pos/stock-snapshot', apiHandler(async (req, res) => {
+    const db = getDb();
+    const targetSku = req.query.sku || req.query.variant_sku || '';
+    const targetWebId = req.query.web_product_id || req.query.product_id || '';
+
+    // Single-product lookup
+    if (targetSku || targetWebId) {
+      const productRef = await findProductRef(db, targetWebId, targetSku);
+      if (!productRef) {
+        return res.status(404).json({ success: false, error: 'Product not found', code: 'not_found' });
+      }
+      const snap = await productRef.get();
+      if (!snap.exists) {
+        return res.status(404).json({ success: false, error: 'Product not found', code: 'not_found' });
+      }
+      const p = snap.data();
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const matched = targetSku
+        ? (variants.find(v => normalizeKey(v.sku) === normalizeKey(targetSku)) || variants[0])
+        : variants[0];
+      return res.json({
+        success: true,
+        server_time: new Date().toISOString(),
+        web_product_id: p.webProductId || snap.id,
+        product_name: p.name || '',
+        sku: matched?.sku || p.sku || '',
+        size: matched?.size || null,
+        color: matched?.color || p.primaryColor || 'Standard',
+        variant_stock: Number(matched?.stock ?? matched?.quantity ?? p.stock ?? 0),
+        total_product_stock: Number(p.stock ?? p.quantity ?? 0),
+        in_stock: Boolean(p.inStock ?? ((p.stock ?? 0) > 0)),
+        updated_at: p.updatedAt?.toDate ? p.updatedAt.toDate().toISOString() : null,
+        all_variants: variants.map(v => ({
+          sku: v.sku || '',
+          size: v.size || '',
+          color: v.color || p.primaryColor || 'Standard',
+          stock: Number(v.stock ?? v.quantity ?? 0)
+        }))
+      });
+    }
+
+    // Full catalog snapshot — all POS-originated products
+    const posProductsSnap = await db.collection('products')
+      .where('integrationOrigin', '==', 'pos')
+      .get();
+
+    const serverTime = new Date();
+    const snapshot = posProductsSnap.docs.map(doc => {
+      const p = doc.data();
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      return {
+        web_product_id: p.webProductId || doc.id,
+        product_name: p.name || '',
+        sku: p.sku || '',
+        category: p.category || '',
+        total_product_stock: Number(p.stock ?? p.quantity ?? 0),
+        in_stock: Boolean(p.inStock ?? ((p.stock ?? 0) > 0)),
+        updated_at: p.updatedAt?.toDate ? p.updatedAt.toDate().toISOString() : null,
+        variants: variants.map(v => ({
+          sku: v.sku || '',
+          size: v.size || '',
+          color: v.color || p.primaryColor || 'Standard',
+          stock: Number(v.stock ?? v.quantity ?? 0)
+        }))
+      };
+    });
+
+    res.json({
+      success: true,
+      server_time: serverTime.toISOString(),
+      total_products: snapshot.length,
+      products: snapshot
+    });
+  }));
+
+  // ── GET /api/pos/stock-changes ───────────────────────────────────────────────
+  // Returns website-initiated stock movements (online orders, admin adjustments)
+  // that the POS should apply to its local database.
+  // Supports:
+  //   ?since=<ISO timestamp>  — only movements after this time
+  //   ?cursor=<opaque>        — continuation cursor for paginated polling
+  //   ?sku=<sku>              — single-variant live stock lookup
+  //   ?web_product_id=<id>   — single-product live stock lookup
+  //   ?mark_consumed=true     — mark returned movement IDs as POS-consumed
   const handleStockChangesGet = apiHandler(async (req, res) => {
     const db = getDb();
     const targetSku = req.query.sku || req.query.variant_sku;
@@ -943,6 +1057,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       const matched = variants.find(v => normalizeKey(v.sku) === normalizeKey(targetSku)) || variants[0];
       return res.json({
         success: true,
+        server_time: new Date().toISOString(),
         web_product_id: p.webProductId || snap.id,
         sku: matched?.sku || p.sku,
         size: matched?.size || null,
@@ -955,17 +1070,34 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     const since = parseIsoTimestamp(req.query.since, { optional: true });
     const cursor = decodeCursor(req.query.cursor, 'stock');
     const limit = Math.min(PAGE_SIZE_MAX, Math.max(1, Number.parseInt(req.query.limit || '100', 10) || 100));
+    const markConsumed = String(req.query.mark_consumed || '').toLowerCase() === 'true';
     const upperMs = cursor?.upperMs ?? Date.now();
     const afterMs = cursor?.afterMs ?? (since?.getTime() ?? 0);
     const afterId = cursor?.afterId ?? '';
-    const snapshot = await db.collection('stockMovements').where('source', '==', 'website').get();
-    const eligible = snapshot.docs.map(doc => ({ id: doc.id, movement: doc.data(), timeMs: timestampMillis(doc.data().createdAt) }))
-      .filter(record => record.timeMs <= upperMs && compareTuple(record, { afterMs, afterId }))
+
+    // Fetch website-source movements and already-consumed movement IDs in parallel
+    const [movementsSnap, consumedSnap] = await Promise.all([
+      db.collection('stockMovements').where('source', '==', 'website').get(),
+      db.collection('posConsumedMovements').get()
+    ]);
+    const consumedIds = new Set(consumedSnap.docs.map(d => d.id));
+
+    const eligible = movementsSnap.docs
+      .map(doc => ({ id: doc.id, movement: doc.data(), timeMs: timestampMillis(doc.data().createdAt) }))
+      .filter(record =>
+        !consumedIds.has(record.id) &&
+        record.timeMs <= upperMs &&
+        compareTuple(record, { afterMs, afterId })
+      )
       .sort((a, b) => a.timeMs - b.timeMs || a.id.localeCompare(b.id));
+
     const page = eligible.slice(0, limit);
     const hasMore = eligible.length > page.length;
     const last = page.at(-1);
-    const nextCursor = hasMore && last ? encodeCursor({ v: 1, feed: 'stock', upperMs, afterMs: last.timeMs, afterId: last.id }) : null;
+    const nextCursor = hasMore && last
+      ? encodeCursor({ v: 1, feed: 'stock', upperMs, afterMs: last.timeMs, afterId: last.id })
+      : null;
+
     const stockChanges = page.map(({ id, movement, timeMs }) => ({
       movement_id: movement.movementId || id,
       web_product_id: movement.webProductId,
@@ -979,7 +1111,35 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       order_id: movement.orderId || movement.externalReference || null,
       created_at: new Date(timeMs).toISOString()
     }));
-    res.json({ success: true, server_time: new Date(upperMs).toISOString(), stock_changes: stockChanges, has_more: hasMore, next_cursor: nextCursor });
+
+    // If mark_consumed=true, write consumed markers so POS won't re-process them
+    if (markConsumed && page.length > 0) {
+      const batch = db.batch();
+      for (const { id, movement, timeMs } of page) {
+        const ref = db.collection('posConsumedMovements').doc(id);
+        batch.set(ref, {
+          movementId: movement.movementId || id,
+          webProductId: movement.webProductId,
+          sku: movement.sku,
+          consumedAt: FieldValue.serverTimestamp(),
+          movementCreatedAt: new Date(timeMs).toISOString()
+        });
+      }
+      try {
+        await batch.commit();
+      } catch (err) {
+        // Non-fatal: POS will re-consume next time with the same checkpoint
+        console.warn('[POS Sync] Failed to mark movements as consumed:', err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      server_time: new Date(upperMs).toISOString(),
+      stock_changes: stockChanges,
+      has_more: hasMore,
+      next_cursor: nextCursor
+    });
   });
 
   app.get('/api/pos/stock-changes', handleStockChangesGet);
