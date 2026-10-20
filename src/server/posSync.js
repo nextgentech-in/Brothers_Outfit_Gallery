@@ -875,15 +875,24 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     const payload = validateStockPayload(req.body);
     const db = getDb();
     const resolved = [];
+    const unknownItems = [];
     for (const item of payload.items) {
       const productRef = await findProductRef(db, item.webProductId, item.sku);
-      if (!productRef) throw new PosSyncError(409, `Unknown web_product_id ${item.webProductId}.`, 'unknown_product');
-      resolved.push({
-        item,
-        productRef,
-        eventRef: db.collection('posStockEvents').doc(stableHash(item.eventId)),
-        movementRef: db.collection('stockMovements').doc(`pos_${stableHash(item.eventId)}`)
-      });
+      if (!productRef) {
+        console.warn(`[POS Sync] Item not found on website, skipping in batch: webProductId=${item.webProductId}, sku=${item.sku}`);
+        unknownItems.push(item);
+      } else {
+        resolved.push({
+          item,
+          productRef,
+          eventRef: db.collection('posStockEvents').doc(stableHash(item.eventId)),
+          movementRef: db.collection('stockMovements').doc(`pos_${stableHash(item.eventId)}`)
+        });
+      }
+    }
+
+    if (resolved.length === 0 && unknownItems.length > 0) {
+      throw new PosSyncError(409, `Unknown web_product_id ${unknownItems[0].webProductId}.`, 'unknown_product');
     }
 
     const { updatedCount, duplicateCount, reconciliation, stockLevels } = await db.runTransaction(async transaction => {
