@@ -9,7 +9,7 @@ import { normalizeToStandardColor } from '../data/colorMaster.js';
 import SEO from '../components/common/SEO';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'Kurta', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+const CATEGORIES = ['All', 'Kurta', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Vest', 'Underwear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
 
 const SUB_CATEGORIES = {
   'Kurta': ['All', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
@@ -21,6 +21,8 @@ const SUB_CATEGORIES = {
   'Jackets': ['All', 'Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
   'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
   'Ethnic Wear': ['All', 'Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
+  'Vest': ['All', 'Plain', 'Lining', 'Coloring'],
+  'Underwear': ['All', 'Long Trunk', 'Mini Trunk', 'Brief'],
   'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
   'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
   'Caps': ['All', 'Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
@@ -275,6 +277,33 @@ export default function ShopPage() {
     return result;
   }, [products, category, subCategory, debouncedSearch, priceRange, selectedSizes, selectedColors, sortBy]);
 
+  const displayCategories = useMemo(() => {
+    const extra = new Set();
+    products.forEach(p => {
+      const c = (p.category || p.categoryId || '').trim();
+      if (c && !CATEGORIES.some(base => base.toLowerCase() === c.toLowerCase())) {
+        extra.add(c);
+      }
+    });
+    return [...CATEGORIES, ...Array.from(extra)];
+  }, [products]);
+
+  const activeSubCategories = useMemo(() => {
+    if (category === 'All') return null;
+    const baseSubs = SUB_CATEGORIES[category] || ['All'];
+    const extraSubs = new Set(baseSubs);
+    products.forEach(p => {
+      const pCat = (p.category || p.categoryId || '').trim().toLowerCase();
+      if (pCat === category.toLowerCase() && p.subCategory && typeof p.subCategory === 'string') {
+        const sub = p.subCategory.trim();
+        if (sub && !Array.from(extraSubs).some(s => s.toLowerCase() === sub.toLowerCase())) {
+          extraSubs.add(sub);
+        }
+      }
+    });
+    return Array.from(extraSubs);
+  }, [category, products]);
+
   const clearFilters = () => {
     setSearch('');
     setCategory('All');
@@ -467,7 +496,7 @@ export default function ShopPage() {
         <div className="shop-filters__group">
           <h4 className="shop-filters__heading">Category</h4>
           <div className="shop-filters__options" role="group" aria-label="Filter by category">
-            {CATEGORIES.map(cat => (
+            {displayCategories.map(cat => (
               <button
                 key={cat}
                 type="button"
@@ -483,11 +512,11 @@ export default function ShopPage() {
         </div>
 
         {/* Sub-Category (shown when a category with sub-types is selected) */}
-        {category !== 'All' && SUB_CATEGORIES[category] && (
+        {category !== 'All' && activeSubCategories && activeSubCategories.length > 1 && (
           <div className="shop-filters__group">
             <h4 className="shop-filters__heading">Type / Fit</h4>
             <div className="shop-filters__options" role="group" aria-label="Filter by type or fit">
-              {SUB_CATEGORIES[category].map(sub => (
+              {activeSubCategories.map(sub => (
                 <button
                   key={sub}
                   type="button"
