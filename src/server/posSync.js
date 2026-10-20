@@ -156,6 +156,9 @@ function validateProduct(raw, productIndex) {
   const mrp = money(raw?.mrp, `${prefix}.mrp`);
   const salePrice = money(raw?.sale_price, `${prefix}.sale_price`);
   if (salePrice > mrp) throw new PosSyncError(422, `${prefix}.sale_price cannot exceed mrp.`, 'validation_error');
+  const costPrice = (raw?.cost_price != null || raw?.purchase_price != null || raw?.costPrice != null)
+    ? money(Number(raw.cost_price ?? raw.purchase_price ?? raw.costPrice), `${prefix}.cost_price`, { allowZero: true })
+    : 0;
   if (!Array.isArray(raw?.sizes) || raw.sizes.length < 1 || raw.sizes.length > 50) {
     throw new PosSyncError(422, `${prefix}.sizes must contain between 1 and 50 variants.`, 'validation_error');
   }
@@ -172,6 +175,9 @@ function validateProduct(raw, productIndex) {
     if (seenVariants.has(variantKey)) throw new PosSyncError(422, `${vp} duplicates a size/color variant.`, 'validation_error');
     seenSkus.add(normalizedSku);
     seenVariants.add(variantKey);
+    const variantCost = (variant?.cost_price != null || variant?.purchase_price != null || variant?.costPrice != null)
+      ? money(Number(variant.cost_price ?? variant.purchase_price ?? variant.costPrice), `${vp}.cost_price`, { allowZero: true })
+      : costPrice;
     return {
       id: stableHash(`${webProductId}|${variantSku}`).slice(0, 24),
       size,
@@ -181,6 +187,10 @@ function validateProduct(raw, productIndex) {
       quantity: integer(variant?.stock, `${vp}.stock`, { min: 0 }),
       price: money(variant?.price, `${vp}.price`),
       salePrice: money(variant?.price, `${vp}.price`),
+      costPrice: variantCost,
+      cost_price: variantCost,
+      purchasePrice: variantCost,
+      purchase_price: variantCost,
       isDefaultPrice: variantIndex === 0
     };
   });
@@ -196,6 +206,10 @@ function validateProduct(raw, productIndex) {
     description: canonicalText(raw?.description, `${prefix}.description`, { required: false, max: 5000 }),
     mrp,
     salePrice,
+    costPrice,
+    cost_price: costPrice,
+    purchasePrice: costPrice,
+    purchase_price: costPrice,
     images,
     variants
   };
@@ -213,6 +227,9 @@ function validateProductForUpdate(raw, productIndex) {
   if (mrp != null && salePrice != null && salePrice > mrp) {
     throw new PosSyncError(422, `${prefix}.sale_price cannot exceed mrp.`, 'validation_error');
   }
+  const costPrice = (raw?.cost_price != null || raw?.purchase_price != null || raw?.costPrice != null)
+    ? money(Number(raw.cost_price ?? raw.purchase_price ?? raw.costPrice), `${prefix}.cost_price`, { allowZero: true })
+    : undefined;
   const images = validateImages(raw?.images, prefix);
   const description = canonicalText(raw?.description, `${prefix}.description`, { required: false, max: 5000 });
   let variants = undefined;
@@ -225,11 +242,14 @@ function validateProductForUpdate(raw, productIndex) {
       return {
         size: canonicalText(variant?.size, `${vp}.size`, { required: false, max: 40 }),
         sku: canonicalText(variant?.sku, `${vp}.sku`, { max: 100 }),
-        price: variant?.price != null ? money(variant.price, `${vp}.price`) : undefined
+        price: variant?.price != null ? money(variant.price, `${vp}.price`) : undefined,
+        costPrice: (variant?.cost_price != null || variant?.purchase_price != null || variant?.costPrice != null)
+          ? money(Number(variant.cost_price ?? variant.purchase_price ?? variant.costPrice), `${vp}.cost_price`, { allowZero: true })
+          : undefined
       };
     });
   }
-  return { webProductId, name, category, subCategory, color, mrp, salePrice, description, images, variants };
+  return { webProductId, name, category, subCategory, color, mrp, salePrice, costPrice, description, images, variants };
 }
 
 function validateProductsPayload(body) {
@@ -344,6 +364,8 @@ function productToWire(id, product) {
     ? variants.reduce((sum, v) => sum + Number(v.stock ?? v.quantity ?? 0), 0)
     : Number(product.stock ?? product.quantity ?? 0);
 
+  const costPrice = Number(product.costPrice ?? product.cost_price ?? product.purchase_price ?? product.purchasePrice ?? 0);
+
   return {
     web_product_id: product.webProductId || id,
     product_name: product.name || '',
@@ -356,20 +378,27 @@ function productToWire(id, product) {
     description: product.description || product.shortDescription || '',
     mrp: Number(product.mrp ?? product.compareAtPrice ?? product.price ?? 0),
     sale_price: Number(product.salePrice ?? product.price ?? 0),
+    cost_price: costPrice,
+    purchase_price: costPrice,
     stock: calculatedStock,
     quantity: calculatedStock,
     opening_stock: calculatedStock,
     images: imageUrls,
     image_url: coverImage,
-    sizes: variants.map(variant => ({
-      size: variant.size || 'One Size',
-      color: variant.color || product.primaryColor || product.colors?.[0]?.name || product.colors?.[0] || 'Standard',
-      stock: Number(variant.stock ?? variant.quantity ?? 0),
-      quantity: Number(variant.stock ?? variant.quantity ?? 0),
-      opening_stock: Number(variant.stock ?? variant.quantity ?? 0),
-      price: Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0),
-      sku: variant.sku || product.sku || ''
-    }))
+    sizes: variants.map(variant => {
+      const vCost = Number(variant.costPrice ?? variant.cost_price ?? variant.purchase_price ?? variant.purchasePrice ?? costPrice);
+      return {
+        size: variant.size || 'One Size',
+        color: variant.color || product.primaryColor || product.colors?.[0]?.name || product.colors?.[0] || 'Standard',
+        stock: Number(variant.stock ?? variant.quantity ?? 0),
+        quantity: Number(variant.stock ?? variant.quantity ?? 0),
+        opening_stock: Number(variant.stock ?? variant.quantity ?? 0),
+        price: Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0),
+        cost_price: vCost,
+        purchase_price: vCost,
+        sku: variant.sku || product.sku || ''
+      };
+    })
   };
 }
 
@@ -717,6 +746,10 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           compareAtPrice: product.mrp,
           salePrice: product.salePrice,
           price: product.salePrice,
+          costPrice: product.costPrice || 0,
+          cost_price: product.costPrice || 0,
+          purchasePrice: product.costPrice || 0,
+          purchase_price: product.costPrice || 0,
           variants: product.variants,
           stock: totalStock,
           quantity: totalStock,
@@ -772,6 +805,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (update.color) { patch.primaryColor = update.color; patch.colors = [{ name: update.color }]; }
         if (update.mrp != null) { patch.mrp = update.mrp; patch.compareAtPrice = update.mrp; }
         if (update.salePrice != null) { patch.salePrice = update.salePrice; patch.price = update.salePrice; }
+        if (update.costPrice != null) {
+          patch.costPrice = update.costPrice;
+          patch.cost_price = update.costPrice;
+          patch.purchasePrice = update.costPrice;
+          patch.purchase_price = update.costPrice;
+        }
         if (update.description) { patch.description = update.description; patch.shortDescription = update.description.slice(0, 240); }
         if (update.images.length > 0) {
           patch.images = update.images;
@@ -786,6 +825,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
             if (!match) return ev;
             const patched = { ...ev };
             if (match.price != null) { patched.price = match.price; patched.salePrice = match.price; }
+            if (match.costPrice != null) {
+              patched.costPrice = match.costPrice;
+              patched.cost_price = match.costPrice;
+              patched.purchasePrice = match.costPrice;
+              patched.purchase_price = match.costPrice;
+            }
             if (match.size) patched.size = match.size;
             return patched;
           });

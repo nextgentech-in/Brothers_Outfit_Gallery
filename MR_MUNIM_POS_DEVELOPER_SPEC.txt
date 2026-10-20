@@ -271,13 +271,15 @@ Success Response (200 OK):
       "color": "Off White",
       "mrp": 1500,
       "sale_price": 1200,
+      "cost_price": 750,
+      "purchase_price": 750,
       "image_url": "https://ik.imagekit.io/brothersoutfit/sample.jpg",
       "images": [
         "https://ik.imagekit.io/brothersoutfit/sample.jpg"
       ],
       "sizes": [
-        { "size": "M", "sku": "1433-OFF-WHITE-M", "stock": 10, "price": 1200 },
-        { "size": "L", "sku": "1433-OFF-WHITE-L", "stock": 10, "price": 1200 }
+        { "size": "M", "sku": "1433-OFF-WHITE-M", "stock": 10, "price": 1200, "cost_price": 750, "purchase_price": 750 },
+        { "size": "L", "sku": "1433-OFF-WHITE-L", "stock": 10, "price": 1200, "cost_price": 750, "purchase_price": 750 }
       ]
     }
   ],
