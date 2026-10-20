@@ -297,6 +297,7 @@ export default function AdminProductForm() {
     description: '',
     mrp: '',
     salePrice: '',
+    costPrice: '',
     colors: [],
     variants: [],
     offerEnabled: false,
@@ -418,6 +419,7 @@ export default function AdminProductForm() {
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
+            costPrice: data.costPrice ?? data.cost_price ?? data.purchase_price ?? '',
             variants: loadedVariants,
             colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
@@ -743,6 +745,14 @@ export default function AdminProductForm() {
     });
   };
 
+  const updateVariantCost = (vId, costVal) => {
+    const parsed = costVal === '' ? '' : parseFloat(costVal);
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.map(v => v.id === vId ? { ...v, costPrice: parsed, cost_price: parsed } : v)
+    }));
+  };
+
   const removeVariant = (vId) => {
     setFormData(prev => {
       const remaining = prev.variants.filter(v => v.id !== vId);
@@ -1049,6 +1059,10 @@ export default function AdminProductForm() {
     if (!mrp || mrp <= 0) return setError("MRP must be > 0.");
     if (!sale || sale <= 0) return setError("Sale Price must be > 0.");
     if (sale > mrp) return setError("Sale price cannot be greater than MRP.");
+    const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && !isNaN(Number(formData.costPrice))
+      ? parseFloat(formData.costPrice)
+      : null;
+    if (costVal !== null && costVal < 0) return setError("Cost Price cannot be negative.");
 
     if (existingImages.length === 0 && pendingImages.length === 0) {
       return setError("Please upload at least one valid product image.");
@@ -1140,16 +1154,24 @@ export default function AdminProductForm() {
         ? parseFloat(defaultVariant.price)
         : sale;
 
+      const finalCostPrice = costVal !== null ? costVal : 0;
       const normalizedVariants = formData.variants.map((v, idx) => {
         const vPrice = (v.price !== undefined && v.price !== '' && !isNaN(Number(v.price)))
           ? parseFloat(v.price)
           : sale;
+        const vCost = (v.costPrice !== undefined && v.costPrice !== '' && !isNaN(Number(v.costPrice)))
+          ? parseFloat(v.costPrice)
+          : finalCostPrice;
         const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
           sku: isEdit ? String(v.sku || '').trim() : buildVariantSku(productSku, v.color, v.size, productId),
           price: vPrice,
           salePrice: vPrice,
+          costPrice: vCost,
+          cost_price: vCost,
+          purchasePrice: vCost,
+          purchase_price: vCost,
           stock: parseInt(v.stock, 10) || 0,
           isDefaultPrice: isDefault
         };
@@ -1201,6 +1223,10 @@ export default function AdminProductForm() {
         mrp: mrp,
         salePrice: finalFrontPrice,
         price: finalFrontPrice,
+        costPrice: finalCostPrice,
+        cost_price: finalCostPrice,
+        purchasePrice: finalCostPrice,
+        purchase_price: finalCostPrice,
         compareAtPrice: mrp,
         discountPercentage: Math.max(0, autoDiscount),
         variants: normalizedVariants,
@@ -1237,6 +1263,7 @@ export default function AdminProductForm() {
           description: '',
           mrp: '',
           salePrice: '',
+          costPrice: '',
           colors: [],
           variants: [],
           offerEnabled: false,
@@ -1282,7 +1309,12 @@ export default function AdminProductForm() {
 
   const activeMrp = parseFloat(formData.mrp) || 0;
   const activeSale = parseFloat(formData.salePrice) || 0;
+  const activeCost = (formData.costPrice !== '' && formData.costPrice !== undefined && !isNaN(Number(formData.costPrice)))
+    ? parseFloat(formData.costPrice)
+    : null;
   const currentDiscount = (activeMrp && activeSale && activeMrp > activeSale) ? Math.round(((activeMrp - activeSale) / activeMrp) * 100) : 0;
+  const grossProfit = (activeSale && activeCost !== null) ? Math.round((activeSale - activeCost) * 100) / 100 : null;
+  const marginPercentage = (grossProfit !== null && activeSale > 0) ? Math.round((grossProfit / activeSale) * 100) : null;
   const calculatedTotalStock = formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
 
   return (
@@ -1652,28 +1684,66 @@ export default function AdminProductForm() {
 
           {/* Pricing */}
           <section className="admin-form-section">
-            <h3 style={{ color: '#dc2626' }}>Pricing (Crucial)</h3>
+            <h3 style={{ color: '#dc2626' }}>Pricing &amp; Cost (Crucial)</h3>
             <div className="admin-form-row">
               <div className="admin-form-group price-field">
                 <label>MRP (Maximum Retail Price)</label>
                 <div className="price-input-wrapper">
                   <span>₹</span>
-                  <input type="number" name="mrp" value={formData.mrp} onChange={handleChange} placeholder="2499" />
+                  <input type="number" name="mrp" value={formData.mrp} onChange={handleChange} placeholder="2499" min="0" />
                 </div>
               </div>
               <div className="admin-form-group price-field highlight">
-                <label>SALE PRICE</label>
+                <label>SALE PRICE (Storefront Selling Price)</label>
                 <div className="price-input-wrapper">
                   <span>₹</span>
-                  <input type="number" name="salePrice" value={formData.salePrice} onChange={handleChange} placeholder="1499" />
+                  <input type="number" name="salePrice" value={formData.salePrice} onChange={handleChange} placeholder="1499" min="0" />
                 </div>
               </div>
-            </div>
-            {currentDiscount > 0 && (
-              <div className="auto-discount-banner">
-                Automatic Discount: <strong>{currentDiscount}% OFF</strong>
+              <div className="admin-form-group price-field cost-field">
+                <label>COST PRICE (Synced to POS)</label>
+                <div className="price-input-wrapper">
+                  <span>₹</span>
+                  <input
+                    type="number"
+                    name="costPrice"
+                    value={formData.costPrice}
+                    onChange={handleChange}
+                    placeholder="e.g. 750"
+                    min="0"
+                    step="any"
+                  />
+                </div>
+                <span style={{ fontSize: '11px', color: '#166534', fontWeight: 600, marginTop: '6px', display: 'block' }}>
+                  Purchase/Mfg cost. Synced to POS system.
+                </span>
               </div>
-            )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+              {currentDiscount > 0 && (
+                <div className="auto-discount-banner" style={{ flex: 1, margin: 0 }}>
+                  Automatic Customer Discount: <strong>{currentDiscount}% OFF</strong>
+                </div>
+              )}
+              {grossProfit !== null && (
+                <div
+                  style={{
+                    flex: 1,
+                    background: grossProfit >= 0 ? '#eff6ff' : '#fef2f2',
+                    color: grossProfit >= 0 ? '#1e40af' : '#b91c1c',
+                    padding: '14px',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    fontWeight: 800,
+                    border: grossProfit >= 0 ? '1px solid #bfdbfe' : '1px solid #fecaca',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  Gross Profit: <strong>₹{grossProfit}</strong> ({marginPercentage}% Gross Margin)
+                </div>
+              )}
+            </div>
           </section>
 
           {/* Professional Image Upload & Color Linking Section */}
@@ -2110,6 +2180,7 @@ export default function AdminProductForm() {
                         <th>SIZE / VOLUME</th>
                         <th>SKU</th>
                         <th>PRICE (₹)</th>
+                        <th>COST (₹)</th>
                         <th>STOCK QUANTITY (LIVE)</th>
                         <th>STATUS</th>
                         <th>ACTIONS</th>
@@ -2165,6 +2236,21 @@ export default function AdminProductForm() {
                                 value={v.price !== undefined ? v.price : (formData.salePrice || '')}
                                 onChange={(e) => updateVariantPrice(v.id, e.target.value)}
                                 style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '14px', background: '#fff' }}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#166534' }}>₹</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder={formData.costPrice || "Cost"}
+                                value={v.costPrice !== undefined ? v.costPrice : ''}
+                                onChange={(e) => updateVariantCost(v.id, e.target.value)}
+                                title="Variant cost price synced to POS"
+                                style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #bbf7d0', fontWeight: 700, fontSize: '14px', background: '#f0fdf4', color: '#14532d' }}
                               />
                             </div>
                           </td>

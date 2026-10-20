@@ -1380,7 +1380,7 @@ test('validateImages rejects oversized base64', () => {
   );
 });
 
-test('productToWire includes images and image_url', () => {
+test('productToWire includes images, image_url, and cost_price', () => {
   const product = {
     webProductId: 'WIRE-TEST',
     name: 'Wire Test',
@@ -1390,11 +1390,12 @@ test('productToWire includes images and image_url', () => {
     description: 'Test',
     mrp: 1000,
     salePrice: 800,
+    costPrice: 450,
     images: [
       { url: 'https://cdn.example.com/a.jpg', isPrimary: false },
       { url: 'https://cdn.example.com/b.jpg', isPrimary: true }
     ],
-    variants: [{ size: 'M', stock: 5, price: 800, sku: 'WIRE-M' }]
+    variants: [{ size: 'M', stock: 5, price: 800, costPrice: 450, sku: 'WIRE-M' }]
   };
   const wire = posSyncInternals.productToWire('test-id', product);
   assert.ok(Array.isArray(wire.images));
@@ -1404,8 +1405,12 @@ test('productToWire includes images and image_url', () => {
   assert.equal(wire.stock, 5);
   assert.equal(wire.quantity, 5);
   assert.equal(wire.opening_stock, 5);
+  assert.equal(wire.cost_price, 450);
+  assert.equal(wire.purchase_price, 450);
   assert.equal(wire.sizes[0].stock, 5);
   assert.equal(wire.sizes[0].opening_stock, 5);
+  assert.equal(wire.sizes[0].cost_price, 450);
+  assert.equal(wire.sizes[0].purchase_price, 450);
 });
 
 test('productToWire handles product with no images', () => {

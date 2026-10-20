@@ -189,6 +189,19 @@
   background: #fefce8;
   border-color: #fef08a;
 }
+.price-field.cost-field {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.price-field.cost-field label {
+  color: #166534;
+}
+.price-field.cost-field .price-input-wrapper span {
+  color: #16a34a;
+}
+.price-field.cost-field .price-input-wrapper input {
+  color: #14532d;
+}
 .price-field label {
   font-weight: 800;
   font-size: 13px;
