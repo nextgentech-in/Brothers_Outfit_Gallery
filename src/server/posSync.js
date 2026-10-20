@@ -44,11 +44,17 @@ function money(value, field, { allowZero = false } = {}) {
   return Math.round(value * 100) / 100;
 }
 
-function integer(value, field, { min = Number.MIN_SAFE_INTEGER } = {}) {
-  // Coerce strings and floats from MySQL/POS clients (e.g. "10", 10.0, "0")
-  const parsed = typeof value === 'string' ? Number(value) : value;
-  const coerced = Number.isFinite(parsed) ? Math.trunc(parsed) : parsed;
-  if (!Number.isSafeInteger(coerced) || coerced < min) {
+function integer(value, field, { min = Number.MIN_SAFE_INTEGER, clampMin = false } = {}) {
+  // Coerce strings and floats from MySQL/POS clients (e.g. "10", 10.0, "0", "-1")
+  const str = typeof value === 'string' ? value.trim() : value;
+  const parsed = typeof str === 'string' && str !== '' ? Number(str) : (typeof str === 'number' ? str : NaN);
+  let coerced = Number.isFinite(parsed) ? Math.trunc(parsed) : parsed;
+  if (!Number.isSafeInteger(coerced)) {
+    throw new PosSyncError(422, `${field} must be an integer${min > Number.MIN_SAFE_INTEGER ? ` greater than or equal to ${min}` : ''}.`, 'validation_error');
+  }
+  if (clampMin && coerced < min) {
+    coerced = min;
+  } else if (coerced < min) {
     throw new PosSyncError(422, `${field} must be an integer${min > Number.MIN_SAFE_INTEGER ? ` greater than or equal to ${min}` : ''}.`, 'validation_error');
   }
   return coerced;
@@ -265,8 +271,10 @@ function validateStockPayload(body) {
     const sku = canonicalText(raw?.sku || raw?.variant_sku || webProductId, `${prefix}.sku`, { max: 100 });
     const size = canonicalText(raw?.size || '', `${prefix}.size`, { required: false, max: 40 });
     const color = canonicalText(raw?.color || '', `${prefix}.color`, { required: false, max: 80 });
-    let deltaChange = raw?.delta_change != null ? integer(raw.delta_change, `${prefix}.delta_change`) : null;
-    let finalStock = raw?.final_stock != null ? integer(raw.final_stock, `${prefix}.final_stock`, { min: 0 }) : (raw?.stock != null ? integer(raw.stock, `${prefix}.stock`, { min: 0 }) : null);
+    let deltaChange = raw?.delta_change != null && raw?.delta_change !== '' ? integer(raw.delta_change, `${prefix}.delta_change`) : null;
+    let finalStock = raw?.final_stock != null && raw?.final_stock !== ''
+      ? integer(raw.final_stock, `${prefix}.final_stock`, { min: 0, clampMin: true })
+      : (raw?.stock != null && raw?.stock !== '' ? integer(raw.stock, `${prefix}.stock`, { min: 0, clampMin: true }) : null);
 
     if (deltaChange == null && finalStock == null) {
       throw new PosSyncError(422, `${prefix} must provide either delta_change or final_stock/stock.`, 'validation_error');
