@@ -23,6 +23,12 @@ export default function AdminInventory() {
   const [isReconciling, setIsReconciling] = useState(false);
   const [showPosDetails, setShowPosDetails] = useState(false);
 
+  // Activity Log state
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [logSearch, setLogSearch] = useState('');
+  const [logFilterSource, setLogFilterSource] = useState('all'); // 'all' | 'pos' | 'website'
+  const [logFilterReason, setLogFilterReason] = useState('all');
+
   const fetchPosStatus = useCallback(async () => {
     try {
       setLoadingPosStatus(true);
@@ -624,6 +630,14 @@ export default function AdminInventory() {
           >
             📤 Export CSV
           </button>
+          <button
+            type="button"
+            className="admin-btn-secondary"
+            onClick={() => { setShowActivityLog(prev => !prev); if (!posStatus) fetchPosStatus(); }}
+            title="View inventory activity log – recent stock changes from POS & website"
+          >
+            📋 {showActivityLog ? 'Hide Log' : 'Activity Log'}
+          </button>
 
           {dirtyProductIds.size > 0 && (
             <button
@@ -821,6 +835,174 @@ export default function AdminInventory() {
           </div>
         )}
       </div>
+
+      {/* ──── Activity Log Panel ──── */}
+      {showActivityLog && (
+        <div className="activity-log-panel">
+          <div className="activity-log-header">
+            <div className="activity-log-title-row">
+              <h3 className="activity-log-title">📋 Inventory Activity Log</h3>
+              <span className="activity-log-count">
+                {posStatus?.recentMovements?.length || 0} entries
+              </span>
+            </div>
+            <button
+              type="button"
+              className="activity-log-close"
+              onClick={() => setShowActivityLog(false)}
+              title="Close activity log"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Log Filters */}
+          <div className="activity-log-filters">
+            <div className="activity-log-search-box">
+              <span className="search-icon">🔍</span>
+              <input
+                type="text"
+                placeholder="Search by SKU, product name, size, color..."
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                className="activity-log-search-input"
+              />
+              {logSearch && (
+                <button type="button" className="clear-search-btn" onClick={() => setLogSearch('')}>✕</button>
+              )}
+            </div>
+            <div className="activity-log-filter-pills">
+              <select
+                value={logFilterSource}
+                onChange={(e) => setLogFilterSource(e.target.value)}
+                className="activity-log-select"
+              >
+                <option value="all">All Sources</option>
+                <option value="pos">🏪 POS Only</option>
+                <option value="website">🌐 Website Only</option>
+              </select>
+              <select
+                value={logFilterReason}
+                onChange={(e) => setLogFilterReason(e.target.value)}
+                className="activity-log-select"
+              >
+                <option value="all">All Reasons</option>
+                <option value="offline_sale">Offline Sale (POS)</option>
+                <option value="pos_stock_inward">Stock Inward (POS)</option>
+                <option value="admin_adjustment">Admin Adjustment</option>
+                <option value="online_order">Online Order</option>
+                <option value="product_created">Product Created</option>
+                <option value="pos_cancel">POS Cancel</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Log Entries */}
+          <div className="activity-log-entries">
+            {(() => {
+              const movements = posStatus?.recentMovements || [];
+              const q = logSearch.trim().toLowerCase();
+
+              // Build a product name lookup from loaded products
+              const nameMap = {};
+              products.forEach(p => {
+                if (p.id) nameMap[p.id] = p.name || '';
+              });
+
+              const filtered = movements.filter(m => {
+                if (logFilterSource !== 'all' && m.source !== logFilterSource) return false;
+                if (logFilterReason !== 'all' && m.reason !== logFilterReason) return false;
+                if (q) {
+                  const productName = (nameMap[m.productId] || nameMap[m.webProductId] || '').toLowerCase();
+                  const haystack = [
+                    m.sku, m.size, m.color, m.reason, m.source,
+                    m.externalReference, productName
+                  ].join(' ').toLowerCase();
+                  if (!haystack.includes(q)) return false;
+                }
+                return true;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="activity-log-empty">
+                    <span style={{ fontSize: 28 }}>📭</span>
+                    <p>No activity log entries match your filters.</p>
+                  </div>
+                );
+              }
+
+              return filtered.map((m, idx) => {
+                const isAddition = m.deltaChange > 0;
+                const productName = nameMap[m.productId] || nameMap[m.webProductId] || '';
+                const reasonLabel = {
+                  offline_sale: '🏪 Offline Sale (POS)',
+                  pos_stock_inward: '📦 Stock Inward (POS)',
+                  admin_adjustment: '✏️ Admin Adjustment',
+                  online_order: '🛒 Online Order',
+                  product_created: '🆕 Product Created',
+                  pos_cancel: '↩️ POS Cancel',
+                }[m.reason] || m.reason;
+
+                const sourceLabel = m.source === 'pos' ? '🏪 POS' : '🌐 Website';
+
+                return (
+                  <div key={m.id || idx} className={`activity-log-entry ${isAddition ? 'log-entry--add' : 'log-entry--sub'}`}>
+                    <div className="log-entry-left">
+                      <div className="log-entry-delta">
+                        <span className={`log-delta-badge ${isAddition ? 'log-delta--plus' : 'log-delta--minus'}`}>
+                          {isAddition ? `+${m.deltaChange}` : m.deltaChange}
+                        </span>
+                      </div>
+                      <div className="log-entry-info">
+                        <div className="log-entry-product">
+                          {productName && <span className="log-product-name">{productName}</span>}
+                          <span className="log-sku">{m.sku}</span>
+                        </div>
+                        <div className="log-entry-meta">
+                          {m.size && <span className="log-meta-chip">Size: {m.size}</span>}
+                          {m.color && <span className="log-meta-chip">Color: {m.color}</span>}
+                          <span className="log-meta-chip log-meta--source">{sourceLabel}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="log-entry-right">
+                      <span className={`log-reason-badge log-reason--${m.reason}`}>{reasonLabel}</span>
+                      <div className="log-entry-stock-after">
+                        Stock After: <strong>{m.stockAfter}</strong>
+                      </div>
+                      <div className="log-entry-time">
+                        {m.createdAt ? formatSyncTime(m.createdAt) : '—'}
+                        {m.createdAt && <span className="log-time-ago">({getTimeAgo(m.createdAt)})</span>}
+                      </div>
+                      {m.externalReference && (
+                        <div className="log-entry-ref" title={m.externalReference}>
+                          Ref: {m.externalReference.length > 16 ? m.externalReference.slice(0, 16) + '…' : m.externalReference}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+
+          {/* Refresh button at bottom */}
+          <div className="activity-log-footer">
+            <button
+              type="button"
+              className="admin-btn-secondary"
+              onClick={fetchPosStatus}
+              disabled={loadingPosStatus}
+            >
+              {loadingPosStatus ? '⏳ Refreshing...' : '🔄 Refresh Log'}
+            </button>
+            <span className="activity-log-footer-hint">
+              Showing up to 100 most recent stock movements from POS &amp; website.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Quick Metrics Bar */}
       <div className="inventory-metrics-strip">
