@@ -6,7 +6,7 @@
 .cart-page-container {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 100px 24px 100px;
+  padding: calc(var(--total-header-height, 104px) + 32px) 24px 100px;
 }
 
 .cart-header-block {
@@ -108,5 +108,14 @@
 @media (max-width: 1024px) {
   .cart-desktop-grid {
     grid-template-columns: 1fr; /* Fallback to 1 column neatly on smaller constraints */
+  }
+}
+
+@media (max-width: 768px) {
+  .cart-page-container {
+    padding: calc(var(--total-header-height, 96px) + 24px) 16px 80px;
+  }
+  .cart-header-block {
+    margin-bottom: 24px;
   }
 }

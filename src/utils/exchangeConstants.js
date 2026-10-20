@@ -34,7 +34,7 @@ export const EXCHANGE_STATUS_METADATA = Object.freeze({
   },
   [EXCHANGE_STATUS.APPROVED]: {
     label: 'Exchange Approved',
-    description: 'Approved by admin, scheduling courier pickup',
+    description: 'Approved by admin',
     badgeClass: 'badge-approved',
     step: 2
   },
@@ -264,7 +264,7 @@ export function isValidExchangeTransition(currentStatus, nextStatus) {
       return [EXCHANGE_STATUS.APPROVED, EXCHANGE_STATUS.REJECTED, EXCHANGE_STATUS.CANCELLED].includes(nextStatus);
 
     case EXCHANGE_STATUS.APPROVED:
-      return [EXCHANGE_STATUS.REVERSE_PICKUP_CREATED, EXCHANGE_STATUS.REVERSE_PICKUP_PENDING, EXCHANGE_STATUS.CANCELLED].includes(nextStatus);
+      return [EXCHANGE_STATUS.RECEIVED, EXCHANGE_STATUS.QC_PENDING, EXCHANGE_STATUS.REVERSE_PICKUP_CREATED, EXCHANGE_STATUS.REVERSE_PICKUP_PENDING, EXCHANGE_STATUS.CANCELLED].includes(nextStatus);
 
     case EXCHANGE_STATUS.REVERSE_PICKUP_PENDING:
       return [EXCHANGE_STATUS.REVERSE_PICKUP_CREATED, EXCHANGE_STATUS.CANCELLED].includes(nextStatus);

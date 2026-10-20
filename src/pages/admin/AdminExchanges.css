@@ -1166,3 +1166,159 @@
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+/* Exchange Success Popup Modal */
+.exchange-success-popup {
+  max-width: 520px;
+  width: 90%;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 24px;
+}
+
+.exchange-success-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 16px;
+}
+
+.exchange-success-icon-badge {
+  width: 48px;
+  height: 48px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.exchange-success-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #059669;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.exchange-success-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.exchange-success-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exchange-success-details-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.success-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.success-detail-row .label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.success-detail-row .value {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.status-badge-approved {
+  background: #d1fae5;
+  color: #065f46;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid #a7f3d0;
+}
+
+.exchange-success-notice {
+  display: flex;
+  gap: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  color: #1e3a8a;
+  line-height: 1.45;
+}
+
+.exchange-success-notice .notice-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.exchange-success-notice p {
+  margin: 0;
+}
+
+.exchange-success-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-success-view-approved {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-success-view-approved:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+}
+
+.btn-success-done {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-success-done:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}

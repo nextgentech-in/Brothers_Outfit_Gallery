@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProductBySlug, isProductInStock } from '../services/productService';
+import { getProductBySlug, isProductInStock, subscribeToProduct } from '../services/productService';
+import { getStoreSettings, DEFAULT_OFFERS_CONFIG } from '../services/adminService';
 import ProductGallery from '../components/product/ProductGallery';
 import ProductInfo from '../components/product/ProductInfo';
 import ReviewsModule from '../components/product/ReviewsModule';
@@ -19,20 +20,55 @@ export default function ProductPage() {
           return parsed.data.find(p => p.slug === slug || p.id === slug) || null;
         }
       }
-    } catch {}
+    } catch { }
     return null;
   });
   const [loading, setLoading] = useState(() => !product);
-  const [selectedColor, setSelectedColor] = useState(() => {
-    const firstCol = product?.colors?.[0];
-    return firstCol ? (firstCol.name || firstCol) : 'Black';
+  const [selectedColor, setSelectedColor] = useState('All');
+  const [selectedColorIndex, setSelectedColorIndex] = useState(-1);
+  const [offersConfig, setOffersConfig] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('bo_offers_config');
+      if (cached) return JSON.parse(cached);
+    } catch { }
+    return DEFAULT_OFFERS_CONFIG;
   });
-  const [selectedColorIndex, setSelectedColorIndex] = useState(0);
+  const unsubscribeSnapshotRef = useRef(null);
 
-  // Fetch product from Firebase (SWR background refresh)
+  // Fetch offersConfig & store settings
+  useEffect(() => {
+    let isCurrent = true;
+    getStoreSettings().then(settings => {
+      if (isCurrent && settings?.offersConfig) {
+        setOffersConfig(settings.offersConfig);
+        try {
+          sessionStorage.setItem('bo_offers_config', JSON.stringify(settings.offersConfig));
+        } catch { }
+      }
+    }).catch(err => {
+      console.warn('Could not load store settings:', err);
+    });
+
+    const handleOffersUpdated = (e) => {
+      if (e?.detail) setOffersConfig(e.detail);
+    };
+    window.addEventListener('bo_offers_updated', handleOffersUpdated);
+
+    return () => {
+      isCurrent = false;
+      window.removeEventListener('bo_offers_updated', handleOffersUpdated);
+    };
+  }, []);
+
+  // Fetch product from Firebase (SWR background refresh + real-time stock subscription)
   useEffect(() => {
     window.scrollTo(0, 0);
     let isCurrent = true;
+
+    if (unsubscribeSnapshotRef.current) {
+      unsubscribeSnapshotRef.current();
+      unsubscribeSnapshotRef.current = null;
+    }
 
     // Check cache synchronously on slug change to avoid displaying previous product
     let cachedProd = null;
@@ -44,27 +80,39 @@ export default function ProductPage() {
           cachedProd = parsed.data.find(p => p.slug === slug || p.id === slug) || null;
         }
       }
-    } catch {}
+    } catch { }
 
     if (cachedProd) {
       setProduct(cachedProd);
       setLoading(false);
-      const firstCol = cachedProd?.colors?.[0];
-      setSelectedColor(firstCol ? (firstCol.name || firstCol) : 'Black');
+      setSelectedColor('All');
+
+      // Attach real-time Firestore listener immediately if we have doc id
+      if (cachedProd.id) {
+        unsubscribeSnapshotRef.current = subscribeToProduct(cachedProd.id, (fresh) => {
+          if (isCurrent && fresh) setProduct(fresh);
+        });
+      }
     } else {
       setProduct(null);
       setLoading(true);
     }
 
-    setSelectedColorIndex(0);
+    setSelectedColorIndex(-1);
 
     const fetchProduct = async () => {
       try {
-        const prod = await getProductBySlug(slug);
+        // forceRefresh = true ensures we bypass stale session cache and get real-time stock
+        const prod = await getProductBySlug(slug, true);
         if (isCurrent && prod) {
           setProduct(prod);
-          const firstCol = prod?.colors?.[0];
-          setSelectedColor(firstCol ? (firstCol.name || firstCol) : 'Black');
+          setSelectedColor('All');
+
+          if (!unsubscribeSnapshotRef.current && prod.id) {
+            unsubscribeSnapshotRef.current = subscribeToProduct(prod.id, (fresh) => {
+              if (isCurrent && fresh) setProduct(fresh);
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching product:", error);
@@ -74,8 +122,18 @@ export default function ProductPage() {
     };
     fetchProduct();
 
+    const handleProductsUpdated = () => {
+      fetchProduct();
+    };
+    window.addEventListener('bo_products_updated', handleProductsUpdated);
+
     return () => {
       isCurrent = false;
+      window.removeEventListener('bo_products_updated', handleProductsUpdated);
+      if (unsubscribeSnapshotRef.current) {
+        unsubscribeSnapshotRef.current();
+        unsubscribeSnapshotRef.current = null;
+      }
     };
   }, [slug]);
 
@@ -107,8 +165,8 @@ export default function ProductPage() {
 
   // Pre-bake images array ensuring a main image is pushed if images doesn't exist logically
   // Primary image is strictly first (index 0)
-  let rawImages = product.images && product.images.length > 0 
-    ? [...product.images] 
+  let rawImages = product.images && product.images.length > 0
+    ? [...product.images]
     : [product.thumbnailUrl || product.image || '/images/hero.png'];
 
   const primaryTarget = product.thumbnailUrl || null;
@@ -136,11 +194,11 @@ export default function ProductPage() {
 
   const productName = product.title || product.name || 'Men’s Fashion Wear';
   const productPrice = Number(product.discountPrice || product.price || 0);
-  const rawDescription = product.description 
+  const rawDescription = product.description
     ? product.description.replace(/<[^>]*>/g, '').trim().slice(0, 160)
     : `Shop ${productName} at Brother’s Outfit Gallery. Premium men’s fashion in Himatnagar, Gujarat. Express shipping across India and store pickup.`;
-  
-  const productImages = allImages.map(img => 
+
+  const productImages = allImages.map(img =>
     typeof img === 'object' && img?.url ? img.url : (typeof img === 'string' ? img : '')
   ).filter(Boolean);
 
@@ -167,8 +225,8 @@ export default function ProductPage() {
         "price": productPrice,
         "priceValidUntil": "2026-12-31",
         "itemCondition": "https://schema.org/NewCondition",
-        "availability": isProductInStock(product) 
-          ? "https://schema.org/InStock" 
+        "availability": isProductInStock(product)
+          ? "https://schema.org/InStock"
           : "https://schema.org/OutOfStock",
         "seller": {
           "@type": "Organization",
@@ -240,8 +298,8 @@ export default function ProductPage() {
 
         <div className="product-main-grid">
           <div className="product-gallery-section">
-            <ProductGallery 
-              images={allImages} 
+            <ProductGallery
+              images={allImages}
               selectedColor={selectedColor}
               selectedColorIndex={selectedColorIndex}
               totalColors={totalColors}
@@ -249,10 +307,11 @@ export default function ProductPage() {
               productName={productName}
             />
           </div>
-          
+
           <div className="product-info-section">
-            <ProductInfo 
-              product={product} 
+            <ProductInfo
+              product={product}
+              offersConfig={offersConfig}
               onColorChange={(colorName, colorIndex) => {
                 if (colorName) setSelectedColor(colorName);
                 if (colorIndex !== undefined) setSelectedColorIndex(colorIndex);

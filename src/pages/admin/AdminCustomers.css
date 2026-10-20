@@ -12,6 +12,27 @@
   margin-bottom: 24px;
 }
 
+.admin-export-customers-btn {
+  border: 0;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+
+.admin-export-customers-btn:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.admin-export-customers-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .admin-customers-controls .admin-search-input {
   width: 100%;
   max-width: 480px;
@@ -77,6 +98,12 @@
 }
 
 @media (max-width: 900px) {
+  .admin-customers-page .admin-header {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+
   .admin-customers-controls .admin-search-input {
     max-width: 100%;
     font-size: 16px;

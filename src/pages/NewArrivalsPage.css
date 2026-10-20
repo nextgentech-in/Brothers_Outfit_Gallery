@@ -141,7 +141,7 @@
 
 @media (max-width: 768px) {
   .new-arrivals-page {
-    padding-top: calc(var(--total-header-height, 88px) + 16px);
+    padding-top: calc(var(--total-header-height, 96px) + 24px);
     padding-bottom: 90px;
   }
 

@@ -5,6 +5,19 @@ import { invalidateProductCache } from './productService';
 
 const PRODUCTS = 'products';
 
+async function saveProductThroughServer(productId, productData, create) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required to save products.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/products/upsert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ productId, productData, create, requestId: globalThis.crypto.randomUUID() })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to save product.');
+  return data;
+}
+
 // Delete a single image from ImageKit (authenticated admin only)
 export const deleteProductImage = async (fileId) => {
   if (!fileId) return;
@@ -78,19 +91,74 @@ export const normalizeSizeGuideFromFirestore = (sizeGuide) => {
   };
 };
 
-// Admin fetching all products without active filters
-export const getAdminProducts = async () => {
-  // Pagination or complex queries can be added here
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(d => {
-    const data = d.data();
-    return {
-      id: d.id,
-      ...data,
-      ...(data.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide) } : {})
-    };
-  });
+const ADMIN_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes cache for fast admin page navigation
+let adminProductsCache = null;
+let adminProductsCacheTimestamp = 0;
+let inFlightAdminFetch = null;
+
+export const getCachedAdminProducts = () => {
+  const now = Date.now();
+  if (adminProductsCache && (now - adminProductsCacheTimestamp < ADMIN_CACHE_TTL_MS)) {
+    return adminProductsCache;
+  }
+  try {
+    const raw = sessionStorage.getItem('bo_admin_products_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.timestamp && (now - parsed.timestamp < ADMIN_CACHE_TTL_MS) && Array.isArray(parsed.data)) {
+        adminProductsCache = parsed.data;
+        adminProductsCacheTimestamp = parsed.timestamp;
+        return adminProductsCache;
+      }
+    }
+  } catch {}
+  return null;
+};
+
+export const invalidateAdminProductsCache = () => {
+  adminProductsCache = null;
+  adminProductsCacheTimestamp = 0;
+  inFlightAdminFetch = null;
+  try {
+    sessionStorage.removeItem('bo_admin_products_cache');
+  } catch {}
+};
+
+// Admin fetching all products with instant cache & background sync capability
+export const getAdminProducts = async (forceRefresh = false) => {
+  if (!forceRefresh) {
+    const cached = getCachedAdminProducts();
+    if (cached) return cached;
+  }
+  if (inFlightAdminFetch) return inFlightAdminFetch;
+
+  inFlightAdminFetch = (async () => {
+    try {
+      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => {
+        const item = d.data();
+        return {
+          id: d.id,
+          ...item,
+          ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
+        };
+      });
+      adminProductsCache = data;
+      adminProductsCacheTimestamp = Date.now();
+      try {
+        sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+          timestamp: adminProductsCacheTimestamp,
+          data
+        }));
+      } catch {}
+      return data;
+    } finally {
+      inFlightAdminFetch = null;
+    }
+  })();
+
+  return inFlightAdminFetch;
 };
 
 export const getAdminProductById = async (id) => {
@@ -154,14 +222,17 @@ export const createProduct = async (productData, preGeneratedId = null) => {
   const newRef = preGeneratedId ? doc(db, PRODUCTS, preGeneratedId) : doc(collection(db, PRODUCTS));
   const payload = {
     ...productData,
+    // The Firestore document ID is the durable website-side integration ID.
+    // It is generated before the write, so it is stable across edits and sync retries.
+    webProductId: productData.webProductId || newRef.id,
+    integrationOrigin: productData.integrationOrigin || 'website',
     name: uniqueName || productData.name,
     slug: uniqueSlug || productData.slug,
     ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   };
-  await setDoc(newRef, payload);
+  await saveProductThroughServer(newRef.id, payload, true);
   invalidateProductCache();
+  invalidateAdminProductsCache();
   return { id: newRef.id, name: uniqueName, slug: uniqueSlug };
 };
 
@@ -181,10 +252,10 @@ export const updateProduct = async (id, productData) => {
     ...(uniqueName ? { name: uniqueName } : {}),
     ...(uniqueSlug ? { slug: uniqueSlug } : {}),
     ...(productData.sizeGuide ? { sizeGuide: sanitizeSizeGuideForFirestore(productData.sizeGuide) } : {}),
-    updatedAt: serverTimestamp(),
   };
-  await updateDoc(docRef, payload);
+  await saveProductThroughServer(docRef.id, payload, false);
   invalidateProductCache();
+  invalidateAdminProductsCache();
   return { id, name: uniqueName, slug: uniqueSlug };
 };
 
@@ -193,6 +264,7 @@ export const deactivateProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
   await updateDoc(docRef, { active: false, updatedAt: serverTimestamp() });
   invalidateProductCache();
+  invalidateAdminProductsCache();
 };
 
 // Toggle Trending Status
@@ -200,6 +272,7 @@ export const toggleProductTrending = async (id, isTrending) => {
   const docRef = doc(db, PRODUCTS, id);
   await updateDoc(docRef, { isTrending, updatedAt: serverTimestamp() });
   invalidateProductCache();
+  invalidateAdminProductsCache();
 };
 
 // Hard Delete
@@ -207,6 +280,7 @@ export const deleteProduct = async (id) => {
   const docRef = doc(db, PRODUCTS, id);
   await deleteDoc(docRef);
   invalidateProductCache();
+  invalidateAdminProductsCache();
 };
 
 // Simple Stats Method
@@ -256,6 +330,7 @@ export const getAdminOrders = async () => {
 };
 
 export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
+  let backendFailure = null;
   // 1. First attempt update via trusted backend API (bypasses Firestore client security limits)
   try {
     const backendUrl = getBackendUrl();
@@ -274,10 +349,18 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
       return data;
     } else {
       const errData = await res.json().catch(() => ({}));
-      console.warn('Backend update-status returned non-ok status:', errData.error || res.statusText);
+      backendFailure = errData.error || res.statusText;
+      console.warn('Backend update-status returned non-ok status:', backendFailure);
     }
   } catch (backendErr) {
+    backendFailure = backendErr.message;
     console.warn('Backend update-status attempt failed, falling back to direct Firestore:', backendErr.message);
+  }
+
+  // Cancellation also changes inventory and must only run through the trusted,
+  // transactional endpoint. A browser-only fallback would leave stock incorrect.
+  if (status === 'Cancelled') {
+    throw new Error(backendFailure || 'The secure cancellation service is unavailable. Please try again.');
   }
 
   // 2. Direct Firestore fallback
@@ -330,12 +413,35 @@ export const getAdminCustomers = async () => {
 
 // ─── ADMIN: INVENTORY ─────────────────────────────────────────────────────────
 export const updateProductVariantStock = async (productId, variants, totalStock) => {
-  const docRef = doc(db, PRODUCTS, productId);
-  await updateDoc(docRef, {
-    variants: variants,
-    stock: totalStock,
-    updatedAt: serverTimestamp()
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required to update inventory.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/inventory/set`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      productId,
+      variants,
+      totalStock,
+      requestId: globalThis.crypto.randomUUID()
+    })
   });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Unable to update inventory.');
+
+  // Sync admin products cache in memory and session storage
+  if (adminProductsCache && Array.isArray(adminProductsCache)) {
+    adminProductsCache = adminProductsCache.map(p =>
+      p.id === productId ? { ...p, variants, stock: totalStock } : p
+    );
+    try {
+      sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+        timestamp: adminProductsCacheTimestamp || Date.now(),
+        data: adminProductsCache
+      }));
+    } catch {}
+  }
+  // Keep storefront inventory in sync
+  invalidateProductCache();
 };
 
 export const restoreOrderStock = async (items = []) => {
@@ -420,25 +526,101 @@ export const deleteCoupon = async (id) => {
 };
 
 // ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
+export const DEFAULT_OFFERS_CONFIG = {
+  enabled: true,
+  title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+  categories: ['all'],
+  items: [
+    {
+      id: 'offer-1',
+      text: 'Buy 2 & Get Flat Rs. 300 OFF',
+      icon: 'discount',
+      link: ''
+    },
+    {
+      id: 'offer-2',
+      text: 'Buy 4 & get Flat Rs. 1250 OFF',
+      icon: 'discount',
+      link: ''
+    },
+    {
+      id: 'offer-3',
+      text: 'Enjoy an Additional 5% OFF on prepaid orders!',
+      icon: 'discount',
+      link: ''
+    },
+    {
+      id: 'offer-4',
+      text: 'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!',
+      icon: 'whatsapp',
+      link: 'https://wa.me/918460233020'
+    }
+  ]
+};
+
 export const getStoreSettings = async () => {
   try {
     const snap = await getDoc(doc(db, 'settings', 'store'));
-    return snap.exists() ? snap.data() : {
+    if (snap.exists()) {
+      const data = snap.data();
+      const rawOffers = data.offersConfig || DEFAULT_OFFERS_CONFIG;
+      const sanitizedItems = Array.isArray(rawOffers.items)
+        ? rawOffers.items.map(item => {
+            if (typeof item === 'string') {
+              return item.replace(/77372\s*25825/g, '84602 33020');
+            }
+            return {
+              ...item,
+              text: String(item.text || '').replace(/77372\s*25825/g, '84602 33020'),
+              link: String(item.link || '').replace(/7737225825/g, '918460233020')
+            };
+          })
+        : DEFAULT_OFFERS_CONFIG.items;
+
+      return {
+        ...data,
+        offersConfig: {
+          ...rawOffers,
+          items: sanitizedItems
+        }
+      };
+    }
+    return {
       storeName: "Brothers Outfit Gallery",
       phone: "+91 84602 33020",
-      email: "contact@brothersoutfit.com",
+      email: "brothersoutfitgallery@gmail.com",
       address: "FF 57, Pratham Square, Sahakari Jin Rd, Anant Vihar Society, Himatnagar, Gujarat 383001",
       whatsappNumber: "918460233020",
       freeShippingMin: 1500,
       autoDiscountThreshold: 2000,
-      autoDiscountAmount: 250
+      autoDiscountAmount: 250,
+      exchangeWindowDays: 2,
+      offersConfig: DEFAULT_OFFERS_CONFIG
     };
   } catch (err) {
-    return {};
+    return {
+      offersConfig: DEFAULT_OFFERS_CONFIG
+    };
   }
 };
 
 export const saveStoreSettings = async (settingsData) => {
+  try {
+    const token = await auth.currentUser?.getIdToken();
+    if (token) {
+      const response = await fetch(`${getBackendUrl()}/api/admin/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ settings: settingsData })
+      });
+      if (response.ok) {
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Server settings save fallback to client Firestore:', err);
+  }
+
   await setDoc(doc(db, 'settings', 'store'), {
     ...settingsData,
     updatedAt: serverTimestamp()
@@ -522,4 +704,29 @@ export const seedDemoProducts = async () => {
 
   const newRef2 = doc(collection(db, PRODUCTS));
   await setDoc(newRef2, dummyProduct2);
+};
+
+// ─── POS Sync Monitoring & Reconciliation ────────────────────────────────────
+export const getPosSyncStatus = async () => {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication required.');
+  const res = await fetch(`${getBackendUrl()}/api/admin/pos/status`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch POS sync status.');
+  return data;
+};
+
+export const reconcilePosInventory = async () => {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication required.');
+  const res = await fetch(`${getBackendUrl()}/api/admin/pos/reconcile`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Failed to reconcile inventory.');
+  invalidateProductCache();
+  return data;
 };

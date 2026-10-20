@@ -17,6 +17,9 @@ import {
   convertMeasurementValue,
   convertColumnHeader
 } from '../../components/common/SizeGuideModal';
+import VisualColorSelector from '../../components/admin/VisualColorSelector.jsx';
+import { detectDominantColor } from '../../utils/imageColorDetector.js';
+import { normalizeToStandardColor } from '../../data/colorMaster.js';
 
 const CATEGORY_SIZES_MAP = {
   'Kurta': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
@@ -41,7 +44,7 @@ const SUB_CATEGORY_MAP = {
   'Kurta': ['Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
   'T-Shirts': ['Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley', 'Full Sleeve', 'Full Sleeve Collar'],
   'Shirts': ['Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
-  'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
+  'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered', 'Mom Fit', 'Straight Fit', 'Narrow Fit'],
   'Trousers': ['Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
   'Shorts': ['Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
   'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
@@ -70,23 +73,6 @@ const COMMON_BATCH_SIZES = {
   'Sunglasses': ['Standard', 'Free Size'],
   'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
 };
-
-const STANDARD_COLORS = [
-  { name: 'Black', hex: '#000000' },
-  { name: 'White', hex: '#ffffff' },
-  { name: 'Navy', hex: '#1e3a8a' },
-  { name: 'Red', hex: '#ef4444' },
-  { name: 'Green', hex: '#22c55e' },
-  { name: 'Blue', hex: '#3b82f6' },
-  { name: 'Grey', hex: '#6b7280' },
-  { name: 'Brown', hex: '#78350f' },
-  { name: 'Beige', hex: '#f5f5dc' },
-  { name: 'Pink', hex: '#ec4899' },
-  { name: 'Yellow', hex: '#eab308' },
-  { name: 'Orange', hex: '#f97316' },
-  { name: 'Purple', hex: '#a855f7' },
-  { name: 'Custom (Type specific name)', hex: '#cccccc' }
-];
 
 // Prebuilt size guide templates per category
 const SIZE_GUIDE_TEMPLATES = {
@@ -226,6 +212,19 @@ const SIZE_GUIDE_TEMPLATES = {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+const normalizeSkuPart = (value, fallback = '') => String(value || fallback)
+  .trim()
+  .toUpperCase()
+  .replace(/[^A-Z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
+
+const buildVariantSku = (productSku, color, size, fallbackProductId = '') => {
+  const base = normalizeSkuPart(productSku) || `PRD-${normalizeSkuPart(fallbackProductId, 'NEW')}`;
+  const colorPart = normalizeSkuPart(color, 'STANDARD');
+  const sizePart = normalizeSkuPart(size, 'ONE-SIZE');
+  return `${base}-${colorPart}-${sizePart}`;
+};
+
 export default function AdminProductForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -258,12 +257,21 @@ export default function AdminProductForm() {
     subCategory: '',
     gsl: '',
     sizeGuide: { enabled: false, unit: 'in', columns: [], rows: [] },
+    offersConfig: {
+      enabled: true,
+      useCustomOffers: false,
+      title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+      items: [
+        'Buy 2 & Get Flat Rs. 300 OFF',
+        'Buy 4 & get Flat Rs. 1250 OFF',
+        'Enjoy an Additional 5% OFF on prepaid orders!',
+        'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
+      ]
+    },
   });
 
   // Ephemeral States
-  const [selectedStandardColor, setSelectedStandardColor] = useState('Black');
-  const [newColorName, setNewColorName] = useState('Black');
-  const [newColorHex, setNewColorHex] = useState('#000000');
+  const [imageColorSuggestion, setImageColorSuggestion] = useState(null);
   const [selectedVariantColor, setSelectedVariantColor] = useState('');
 
   // Customizable Sizes, Bulk Stock & Size-Wise Price States
@@ -314,9 +322,43 @@ export default function AdminProductForm() {
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
             variants: loadedVariants,
-            colors: data.colors || [],
+            colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
             sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
+            offersConfig: data.offersConfig ? {
+              enabled: data.offersConfig.enabled !== false,
+              useCustomOffers: !!data.offersConfig.useCustomOffers,
+              title: data.offersConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+              items: Array.isArray(data.offersConfig.items)
+                ? data.offersConfig.items.map(i => {
+                    const str = typeof i === 'string' ? i : (i.text || '');
+                    return str.replace(/77372\s*25825/g, '84602 33020');
+                  })
+                : [
+                    'Buy 2 & Get Flat Rs. 300 OFF',
+                    'Buy 4 & get Flat Rs. 1250 OFF',
+                    'Enjoy an Additional 5% OFF on prepaid orders!',
+                    'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
+                  ]
+            } : (Array.isArray(data.customOffers) && data.customOffers.length > 0 ? {
+              enabled: true,
+              useCustomOffers: true,
+              title: data.offersTitle || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+              items: data.customOffers.map(i => {
+                const str = typeof i === 'string' ? i : (i.text || '');
+                return str.replace(/77372\s*25825/g, '84602 33020');
+              })
+            } : {
+              enabled: true,
+              useCustomOffers: false,
+              title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
+              items: [
+                'Buy 2 & Get Flat Rs. 300 OFF',
+                'Buy 4 & get Flat Rs. 1250 OFF',
+                'Enjoy an Additional 5% OFF on prepaid orders!',
+                'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
+              ]
+            }),
           });
 
           if (data.categoryId) {
@@ -355,39 +397,89 @@ export default function AdminProductForm() {
       if (name === 'name' && !isEdit) {
         updated.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       }
+      if (name === 'sku' && !isEdit) {
+        updated.variants = prev.variants.map(variant => ({
+          ...variant,
+          sku: buildVariantSku(value, variant.color, variant.size, productId)
+        }));
+      }
       return updated;
     });
   };
 
-  const handleStandardColorChange = (e) => {
-    const selected = e.target.value;
-    setSelectedStandardColor(selected);
+  const handleColorsChange = (updatedColors) => {
+    setFormData(prev => {
+      const prevColors = prev.colors || [];
+      const removedColors = prevColors.filter(c => {
+        const cId = c.id || c.name?.toLowerCase();
+        return !updatedColors.some(u => (u.id || u.name?.toLowerCase()) === cId);
+      });
+      const removedNames = new Set(removedColors.map(c => c.name));
 
-    const matched = STANDARD_COLORS.find(c => c.name === selected);
-    if (matched && matched.name !== 'Custom (Type specific name)') {
-      setNewColorName(matched.name);
-      setNewColorHex(matched.hex);
-    } else {
-      setNewColorName('');
-      setNewColorHex('#cccccc');
+      return {
+        ...prev,
+        colors: updatedColors,
+        variants: prev.variants.filter(v => !removedNames.has(v.color))
+      };
+    });
+  };
+
+  const triggerColorDetectionForFile = async (fileOrUrl) => {
+    if (!fileOrUrl) return;
+    try {
+      const result = await detectDominantColor(fileOrUrl);
+      if (result && result.success && result.standardColor) {
+        setImageColorSuggestion(result);
+        showToast(`Detected color: ${result.standardColor.name} (${result.confidence}% match)`, 'info');
+      } else {
+        setImageColorSuggestion(null);
+        if (result?.error && typeof fileOrUrl !== 'object') {
+          showToast(result.error, 'info');
+        }
+      }
+    } catch (err) {
+      console.warn('Image color detection error:', err);
+      setImageColorSuggestion(null);
     }
   };
 
-  const handleAddColor = () => {
-    if (!newColorName) return;
-    setFormData(prev => ({
-      ...prev,
-      colors: [...prev.colors, { name: newColorName, hex: newColorHex }]
-    }));
-    setNewColorName('');
+  const handleAcceptColorSuggestion = (standardColor) => {
+    if (!standardColor) return;
+    setFormData(prev => {
+      const exists = prev.colors.some(c => (c.id || c.name?.toLowerCase()) === (standardColor.id || standardColor.name?.toLowerCase()));
+      if (exists) return prev;
+      return {
+        ...prev,
+        colors: [...prev.colors, standardColor]
+      };
+    });
+
+    // Auto-tag pending/existing image if untagged
+    setPendingImages(prev => {
+      if (prev.length > 0 && !prev[0].color) {
+        return prev.map((img, i) => i === 0 ? { ...img, color: standardColor.name } : img);
+      }
+      return prev;
+    });
+    setExistingImages(prev => {
+      if (prev.length > 0 && !prev[0].color) {
+        return prev.map((img, i) => i === 0 ? { ...img, color: standardColor.name } : img);
+      }
+      return prev;
+    });
+
+    setImageColorSuggestion(null);
+    showToast(`Added ${standardColor.name} and linked image!`, 'success');
   };
 
-  const handleRemoveColor = (name) => {
-    setFormData(prev => ({
-      ...prev,
-      colors: prev.colors.filter(c => c.name !== name),
-      variants: prev.variants.filter(v => v.color !== name)
-    }));
+  const handleManualDetectFromImage = (specificTarget = null) => {
+    const target = specificTarget || pendingImages[0]?.file || pendingImages[0]?.preview || existingImages[0]?.url;
+    if (!target) {
+      showToast('Please upload an image first to detect color.', 'warning');
+      return;
+    }
+    showToast('Analyzing image colors...', 'info');
+    triggerColorDetectionForFile(target);
   };
 
   // Helper to determine active target colors (or 'Standard' if product has no color variations)
@@ -424,7 +516,7 @@ export default function AdminProductForm() {
             id: `${colName}-${cleanSize}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             color: colName,
             size: cleanSize,
-            sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${cleanSize.replace(/[^a-zA-Z0-9]/g, '')}`,
+            sku: buildVariantSku(prev.sku, colName, cleanSize, productId),
             stock: parseInt(stock, 10) || 0,
             price: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || ''),
             salePrice: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || '')
@@ -461,7 +553,7 @@ export default function AdminProductForm() {
               id: `${colName}-${sz}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               color: colName,
               size: sz,
-              sku: `${prev.sku || 'PRD'}-${colName[0]?.toUpperCase() || 'S'}-${sz.replace(/[^a-zA-Z0-9]/g, '')}`,
+              sku: buildVariantSku(prev.sku, colName, sz, productId),
               stock: parseInt(batchStock, 10) || 0,
               price: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || ''),
               salePrice: defaultPrice !== '' ? defaultPrice : (parseFloat(prev.salePrice) || '')
@@ -781,6 +873,9 @@ export default function AdminProductForm() {
         }
         return combined;
       });
+
+      // Auto-analyze uploaded product image for dominant color suggestion (client-side, non-blocking)
+      triggerColorDetectionForFile(newPending[0].file);
     }
 
     // Reset input so the same files can be selected again later
@@ -850,6 +945,8 @@ export default function AdminProductForm() {
   const handleSave = async (saveAndNew = false) => {
     // Validations
     if (!formData.name) return setError("Name is required.");
+    const productSku = String(formData.sku || '').trim();
+    if (!productSku) return setError("Product SKU is required. Enter a unique SKU such as SHT-BLK-001.");
     const mrp = parseFloat(formData.mrp);
     const sale = parseFloat(formData.salePrice);
     if (!mrp || mrp <= 0) return setError("MRP must be > 0.");
@@ -862,6 +959,20 @@ export default function AdminProductForm() {
 
     for (let v of formData.variants) {
       if (v.stock < 0) return setError("Variant stock cannot be negative.");
+    }
+
+    const skuCandidates = [
+      productSku,
+      ...formData.variants.map(variant => isEdit
+        ? String(variant.sku || '').trim()
+        : buildVariantSku(productSku, variant.color, variant.size, productId))
+    ];
+    if (skuCandidates.some(sku => !sku)) {
+      return setError("Every product variant must have a SKU.");
+    }
+    const normalizedSkuCandidates = skuCandidates.map(sku => sku.toLowerCase());
+    if (new Set(normalizedSkuCandidates).size !== normalizedSkuCandidates.length) {
+      return setError("Product and variant SKUs must be unique. Check duplicate color/size variants.");
     }
 
     setSubmitting(true);
@@ -939,6 +1050,7 @@ export default function AdminProductForm() {
         const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
+          sku: isEdit ? String(v.sku || '').trim() : buildVariantSku(productSku, v.color, v.size, productId),
           price: vPrice,
           salePrice: vPrice,
           stock: parseInt(v.stock, 10) || 0,
@@ -958,9 +1070,26 @@ export default function AdminProductForm() {
       const calculatedStock = normalizedVariants.reduce((acc, v) => acc + (v.stock || 0), 0);
       const inStockSizes = [...new Set(normalizedVariants.filter(v => (v.stock || 0) > 0).map(v => v.size))].filter(Boolean);
       const allSizes = [...new Set(normalizedVariants.map(v => v.size))].filter(Boolean);
+      // Sanitize offersConfig for saving
+      const cleanOffersItems = Array.isArray(formData.offersConfig?.items)
+        ? formData.offersConfig.items
+            .map(i => (typeof i === 'string' ? i : (i?.text || '')).trim())
+            .filter(Boolean)
+        : [];
+
+      const sanitizedOffersConfig = {
+        enabled: formData.offersConfig?.enabled !== false,
+        useCustomOffers: Boolean(formData.offersConfig?.useCustomOffers),
+        title: String(formData.offersConfig?.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!').trim(),
+        items: cleanOffersItems
+      };
 
       const payload = {
         ...formData,
+        offersConfig: sanitizedOffersConfig,
+        customOffers: sanitizedOffersConfig.useCustomOffers ? cleanOffersItems : [],
+        offersTitle: sanitizedOffersConfig.title,
+        sku: productSku,
         sizeGuide: sanitizeSizeGuideForFirestore(formData.sizeGuide),
         mrp: mrp,
         salePrice: finalFrontPrice,
@@ -1011,6 +1140,7 @@ export default function AdminProductForm() {
         });
         setExistingImages([]);
         setPendingImages([]);
+        setImageColorSuggestion(null);
         setError(null);
         setSubmitting(false);
         if (isEdit) navigate('/admin/products/new');
@@ -1200,7 +1330,18 @@ export default function AdminProductForm() {
               </div>
               <div className="admin-form-group">
                 <label>SKU (Stock Keeping Unit)</label>
-                <input type="text" name="sku" value={formData.sku} onChange={handleChange} placeholder="e.g. SHT-BLK-001" />
+                <input
+                  type="text"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  placeholder="e.g. SHT-BLK-001"
+                  readOnly={isEdit}
+                  title={isEdit ? 'SKU identity cannot be changed after product creation.' : 'Use a unique SKU; variant SKUs are generated from it.'}
+                />
+                <small style={{ color: '#64748b' }}>
+                  {isEdit ? 'SKU is locked after publishing.' : 'Must be unique. Variant SKUs update automatically.'}
+                </small>
               </div>
               <div className="admin-form-group">
                 <label>Slug (URL Friendly)</label>
@@ -1395,6 +1536,15 @@ export default function AdminProductForm() {
                     </div>
 
                     <div className="admin-image-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleManualDetectFromImage(img.url)}
+                        className="btn-set-primary"
+                        style={{ background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}
+                        title="Detect dominant color from this image"
+                      >
+                        🎨 Detect Color
+                      </button>
                       {!img.isPrimary && (
                         <button onClick={() => setPrimaryImage('existing', idx)} className="btn-set-primary">Make Primary</button>
                       )}
@@ -1436,6 +1586,15 @@ export default function AdminProductForm() {
                     </div>
 
                     <div className="admin-image-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleManualDetectFromImage(fileObj.file || fileObj.preview)}
+                        className="btn-set-primary"
+                        style={{ background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}
+                        title="Detect dominant color from this image"
+                      >
+                        🎨 Detect Color
+                      </button>
                       {!fileObj.isPrimary && (
                         <button onClick={() => setPrimaryImage('pending', idx)} className="btn-set-primary">Make Primary</button>
                       )}
@@ -1454,32 +1613,18 @@ export default function AdminProductForm() {
             )}
           </section>
 
-          {/* Colors & Variants (Preserved) */}
+          {/* Visual Color Selector Section */}
           <section className="admin-form-section">
-            <h3>Colors</h3>
-            <div className="admin-color-pills">
-              {formData.colors.map(c => (
-                <div key={c.name} className="admin-color-pill">
-                  <span className="color-dot" style={{ background: c.hex }}></span>
-                  {c.name}
-                  <button onClick={() => handleRemoveColor(c.name)}>x</button>
-                </div>
-              ))}
-            </div>
-            <div className="admin-add-color-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
-              <select
-                value={selectedStandardColor}
-                onChange={handleStandardColorChange}
-                style={{ width: '100%', padding: '12px', border: '1px solid #e7e5e4', borderRadius: '8px', marginBottom: '8px', background: '#fff', fontSize: '14px' }}
-              >
-                {STANDARD_COLORS.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-              </select>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="text" placeholder="Color Name (e.g. Black)" value={newColorName} onChange={(e) => setNewColorName(e.target.value)} />
-                <input type="color" value={newColorHex} onChange={(e) => setNewColorHex(e.target.value)} className="color-picker-input" />
-                <button type="button" className="admin-btn-secondary" onClick={handleAddColor}>ADD</button>
-              </div>
-            </div>
+            <VisualColorSelector
+              selectedColors={formData.colors}
+              onChange={handleColorsChange}
+              imageSuggestion={imageColorSuggestion}
+              onAcceptSuggestion={handleAcceptColorSuggestion}
+              onDismissSuggestion={() => setImageColorSuggestion(null)}
+              onDetectFromImage={() => handleManualDetectFromImage()}
+              hasImages={existingImages.length > 0 || pendingImages.length > 0}
+              showToast={showToast}
+            />
           </section>
 
           {/* Sizes & Inventory Section */}
@@ -2122,23 +2267,201 @@ export default function AdminProductForm() {
           </section>
 
           <section className="admin-form-section">
-            <h3>Limited-Time Sale Offer</h3>
-            <label className="admin-checkbox-param">
-              <input type="checkbox" name="offerEnabled" checked={formData.offerEnabled} onChange={handleChange} />
-              Enable Limited-Time Offer?
-            </label>
-            {formData.offerEnabled && (
-              <div className="admin-form-row">
-                <div className="admin-form-group">
-                  <label>Offer Start Date</label>
-                  <input type="datetime-local" name="offerStartAt" value={formData.offerStartAt} onChange={handleChange} />
+            <h3>Promotional Offers & Special Discounts</h3>
+
+            {/* Product Page Promotional Offers Box */}
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={formData.offersConfig?.enabled !== false}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData(prev => ({
+                      ...prev,
+                      offersConfig: {
+                        ...(prev.offersConfig || {}),
+                        enabled: checked
+                      }
+                    }));
+                  }}
+                  style={{ width: '18px', height: '18px', accentColor: '#0f172a' }}
+                />
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', display: 'block' }}>
+                    Show "Offers For You" Box on this Product Page
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    Displays the high-converting promo banner below the price.
+                  </span>
                 </div>
-                <div className="admin-form-group">
-                  <label>Offer End Date</label>
-                  <input type="datetime-local" name="offerEndAt" value={formData.offerEndAt} onChange={handleChange} />
-                </div>
+              </label>
+            </div>
+
+            {formData.offersConfig?.enabled !== false && (
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '16px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!formData.offersConfig?.useCustomOffers}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData(prev => ({
+                        ...prev,
+                        offersConfig: {
+                          ...(prev.offersConfig || {}),
+                          useCustomOffers: checked
+                        }
+                      }));
+                    }}
+                    style={{ width: '18px', height: '18px', accentColor: '#0f172a' }}
+                  />
+                  <div>
+                    <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a', display: 'block' }}>
+                      Customize Offer Text for THIS product (Override store global offers)
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      When unchecked, this product uses the global store offers configured in Store Settings.
+                    </span>
+                  </div>
+                </label>
+
+                {formData.offersConfig?.useCustomOffers && (
+                  <div style={{ background: '#ffffff', padding: '20px', borderRadius: '10px', border: '1.5px solid #cbd5e1' }}>
+                    <div className="admin-form-group">
+                      <label>Offer Box Banner Header</label>
+                      <input
+                        type="text"
+                        value={formData.offersConfig?.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData(prev => ({
+                            ...prev,
+                            offersConfig: {
+                              ...(prev.offersConfig || {}),
+                              title: val
+                            }
+                          }));
+                        }}
+                        placeholder="e.g. OFFERS FOR YOU – SHOP MORE, SAVE MORE!"
+                      />
+                    </div>
+
+                    <div className="admin-form-group" style={{ marginTop: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label style={{ margin: 0 }}>Offer Text Lines (One offer per line)</label>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cur = Array.isArray(formData.offersConfig?.items) ? formData.offersConfig.items.map(i => typeof i === 'string' ? i : i.text) : [];
+                              cur.push('International Orders? WhatsApp Us on +91 84602 33020 for Assistance!');
+                              setFormData(prev => ({
+                                ...prev,
+                                offersConfig: {
+                                  ...(prev.offersConfig || {}),
+                                  items: cur
+                                }
+                              }));
+                            }}
+                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            + WhatsApp Line
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                offersConfig: {
+                                  ...(prev.offersConfig || {}),
+                                  items: [
+                                    'Buy 2 & Get Flat Rs. 300 OFF',
+                                    'Buy 4 & get Flat Rs. 1250 OFF',
+                                    'Enjoy an Additional 5% OFF on prepaid orders!',
+                                    'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
+                                  ]
+                                }
+                              }));
+                            }}
+                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            ↺ Default Lines
+                          </button>
+                        </div>
+                      </div>
+
+                      <textarea
+                        rows="5"
+                        value={
+                          Array.isArray(formData.offersConfig?.items)
+                            ? formData.offersConfig.items.map(i => typeof i === 'string' ? i : (i.text || '')).join('\n')
+                            : ''
+                        }
+                        onChange={(e) => {
+                          const lines = e.target.value.split('\n');
+                          setFormData(prev => ({
+                            ...prev,
+                            offersConfig: {
+                              ...(prev.offersConfig || {}),
+                              items: lines
+                            }
+                          }));
+                        }}
+                        placeholder="Type each offer on a separate line&#10;e.g.&#10;Buy 2 & Get Flat Rs. 300 OFF&#10;Buy 4 & get Flat Rs. 1250 OFF&#10;Enjoy an Additional 5% OFF on prepaid orders!"
+                        style={{ width: '100%', fontFamily: 'monospace', fontSize: '13px', lineHeight: 1.5, padding: '12px' }}
+                      />
+                      <span style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                        💡 Each line you type above becomes an offer row with its own icon in the box. WhatsApp lines automatically get the green WhatsApp icon!
+                      </span>
+                    </div>
+
+                    {/* Live Preview */}
+                    <div style={{ marginTop: '20px', padding: '16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                        Live Customer Preview:
+                      </div>
+                      <div style={{ maxWidth: '480px', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', background: '#ffffff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                        <div style={{ background: '#111111', color: '#ffffff', fontSize: '12px', fontWeight: '800', letterSpacing: '0.6px', padding: '9px 14px', textTransform: 'uppercase' }}>
+                          {formData.offersConfig?.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+                        </div>
+                        <div style={{ padding: '4px 14px' }}>
+                          {(Array.isArray(formData.offersConfig?.items) ? formData.offersConfig.items : []).filter(line => String(line || '').trim()).map((line, idx) => {
+                            const isWa = String(line).toLowerCase().includes('whatsapp');
+                            return (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: idx !== formData.offersConfig.items.length - 1 ? '1px dashed #e5e7eb' : 'none' }}>
+                                <span style={{ fontSize: '14px' }}>{isWa ? '💬' : '🏷️'}</span>
+                                <span style={{ fontSize: '12.5px', fontWeight: '600', color: '#1f2937' }}>{typeof line === 'string' ? line : (line.text || '')}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+
+            {/* Limited-Time Countdown Option */}
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '16px', marginTop: '16px' }}>
+              <label className="admin-checkbox-param">
+                <input type="checkbox" name="offerEnabled" checked={formData.offerEnabled} onChange={handleChange} />
+                Enable Limited-Time Countdown Timer Banner?
+              </label>
+              {formData.offerEnabled && (
+                <div className="admin-form-row" style={{ marginTop: '12px' }}>
+                  <div className="admin-form-group">
+                    <label>Offer Start Date</label>
+                    <input type="datetime-local" name="offerStartAt" value={formData.offerStartAt} onChange={handleChange} />
+                  </div>
+                  <div className="admin-form-group">
+                    <label>Offer End Date</label>
+                    <input type="datetime-local" name="offerEndAt" value={formData.offerEndAt} onChange={handleChange} />
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
         </div>
 

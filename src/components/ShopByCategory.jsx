@@ -24,6 +24,7 @@ const CATEGORY_FALLBACK_IMAGES = {
 };
 
 const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
+const HIDDEN_CATEGORY_NAMES = new Set(['wallets']);
 
 const getCuratedCategories = () => CURATED_CATEGORY_NAMES.map(name => ({
   name,
@@ -105,12 +106,9 @@ export default function ShopByCategory() {
           categoryMap[catKey].push(product);
         });
 
-        // Combine categories from products and any admin-configured custom category images
-        const allCategoryNames = new Set([
-          ...CURATED_CATEGORY_NAMES,
-          ...Object.keys(categoryMap),
-          ...Object.keys(adminCategoryImages).filter(k => adminCategoryImages[k])
-        ]);
+        // Keep the home category rail fixed. Product uploads must not create a
+        // new category tile automatically; only the curated storefront choices appear.
+        const allCategoryNames = CURATED_CATEGORY_NAMES;
 
         // Build category entries with representative image
         const categoryEntries = Array.from(allCategoryNames)
@@ -130,7 +128,7 @@ export default function ShopByCategory() {
               productCount: products.length
             };
           })
-          .filter(cat => cat.imageUrl); // Only show categories that have an image source
+          .filter(cat => cat.imageUrl && !HIDDEN_CATEGORY_NAMES.has(cat.name.toLowerCase()));
 
         // Sort by preferred display order
         categoryEntries.sort((a, b) => {

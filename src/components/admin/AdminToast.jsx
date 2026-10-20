@@ -17,6 +17,20 @@ export default function AdminToast() {
             {(!toast.type || toast.type === 'info') && 'ℹ'}
           </div>
           <div className="admin-toast-msg">{toast.message}</div>
+          {toast.action && (
+            <button
+              type="button"
+              className="admin-toast-action-btn"
+              onClick={() => {
+                removeToast(toast.id);
+                if (typeof toast.action.onClick === 'function') {
+                  toast.action.onClick();
+                }
+              }}
+            >
+              {toast.action.label || 'Retry'}
+            </button>
+          )}
           <button
             type="button"
             className="admin-toast-close"

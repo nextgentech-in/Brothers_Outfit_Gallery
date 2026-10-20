@@ -98,9 +98,8 @@
   background: #e2e8f0;
 }
 
-/* ───────── 1. Hero Section ───────── */
 .about-hero {
-  padding: 130px 24px 70px;
+  padding: calc(var(--total-header-height, 104px) + 36px) 24px 70px;
   background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
   text-align: center;
   border-bottom: 1px solid #f1f5f9;
@@ -769,6 +768,9 @@
 }
 
 @media (max-width: 768px) {
+  .about-hero {
+    padding: calc(var(--total-header-height, 96px) + 24px) 16px 50px;
+  }
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }

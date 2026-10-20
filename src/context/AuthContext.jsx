@@ -1,18 +1,27 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db, googleProvider } from '../firebase/firebaseConfig';
+import { auth } from '../firebase/firebaseAuth';
+import { getBackendUrl } from '../utils/apiConfig';
 import {
-  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
 } from 'firebase/auth';
 
 const AuthContext = createContext();
+
+let phoneRecaptchaVerifier = null;
+
+const toIndianE164 = (phone) => {
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (!/^[6-9]\d{9}$/.test(digits)) {
+    throw new Error('Enter a valid 10-digit Indian mobile number.');
+  }
+  return `+91${digits}`;
+};
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -26,7 +35,10 @@ export function AuthProvider({ children }) {
   // Fetch or create profile logic asynchronously
   const fetchUserProfile = async (uid, authUser) => {
     try {
-      const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      const [{ doc, getDoc, setDoc, serverTimestamp }, { db }] = await Promise.all([
+        import('firebase/firestore'),
+        import('../firebase/firebaseConfig')
+      ]);
       const docRef = doc(db, 'users', uid);
       const docSnap = await getDoc(docRef);
       let isAdmin = false;
@@ -40,6 +52,21 @@ export function AuthProvider({ children }) {
 
       if (effectiveEmail && adminEmails.includes(effectiveEmail)) {
         isAdmin = true;
+      }
+
+      // The server evaluates phone-based admin access after token verification.
+      // This keeps the phone allowlist out of the browser and user profiles.
+      if (!isAdmin && authUser) {
+        try {
+          const token = await authUser.getIdToken();
+          const response = await fetch(`${getBackendUrl()}/api/auth/admin-status`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const status = await response.json().catch(() => ({}));
+          isAdmin = response.ok && status.isAdmin === true;
+        } catch {
+          // Deny admin UI access while the trusted role service is unavailable.
+        }
       }
 
       try {
@@ -59,7 +86,7 @@ export function AuthProvider({ children }) {
         }
         setUserProfile({ id: docSnap.id, ...data, isAdmin });
       } else {
-        // Auto-create basic profile for new users (e.g. Google Sign-In)
+        // Auto-create a basic profile for newly authenticated users.
         const newProfile = {
           fullName: authUser?.displayName || auth.currentUser?.displayName || effectiveEmail.split('@')[0] || 'User',
           email: effectiveEmail,
@@ -67,7 +94,7 @@ export function AuthProvider({ children }) {
           birthdate: '',
           age: '',
           address: { line1: '', city: '', state: '', pincode: '' },
-          provider: authUser?.providerData?.[0]?.providerId || 'google.com',
+          provider: authUser?.providerData?.[0]?.providerId || 'phone',
           createdAt: serverTimestamp()
         };
 
@@ -96,31 +123,51 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-  async function loginWithGoogle() {
+  async function startPhoneSignIn(phone, recaptchaContainerId) {
+    const phoneNumber = toIndianE164(phone);
+    const container = document.getElementById(recaptchaContainerId);
+    if (!container) throw new Error('Phone verification is not ready. Please try again.');
+
+    // Clear a previous challenge before creating a new one, including after a failed attempt.
+    if (phoneRecaptchaVerifier) {
+      phoneRecaptchaVerifier.clear();
+      phoneRecaptchaVerifier = null;
+    }
+    container.replaceChildren();
+
+    phoneRecaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+      size: 'invisible'
+    });
+
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      if (result && result.user) {
-        setCurrentUser(result.user);
-        fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
-      }
-      return result;
+      await phoneRecaptchaVerifier.render();
+      return await signInWithPhoneNumber(auth, phoneNumber, phoneRecaptchaVerifier);
     } catch (error) {
-      console.warn("Google signInWithPopup error code:", error.code, error.message);
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-        console.warn("Falling back to signInWithRedirect...");
-        const provider = new GoogleAuthProvider();
-        provider.setCustomParameters({ prompt: 'select_account' });
-        return await signInWithRedirect(auth, provider);
-      }
+      phoneRecaptchaVerifier.clear();
+      phoneRecaptchaVerifier = null;
       throw error;
     }
   }
 
+  async function verifyPhoneSignIn(confirmationResult, verificationCode) {
+    if (!confirmationResult) throw new Error('Request a verification code first.');
+    const code = String(verificationCode || '').trim();
+    if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit verification code.');
+
+    const result = await confirmationResult.confirm(code);
+    if (result?.user) {
+      setCurrentUser(result.user);
+      fetchUserProfile(result.user.uid, result.user).catch(err => console.warn(err));
+    }
+    return result;
+  }
+
   // Create or update a profile document in Firestore natively
   async function updateFirestoreProfile(uid, data) {
-    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    const [{ doc, setDoc, serverTimestamp }, { db }] = await Promise.all([
+      import('firebase/firestore'),
+      import('../firebase/firebaseConfig')
+    ]);
     const docRef = doc(db, 'users', uid);
     await setDoc(docRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
     await fetchUserProfile(uid, currentUser);
@@ -131,20 +178,6 @@ export function AuthProvider({ children }) {
     const safetyTimer = setTimeout(() => {
       setLoading(false);
     }, 1500);
-
-    // Process redirect sign in results (from Google redirect)
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result && result.user) {
-          setCurrentUser(result.user);
-          fetchUserProfile(result.user.uid, result.user).catch(err => console.error(err));
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.warn("Redirect sign-in check:", err.message);
-        setLoading(false);
-      });
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       clearTimeout(safetyTimer);
@@ -174,7 +207,8 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    loginWithGoogle,
+    startPhoneSignIn,
+    verifyPhoneSignIn,
     updateFirestoreProfile,
     resetPassword
   };

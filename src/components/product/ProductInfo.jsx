@@ -5,8 +5,9 @@ import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
 import { isClothingProduct, getAvailableProductSizes } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
-import AuthModal from '../auth/AuthModal';
 import SizeGuideModal from '../common/SizeGuideModal';
+import { flyProductToCart } from '../../utils/cartFlyAnimation';
+import { normalizeToStandardColor } from '../../data/colorMaster.js';
 import './ProductInfo.css';
 
 const COLOR_SWATCHES = [
@@ -14,12 +15,17 @@ const COLOR_SWATCHES = [
   ['maroon', '#7f1d1d'], ['marron', '#7f1d1d'], ['brown', '#8b5e3c'], ['beige', '#d6c3a1'],
   ['khaki', '#b6a26d'], ['pink', '#d58a91'], ['purple', '#77608e'], ['blue', '#35679b'],
   ['green', '#259b4a'], ['olive', '#667a36'], ['yellow', '#d5a321'], ['red', '#bd3f3f'],
-  ['orange', '#d96f29'], ['navy', '#173c6b'], ['cyan', '#59d5de']
+  ['orange', '#d96f29'], ['navy', '#173c6b'], ['cyan', '#59d5de'], ['rani', '#C41242']
 ];
 
 function getColorSwatchStyle({ name, hex }) {
   if (hex && /^#([\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(hex.trim())) {
     return { backgroundColor: hex.trim() };
+  }
+
+  const standard = normalizeToStandardColor(name);
+  if (standard && standard.hex) {
+    return { backgroundColor: standard.hex };
   }
 
   const normalizedName = String(name || '').toLowerCase();
@@ -68,7 +74,7 @@ function MiniCountdown({ targetDate }) {
   );
 }
 
-export default function ProductInfo({ product, onColorChange }) {
+export default function ProductInfo({ product, onColorChange, offersConfig }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
   const { isInWishlist, toggleWishlist } = useWishlist() || {};
@@ -115,7 +121,6 @@ export default function ProductInfo({ product, onColorChange }) {
   const [selectedColor, setSelectedColor] = useState('All');
   const [selectedSize, setSelectedSize] = useState(() => defaultFrontVariant?.size || null);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [deliveryPincode, setDeliveryPincode] = useState('');
@@ -239,6 +244,12 @@ export default function ProductInfo({ product, onColorChange }) {
     const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
     const colorToUse = (selectedColor && selectedColor !== 'All') ? selectedColor : (availableColors[0]?.name || productColors[0] || 'Default');
     addToCart(product, sizeToUse, colorToUse, quantity, activeSale);
+
+    // Trigger visual flying animation from main product gallery image to the navbar cart
+    const galleryMainImg = document.querySelector('.product-gallery-main img, .image-zoom-img') || document.querySelector('.product-gallery-section img');
+    const fallbackImg = product.images?.[0]?.url || product.images?.[0] || product.image;
+    flyProductToCart(galleryMainImg, fallbackImg);
+
     setAdded(true);
     setTimeout(() => setAdded(false), 3000);
   };
@@ -259,16 +270,6 @@ export default function ProductInfo({ product, onColorChange }) {
       return;
     }
 
-    // Require account creation/login before navigating to checkout
-    if (!currentUser) {
-      setAuthModalOpen(true);
-      return;
-    }
-
-    executeBuyNow();
-  };
-
-  const onAuthSuccess = () => {
     executeBuyNow();
   };
 
@@ -357,6 +358,131 @@ export default function ProductInfo({ product, onColorChange }) {
       </div>
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
+
+      {/* Offers Box (Shop More, Save More) - Fully Customizable & Category Targeted */}
+      {(() => {
+        // 1. If offers are explicitly disabled on this product, hide the box completely
+        if (product.offersConfig && product.offersConfig.enabled === false) return null;
+
+        // 2. Priority: Specific product custom offers (ONLY if useCustomOffers is explicitly enabled) > Store global offersConfig
+        const hasProductCustomOffers = Boolean(
+          (product.offersConfig?.useCustomOffers && Array.isArray(product.offersConfig?.items) && product.offersConfig.items.some(i => String(typeof i === 'string' ? i : i?.text || '').trim())) ||
+          (Array.isArray(product.customOffers) && product.customOffers.some(i => String(typeof i === 'string' ? i : i?.text || '').trim()))
+        );
+
+        const prodCustom = hasProductCustomOffers
+          ? (product.offersConfig?.useCustomOffers
+              ? product.offersConfig
+              : { enabled: true, title: product.offersTitle || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!', items: product.customOffers })
+          : null;
+
+        const effectiveConfig = prodCustom || offersConfig;
+        if (!effectiveConfig || effectiveConfig.enabled === false) return null;
+
+        // 3. Category targeting check (only applies to store global offers)
+        if (!prodCustom) {
+          const cats = effectiveConfig.categories || ['all'];
+          const isAll = cats.length === 0 || cats.includes('all') || cats.includes('All');
+          if (!isAll) {
+            const pCat = String(product.category || product.categoryId || '').trim().toLowerCase();
+            const pSubCat = String(product.subCategory || '').trim().toLowerCase();
+            const match = cats.some(c => {
+              const lower = String(c).trim().toLowerCase();
+              return lower === pCat || lower === pSubCat || (lower && (pCat.includes(lower) || lower.includes(pCat)));
+            });
+            if (!match) return null;
+          }
+        }
+
+        const rawItems = effectiveConfig.items || [];
+        const items = (Array.isArray(rawItems) ? rawItems : []).filter(item => {
+          const t = typeof item === 'string' ? item : item?.text;
+          return Boolean(t && String(t).trim());
+        });
+        if (items.length === 0) return null;
+
+        return (
+          <div className="product-offers-container" aria-label="Special Offers">
+            <div className="product-offers-banner">
+              {effectiveConfig.title || 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!'}
+            </div>
+            <div className="product-offers-content">
+              {items.map((item, idx) => {
+                let text = typeof item === 'string' ? item : (item.text || '');
+                // Ensure About Us phone number is used everywhere
+                text = text.replace(/77372\s*25825/g, '84602 33020');
+
+                const lowerText = text.toLowerCase();
+                const isWa = lowerText.includes('whatsapp') || lowerText.includes('wa.me');
+                const isShipping = lowerText.includes('shipping') || lowerText.includes('delivery');
+                const isDiscount = lowerText.includes('off') || lowerText.includes('discount') || lowerText.includes('%');
+
+                let icon = typeof item === 'object' && item.icon ? item.icon : null;
+                if (!icon) {
+                  if (isWa) icon = 'whatsapp';
+                  else if (isShipping) icon = 'shipping';
+                  else if (isDiscount) icon = 'discount';
+                  else icon = 'discount';
+                }
+
+                let link = typeof item === 'object' && item.link ? item.link : null;
+                if (link) {
+                  link = link.replace(/7737225825/g, '918460233020');
+                } else if (isWa) {
+                  link = `https://wa.me/918460233020?text=${encodeURIComponent(`Hi Brothers Outfit! I have a question regarding: ${product.name || 'this item'}`)}`;
+                }
+
+                const rowContent = (
+                  <div className="product-offer-row" key={idx}>
+                    <span className="product-offer-icon" aria-hidden="true">
+                      {icon === 'whatsapp' ? (
+                        <svg className="offer-svg-whatsapp" viewBox="0 0 24 24" width="18" height="18" fill="none">
+                          <path fill="#25D366" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.04 14.69 2 12.04 2Z" />
+                          <path fill="#ffffff" d="M17.52 14.33C17.22 14.18 15.75 13.45 15.48 13.35C15.21 13.25 15.01 13.2 14.81 13.5C14.61 13.8 14.04 14.47 13.86 14.67C13.69 14.87 13.51 14.9 13.21 14.75C12.91 14.6 11.95 14.28 10.81 13.26C9.92 12.47 9.32 11.5 9.14 11.2C8.97 10.9 9.12 10.74 9.27 10.59C9.41 10.46 9.57 10.24 9.72 10.07C9.87 9.9 9.92 9.77 10.02 9.57C10.12 9.37 10.07 9.2 10 9.05C9.92 8.9 9.32 7.43 9.07 6.83C8.83 6.25 8.58 6.33 8.4 6.32H7.83C7.63 6.32 7.3 6.39 7.03 6.69C6.75 6.99 6 7.69 6 9.13C6 10.57 7.05 11.96 7.2 12.16C7.35 12.36 9.27 15.31 12.21 16.58C12.91 16.88 13.46 17.06 13.88 17.2C14.58 17.42 15.22 17.39 15.72 17.31C16.28 17.23 17.44 16.61 17.68 15.93C17.93 15.26 17.93 14.68 17.85 14.56C17.78 14.43 17.62 14.38 17.52 14.33Z" />
+                        </svg>
+                      ) : icon === 'shipping' ? (
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#B88A2E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="1" y="3" width="15" height="13"></rect>
+                          <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                          <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                          <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                        </svg>
+                      ) : icon === 'star' ? (
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="#B88A2E" stroke="#B88A2E" strokeWidth="1">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#B88A2E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" strokeDasharray="3 3"></circle>
+                          <path d="m9 15 6-6"></path>
+                          <circle cx="9.5" cy="9.5" r=".5" fill="#B88A2E"></circle>
+                          <circle cx="14.5" cy="14.5" r=".5" fill="#B88A2E"></circle>
+                        </svg>
+                      )}
+                    </span>
+                    <span className="product-offer-text">{text}</span>
+                  </div>
+                );
+
+                if (link && String(link).trim()) {
+                  return (
+                    <a
+                      key={idx}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="product-offer-link-wrapper"
+                    >
+                      {rowContent}
+                    </a>
+                  );
+                }
+                return rowContent;
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Color Selection: Show buttons if in-stock colors exist */}
       {inStockColors.length > 0 && !inStockColors.every(c => c.name === 'Standard' || c.name === 'Default') && (
@@ -533,26 +659,6 @@ export default function ProductInfo({ product, onColorChange }) {
         {inWishlist ? 'SAVED TO WISHLIST ✓' : 'SAVE TO WISHLIST'}
       </button>
 
-      {/* Delivery & Purchase Confidence Badges */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>Delhivery Express</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>Estimated 2-4 business days across India</div>
-        </div>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>48H Replacement</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>For damaged/defective items with unboxing video</div>
-        </div>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>100% Genuine</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>Direct from Himatnagar flagship store</div>
-        </div>
-        <div style={{ background: '#ffffff', padding: '14px', borderRadius: '6px', border: '1px solid var(--color-stone, #D9D3C7)' }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-charcoal, #111111)', marginBottom: '3px' }}>Free Shipping</div>
-          <div style={{ fontSize: '11.5px', color: '#6B665C' }}>On all prepaid & COD orders above ₹999</div>
-        </div>
-      </div>
-
       <div className="delivery-checker">
         <h4 className="checker-title">Check Delhivery Express Serviceability</h4>
         <form className="checker-form" onSubmit={handleDeliveryCheck}>
@@ -625,6 +731,41 @@ export default function ProductInfo({ product, onColorChange }) {
         </details>
       </div>
 
+      {/* Delivery & Purchase Confidence Badges (Moved right after Shipping & Exchange Policy) */}
+      <div className="product-confidence-cards">
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">🚚</span>
+            <span className="confidence-card-title">Delhivery Express</span>
+          </div>
+          <div className="confidence-card-desc">Estimated 2-4 business days across India</div>
+        </div>
+
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">🔄</span>
+            <span className="confidence-card-title">48H Replacement</span>
+          </div>
+          <div className="confidence-card-desc">For damaged/defective items with unboxing video</div>
+        </div>
+
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">✨</span>
+            <span className="confidence-card-title">100% Genuine</span>
+          </div>
+          <div className="confidence-card-desc">Direct from Himatnagar flagship store</div>
+        </div>
+
+        <div className="confidence-card">
+          <div className="confidence-card-header">
+            <span className="confidence-card-icon">📦</span>
+            <span className="confidence-card-title">Free Shipping</span>
+          </div>
+          <div className="confidence-card-desc">On all prepaid & COD orders above ₹999</div>
+        </div>
+      </div>
+
       {/* Mobile Sticky Bottom Purchase Bar */}
       <aside className="product-sticky-bar" aria-label="Mobile Quick Purchase Bar">
         <div className="product-sticky-bar__inner">
@@ -666,15 +807,6 @@ export default function ProductInfo({ product, onColorChange }) {
         category={product.categoryId || product.category || 'Shirts'}
         customSizeGuide={product.sizeGuide}
         onSelectSize={(size) => setSelectedSize(size)}
-      />
-
-      {/* Account Login / Signup Modal on Buy Now */}
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onSuccess={onAuthSuccess}
-        initialTab="signup"
-        message="Please create an account or sign in to proceed with your order."
       />
     </div>
   );

@@ -1,205 +1,226 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import SEO from '../components/common/SEO';
 import './AuthPage.css';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [phoneConfirmation, setPhoneConfirmation] = useState(null);
+  const [loadingPhone, setLoadingPhone] = useState(false);
   const [error, setError] = useState('');
-  const [loadingEmail, setLoadingEmail] = useState(false);
-  const [loadingGoogle, setLoadingGoogle] = useState(false);
-  const [resetMode, setResetMode] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetSuccess, setResetSuccess] = useState('');
-  const [loadingReset, setLoadingReset] = useState(false);
-  const { currentUser, login, loginWithGoogle, resetPassword } = useAuth();
-  const navigate = useNavigate();
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Redirect if already logged in (e.g. after Google redirect authentication)
+  const otpInputRef = useRef(null);
+  const { currentUser, startPhoneSignIn, verifyPhoneSignIn } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Redirect if already signed in
   useEffect(() => {
     if (currentUser) {
-      navigate('/');
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, navigate, location]);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  // Focus OTP input when code is sent
+  useEffect(() => {
+    if (phoneConfirmation && otpInputRef.current) {
+      otpInputRef.current.focus();
+    }
+  }, [phoneConfirmation]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handlePhoneCodeRequest = async (e) => {
+    if (e) e.preventDefault();
+    const cleanDigits = phone.replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(cleanDigits)) {
+      return setError('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
+    }
+
     try {
       setError('');
-      setLoadingEmail(true);
-      await login(email.trim(), password);
-      navigate('/');
+      setLoadingPhone(true);
+      const confirmation = await startPhoneSignIn(cleanDigits, 'phone-signin-recaptcha');
+      setPhoneConfirmation(confirmation);
+      setResendCooldown(30);
     } catch (err) {
-      console.error("Login error:", err);
-      if (
-        err.code === 'auth/user-not-found' ||
-        err.code === 'auth/wrong-password' ||
-        err.code === 'auth/invalid-credential'
-      ) {
-        setError('Incorrect email or password. Please verify your credentials or create an account.');
+      console.error('Phone sign-in code request error:', err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError('Mobile sign-in is not enabled. Please enable Phone in Firebase Console.');
       } else if (err.code === 'auth/too-many-requests') {
-        setError('Access temporarily disabled due to many failed attempts. Please try again in a few minutes.');
-      } else if (err.code === 'auth/network-request-failed') {
-        setError('Network connection error. Please check your internet connection.');
+        setError('Too many verification requests. Please wait a few minutes and try again.');
       } else {
-        setError(err.message || 'Incorrect email or password.');
+        setError(err.message || 'Unable to send verification code. Please check your number.');
       }
     } finally {
-      setLoadingEmail(false);
+      setLoadingPhone(false);
     }
-  }
+  };
 
-  async function handleResetPassword(e) {
+  const handlePhoneVerification = async (e) => {
     e.preventDefault();
-    if (!resetEmail.trim()) {
-      return setError('Please enter your email address.');
+    const cleanCode = verificationCode.replace(/\D/g, '').trim();
+    if (cleanCode.length !== 6) {
+      return setError('Please enter the complete 6-digit verification code.');
     }
-    try {
-      setError('');
-      setResetSuccess('');
-      setLoadingReset(true);
-      await resetPassword(resetEmail.trim());
-      setResetSuccess(`Password reset email sent to ${resetEmail.trim()}! Please check your inbox and spam folder.`);
-    } catch (err) {
-      console.error('Password reset error:', err);
-      if (err.code === 'auth/user-not-found') {
-        setError('No account exists with this email address.');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Please enter a valid email address.');
-      } else {
-        setError(err.message || 'Unable to send password reset email.');
-      }
-    } finally {
-      setLoadingReset(false);
-    }
-  }
 
-  async function handleGoogleSignin() {
     try {
       setError('');
-      setLoadingGoogle(true);
-      const res = await loginWithGoogle();
-      if (res?.user) {
-        navigate('/');
+      setLoadingPhone(true);
+      const result = await verifyPhoneSignIn(phoneConfirmation, cleanCode);
+      if (result?.user) {
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
       }
     } catch (err) {
-      console.error("Google signin error:", err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('Google sign-in window was closed.');
-      } else if (err.code === 'auth/unauthorized-domain') {
-        setError('Domain not authorized in Firebase Console. Please add this domain in Firebase Console > Authentication > Settings > Authorized domains.');
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError('Google Sign-In is not enabled in Firebase Console > Authentication > Sign-in method.');
-      } else if (err.code === 'auth/network-request-failed') {
-        setError('Network error during Google sign-in. Please try again.');
-      } else {
-        setError(`Google sign-in error: ${err.message || 'Unable to connect to Google.'}`);
-      }
+      console.error('Phone verification error:', err);
+      setError(
+        err.code === 'auth/invalid-verification-code'
+          ? 'That verification code is incorrect. Please check the SMS and try again.'
+          : (err.message || 'Unable to verify code.')
+      );
     } finally {
-      setLoadingGoogle(false);
+      setLoadingPhone(false);
     }
-  }
+  };
 
   return (
     <div className="auth-page">
-      <SEO title="Account Login | Brother’s Outfit Gallery" noindex={true} />
+      <SEO title="Mobile Sign In | Brother’s Outfit Gallery" noindex={true} />
       <div className="auth-split">
         <div className="auth-image"></div>
         <div className="auth-content">
           <div className="auth-box">
-            {resetMode ? (
-              /* Password Reset Form */
-              <>
-                <div className="auth-header">
-                  <h1 className="auth-title">RESET PASSWORD</h1>
-                  <p className="auth-subtitle">Enter your registered email to receive a password reset link.</p>
-                </div>
+            <div className="auth-header">
+              <h1 className="auth-title">
+                {phoneConfirmation ? 'VERIFY OTP' : 'SIGN IN / REGISTER'}
+              </h1>
+              <p className="auth-subtitle">
+                {phoneConfirmation 
+                  ? `Enter the 6-digit code sent to +91 ${phone.replace(/\D/g, '').slice(-10)}`
+                  : 'Enter your 10-digit mobile number for instant verification'
+                }
+              </p>
+            </div>
 
-                {error && <div className="auth-error">{error}</div>}
-                {resetSuccess && (
-                  <div style={{ background: '#dcfce7', color: '#15803d', padding: '12px 16px', borderRadius: '6px', fontSize: '13.5px', marginBottom: '16px', border: '1px solid #bbf7d0' }}>
-                    {resetSuccess}
-                  </div>
-                )}
+            {error && <div className="auth-error">{error}</div>}
 
-                {!resetSuccess ? (
-                  <form onSubmit={handleResetPassword} className="auth-form">
-                    <div className="form-group">
-                      <label>Email Address</label>
-                      <input 
-                        type="email" 
-                        className="form-input" 
-                        value={resetEmail} 
-                        onChange={(e) => setResetEmail(e.target.value)} 
-                        placeholder="yourname@example.com"
-                        required 
-                      />
-                    </div>
-                    <button disabled={loadingReset} type="submit" className="btn-auth-primary">
-                      {loadingReset ? 'SENDING RESET LINK...' : 'SEND PASSWORD RESET LINK'}
-                    </button>
-                  </form>
-                ) : null}
-
-                <div className="auth-links" style={{ marginTop: '20px' }}>
-                  <p>
-                    <a href="#back" onClick={(e) => { e.preventDefault(); setResetMode(false); setError(''); setResetSuccess(''); }}>
-                      ← Back to Sign In
-                    </a>
-                  </p>
-                </div>
-              </>
-            ) : (
-              /* Normal Sign In Form */
-              <>
-                <div className="auth-header">
-                  <h1 className="auth-title">WELCOME BACK</h1>
-                  <p className="auth-subtitle">Sign in to continue shopping.</p>
-                </div>
-                
-                {error && <div className="auth-error">{error}</div>}
-                
-                <form onSubmit={handleSubmit} className="auth-form">
-                  <div className="form-group">
-                    <label>Email</label>
-                    <input 
-                      type="email" 
-                      className="form-input" 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      required 
+            {!phoneConfirmation ? (
+              /* Step 1: Mobile Phone Number Entry */
+              <form onSubmit={handlePhoneCodeRequest} className="auth-form auth-phone-form">
+                <div className="form-group">
+                  <label htmlFor="auth-phone-input">Mobile Number</label>
+                  <div className="phone-input-wrapper">
+                    <span className="phone-country-prefix">🇮🇳 +91</span>
+                    <input
+                      id="auth-phone-input"
+                      type="tel"
+                      className="form-input phone-input-field"
+                      value={phone}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setPhone(val);
+                        if (error) setError('');
+                      }}
+                      placeholder="98765 43210"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      autoFocus
+                      required
                     />
                   </div>
-                  <div className="form-group">
-                    <label>Password</label>
-                    <input 
-                      type="password" 
-                      className="form-input" 
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                  <button disabled={loadingEmail || loadingGoogle} type="submit" className="btn-auth-primary">
-                    {loadingEmail ? 'SIGNING IN...' : 'SIGN IN'}
-                  </button>
-                </form>
+                </div>
 
-                <div className="auth-divider">OR</div>
-
-                <button disabled={loadingEmail || loadingGoogle} onClick={handleGoogleSignin} className="btn-auth-google">
-                  <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
-                  {loadingGoogle ? 'CONNECTING...' : 'CONTINUE WITH GOOGLE'}
+                <button 
+                  disabled={loadingPhone || phone.replace(/\D/g, '').length < 10} 
+                  type="submit" 
+                  className="btn-auth-primary"
+                  style={{ marginTop: '8px' }}
+                >
+                  {loadingPhone ? 'SENDING OTP...' : 'CONTINUE WITH MOBILE'}
                 </button>
 
-                <div className="auth-links">
-                  <p><a href="#forgot" onClick={(e) => { e.preventDefault(); setResetMode(true); setResetEmail(email); setError(''); setResetSuccess(''); }}>Forgot Password?</a></p>
-                  <p>Don't have an account? <Link to="/signup">Create Account</Link></p>
+                <div className="auth-help-banner">
+                  <span className="help-icon">🔒</span>
+                  <span>Fast & passwordless login. New accounts are automatically created upon verification.</span>
                 </div>
-              </>
+              </form>
+            ) : (
+              /* Step 2: 6-Digit OTP Verification */
+              <form onSubmit={handlePhoneVerification} className="auth-form auth-phone-form">
+                <div className="form-group">
+                  <label htmlFor="auth-otp-input">6-Digit Verification Code</label>
+                  <input
+                    id="auth-otp-input"
+                    ref={otpInputRef}
+                    type="text"
+                    className="form-input otp-large-input"
+                    value={verificationCode}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setVerificationCode(val);
+                      if (error) setError('');
+                    }}
+                    placeholder="• • • • • •"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    required
+                  />
+                </div>
+
+                <button 
+                  disabled={loadingPhone || verificationCode.length < 6} 
+                  type="submit" 
+                  className="btn-auth-primary"
+                >
+                  {loadingPhone ? 'VERIFYING...' : 'VERIFY & SIGN IN'}
+                </button>
+
+                <div className="otp-resend-row">
+                  {resendCooldown > 0 ? (
+                    <span className="cooldown-text">
+                      Resend code in <strong>{resendCooldown}s</strong>
+                    </span>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="auth-text-button" 
+                      onClick={handlePhoneCodeRequest}
+                      disabled={loadingPhone}
+                    >
+                      Resend OTP Code
+                    </button>
+                  )}
+                  <span className="dot-sep">•</span>
+                  <button 
+                    type="button" 
+                    className="auth-text-button" 
+                    onClick={() => { 
+                      setPhoneConfirmation(null); 
+                      setVerificationCode(''); 
+                      setError(''); 
+                    }}
+                  >
+                    Change Number
+                  </button>
+                </div>
+              </form>
             )}
+
+            {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+            <div id="phone-signin-recaptcha" />
           </div>
         </div>
       </div>

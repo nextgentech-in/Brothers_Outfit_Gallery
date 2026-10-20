@@ -1,9 +1,9 @@
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 const PRODUCTS = 'products';
 const CATEGORIES = 'categories';
-const CACHE_TTL_MS = 30 * 1000; // 30 seconds fresh cache
+const CACHE_TTL_MS = 2 * 60 * 1000; // fast revisits; checkout still force-refreshes stock
 
 // In-Memory & Session Storage Caching + Request Coalescing Layer
 let memoryCache = null;
@@ -46,6 +46,33 @@ function setCachedProducts(products) {
     // Ignore storage quota
   }
 }
+
+export const updateSingleProductInCache = (productData) => {
+  if (!productData || !productData.id) return;
+  if (memoryCache && Array.isArray(memoryCache)) {
+    const idx = memoryCache.findIndex(p => p.id === productData.id || (p.slug && p.slug === productData.slug));
+    if (idx !== -1) {
+      memoryCache[idx] = { ...memoryCache[idx], ...productData };
+    } else {
+      memoryCache.unshift(productData);
+    }
+  }
+  try {
+    const raw = sessionStorage.getItem('bo_products_cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.data)) {
+        const idx = parsed.data.findIndex(p => p.id === productData.id || (p.slug && p.slug === productData.slug));
+        if (idx !== -1) {
+          parsed.data[idx] = { ...parsed.data[idx], ...productData };
+        } else {
+          parsed.data.unshift(productData);
+        }
+        sessionStorage.setItem('bo_products_cache', JSON.stringify(parsed));
+      }
+    }
+  } catch {}
+};
 
 export const invalidateProductCache = () => {
   memoryCache = null;
@@ -232,35 +259,59 @@ export const getTrendingProducts = async (qty = 12) => {
   return trending.slice(0, qty);
 };
 
-export const getProductBySlug = async (slug) => {
+export const getProductBySlug = async (slug, forceRefresh = false) => {
   if (!slug) return null;
 
-  // 1. Instant check in memory cache
-  const cached = getCachedProducts();
-  if (cached) {
-    const found = cached.find(p => p.slug === slug || p.id === slug);
-    if (found) return found;
+  // 1. Instant check in memory cache (only if not forcing refresh)
+  if (!forceRefresh) {
+    const cached = getCachedProducts();
+    if (cached) {
+      const found = cached.find(p => p.slug === slug || p.id === slug);
+      if (found) return found;
+    }
   }
 
-  // 2. Direct Firestore query fallback
+  // 2. Direct Firestore query
   try {
     const q = query(collection(db, PRODUCTS), where('slug', '==', slug), limit(1));
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
-      return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+      const productData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+      updateSingleProductInCache(productData);
+      return productData;
     }
 
     // Fallback: lookup by direct Firestore document ID
-    const { doc, getDoc } = await import('firebase/firestore');
     const docSnap = await getDoc(doc(db, PRODUCTS, slug));
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      const productData = { id: docSnap.id, ...docSnap.data() };
+      updateSingleProductInCache(productData);
+      return productData;
     }
 
     return null;
   } catch (err) {
     console.error('Error fetching product by slug or id:', err);
     return null;
+  }
+};
+
+export const subscribeToProduct = (docId, onUpdate) => {
+  if (!docId) return () => {};
+  try {
+    const unsub = onSnapshot(doc(db, PRODUCTS, docId), (docSnap) => {
+      if (docSnap.exists()) {
+        const fresh = { id: docSnap.id, ...docSnap.data() };
+        updateSingleProductInCache(fresh);
+        onUpdate?.(fresh);
+      }
+    }, (err) => {
+      console.warn('Real-time product listener error:', err.message);
+    });
+    return unsub;
+  } catch (err) {
+    console.warn('Could not establish product subscription:', err);
+    return () => {};
   }
 };
 

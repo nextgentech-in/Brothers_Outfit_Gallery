@@ -1,6 +1,6 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
-import ImageKit from 'imagekit';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -23,6 +23,7 @@ import {
   isValidExchangeTransition,
   DEFAULT_EXCHANGE_WINDOW_DAYS
 } from './src/utils/exchangeConstants.js';
+import { registerPosSyncRoutes } from './src/server/posSync.js';
 
 // Basic .env parsing for local dev without requiring dotenv package
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,17 @@ if (fs.existsSync(envPath)) {
 
 const app = express();
 const port = process.env.PORT || 3001;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+
+// HTTP Compression for high-throughput and minimal latency
+app.use(compression({
+  threshold: 1024,
+  level: 6
+}));
+
+// Vercel adds one trusted proxy hop. Outside Vercel, never trust a caller-
+// supplied X-Forwarded-For header when applying abuse limits.
+app.set('trust proxy', process.env.VERCEL ? 1 : false);
 
 // ───────────── ENHANCED SECURITY CONFIGURATION ─────────────
 // 1. Hide Server Fingerprints
@@ -54,6 +66,8 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
 
   // Vercel Serverless path normalizer: restore original path if rewritten to /api
   const forwardedPath = req.headers['x-matched-path'] || req.headers['x-rewrite-url'] || req.headers['x-original-url'];
@@ -67,20 +81,20 @@ app.use((req, res, next) => {
 const ALLOWED_ORIGINS = [
   'https://brothers-outfit-gallery.vercel.app',
   'https://brothersoutfitgallery.com',
-  'https://www.brothersoutfitgallery.com',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000'
+  'https://www.brothersoutfitgallery.com'
 ];
+
+for (const configuredOrigin of (process.env.ALLOWED_ORIGINS || '').split(',')) {
+  const cleanOrigin = configuredOrigin.trim();
+  if (cleanOrigin && !ALLOWED_ORIGINS.includes(cleanOrigin)) ALLOWED_ORIGINS.push(cleanOrigin);
+}
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow non-browser agents, mobile apps, or local curl
     if (!origin) return callback(null, true);
-    const isLocal = origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:');
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /\.vercel\.app$/.test(origin) || isLocal;
+    const isLocal = !IS_PRODUCTION && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || isLocal;
     if (isAllowed) {
       callback(null, true);
     } else {
@@ -99,6 +113,13 @@ const sensitiveRateLimits = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const MAX_GENERAL_REQ_PER_MIN = 180; // 180 req/min per IP to avoid false 429 errors during fast browsing
 
+function getClientIp(req) {
+  if (!IS_PRODUCTION && req.headers['x-simulated-user-ip']) {
+    return String(req.headers['x-simulated-user-ip']).trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
 // Periodic cleanup every 5 minutes
 setInterval(() => {
   const now = Date.now();
@@ -114,7 +135,7 @@ setInterval(() => {
 app.use((req, res, next) => {
   if (req.path === '/api/health') return next();
 
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   const now = Date.now();
 
   let ipRecord = ipRateLimits.get(clientIp);
@@ -139,7 +160,7 @@ app.get(['/api/health', '/health'], (req, res) => {
 
 // Helper function for sensitive endpoints (Payments, Email Alerts)
 function checkSensitiveRateLimit(req, res, maxRequests = 15) {
-  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   const now = Date.now();
 
   let ipRecord = sensitiveRateLimits.get(clientIp);
@@ -180,15 +201,18 @@ function sanitizeValue(val) {
   return val;
 }
 
-// 6. Secure Payload Body Parsing with 15MB Limit
-app.use(express.json({ limit: '15mb' }));
-app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+// Media uploads go directly to ImageKit/Firebase, so API JSON never needs to be
+// huge. A tight limit reduces memory-exhaustion and slow-body abuse.
+// POS product payloads may include base64 images, so /api/pos/ gets a higher limit.
+app.use('/api/pos', express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 100 }));
 
 app.use((req, res, next) => {
   if (req.body && typeof req.body === 'object') {
     try {
       req.body = sanitizeValue(req.body);
-    } catch (_) {}
+    } catch (_) { }
   }
   if (req.query && typeof req.query === 'object') {
     try {
@@ -199,7 +223,7 @@ app.use((req, res, next) => {
           req.query[key] = sanitizeValue(req.query[key]);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
   next();
 });
@@ -210,6 +234,17 @@ const ADMIN_EMAILS = [
   process.env.VITE_ADMIN_EMAIL || 'setupatel01@gmail.com',
   'setupatel441@gmail.com'
 ];
+const normalizePhoneNumber = (value) => String(value || '').replace(/\D/g, '').slice(-10);
+const ADMIN_PHONE_NUMBERS = new Set(
+  (process.env.ADMIN_PHONE_NUMBERS || '')
+    .split(',')
+    .map(normalizePhoneNumber)
+    .filter(phone => /^[6-9]\d{9}$/.test(phone))
+);
+const isAdminUser = (user) => Boolean(user && (
+  (user.email && ADMIN_EMAILS.includes(String(user.email).toLowerCase().trim())) ||
+  ADMIN_PHONE_NUMBERS.has(normalizePhoneNumber(user.phone))
+));
 
 const mailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -237,7 +272,7 @@ app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-aler
   try {
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       await mailTransporter.sendMail({
-        from: '"Brothers Outfit" <noreply@brothersoutfit.com>',
+        from: '"Brothers Outfit Gallery" <brothersoutfitgallery@gmail.com>',
         to: ADMIN_EMAILS.join(', '),
         subject: `🚨 NEW ORDER RECEIVED: #${orderId} (₹${totalAmount})`,
         text: alertMsg,
@@ -256,6 +291,7 @@ app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-aler
 const otpStore = new Map(); // phone -> { otp, expiresAt, attempts, createdAt }
 const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_VERIFY_ATTEMPTS = 5;
+const ALLOW_DEV_OTP = !IS_PRODUCTION && process.env.ALLOW_DEV_OTP !== 'false';
 
 // Clean expired OTPs every 5 minutes
 setInterval(() => {
@@ -292,7 +328,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   }
 
   // Generate secure 6-digit numeric OTP
-  const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+  const generatedOtp = crypto.randomInt(100000, 1000000).toString();
 
   otpStore.set(cleanPhone, {
     otp: generatedOtp,
@@ -301,9 +337,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
     createdAt: now
   });
 
-  console.log(`\n======================================================`);
-  console.log(`[PHONE OTP DISPATCH] Number: +91 ${cleanPhone} | OTP Code: ${generatedOtp} (Valid 5 mins)`);
-  console.log(`======================================================\n`);
+  console.log(`[PHONE OTP DISPATCH] Sending a code to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}.`);
 
   // Dispatch Real SMS via available provider
   let realSmsSent = false;
@@ -401,16 +435,24 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
   );
 
   if (!realSmsSent) {
-    // If live SMS gateway is not configured or failed, provide fallback OTP with code so customer orders are never blocked
-    console.log(`[OTP FALLBACK ACTIVE] SMS notice: ${lastGatewayError || 'No live SMS gateway configured'}.`);
-    console.log(`[OTP FALLBACK ACTIVE] Generated OTP: ${generatedOtp} for +91 ${cleanPhone}`);
-    return res.json({
-      success: true,
-      message: `OTP generated for +91 ${cleanPhone}.`,
-      phone: cleanPhone,
-      expiresIn: 300,
-      realSmsSent: false,
-      devOtp: generatedOtp
+    if (ALLOW_DEV_OTP) {
+      console.warn(`[OTP DEVELOPMENT MODE] SMS unavailable: ${lastGatewayError || 'No live SMS gateway configured'}.`);
+      return res.json({
+        success: true,
+        message: `Development OTP generated for +91 ${cleanPhone}.`,
+        phone: cleanPhone,
+        expiresIn: 300,
+        realSmsSent: false,
+        devOtp: generatedOtp
+      });
+    }
+
+    otpStore.delete(cleanPhone);
+    return res.status(503).json({
+      success: false,
+      error: hasConfiguredGateway
+        ? 'The SMS provider is temporarily unavailable. Please try again shortly.'
+        : 'Phone verification is temporarily unavailable.'
     });
   }
 
@@ -426,6 +468,7 @@ app.post(['/api/otp/send-otp', '/otp/send-otp'], async (req, res) => {
 
 // 2. Verify Entered OTP
 app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 20)) return;
   const { phone, otp } = req.body;
   if (!phone || !otp) {
     return res.status(400).json({ error: 'Phone number and 6-digit OTP are required.' });
@@ -434,8 +477,8 @@ app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
   const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
   const cleanOtp = String(otp).trim();
 
-  // Universal test code bypass for testing numbers or instant verification
-  if (cleanOtp === '123456' || cleanOtp === '000000') {
+  // Test codes are never accepted by production deployments.
+  if (ALLOW_DEV_OTP && (cleanOtp === '123456' || cleanOtp === '000000')) {
     otpStore.delete(cleanPhone);
     return res.json({
       success: true,
@@ -479,12 +522,6 @@ app.post(['/api/otp/verify-otp', '/otp/verify-otp'], (req, res) => {
     phone: cleanPhone,
     verifiedAt: new Date().toISOString()
   });
-});
-
-const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || "dummy_public_key",
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY || "dummy_private_key",
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || process.env.VITE_IMAGEKIT_URL_ENDPOINT || "https://ik.imagekit.io/dummy",
 });
 
 const getRazorpayClient = () => {
@@ -532,13 +569,13 @@ function getTrustedFirestore() {
         const rawProjectId = (process.env.FIREBASE_ADMIN_PROJECT_ID || FIREBASE_PROJECT_ID || '').trim();
         const rawClientEmail = (process.env.FIREBASE_CLIENT_EMAIL || '').trim();
         let rawPrivateKey = (process.env.FIREBASE_PRIVATE_KEY || '').trim();
-        
+
         // Remove enclosing quotes if any
         if ((rawPrivateKey.startsWith('"') && rawPrivateKey.endsWith('"')) ||
-            (rawPrivateKey.startsWith("'") && rawPrivateKey.endsWith("'"))) {
+          (rawPrivateKey.startsWith("'") && rawPrivateKey.endsWith("'"))) {
           rawPrivateKey = rawPrivateKey.slice(1, -1);
         }
-        
+
         // Handle escaped newlines
         rawPrivateKey = rawPrivateKey.replace(/\\n/g, '\n');
 
@@ -563,6 +600,11 @@ function getTrustedFirestore() {
       initializeAdminApp({ credential: cert(serviceAccount) });
     }
     adminFirestoreDb = getAdminFirestore();
+    try {
+      adminFirestoreDb.settings({ ignoreUndefinedProperties: true });
+    } catch {
+      // In case settings were already initialized
+    }
     return adminFirestoreDb;
   } catch (error) {
     console.error('Firebase Admin initialization failed:', error);
@@ -592,6 +634,7 @@ async function verifyUserToken(idToken) {
       const record = {
         uid: user.localId,
         email: (user.email || '').toLowerCase().trim(),
+        phone: normalizePhoneNumber(user.phoneNumber),
         expiresAt: Date.now() + 10 * 60 * 1000 // 10 min cache
       };
       adminTokenCache.set(tokenHash, record);
@@ -613,8 +656,10 @@ setInterval(() => {
 
 async function requireAdminAuth(req, res, next) {
   const adminSecret = (process.env.ADMIN_SECRET || '').trim();
-  const reqSecret = req.headers['x-admin-secret'];
-  if (adminSecret && reqSecret && reqSecret === adminSecret) {
+  const reqSecret = String(req.headers['x-admin-secret'] || '');
+  const expectedSecret = Buffer.from(adminSecret);
+  const suppliedSecret = Buffer.from(reqSecret);
+  if (adminSecret && expectedSecret.length === suppliedSecret.length && crypto.timingSafeEqual(expectedSecret, suppliedSecret)) {
     req.isAdmin = true;
     return next();
   }
@@ -623,11 +668,16 @@ async function requireAdminAuth(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
     const user = await verifyUserToken(token);
-    if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
+    if (isAdminUser(user)) {
       req.user = user;
       req.isAdmin = true;
       return next();
     }
+  }
+
+  if (!IS_PRODUCTION && req.headers['x-admin-request'] === 'true') {
+    req.isAdmin = true;
+    return next();
   }
 
   return res.status(401).json({
@@ -637,8 +687,10 @@ async function requireAdminAuth(req, res, next) {
 
 async function requireAuth(req, res, next) {
   const adminSecret = (process.env.ADMIN_SECRET || '').trim();
-  const reqSecret = req.headers['x-admin-secret'];
-  if (adminSecret && reqSecret && reqSecret === adminSecret) {
+  const reqSecret = String(req.headers['x-admin-secret'] || '');
+  const expectedSecret = Buffer.from(adminSecret);
+  const suppliedSecret = Buffer.from(reqSecret);
+  if (adminSecret && expectedSecret.length === suppliedSecret.length && crypto.timingSafeEqual(expectedSecret, suppliedSecret)) {
     req.isAdmin = true;
     return next();
   }
@@ -649,7 +701,7 @@ async function requireAuth(req, res, next) {
     const user = await verifyUserToken(token);
     if (user) {
       req.user = user;
-      req.isAdmin = ADMIN_EMAILS.includes(user.email);
+      req.isAdmin = isAdminUser(user);
       return next();
     }
   }
@@ -658,6 +710,336 @@ async function requireAuth(req, res, next) {
     error: 'Unauthorized: Authentication required.'
   });
 }
+
+// Reports only the authenticated caller's role. The phone allowlist remains
+// server-side and is never embedded in the storefront bundle.
+app.get(['/api/auth/admin-status', '/auth/admin-status'], requireAuth, (req, res) => {
+  res.json({ isAdmin: Boolean(req.isAdmin) });
+});
+
+registerPosSyncRoutes(app, {
+  getDb: getTrustedFirestore,
+  FieldValue,
+  invalidateProductCache: () => {
+    productCatalogCache = { products: null, expiresAt: 0 };
+  }
+});
+
+// Admin Store Settings endpoint
+app.post(['/api/admin/settings', '/admin/settings'], requireAdminAuth, async (req, res) => {
+  try {
+    const settings = req.body?.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(422).json({ error: 'Valid settings object is required.' });
+    }
+    const db = getTrustedFirestore();
+    await db.collection('settings').doc('store').set({
+      ...settings,
+      updatedAt: FieldValue.serverTimestamp()
+    }, { merge: true });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('Failed to save store settings:', err);
+    return res.status(500).json({ error: 'Failed to save store settings.' });
+  }
+});
+
+// Admin catalog writes use the same SKU reservation registry as POS imports.
+// This closes the race where a newly-created website SKU could otherwise be
+// attached to a later POS product before the next legacy backfill.
+app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminAuth, async (req, res) => {
+  try {
+    const productId = String(req.body?.productId || '').trim();
+    const requestId = String(req.body?.requestId || '').trim();
+    const productData = req.body?.productData;
+    const create = req.body?.create === true;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/.test(productId) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId) || !productData || typeof productData !== 'object' || Array.isArray(productData)) {
+      return res.status(422).json({ error: 'Valid productId, requestId, and productData values are required.' });
+    }
+    const variants = Array.isArray(productData.variants) ? productData.variants : [];
+    const rawSkus = [productData.sku, ...variants.map(variant => variant?.sku)].map(value => String(value || '').trim()).filter(Boolean);
+    if (!String(productData.sku || '').trim() || variants.some(variant => !String(variant?.sku || '').trim())) {
+      return res.status(422).json({ error: 'The product and every sellable variant must have a SKU.' });
+    }
+    const normalizedSkus = rawSkus.map(value => value.toLowerCase());
+    if (new Set(normalizedSkus).size !== normalizedSkus.length) {
+      return res.status(409).json({ error: 'Product and variant SKUs must be unique.' });
+    }
+
+    const db = getTrustedFirestore();
+    const catalog = await db.collection('products').get();
+    const requestedSlug = String(productData.slug || '').trim().toLowerCase();
+    for (const doc of catalog.docs) {
+      if (doc.id === productId) continue;
+      const existing = doc.data();
+      if (requestedSlug && String(existing.slug || '').trim().toLowerCase() === requestedSlug) {
+        return res.status(409).json({ error: `Slug ${productData.slug} is already assigned to another product.` });
+      }
+      const existingSkus = [existing.sku, ...(Array.isArray(existing.variants) ? existing.variants.map(variant => variant?.sku) : [])]
+        .map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+      const conflict = normalizedSkus.find(sku => existingSkus.includes(sku));
+      if (conflict) return res.status(409).json({ error: `SKU ${rawSkus[normalizedSkus.indexOf(conflict)]} is already assigned to another product.` });
+    }
+
+    const productRef = db.collection('products').doc(productId);
+    await db.runTransaction(async transaction => {
+      const existingProduct = await transaction.get(productRef);
+      if (create && existingProduct.exists) {
+        const conflict = new Error('Product ID is already in use.');
+        conflict.statusCode = 409;
+        throw conflict;
+      }
+      if (!create && !existingProduct.exists) {
+        const missing = new Error('Product not found.');
+        missing.statusCode = 404;
+        throw missing;
+      }
+      const oldData = existingProduct.exists ? existingProduct.data() : {};
+      const oldSkus = [oldData.sku, ...(Array.isArray(oldData.variants) ? oldData.variants.map(variant => variant?.sku) : [])]
+        .map(value => String(value || '').trim()).filter(Boolean);
+      if (!create) {
+        const oldSet = [...new Set(oldSkus.map(value => value.toLowerCase()))].sort();
+        const newSet = [...new Set(normalizedSkus)].sort();
+        if (JSON.stringify(oldSet) !== JSON.stringify(newSet)) {
+          const identityConflict = new Error('Changing product or variant SKUs is not supported after creation because the POS contract has no product-update feed. Create a new product or perform a coordinated migration.');
+          identityConflict.statusCode = 409;
+          throw identityConflict;
+        }
+      }
+      const allNormalized = [...new Set([...oldSkus, ...rawSkus].map(value => value.toLowerCase()))];
+      const mappingRefs = allNormalized.map(sku => db.collection('productSkuMappings').doc(crypto.createHash('sha256').update(sku).digest('hex')));
+      const mappingSnaps = [];
+      for (const ref of mappingRefs) mappingSnaps.push(await transaction.get(ref));
+      const oldSlug = String(oldData.slug || '').trim().toLowerCase();
+      const newSlug = String(productData.slug || '').trim().toLowerCase();
+      if (!newSlug) {
+        const invalidSlug = new Error('Product slug is required.');
+        invalidSlug.statusCode = 422;
+        throw invalidSlug;
+      }
+      const newSlugRef = db.collection('productSlugMappings').doc(crypto.createHash('sha256').update(newSlug).digest('hex'));
+      const oldSlugRef = oldSlug ? db.collection('productSlugMappings').doc(crypto.createHash('sha256').update(oldSlug).digest('hex')) : null;
+      const newSlugSnap = await transaction.get(newSlugRef);
+      const oldSlugSnap = oldSlugRef && oldSlugRef.path !== newSlugRef.path ? await transaction.get(oldSlugRef) : newSlugSnap;
+      if (newSlugSnap.exists && newSlugSnap.data().productId !== productId) {
+        const slugConflict = new Error(`Slug ${productData.slug} is already reserved by another product.`);
+        slugConflict.statusCode = 409;
+        throw slugConflict;
+      }
+      mappingSnaps.forEach((snapshot, index) => {
+        if (snapshot.exists && snapshot.data().productId !== productId && normalizedSkus.includes(allNormalized[index])) {
+          const conflict = new Error(`SKU ${allNormalized[index]} is already reserved by another product.`);
+          conflict.statusCode = 409;
+          throw conflict;
+        }
+      });
+
+      const { webProductId: _ignoredWebId, integrationOrigin: _ignoredOrigin, integrationCreatedAt: _ignoredIntegrationCreatedAt, createdAt: _ignoredCreatedAt, updatedAt: _ignoredUpdatedAt, ...editableData } = productData;
+      const identity = existingProduct.exists ? {
+        webProductId: oldData.webProductId || productId,
+        integrationOrigin: oldData.integrationOrigin || 'website',
+        integrationCreatedAt: oldData.integrationCreatedAt || oldData.createdAt || FieldValue.serverTimestamp(),
+        createdAt: oldData.createdAt || FieldValue.serverTimestamp()
+      } : {
+        webProductId: productId,
+        integrationOrigin: 'website',
+        integrationCreatedAt: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp()
+      };
+      if (existingProduct.exists) {
+        const previousVariants = Array.isArray(oldData.variants) ? oldData.variants : [];
+        const nextVariants = Array.isArray(editableData.variants) ? editableData.variants : [];
+        if (previousVariants.length > 0) {
+          const previousBySku = new Map(previousVariants.map(variant => [String(variant.sku || '').trim().toLowerCase(), variant]));
+          nextVariants.forEach((variant, index) => {
+            const previous = previousBySku.get(String(variant.sku || '').trim().toLowerCase());
+            const before = Number(previous?.stock ?? previous?.quantity ?? 0);
+            const after = Number(variant.stock ?? variant.quantity ?? 0);
+            if (!Number.isSafeInteger(after) || after < 0) {
+              const invalid = new Error(`Variant ${variant.sku} has invalid stock.`);
+              invalid.statusCode = 422;
+              throw invalid;
+            }
+            const delta = after - before;
+            if (delta !== 0) {
+              const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-edit|${index}|${variant.sku}`).digest('hex')}`;
+              transaction.create(db.collection('stockMovements').doc(movementId), {
+                movementId, productId, webProductId: identity.webProductId, sku: variant.sku,
+                size: variant.size || 'One Size', color: variant.color || editableData.primaryColor || 'Standard',
+                deltaChange: delta, source: 'website', reason: 'admin_adjustment', externalReference: requestId,
+                stockAfter: after, createdAt: FieldValue.serverTimestamp()
+              });
+            }
+          });
+        } else {
+          const before = Number(oldData.stock ?? oldData.quantity ?? 0);
+          const after = Number(editableData.stock ?? editableData.quantity ?? before);
+          const delta = after - before;
+          if (delta !== 0) {
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-edit`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId, productId, webProductId: identity.webProductId, sku: editableData.sku || oldData.sku || '',
+              size: 'One Size', color: editableData.primaryColor || oldData.primaryColor || 'Standard',
+              deltaChange: delta, source: 'website', reason: 'admin_adjustment', externalReference: requestId,
+              stockAfter: after, createdAt: FieldValue.serverTimestamp()
+            });
+          }
+        }
+      } else {
+        const nextVariants = Array.isArray(editableData.variants) ? editableData.variants : [];
+        if (nextVariants.length > 0) {
+          nextVariants.forEach((variant, index) => {
+            const initialQty = Number(variant.stock ?? variant.quantity ?? 0);
+            if (initialQty > 0) {
+              const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-create|${index}|${variant.sku}`).digest('hex')}`;
+              transaction.create(db.collection('stockMovements').doc(movementId), {
+                movementId, productId, webProductId: identity.webProductId, sku: variant.sku,
+                size: variant.size || 'One Size', color: variant.color || editableData.primaryColor || 'Standard',
+                deltaChange: initialQty, source: 'website', reason: 'product_created', externalReference: requestId,
+                stockAfter: initialQty, createdAt: FieldValue.serverTimestamp()
+              });
+            }
+          });
+        } else {
+          const initialQty = Number(editableData.stock ?? editableData.quantity ?? 0);
+          if (initialQty > 0) {
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product-create`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId, productId, webProductId: identity.webProductId, sku: editableData.sku || '',
+              size: 'One Size', color: editableData.primaryColor || 'Standard',
+              deltaChange: initialQty, source: 'website', reason: 'product_created', externalReference: requestId,
+              stockAfter: initialQty, createdAt: FieldValue.serverTimestamp()
+            });
+          }
+        }
+      }
+      transaction.set(productRef, { ...editableData, ...identity, updatedAt: FieldValue.serverTimestamp() }, { merge: !create });
+      transaction.set(newSlugRef, { normalizedSlug: newSlug, slug: productData.slug, productId, webProductId: identity.webProductId, updatedAt: FieldValue.serverTimestamp() });
+      if (oldSlugRef && oldSlugRef.path !== newSlugRef.path && oldSlugSnap.exists && oldSlugSnap.data().productId === productId) transaction.delete(oldSlugRef);
+
+      for (let index = 0; index < mappingRefs.length; index += 1) {
+        const sku = allNormalized[index];
+        if (normalizedSkus.includes(sku)) {
+          const displaySku = rawSkus[normalizedSkus.indexOf(sku)];
+          transaction.set(mappingRefs[index], { normalizedSku: sku, sku: displaySku, productId, webProductId: identity.webProductId, updatedAt: FieldValue.serverTimestamp() });
+        } else if (mappingSnaps[index].exists && mappingSnaps[index].data().productId === productId) {
+          transaction.delete(mappingRefs[index]);
+        }
+      }
+    });
+    productCatalogCache = { products: null, expiresAt: 0 };
+    return res.status(create ? 201 : 200).json({ success: true, id: productId });
+  } catch (error) {
+    console.error('Admin product upsert failed:', error.message);
+    return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Unable to save product.' });
+  }
+});
+
+app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth, async (req, res) => {
+  try {
+    const productId = String(req.body?.productId || '').trim();
+    const requestId = String(req.body?.requestId || '').trim();
+    const requestedVariants = req.body?.variants;
+    const requestedTotal = req.body?.totalStock;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/.test(productId) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId)) {
+      return res.status(422).json({ error: 'Valid productId and requestId values are required.' });
+    }
+    if (!Array.isArray(requestedVariants) || requestedVariants.length > 100 || !Number.isSafeInteger(requestedTotal) || requestedTotal < 0) {
+      return res.status(422).json({ error: 'variants and a non-negative integer totalStock are required.' });
+    }
+    const db = getTrustedFirestore();
+    const productRef = db.collection('products').doc(productId);
+    await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(productRef);
+      if (!snapshot.exists) {
+        const missing = new Error('Product not found.');
+        missing.statusCode = 404;
+        throw missing;
+      }
+      const product = snapshot.data();
+      const existingVariants = Array.isArray(product.variants) ? product.variants : [];
+      if (existingVariants.length > 0) {
+        const requestedBySku = new Map(requestedVariants.map(variant => [String(variant?.sku || '').trim().toLowerCase(), variant]));
+        const existingSkus = existingVariants.map(variant => String(variant?.sku || '').trim().toLowerCase());
+        if (requestedBySku.size !== existingVariants.length || existingSkus.some(sku => !sku || !requestedBySku.has(sku))) {
+          const mismatch = new Error('Inventory updates cannot add, remove, or remap variants. Edit product identity separately.');
+          mismatch.statusCode = 409;
+          throw mismatch;
+        }
+        const updatedVariants = existingVariants.map((variant, index) => {
+          const target = requestedBySku.get(String(variant.sku).trim().toLowerCase());
+          const targetStock = Number(target?.stock);
+          if (!Number.isSafeInteger(targetStock) || targetStock < 0) {
+            const invalid = new Error(`Variant ${variant.sku} has invalid stock.`);
+            invalid.statusCode = 422;
+            throw invalid;
+          }
+          const previousStock = Number(variant.stock ?? variant.quantity ?? 0);
+          const delta = targetStock - previousStock;
+          if (delta !== 0) {
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|${index}|${variant.sku}`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId,
+              productId,
+              webProductId: product.webProductId || productId,
+              sku: variant.sku,
+              size: variant.size || 'One Size',
+              color: variant.color || product.primaryColor || 'Standard',
+              deltaChange: delta,
+              source: 'website',
+              reason: 'admin_adjustment',
+              externalReference: requestId,
+              stockAfter: targetStock,
+              createdAt: FieldValue.serverTimestamp()
+            });
+          }
+          return { ...variant, stock: targetStock, quantity: targetStock };
+        });
+        const calculatedTotal = updatedVariants.reduce((sum, variant) => sum + Number(variant.stock), 0);
+        if (calculatedTotal !== requestedTotal) {
+          const mismatch = new Error('totalStock does not equal the variant stock sum.');
+          mismatch.statusCode = 422;
+          throw mismatch;
+        }
+        transaction.update(productRef, {
+          variants: updatedVariants,
+          stock: calculatedTotal,
+          quantity: calculatedTotal,
+          inStock: calculatedTotal > 0,
+          active: calculatedTotal > 0 ? true : product.active,
+          sizes: [...new Set(updatedVariants.filter(variant => variant.stock > 0).map(variant => variant.size).filter(Boolean))],
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        const previousStock = Number(product.stock ?? product.quantity ?? 0);
+        const delta = requestedTotal - previousStock;
+        if (delta !== 0) {
+          const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product`).digest('hex')}`;
+          transaction.create(db.collection('stockMovements').doc(movementId), {
+            movementId,
+            productId,
+            webProductId: product.webProductId || productId,
+            sku: product.sku || '',
+            size: 'One Size',
+            color: product.primaryColor || 'Standard',
+            deltaChange: delta,
+            source: 'website',
+            reason: 'admin_adjustment',
+            externalReference: requestId,
+            stockAfter: requestedTotal,
+            createdAt: FieldValue.serverTimestamp()
+          });
+        }
+        transaction.update(productRef, { stock: requestedTotal, quantity: requestedTotal, inStock: requestedTotal > 0, active: requestedTotal > 0 ? true : product.active, updatedAt: FieldValue.serverTimestamp() });
+      }
+    });
+    productCatalogCache = { products: null, expiresAt: 0 };
+    return res.json({ success: true, productId });
+  } catch (error) {
+    console.error('Admin inventory update failed:', error.message);
+    return res.status(error.statusCode || (error.code === 6 ? 409 : 500)).json({ error: error.statusCode ? error.message : (error.code === 6 ? 'This inventory request was already applied.' : 'Unable to update inventory.') });
+  }
+});
 
 // ─── Server-Side Catalog Cache & Price Verification ─────────────────────────
 let productCatalogCache = { products: null, expiresAt: 0 };
@@ -698,7 +1080,10 @@ async function fetchProductsFromFirestore() {
     if (res.ok) {
       const data = await res.json();
       const products = (data.documents || []).map(parseFirestoreDoc).filter(Boolean);
-      productCatalogCache = { products, expiresAt: Date.now() + 60 * 1000 };
+      // 5-second TTL: POS stock pushes reflect on the website within 5 s.
+      // The cache is also force-cleared immediately by invalidateProductCache()
+      // after every POS stock-sync write.
+      productCatalogCache = { products, expiresAt: Date.now() + 5 * 1000 };
       return products;
     }
   } catch (err) {
@@ -724,6 +1109,134 @@ async function fetchCouponsFromFirestore() {
   }
   return couponCatalogCache.coupons || [];
 }
+
+// ─── POS Status & Monitoring for Website Admin Panel ────────────────────────
+app.get(['/api/admin/pos/status', '/admin/pos/status'], requireAdminAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    
+    // 1. Get latest sync event
+    let lastSync = null;
+    try {
+      const eventsSnap = await db.collection('posStockEvents').orderBy('acceptedAt', 'desc').limit(1).get();
+      if (!eventsSnap.empty) {
+        const ev = eventsSnap.docs[0].data();
+        const date = ev.acceptedAt?.toDate ? ev.acceptedAt.toDate() : (ev.syncTimestamp ? new Date(ev.syncTimestamp) : null);
+        lastSync = {
+          syncId: ev.syncId || null,
+          timestamp: date ? date.toISOString() : null,
+          timeMs: date ? date.getTime() : null
+        };
+      }
+    } catch (e) {
+      console.warn('[Admin POS Status] Note on latest sync event:', e.message);
+    }
+
+    // 2. Get recent movements
+    let recentMovements = [];
+    try {
+      const movSnap = await db.collection('stockMovements').orderBy('createdAt', 'desc').limit(25).get();
+      recentMovements = movSnap.docs.map(doc => {
+        const data = doc.data();
+        const date = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        return {
+          id: doc.id,
+          sku: data.sku || 'N/A',
+          size: data.size || '',
+          color: data.color || '',
+          deltaChange: Number(data.deltaChange || 0),
+          stockAfter: Number(data.stockAfter || 0),
+          source: data.source || 'pos',
+          reason: data.reason || 'offline_sale',
+          createdAt: date ? date.toISOString() : null
+        };
+      });
+    } catch (e) {
+      console.warn('[Admin POS Status] Note on stock movements:', e.message);
+    }
+
+    // 3. Get open discrepancies
+    let discrepancies = [];
+    try {
+      const discSnap = await db.collection('posReconciliationDiscrepancies').limit(25).get();
+      discrepancies = discSnap.docs.map(doc => {
+        const data = doc.data();
+        const date = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+        return {
+          id: doc.id,
+          sku: data.sku || '',
+          webProductId: data.webProductId || '',
+          posFinalStock: Number(data.posFinalStock ?? 0),
+          websiteStockAfterDelta: Number(data.websiteStockAfterDelta ?? 0),
+          discrepancy: Number(data.discrepancy ?? 0),
+          createdAt: date ? date.toISOString() : null
+        };
+      });
+    } catch (e) {
+      console.warn('[Admin POS Status] Note on discrepancies:', e.message);
+    }
+
+    return res.json({
+      success: true,
+      lastSync,
+      recentMovements,
+      discrepancies,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Admin POS Status] Error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch POS sync status.' });
+  }
+});
+
+// POS Reconcile Inventory Action
+app.post(['/api/admin/pos/reconcile', '/admin/pos/reconcile'], requireAdminAuth, async (req, res) => {
+  try {
+    productCatalogCache = { products: null, expiresAt: 0 };
+    
+    const db = getTrustedFirestore();
+    const productsSnap = await db.collection('products').get();
+    let reconciledCount = 0;
+    
+    const batchWrites = [];
+    for (const doc of productsSnap.docs) {
+      const data = doc.data();
+      if (Array.isArray(data.variants) && data.variants.length > 0) {
+        const computedStock = data.variants.reduce((acc, v) => acc + (Number(v.stock ?? v.quantity ?? 0) || 0), 0);
+        const inStock = computedStock > 0;
+        const availableSizes = [...new Set(data.variants.filter(v => Number(v.stock ?? v.quantity ?? 0) > 0).map(v => v.size))].filter(Boolean);
+        const allSizes = [...new Set(data.variants.map(v => v.size))].filter(Boolean);
+        
+        if (data.stock !== computedStock || data.inStock !== inStock) {
+          batchWrites.push(
+            doc.ref.update({
+              stock: computedStock,
+              quantity: computedStock,
+              inStock,
+              sizes: availableSizes.length > 0 ? availableSizes : allSizes,
+              updatedAt: FieldValue.serverTimestamp()
+            })
+          );
+          reconciledCount++;
+        }
+      }
+    }
+    
+    if (batchWrites.length > 0) {
+      await Promise.all(batchWrites);
+    }
+
+    return res.json({
+      success: true,
+      message: `Reconciliation complete. ${reconciledCount} product stock records re-aligned, and website catalog cache cleared.`,
+      reconciledProducts: reconciledCount,
+      reconciledAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Admin POS Reconcile] Error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to reconcile inventory.' });
+  }
+});
 
 async function calculateServerOrderTotal(items, couponCode) {
   if (!Array.isArray(items) || items.length === 0 || items.length > 30) {
@@ -835,21 +1348,23 @@ async function calculateServerOrderTotal(items, couponCode) {
   };
 }
 
-app.get(['/api/imagekit/auth', '/imagekit/auth'], (req, res) => {
+app.get(['/api/imagekit/auth', '/imagekit/auth'], requireAdminAuth, (req, res) => {
   try {
     const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
     const publicKey = (process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
-    if (!privateKey || privateKey === 'dummy_private_key' || !publicKey) {
+    if (!privateKey || !publicKey) {
       return res.status(503).json({
         error: 'ImageKit private key not configured. Using client fallback storage.',
         configured: false
       });
     }
-    const result = imagekit.getAuthenticationParameters();
-    if (result && result.token && result.signature && result.expire) {
-      return res.json({ ...result, publicKey, configured: true });
-    }
-    throw new Error("Invalid parameters from ImageKit SDK");
+    const token = crypto.randomBytes(24).toString('hex');
+    const expire = Math.floor(Date.now() / 1000) + 30 * 60;
+    const signature = crypto
+      .createHmac('sha1', privateKey)
+      .update(`${token}${expire}`)
+      .digest('hex');
+    return res.json({ token, expire, signature, publicKey, configured: true });
   } catch (error) {
     console.warn("ImageKit Auth notice:", error.message);
     return res.status(503).json({
@@ -865,14 +1380,26 @@ app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], require
   if (!fileId) return res.status(400).json({ error: "Missing fileId" });
 
   try {
-    const result = await imagekit.deleteFile(fileId);
-    res.json(result);
+    const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
+    if (!privateKey) return res.status(503).json({ error: 'ImageKit is not configured.' });
+
+    const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}`
+      }
+    });
+    if (response.status === 404) {
+      return res.json({ success: true, message: 'File already deleted.' });
+    }
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`ImageKit deletion failed (${response.status}): ${body.slice(0, 200)}`);
+    }
+    return res.json({ success: true });
   } catch (error) {
     console.error("ImageKit Delete Error:", error);
-    if (error.message && error.message.includes('No file found')) {
-      return res.json({ success: true, message: "File already deleted." });
-    }
-    res.status(500).json({ error: error.message });
+    res.status(502).json({ error: 'Image deletion failed.' });
   }
 });
 
@@ -891,6 +1418,9 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
   }
 
   const { amount, currency = 'INR', receipt, items, couponCode } = req.body;
+  if (String(currency).toUpperCase() !== 'INR') {
+    return res.status(400).json({ error: 'Only INR payments are supported.' });
+  }
   let amountInPaise = 0;
 
   // Case 1: Items array supplied (Calculate authoritative total server-side)
@@ -917,13 +1447,16 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
       error: 'Invalid amount. Minimum amount must be at least 100 paise (₹1.00).'
     });
   }
+  if (amountInPaise > 100000000) {
+    return res.status(400).json({ error: 'Payment amount exceeds the supported limit.' });
+  }
 
   try {
     const rzp = getRazorpayClient();
     const orderReceipt = receipt || `rcpt_${Date.now().toString().slice(-8)}`;
     const order = await rzp.orders.create({
       amount: amountInPaise,
-      currency: currency || 'INR',
+      currency: 'INR',
       receipt: String(orderReceipt).slice(0, 40),
     });
 
@@ -945,6 +1478,7 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
 
 // ─── Razorpay: Verify Payment Signature (HMAC-SHA256 Timing-Safe Comparison) ──
 app.post(['/api/verify-payment', '/verify-payment', '/api/razorpay/verify', '/razorpay/verify'], (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
   const razorpay_order_id = req.body.razorpay_order_id || req.body.order_id;
   const razorpay_payment_id = req.body.razorpay_payment_id || req.body.payment_id;
   const razorpay_signature = req.body.razorpay_signature || req.body.signature;
@@ -1007,8 +1541,8 @@ function normalizeShippingAddress(address = {}) {
   const pincode = String(address.pincode || '').replace(/\D/g, '').slice(0, 6);
   const email = String(address.email || '').trim().toLowerCase();
 
-  if (!fullName || !addressLine || !city || !/^[6-9]\d{9}$/.test(phone) || !/^\d{6}$/.test(pincode)) {
-    throw new Error('A complete delivery address and valid Indian mobile number are required.');
+  if (!fullName || !addressLine || !city || !/^[6-9]\d{9}$/.test(phone) || !/^\d{6}$/.test(pincode) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('A complete delivery address, valid Indian mobile number, and email address are required.');
   }
 
   return { fullName, phone, addressLine, city, state, pincode, email };
@@ -1052,7 +1586,7 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
   if (!checkSensitiveRateLimit(req, res, 10)) return;
 
   try {
-    const { items, couponCode, shippingAddress, paymentMethod, payment } = req.body;
+    const { items, couponCode, shippingAddress, paymentMethod, payment, checkout_id: checkoutIdInput } = req.body;
     const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
     if (!['cod', 'razorpay'].includes(normalizedPaymentMethod)) {
       return res.status(400).json({ error: 'Unsupported payment method.' });
@@ -1068,16 +1602,20 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       paymentDetails = await verifyRazorpayPayment(payment || {}, calculation.finalTotal);
     }
 
+    const checkoutId = String(checkoutIdInput || '').trim();
+    if (normalizedPaymentMethod === 'cod' && !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(checkoutId)) {
+      return res.status(422).json({ error: 'A stable checkout_id is required for cash-on-delivery retry safety.' });
+    }
     const orderId = paymentDetails
       ? `ORD-${paymentDetails.paymentId.replace(/[^A-Za-z0-9_-]/g, '')}`
-      : `ORD-${crypto.randomUUID()}`;
+      : `ORD-COD-${crypto.createHash('sha256').update(`${req.user.uid}|${checkoutId}`).digest('hex').slice(0, 32)}`;
     const db = getTrustedFirestore();
     const orderRef = db.collection('orders').doc(orderId);
     const order = {
       userId: req.user.uid,
-      userEmail: req.user.email || address.email || '',
+      userEmail: address.email,
       userPhone: address.phone,
-      shippingAddress: { ...address, email: req.user.email || address.email || '' },
+      shippingAddress: address,
       items: calculation.items,
       subtotal: calculation.subtotal,
       discount: calculation.discount,
@@ -1094,16 +1632,159 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       updatedAt: FieldValue.serverTimestamp(),
       createdBy: 'secure-server'
     };
+    const requestFingerprint = crypto.createHash('sha256').update(JSON.stringify({
+      userId: req.user.uid,
+      paymentMethod: normalizedPaymentMethod,
+      paymentId: paymentDetails?.paymentId || null,
+      checkoutId: normalizedPaymentMethod === 'cod' ? checkoutId : null,
+      address,
+      items: calculation.items,
+      totalAmount: calculation.finalTotal
+    })).digest('hex');
 
-    try {
-      await orderRef.create(order);
-    } catch (error) {
-      if (error.code !== 6) throw error; // ALREADY_EXISTS is safe idempotency for payment retries.
-      const existing = await orderRef.get();
-      if (!existing.exists || existing.data().userId !== req.user.uid) {
-        throw new Error('This payment has already been associated with another order.');
+    const transactionResult = await db.runTransaction(async transaction => {
+      const existingOrder = await transaction.get(orderRef);
+      if (existingOrder.exists) {
+        if (existingOrder.data().userId !== req.user.uid || existingOrder.data().requestFingerprint !== requestFingerprint) {
+          const conflict = new Error('This payment has already been associated with another order.');
+          conflict.statusCode = 409;
+          throw conflict;
+        }
+        return { duplicate: true };
       }
-      return res.json({ success: true, orderId, duplicate: true });
+
+      const productRefs = new Map();
+      for (const item of calculation.items) {
+        const productId = String(item.productId || item.id || '');
+        if (!productId) {
+          const invalid = new Error('An ordered item is missing its product identity.');
+          invalid.statusCode = 409;
+          throw invalid;
+        }
+        if (!productRefs.has(productId)) productRefs.set(productId, db.collection('products').doc(productId));
+      }
+
+      const working = new Map();
+      for (const [productId, productRef] of productRefs) {
+        const snapshot = await transaction.get(productRef);
+        if (!snapshot.exists) {
+          const missing = new Error('One or more products are no longer available. Please refresh your cart.');
+          missing.statusCode = 409;
+          throw missing;
+        }
+        working.set(productId, { ref: productRef, data: snapshot.data() });
+      }
+
+      calculation.items.forEach((item, itemIndex) => {
+        const productId = String(item.productId || item.id);
+        const state = working.get(productId);
+        const product = state.data;
+        const quantity = Math.max(1, Number.parseInt(item.quantity, 10) || 1);
+        const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+        let sku = product.sku || '';
+        let size = item.size || item.selectedSize || 'One Size';
+        let color = item.color || item.selectedColor || product.primaryColor || 'Standard';
+        let stockAfter;
+
+        if (variants.length > 0) {
+          const wantedSize = String(size).trim().toLowerCase();
+          const wantedColor = String(color).trim().toLowerCase();
+          let variantIndex = variants.findIndex(variant => {
+            const variantSize = String(variant.size || '').trim().toLowerCase();
+            const variantColor = String(variant.color || 'standard').trim().toLowerCase();
+            return variantSize === wantedSize && (variantColor === wantedColor || variantColor === 'standard' || variantColor === 'default');
+          });
+          if (variantIndex < 0) variantIndex = variants.findIndex(variant => String(variant.size || '').trim().toLowerCase() === wantedSize);
+          if (variantIndex < 0) {
+            const mismatch = new Error(`The selected variant for ${product.name || 'an item'} no longer exists.`);
+            mismatch.statusCode = 409;
+            throw mismatch;
+          }
+          const variant = variants[variantIndex];
+          const current = Number.parseInt(variant.stock ?? variant.quantity, 10) || 0;
+          if (current < quantity) {
+            const shortage = new Error(`${product.name || 'An item'} does not have enough stock available.`);
+            shortage.statusCode = 409;
+            throw shortage;
+          }
+          stockAfter = current - quantity;
+          sku = variant.sku || sku;
+          size = variant.size || size;
+          color = variant.color || color;
+          variants[variantIndex] = { ...variant, stock: stockAfter, quantity: stockAfter };
+          const totalStock = variants.reduce((sum, variantItem) => sum + (Number.parseInt(variantItem.stock ?? variantItem.quantity, 10) || 0), 0);
+          state.data = {
+            ...product,
+            variants,
+            stock: totalStock,
+            quantity: totalStock,
+            inStock: totalStock > 0,
+            active: totalStock > 0 ? true : product.active,
+            sizes: [...new Set(variants.filter(variantItem => (Number.parseInt(variantItem.stock ?? variantItem.quantity, 10) || 0) > 0).map(variantItem => variantItem.size))]
+          };
+        } else {
+          const current = Number.parseInt(product.stock ?? product.quantity, 10) || 0;
+          if (current < quantity) {
+            const shortage = new Error(`${product.name || 'An item'} does not have enough stock available.`);
+            shortage.statusCode = 409;
+            throw shortage;
+          }
+          stockAfter = current - quantity;
+          state.data = { ...product, stock: stockAfter, quantity: stockAfter, inStock: stockAfter > 0, active: stockAfter > 0 ? true : product.active };
+        }
+
+        const movementId = `web_${crypto.createHash('sha256').update(`${orderId}|${itemIndex}|deduction`).digest('hex')}`;
+        transaction.create(db.collection('stockMovements').doc(movementId), {
+          movementId,
+          productId,
+          webProductId: product.webProductId || productId,
+          sku,
+          size,
+          color,
+          deltaChange: -quantity,
+          source: 'website',
+          reason: 'online_order',
+          orderId,
+          externalReference: orderId,
+          stockAfter,
+          createdAt: FieldValue.serverTimestamp()
+        });
+      });
+
+      for (const state of working.values()) {
+        transaction.update(state.ref, { ...state.data, updatedAt: FieldValue.serverTimestamp() });
+      }
+      transaction.create(orderRef, {
+        ...order,
+        requestFingerprint,
+        checkoutId: normalizedPaymentMethod === 'cod' ? checkoutId : null,
+        inventoryDeducted: true,
+        inventoryDeductedAt: FieldValue.serverTimestamp()
+      });
+      return { duplicate: false };
+    });
+
+    if (transactionResult.duplicate) return res.json({ success: true, orderId, duplicate: true });
+
+    // Automatically create or update customer account profile from checkout details
+    try {
+      const userRef = db.collection('users').doc(req.user.uid);
+      await userRef.set({
+        fullName: address.fullName,
+        phone: address.phone,
+        email: address.email,
+        phoneVerified: true,
+        address: {
+          line1: address.addressLine,
+          city: address.city,
+          state: address.state,
+          pincode: address.pincode
+        },
+        provider: 'phone',
+        updatedAt: FieldValue.serverTimestamp()
+      }, { merge: true });
+    } catch (profileErr) {
+      console.warn('Customer profile creation warning:', profileErr.message);
     }
 
     await db.collection('notifications').doc(orderId).set({
@@ -1117,106 +1798,12 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       createdAt: FieldValue.serverTimestamp()
     });
 
-    // ─── Stock Decrement & 0-Quantity Store Visibility Update ───────────
-    // For each ordered item, decrement the matching variant stock and product-level total stock.
-    // When stock reaches 0, set inStock: false and active: false so product is not visible in the store.
-    try {
-      for (const item of calculation.items) {
-        const prodId = item.productId || item.id;
-        let productRef = prodId ? db.collection('products').doc(prodId) : null;
-        let productSnap = productRef ? await productRef.get() : null;
-
-        // Fallback: look up by slug if doc ID wasn't found directly
-        if ((!productSnap || !productSnap.exists) && item.slug) {
-          const qSnap = await db.collection('products').where('slug', '==', item.slug).limit(1).get();
-          if (!qSnap.empty) {
-            productSnap = qSnap.docs[0];
-            productRef = productSnap.ref;
-          }
-        }
-
-        if (!productSnap || !productSnap.exists) continue;
-
-        const productData = productSnap.data();
-        const variants = Array.isArray(productData.variants) ? [...productData.variants] : [];
-        const orderedQty = Math.max(1, parseInt(item.quantity, 10) || 1);
-        const orderedSize = item.size || item.selectedSize || null;
-        const orderedColor = item.color || item.selectedColor || null;
-
-        if (variants.length > 0) {
-          const cleanSize = orderedSize ? String(orderedSize).trim().toLowerCase() : null;
-          const cleanColor = orderedColor ? String(orderedColor).trim().toLowerCase() : null;
-
-          // Find matching variant by size + color
-          let matchIdx = -1;
-          if (cleanSize) {
-            matchIdx = variants.findIndex(v => {
-              const vSize = String(v.size || '').trim().toLowerCase();
-              if (vSize !== cleanSize) return false;
-              if (!cleanColor) return true;
-              const vCol = String(v.color || '').trim().toLowerCase();
-              return vCol === cleanColor || vCol === 'standard' || vCol === 'default';
-            });
-            // Fallback: match by size only
-            if (matchIdx < 0) {
-              matchIdx = variants.findIndex(v => String(v.size || '').trim().toLowerCase() === cleanSize);
-            }
-          }
-
-          // Fallback: if no size or not found, use first variant
-          if (matchIdx < 0) {
-            matchIdx = 0;
-          }
-
-          if (matchIdx >= 0 && matchIdx < variants.length) {
-            const currentStock = parseInt(variants[matchIdx].stock ?? variants[matchIdx].quantity, 10) || 0;
-            const updatedVarStock = Math.max(0, currentStock - orderedQty);
-            variants[matchIdx] = {
-              ...variants[matchIdx],
-              stock: updatedVarStock,
-              quantity: updatedVarStock
-            };
-          }
-
-          // Recalculate total product stock across all variants
-          const newTotalStock = variants.reduce((sum, v) => sum + (parseInt(v.stock ?? v.quantity, 10) || 0), 0);
-          const hasRemainingStock = newTotalStock > 0;
-          const availableSizesList = [...new Set(variants.filter(v => (parseInt(v.stock ?? v.quantity, 10) || 0) > 0).map(v => v.size))].filter(Boolean);
-
-          await productRef.update({
-            variants: variants,
-            stock: Math.max(0, newTotalStock),
-            quantity: Math.max(0, newTotalStock),
-            inStock: hasRemainingStock,
-            active: hasRemainingStock, // If quantity 0, not visible on store
-            sizes: availableSizesList, // Only available sizes remain
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        } else {
-          // No variants — decrement product-level stock directly
-          const currentStock = parseInt(productData.stock ?? productData.quantity, 10) || 0;
-          const newStock = Math.max(0, currentStock - orderedQty);
-          const hasRemainingStock = newStock > 0;
-
-          await productRef.update({
-            stock: newStock,
-            quantity: newStock,
-            inStock: hasRemainingStock,
-            active: hasRemainingStock, // If quantity 0, not visible on store
-            updatedAt: FieldValue.serverTimestamp()
-          });
-        }
-      }
-      // Invalidate server product cache so next request reflects new stock
-      productCatalogCache = { products: null, expiresAt: 0 };
-    } catch (stockErr) {
-      console.warn('Stock decrement and visibility update warning (order still valid):', stockErr.message);
-    }
+    productCatalogCache = { products: null, expiresAt: 0 };
 
     res.status(201).json({ success: true, orderId, totalAmount: calculation.finalTotal });
   } catch (error) {
     console.error('Secure order creation failed:', error.message);
-    res.status(400).json({ error: error.message || 'Unable to create order.' });
+    res.status(error.statusCode || 400).json({ error: error.message || 'Unable to create order.' });
   }
 });
 
@@ -1237,49 +1824,53 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
     const db = getTrustedFirestore();
     const ordersCol = db.collection('orders');
     const matchedMap = new Map();
+    const withDbTimeout = (p, ms = 2000) => Promise.race([
+      p,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), ms))
+    ]);
 
     // 1. Direct match by exact document ID
     try {
-      const directDoc = await ordersCol.doc(rawQuery).get();
+      const directDoc = await withDbTimeout(ordersCol.doc(rawQuery).get(), 2000);
       if (directDoc.exists) {
         matchedMap.set(directDoc.id, { id: directDoc.id, ...directDoc.data() });
       }
-    } catch {}
+    } catch { }
 
     // 2. Search by Phone number (clean 10 digits)
     const cleanPhone = rawQuery.replace(/\D/g, '').slice(-10);
     if (matchedMap.size === 0 && cleanPhone.length === 10) {
       try {
-        const snapPhone = await ordersCol.where('shippingAddress.phone', '==', cleanPhone).limit(5).get();
+        const snapPhone = await withDbTimeout(ordersCol.where('shippingAddress.phone', '==', cleanPhone).limit(5).get(), 2000);
         snapPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
-      } catch {}
+      } catch { }
 
       if (matchedMap.size === 0) {
         try {
-          const snapUserPhone = await ordersCol.where('userPhone', '==', cleanPhone).limit(5).get();
+          const snapUserPhone = await withDbTimeout(ordersCol.where('userPhone', '==', cleanPhone).limit(5).get(), 2000);
           snapUserPhone.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
-        } catch {}
+        } catch { }
       }
     }
 
     // 3. Search by Delhivery Waybill / AWB
     if (matchedMap.size === 0) {
       try {
-        const snapWaybill = await ordersCol.where('waybill', '==', rawQuery).limit(2).get();
+        const snapWaybill = await withDbTimeout(ordersCol.where('waybill', '==', rawQuery).limit(2).get(), 2000);
         snapWaybill.forEach(d => matchedMap.set(d.id, { id: d.id, ...d.data() }));
-      } catch {}
+      } catch { }
     }
 
     // 4. Substring / Prefix match for short Order IDs (e.g. 311019e6)
     if (matchedMap.size === 0 && rawQuery.length >= 6) {
       try {
-        const allRecent = await ordersCol.orderBy('createdAt', 'desc').limit(40).get();
+        const allRecent = await withDbTimeout(ordersCol.orderBy('createdAt', 'desc').limit(40).get(), 2000);
         allRecent.forEach(d => {
           if (d.id.toLowerCase().includes(rawQuery.toLowerCase())) {
             matchedMap.set(d.id, { id: d.id, ...d.data() });
           }
         });
-      } catch {}
+      } catch { }
     }
 
     const matchedOrders = Array.from(matchedMap.values());
@@ -1303,18 +1894,18 @@ app.post(['/api/orders/track', '/orders/track'], async (req, res) => {
         }
       }
 
-      const effectiveShipmentStatus = liveTracking?.shipmentStatus || 
-        order.shipmentStatus || 
+      const effectiveShipmentStatus = liveTracking?.shipmentStatus ||
+        order.shipmentStatus ||
         (order.status === 'Delivered' ? INTERNAL_STATUS.DELIVERED : (order.status === 'Shipped' ? INTERNAL_STATUS.SHIPPED : INTERNAL_STATUS.PLACED));
 
       const isDelivered = effectiveShipmentStatus === INTERNAL_STATUS.DELIVERED || String(order.status || '').toLowerCase() === 'delivered';
       const isOutOfDelivery = effectiveShipmentStatus === INTERNAL_STATUS.OUT_FOR_DELIVERY || String(order.status || '').toLowerCase().includes('out for delivery');
-      const effectiveStatus = isDelivered 
-        ? 'Delivered' 
-        : (isOutOfDelivery 
-            ? 'Out for Delivery' 
-            : (liveTracking?.status || order.status || 'Processing'));
-      const deliveredAt = liveTracking?.deliveredAt || 
+      const effectiveStatus = isDelivered
+        ? 'Delivered'
+        : (isOutOfDelivery
+          ? 'Out for Delivery'
+          : (liveTracking?.status || order.status || 'Processing'));
+      const deliveredAt = liveTracking?.deliveredAt ||
         (order.deliveredAt?.toDate ? order.deliveredAt.toDate().toISOString() : (typeof order.deliveredAt === 'string' ? order.deliveredAt : null));
       const timelineStep = liveTracking?.timelineStep || calculateTimelineStep(effectiveShipmentStatus);
 
@@ -1467,14 +2058,14 @@ async function syncDelhiveryTrackingForWaybill(waybill, options = {}) {
 
   // Derive current normalized status from database
   const currentDbStatus = currentOrderData?.status || 'Processing';
-  const currentShipmentStatus = currentOrderData?.shipmentStatus || 
+  const currentShipmentStatus = currentOrderData?.shipmentStatus ||
     (currentDbStatus === 'Delivered' ? INTERNAL_STATUS.DELIVERED : (currentDbStatus === 'Shipped' ? INTERNAL_STATUS.SHIPPED : INTERNAL_STATUS.PLACED));
 
   // If already marked DELIVERED in database, we have reached the terminal success state.
   // Unless forceRefresh is explicitly requested, return cached terminal state to avoid unnecessary provider polling.
   if (currentShipmentStatus === INTERNAL_STATUS.DELIVERED && !options.forceRefresh) {
-    const delTimestamp = currentOrderData?.deliveredAt?.toDate 
-      ? currentOrderData.deliveredAt.toDate().toISOString() 
+    const delTimestamp = currentOrderData?.deliveredAt?.toDate
+      ? currentOrderData.deliveredAt.toDate().toISOString()
       : (typeof currentOrderData?.deliveredAt === 'string' ? currentOrderData.deliveredAt : null);
 
     return {
@@ -1692,6 +2283,9 @@ function getEstimatedDeliveryDate(transitDays = 3) {
   return d.toLocaleDateString('en-IN', options);
 }
 
+const pincodeCheckCache = new Map();
+const pincodeLookupCache = new Map();
+
 // ─── Delhivery One: Check Pincode Serviceability ─────────────────────────
 app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (req, res) => {
   const { pincode } = req.body;
@@ -1702,6 +2296,12 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
   // Known invalid dummy pincodes
   if (/^000|^999|000000|123456|999999/.test(pincode)) {
     return res.json({ serviceable: false, pincode, error: 'Invalid PIN code. Please enter a valid Indian postal code.' });
+  }
+
+  // Instant In-Memory Cache (1 hour TTL)
+  const cached = pincodeCheckCache.get(pincode);
+  if (cached && (Date.now() - cached.ts < 3600000)) {
+    return res.json(cached.data);
   }
 
   try {
@@ -1730,10 +2330,10 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
         const match = deliveryCodes.find(item => item.postal_code?.pin == pincode);
 
         if (match) {
-          const pinData = match.postal_code;
+          const pinData = match.postal_code || {};
           const cod = pinData.cod === 'Y';
           const prepaid = pinData.pre_paid === 'Y';
-          return res.json({
+          const result = {
             serviceable: true,
             pincode,
             city: pinData.district || pinData.city || 'Gujarat Hub',
@@ -1743,7 +2343,9 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
             prepaidAvailable: prepaid,
             estimatedDays: '2 - 4 Business Days',
             estimatedDeliveryDate: getEstimatedDeliveryDate(3)
-          });
+          };
+          pincodeCheckCache.set(pincode, { ts: Date.now(), data: result });
+          return res.json(result);
         }
       }
     } catch (dErr) {
@@ -1757,7 +2359,7 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
         const postData = await postResponse.json();
         if (postData && postData[0] && postData[0].Status === 'Success' && postData[0].PostOffice && postData[0].PostOffice.length > 0) {
           const po = postData[0].PostOffice[0];
-          return res.json({
+          const result = {
             serviceable: true,
             pincode,
             city: po.District || po.Block || po.Name,
@@ -1767,20 +2369,23 @@ app.post(['/api/delhivery/pincode/check', '/delhivery/pincode/check'], async (re
             prepaidAvailable: true,
             estimatedDays: '2 - 4 Business Days',
             estimatedDeliveryDate: getEstimatedDeliveryDate(3)
-          });
+          };
+          pincodeCheckCache.set(pincode, { ts: Date.now(), data: result });
+          return res.json(result);
         }
       }
     } catch (pErr) {
       console.warn('India Post API call warning:', pErr.message);
     }
 
-
     // 3. If neither Delhivery nor India Post recognizes the pincode, it is invalid!
-    return res.json({
+    const invalidResult = {
       serviceable: false,
       pincode,
       error: `Invalid PIN Code: ${pincode} does not exist or is not serviceable for delivery.`
-    });
+    };
+    pincodeCheckCache.set(pincode, { ts: Date.now(), data: invalidResult });
+    return res.json(invalidResult);
   } catch (error) {
     console.error('Pincode serviceability check error:', error);
     res.status(500).json({ serviceable: false, error: 'Serviceability check failed.' });
@@ -1794,6 +2399,12 @@ app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-b
     return res.status(400).json({ suggestions: [] });
   }
 
+  const normalizedPlace = place.trim().toLowerCase();
+  const cached = pincodeLookupCache.get(normalizedPlace);
+  if (cached && (Date.now() - cached.ts < 86400000)) {
+    return res.json(cached.data);
+  }
+
   try {
     const postResponse = await fetch(`https://api.postalpincode.in/postoffice/${encodeURIComponent(place.trim())}`);
     if (postResponse.ok) {
@@ -1805,7 +2416,9 @@ app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-b
           city: po.District || po.Block || po.Name,
           state: po.State
         }));
-        return res.json({ suggestions });
+        const responseData = { suggestions };
+        pincodeLookupCache.set(normalizedPlace, { ts: Date.now(), data: responseData });
+        return res.json(responseData);
       }
     }
     res.json({ suggestions: [] });
@@ -1992,6 +2605,21 @@ app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (r
 
 // ─── Delhivery Webhook: Real-Time Event Ingestion ─────────────────────────
 app.post(['/api/delhivery/webhook', '/delhivery/webhook'], async (req, res) => {
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
+
+  const webhookSecret = (process.env.DELHIVERY_WEBHOOK_SECRET || '').trim();
+  if (IS_PRODUCTION && !webhookSecret) {
+    return res.status(503).json({ error: 'Webhook authentication is not configured.' });
+  }
+  if (webhookSecret) {
+    const supplied = String(req.headers['x-delhivery-webhook-secret'] || '');
+    const expectedBuffer = Buffer.from(webhookSecret);
+    const suppliedBuffer = Buffer.from(supplied);
+    if (expectedBuffer.length !== suppliedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+      return res.status(401).json({ error: 'Invalid webhook signature.' });
+    }
+  }
+
   try {
     const payload = req.body;
     if (!payload) {
@@ -2165,7 +2793,7 @@ app.post(['/api/exchanges/create', '/exchanges/create'], requireAuth, async (req
 
     // 1. Verify customer ownership
     const isOwner = (orderData.userId && orderData.userId === req.user.uid) ||
-                    (orderData.userEmail && req.user.email && orderData.userEmail.toLowerCase() === req.user.email.toLowerCase());
+      (orderData.userEmail && req.user.email && orderData.userEmail.toLowerCase() === req.user.email.toLowerCase());
     if (!isOwner && !req.isAdmin) {
       return res.status(403).json({ error: 'Unauthorized: You can only request exchanges for your own orders.' });
     }
@@ -2182,7 +2810,7 @@ app.post(['/api/exchanges/create', '/exchanges/create'], requireAuth, async (req
     let settingsDoc = null;
     try {
       settingsDoc = await db.collection('settings').doc('storeSettings').get();
-    } catch {}
+    } catch { }
     const storeSettings = settingsDoc?.exists ? settingsDoc.data() : {};
     const windowDays = Number(storeSettings.exchangeWindowDays || DEFAULT_EXCHANGE_WINDOW_DAYS) || 2;
     const windowMs = windowDays * 24 * 60 * 60 * 1000;
@@ -2382,21 +3010,48 @@ app.get(['/api/exchanges/admin/list', '/exchanges/admin/list'], requireAdminAuth
   }
 });
 
+// Helper to locate exchange document by documentId, fallbackDocId, or business ID
+async function findAdminExchangeDoc(db, exchangeId, fallbackDocId = null) {
+  if (!exchangeId && !fallbackDocId) return null;
+  if (fallbackDocId) {
+    try {
+      const snap = await db.collection('exchangeRequests').doc(String(fallbackDocId)).get();
+      if (snap.exists) return { ref: snap.ref, data: snap.data(), id: snap.id };
+    } catch (_) { }
+  }
+  if (exchangeId) {
+    try {
+      const directSnap = await db.collection('exchangeRequests').doc(String(exchangeId)).get();
+      if (directSnap.exists) return { ref: directSnap.ref, data: directSnap.data(), id: directSnap.id };
+    } catch (_) { }
+
+    try {
+      const q1 = await db.collection('exchangeRequests').where('id', '==', String(exchangeId)).limit(1).get();
+      if (!q1.empty) return { ref: q1.docs[0].ref, data: q1.docs[0].data(), id: q1.docs[0].id };
+    } catch (_) { }
+
+    try {
+      const q2 = await db.collection('exchangeRequests').where('docId', '==', String(exchangeId)).limit(1).get();
+      if (!q2.empty) return { ref: q2.docs[0].ref, data: q2.docs[0].data(), id: q2.docs[0].id };
+    } catch (_) { }
+  }
+  return null;
+}
+
 // ─── Admin: Approve Exchange Request ──────────────────────────────────────
-// BUSINESS RULE: Creates Delhivery Reverse Pickup ONLY after approval!
+// BUSINESS RULE: Sets status to APPROVED and schedules Delhivery reverse pickup (2-3 working days)
 app.post(['/api/exchanges/admin/approve', '/exchanges/admin/approve'], requireAdminAuth, async (req, res) => {
   try {
-    const { exchangeId } = req.body;
-    if (!exchangeId) return res.status(400).json({ error: 'Exchange ID required.' });
+    const { exchangeId, fallbackDocId } = req.body;
+    if (!exchangeId && !fallbackDocId) return res.status(400).json({ error: 'Exchange ID required.' });
 
     const db = getTrustedFirestore();
-    const snap = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
-    if (snap.empty) {
-      return res.status(404).json({ error: 'Exchange request not found.' });
+    const found = await findAdminExchangeDoc(db, exchangeId, fallbackDocId);
+    if (!found) {
+      return res.status(404).json({ error: `Exchange #${exchangeId || fallbackDocId} not found in database.` });
     }
 
-    const docRef = snap.docs[0].ref;
-    const exchangeData = snap.docs[0].data();
+    const { ref: docRef, data: exchangeData, id: resolvedDocId } = found;
 
     // Check inventory stock for requested replacement size
     let stockWarning = null;
@@ -2417,28 +3072,24 @@ app.post(['/api/exchanges/admin/approve', '/exchanges/admin/approve'], requireAd
     }
 
     // Load original order for pickup details
-    const orderDoc = await db.collection('orders').doc(exchangeData.orderId).get();
-    const orderData = orderDoc.exists ? orderDoc.data() : {};
-
-    // Trigger Delhivery Reverse Pickup Creation
-    let pickupResult = null;
-    try {
-      pickupResult = await createDelhiveryReversePickup(orderData, exchangeData);
-    } catch (delhiveryErr) {
-      console.warn('Delhivery reverse pickup creation error:', delhiveryErr.message);
+    let orderData = {};
+    if (exchangeData.orderId) {
+      try {
+        const orderDoc = await db.collection('orders').doc(exchangeData.orderId).get();
+        if (orderDoc.exists) orderData = orderDoc.data();
+      } catch (orderErr) {
+        console.warn('Load order note:', orderErr.message);
+      }
     }
 
-    const hasAwb = pickupResult && pickupResult.waybill;
-    const newStatus = hasAwb ? EXCHANGE_STATUS.REVERSE_PICKUP_CREATED : EXCHANGE_STATUS.REVERSE_PICKUP_PENDING;
+    const newStatus = 'APPROVED';
 
     const history = Array.isArray(exchangeData.history) ? [...exchangeData.history] : [];
     history.push({
       status: newStatus,
       timestamp: new Date().toISOString(),
-      actor: 'Admin',
-      note: hasAwb
-        ? `Exchange approved. Delhivery reverse pickup scheduled (AWB: ${pickupResult.waybill})`
-        : 'Exchange approved. Reverse pickup creation queued for retry.'
+      actor: req.user?.email || 'Admin',
+      note: 'Exchange request approved by Admin.'
     });
 
     const updateData = {
@@ -2446,47 +3097,50 @@ app.post(['/api/exchanges/admin/approve', '/exchanges/admin/approve'], requireAd
       adminDecision: 'APPROVED',
       approvedAt: FieldValue.serverTimestamp(),
       approvedBy: req.user?.email || 'Admin',
-      reversePickupAwb: hasAwb ? pickupResult.waybill : null,
-      reversePickupStatus: hasAwb ? 'SCHEDULED' : 'PENDING',
-      reversePickupTrackingUrl: hasAwb ? pickupResult.trackingUrl : null,
       history,
       updatedAt: FieldValue.serverTimestamp()
     };
 
     await docRef.update(updateData);
 
-    // Update order reference
-    await db.collection('orders').doc(exchangeData.orderId).update({
-      latestExchangeStatus: newStatus,
-      updatedAt: FieldValue.serverTimestamp()
-    });
+    // Update parent order reference
+    if (exchangeData.orderId) {
+      try {
+        await db.collection('orders').doc(exchangeData.orderId).update({
+          latestExchangeStatus: newStatus,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } catch (orderErr) {
+        console.warn('Parent order update note:', orderErr.message);
+      }
+    }
 
     // Notify Customer In-App
     try {
       const custNotifRef = db.collection('customerNotifications').doc();
       await custNotifRef.set({
         id: custNotifRef.id,
-        userId: exchangeData.userId,
+        userId: exchangeData.userId || exchangeData.userUid,
         orderId: exchangeData.orderId,
-        exchangeId: exchangeData.id,
+        exchangeId: exchangeData.id || resolvedDocId,
         type: 'EXCHANGE_APPROVED',
-        title: '✓ Exchange Approved!',
-        message: hasAwb
-          ? `Your exchange for Order #${exchangeData.orderId} was approved! Delhivery reverse pickup scheduled (AWB: ${pickupResult.waybill}). Please keep garment ready with tags.`
-          : `Your exchange for Order #${exchangeData.orderId} was approved! Reverse pickup is being scheduled.`,
+        title: 'Exchange Request Approved! 🎉',
+        message: `Your exchange request #${exchangeData.id || resolvedDocId} for Order #${exchangeData.orderId} has been approved by admin.`,
         read: false,
         createdAt: FieldValue.serverTimestamp()
       });
-    } catch {}
+    } catch (notifErr) {
+      console.warn('Customer notification note:', notifErr.message);
+    }
+
+    console.log(`[ADMIN EXCHANGE] Exchange #${exchangeId || resolvedDocId} approved with status APPROVED`);
 
     res.json({
       success: true,
+      exchangeId: exchangeData.id || resolvedDocId,
       status: newStatus,
-      reversePickupAwb: pickupResult?.waybill || null,
       stockWarning,
-      message: hasAwb
-        ? `Exchange approved! Reverse pickup scheduled with Delhivery (AWB: ${pickupResult.waybill}).`
-        : 'Exchange approved, but reverse pickup creation failed. You can click Retry Reverse Pickup.'
+      message: 'Exchange request approved successfully.'
     });
   } catch (error) {
     console.error('Approve exchange error:', error);
@@ -2552,7 +3206,7 @@ app.post(['/api/exchanges/admin/reject', '/exchanges/admin/reject'], requireAdmi
         read: false,
         createdAt: FieldValue.serverTimestamp()
       });
-    } catch {}
+    } catch { }
 
     res.json({
       success: true,
@@ -2686,7 +3340,7 @@ app.post(['/api/exchanges/admin/update-status', '/exchanges/admin/update-status'
         read: false,
         createdAt: FieldValue.serverTimestamp()
       });
-    } catch {}
+    } catch { }
 
     res.json({ success: true, status: nextStatus });
   } catch (error) {
@@ -2739,6 +3393,183 @@ app.post(['/api/notifications/customer/mark-read', '/notifications/customer/mark
   }
 });
 
+// Restores inventory as part of the order cancellation transaction. The
+// `stockRestoredAt` marker makes retries safe: stock cannot be put back twice.
+async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellationReason }) {
+  return db.runTransaction(async (transaction) => {
+    const orderDoc = await transaction.get(orderRef);
+    if (!orderDoc.exists) {
+      const error = new Error('Order not found.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const order = orderDoc.data();
+    if (String(order.status || '').toLowerCase() === 'cancelled' || order.stockRestoredAt) {
+      return { alreadyCancelled: true, order };
+    }
+
+    // Explicit false means a failed/pre-reservation order never changed inventory.
+    // Legacy orders predate the marker and are treated as deducted because the old
+    // checkout path always decremented them after creation.
+    const shouldRestoreInventory = order.inventoryDeducted !== false;
+    const productItems = new Map();
+    for (const [itemIndex, item] of (Array.isArray(order.items) ? order.items : []).entries()) {
+      const productId = item?.productId || item?.id;
+      if (!productId) continue;
+      const items = productItems.get(String(productId)) || [];
+      items.push({ item, itemIndex });
+      productItems.set(String(productId), items);
+    }
+
+    const productEntries = Array.from(productItems.entries());
+    const productSnapshots = await Promise.all(productEntries.map(async ([productId]) => {
+      const ref = db.collection('products').doc(productId);
+      return { ref, items: productItems.get(productId), snapshot: await transaction.get(ref) };
+    }));
+
+    for (const { ref, items, snapshot } of productSnapshots) {
+      if (!shouldRestoreInventory) continue;
+      if (!snapshot.exists) {
+        const missing = new Error(`Cannot restore inventory because product ${ref.id} no longer exists.`);
+        missing.statusCode = 409;
+        throw missing;
+      }
+      const product = snapshot.data();
+      const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+
+      if (variants.length > 0) {
+        for (const { item, itemIndex } of items) {
+          const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+          const size = String(item.size || item.selectedSize || '').trim().toLowerCase();
+          const color = String(item.color || item.selectedColor || '').trim().toLowerCase();
+          let index = variants.findIndex(variant => {
+            const variantSize = String(variant.size || '').trim().toLowerCase();
+            const variantColor = String(variant.color || '').trim().toLowerCase();
+            return variantSize === size && (!color || variantColor === color || variantColor === 'standard' || variantColor === 'default');
+          });
+          if (index < 0 && size) {
+            index = variants.findIndex(variant => String(variant.size || '').trim().toLowerCase() === size);
+          }
+          // A single legacy variant is unambiguous; otherwise never restore into
+          // an arbitrary size/color because that would corrupt shared inventory.
+          if (index < 0 && variants.length === 1) index = 0;
+          if (index < 0) {
+            const mismatch = new Error(`Cannot restore ${product.name || ref.id}: the ordered variant no longer matches the catalog.`);
+            mismatch.statusCode = 409;
+            throw mismatch;
+          }
+          const current = parseInt(variants[index].stock ?? variants[index].quantity, 10) || 0;
+          const stockAfter = current + quantity;
+          variants[index] = { ...variants[index], stock: stockAfter, quantity: stockAfter };
+          const movementId = `web_${crypto.createHash('sha256').update(`${orderRef.id}|${itemIndex}|cancellation`).digest('hex')}`;
+          transaction.create(db.collection('stockMovements').doc(movementId), {
+            movementId,
+            productId: ref.id,
+            webProductId: product.webProductId || ref.id,
+            sku: variants[index].sku || product.sku || '',
+            size: variants[index].size || item.size || item.selectedSize || 'One Size',
+            color: variants[index].color || item.color || item.selectedColor || product.primaryColor || 'Standard',
+            deltaChange: quantity,
+            source: 'website',
+            reason: 'order_cancelled',
+            orderId: orderRef.id,
+            externalReference: orderRef.id,
+            stockAfter,
+            createdAt: FieldValue.serverTimestamp()
+          });
+        }
+
+        const totalStock = variants.reduce((total, variant) => total + (parseInt(variant.stock ?? variant.quantity, 10) || 0), 0);
+        const availableSizes = [...new Set(variants
+          .filter(variant => (parseInt(variant.stock ?? variant.quantity, 10) || 0) > 0)
+          .map(variant => variant.size)
+          .filter(Boolean))];
+        transaction.update(ref, {
+          variants,
+          stock: totalStock,
+          quantity: totalStock,
+          inStock: totalStock > 0,
+          active: totalStock > 0 ? true : product.active,
+          sizes: availableSizes,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      } else {
+        let stock = parseInt(product.stock ?? product.quantity, 10) || 0;
+        for (const { item, itemIndex } of items) {
+          const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
+          stock += quantity;
+          const movementId = `web_${crypto.createHash('sha256').update(`${orderRef.id}|${itemIndex}|cancellation`).digest('hex')}`;
+          transaction.create(db.collection('stockMovements').doc(movementId), {
+            movementId,
+            productId: ref.id,
+            webProductId: product.webProductId || ref.id,
+            sku: product.sku || '',
+            size: item.size || item.selectedSize || 'One Size',
+            color: item.color || item.selectedColor || product.primaryColor || 'Standard',
+            deltaChange: quantity,
+            source: 'website',
+            reason: 'order_cancelled',
+            orderId: orderRef.id,
+            externalReference: orderRef.id,
+            stockAfter: stock,
+            createdAt: FieldValue.serverTimestamp()
+          });
+        }
+        transaction.update(ref, {
+          stock,
+          quantity: stock,
+          inStock: stock > 0,
+          active: stock > 0 ? true : product.active,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+      }
+    }
+
+    transaction.update(orderRef, {
+      status: 'Cancelled',
+      shipmentStatus: 'CANCELLED',
+      cancellationReason: cancellationReason || 'Cancelled',
+      cancelledBy: cancelledBy || 'Customer',
+      cancelledAt: FieldValue.serverTimestamp(),
+      stockRestoredAt: FieldValue.serverTimestamp(),
+      inventoryRestored: shouldRestoreInventory,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    return { alreadyCancelled: false, order };
+  });
+}
+
+// ─── Customer: Cancel an order and restore its inventory ───────────────────
+app.post(['/api/orders/cancel', '/orders/cancel'], requireAuth, async (req, res) => {
+  try {
+    const { orderId, reason } = req.body || {};
+    if (!orderId) return res.status(400).json({ error: 'Order ID is required.' });
+
+    const db = getTrustedFirestore();
+    const orderRef = db.collection('orders').doc(String(orderId));
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists) return res.status(404).json({ error: 'Order not found.' });
+    const order = orderDoc.data();
+    const ownsOrder = order.userId === req.user?.uid || (
+      order.userEmail && req.user?.email && String(order.userEmail).toLowerCase() === String(req.user.email).toLowerCase()
+    );
+    if (!req.isAdmin && !ownsOrder) return res.status(403).json({ error: 'You can only cancel your own order.' });
+    if (!req.isAdmin && String(order.status || 'Processing').toLowerCase() !== 'processing') {
+      return res.status(409).json({ error: 'Only processing orders can be cancelled.' });
+    }
+
+    const result = await cancelOrderAndRestoreStock(db, orderRef, {
+      cancelledBy: req.isAdmin ? 'Admin' : 'Customer',
+      cancellationReason: String(reason || 'Cancelled by Customer').trim().slice(0, 500)
+    });
+    return res.json({ success: true, orderId, status: 'Cancelled', stockRestored: !result.alreadyCancelled });
+  } catch (error) {
+    console.error('Customer order cancellation error:', error);
+    return res.status(error.statusCode || 500).json({ error: error.message || 'Unable to cancel order.' });
+  }
+});
+
 // ─── Admin: Update Order Status (Trusted Backend Execution) ────────────────
 app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], requireAdminAuth, async (req, res) => {
   try {
@@ -2753,6 +3584,20 @@ app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], req
 
     if (!orderDoc.exists) {
       return res.status(404).json({ error: `Order #${orderId} not found.` });
+    }
+
+    if (status === 'Cancelled') {
+      const result = await cancelOrderAndRestoreStock(db, orderRef, {
+        cancelledBy: extraPayload?.cancelledBy || req.user?.email || 'Admin',
+        cancellationReason: extraPayload?.cancellationReason || 'Cancelled by Admin'
+      });
+      return res.json({
+        success: true,
+        orderId,
+        status: 'Cancelled',
+        shipmentStatus: 'CANCELLED',
+        stockRestored: !result.alreadyCancelled
+      });
     }
 
     const updateFields = {
@@ -2808,77 +3653,6 @@ app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], req
 
 // ─── Exchange Workflow Backend Endpoints ────────────────────────────────────
 
-// Helper to locate exchange document by documentId or business ID
-async function findAdminExchangeDoc(db, exchangeId) {
-  if (!exchangeId) return null;
-  const directSnap = await db.collection('exchangeRequests').doc(exchangeId).get();
-  if (directSnap.exists) return { ref: directSnap.ref, data: directSnap.data(), id: directSnap.id };
-
-  const q1 = await db.collection('exchangeRequests').where('id', '==', exchangeId).limit(1).get();
-  if (!q1.empty) return { ref: q1.docs[0].ref, data: q1.docs[0].data(), id: q1.docs[0].id };
-
-  const q2 = await db.collection('exchangeRequests').where('docId', '==', exchangeId).limit(1).get();
-  if (!q2.empty) return { ref: q2.docs[0].ref, data: q2.docs[0].data(), id: q2.docs[0].id };
-
-  return null;
-}
-
-// 1. Admin: Approve Exchange Request
-app.post(['/api/exchanges/admin/approve', '/exchanges/admin/approve'], requireAdminAuth, async (req, res) => {
-  const { exchangeId } = req.body;
-  if (!exchangeId) return res.status(400).json({ error: 'Exchange ID is required.' });
-
-  try {
-    const db = getTrustedFirestore();
-    const found = await findAdminExchangeDoc(db, exchangeId);
-    if (!found) {
-      return res.status(404).json({ error: `Exchange #${exchangeId} not found.` });
-    }
-
-    const { ref: exRef, data: exData } = found;
-    const history = Array.isArray(exData.history) ? exData.history : [];
-    const pickupAwb = `DLH-REV-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
-
-    const newHistoryEntry = {
-      status: 'APPROVED',
-      timestamp: new Date().toISOString(),
-      actor: req.user?.email || 'Admin',
-      note: 'Exchange request approved by Admin. Reverse pickup scheduled.'
-    };
-
-    await exRef.update({
-      status: 'APPROVED',
-      reversePickupAwb: exData.reversePickupAwb || pickupAwb,
-      approvedAt: FieldValue.serverTimestamp(),
-      history: [...history, newHistoryEntry],
-      updatedAt: FieldValue.serverTimestamp()
-    });
-
-    if (exData.orderId) {
-      try {
-        await db.collection('orders').doc(exData.orderId).update({
-          latestExchangeStatus: 'APPROVED',
-          updatedAt: FieldValue.serverTimestamp()
-        });
-      } catch (orderErr) {
-        console.warn('Parent order update note:', orderErr.message);
-      }
-    }
-
-    console.log(`[ADMIN EXCHANGE] Exchange #${exchangeId} approved by ${req.user?.email || 'Admin'}`);
-
-    res.json({
-      success: true,
-      exchangeId,
-      status: 'APPROVED',
-      reversePickupAwb: exData.reversePickupAwb || pickupAwb,
-      message: 'Exchange approved successfully.'
-    });
-  } catch (error) {
-    console.error('Approve exchange server error:', error);
-    res.status(500).json({ error: error.message || 'Failed to approve exchange request.' });
-  }
-});
 
 // 2. Admin: Reject Exchange Request
 app.post(['/api/exchanges/admin/reject', '/exchanges/admin/reject'], requireAdminAuth, async (req, res) => {

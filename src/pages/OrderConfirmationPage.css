@@ -1,6 +1,6 @@
 .order-confirm-container {
   max-width: 700px;
-  margin: 60px auto;
+  margin: calc(var(--total-header-height, 104px) + 32px) auto 60px;
   padding: 0 20px;
 }
 

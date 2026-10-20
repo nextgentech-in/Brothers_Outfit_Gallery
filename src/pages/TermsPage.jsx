@@ -68,7 +68,7 @@ export default function TermsPage() {
           <div className="policy-contact-box">
             <p><strong>Questions regarding our Terms & Conditions?</strong></p>
             <p>Brothers Outfit Gallery Legal & Customer Relations</p>
-            <p>✉️ Email: legal@brothersoutfit.in</p>
+            <p>✉️ Email: brothersoutfitgallery@gmail.com</p>
             <p>📱 WhatsApp: +91 84602 33020</p>
           </div>
         </div>

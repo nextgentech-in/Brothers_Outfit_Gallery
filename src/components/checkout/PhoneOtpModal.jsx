@@ -169,7 +169,7 @@ export default function PhoneOtpModal({
       setError('');
       const res = await verifyPhoneOtp(cleanPhone, otpToSubmit);
       if (res?.success || res?.verified) {
-        onSuccess(cleanPhone);
+        onSuccess(cleanPhone, res?.user);
       } else {
         setError(res.error || 'Verification failed. Please try again.');
       }

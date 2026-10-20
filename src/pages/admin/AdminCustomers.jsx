@@ -24,10 +24,38 @@ export default function AdminCustomers() {
     c.birthdate?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const exportCustomersCsv = () => {
+    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const headers = ['Name', 'Email', 'Phone', 'Birthdate', 'Age', 'City', 'State', 'Role'];
+    const rows = filtered.map(customer => [
+      customer.fullName || '',
+      customer.email || '',
+      customer.phone || '',
+      customer.birthdate || '',
+      customer.age || '',
+      customer.address?.city || '',
+      customer.address?.state || '',
+      customer.isAdmin ? 'Admin' : 'Customer'
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\r\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `brothers-outfit-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="admin-customers-page">
       <div className="admin-header">
         <h1 className="admin-title">Customers ({customers.length})</h1>
+        <button type="button" className="admin-export-customers-btn" onClick={exportCustomersCsv} disabled={loading || filtered.length === 0}>
+          Export CSV{filtered.length !== customers.length ? ` (${filtered.length})` : ''}
+        </button>
       </div>
 
       <div className="admin-customers-controls">

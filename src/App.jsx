@@ -1,5 +1,5 @@
 import React, { Component, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, useParams, Link, useLocation, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useParams, Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
@@ -370,6 +370,7 @@ function AppContent() {
                 <CompleteProfile />
               </ProtectedRoute>
             } />
+            <Route path="/exchanges" element={<Navigate to="/profile?tab=exchanges" replace />} />
 
             <Route path="/product/:slug" element={<ProductPage />} />
             <Route path="*" element={<NotFoundPage />} />

@@ -897,7 +897,7 @@
 /* Responsive */
 @media (max-width: 640px) {
   .track-page-container {
-    padding: 24px 12px 60px;
+    padding: calc(var(--total-header-height, 96px) + 24px) 12px 60px;
   }
   .track-main-title {
     font-size: 26px;

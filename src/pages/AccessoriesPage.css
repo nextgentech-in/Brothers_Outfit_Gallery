@@ -143,7 +143,7 @@
 
 @media (max-width: 768px) {
   .accessories-hero {
-    padding: calc(var(--total-header-height, 88px) + 24px) 16px 36px;
+    padding: calc(var(--total-header-height, 96px) + 24px) 16px 36px;
   }
 
   .accessories-hero h1 {
@@ -158,7 +158,7 @@
   }
 
   .accessories-tabs-container {
-    top: var(--total-header-height, 88px);
+    top: var(--total-header-height, 96px);
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);

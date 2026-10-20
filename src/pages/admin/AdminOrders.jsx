@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminOrders, updateOrderStatus, updateOrderShipment, restoreOrderStock } from '../../services/adminService';
+import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import { fetchAllActiveProducts } from '../../services/productService';
 import { useAdminUI } from '../../context/AdminUIContext';
@@ -109,10 +109,16 @@ export default function AdminOrders() {
       await fetchOrders();
     } catch (err) {
       console.error('Failed to change order status:', err);
-      showToast(`Failed to update status: ${err.message}`, 'error', 5000);
       // Revert optimistic update on failure
       setOrders(previousOrders);
-      await fetchOrders();
+      if (selectedOrder && selectedOrder.id === orderId) {
+        const prevSelected = previousOrders.find(o => o.id === orderId);
+        if (prevSelected) setSelectedOrder(prevSelected);
+      }
+      showToast(`Failed to update status: ${err.message}`, 'error', 7000, {
+        label: 'Retry',
+        onClick: () => handleStatusChange(orderId, newStatus)
+      });
     }
   };
 
@@ -205,10 +211,6 @@ export default function AdminOrders() {
     try {
       if (order.waybill) {
         await cancelDelhiveryShipment(order.waybill, finalReason);
-      }
-
-      if (order.items && order.items.length > 0) {
-        await restoreOrderStock(order.items);
       }
 
       await updateOrderStatus(order.id, 'Cancelled', {

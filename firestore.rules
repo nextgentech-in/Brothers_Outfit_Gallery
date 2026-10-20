@@ -11,22 +11,19 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Secure Admin Check: strictly based on verified admin email whitelist, protected admins collection, or verified admin user record
+    // Admin authority comes only from a verified email or the protected admins
+    // collection. Never trust role/isAdmin fields on a user-editable profile.
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.email in ['setupatel01@gmail.com', 'setupatel441@gmail.com'] ||
         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin') ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true))
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin')
       );
     }
 
     // Admin Collection: stores verified admin roles; only existing admins can manage
     match /admins/{adminId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // Products: public read; admin write only
@@ -55,10 +52,11 @@ service cloud.firestore {
     // User Profiles: owner can read/write; users cannot set or escalate isAdmin privileges
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false);
+      allow create: if isOwner(userId) &&
+                    !request.resource.data.keys().hasAny(['isAdmin', 'role']);
       allow update: if isAdmin() || (
         isOwner(userId) &&
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin']))
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'role'])
       );
       allow delete: if isAdmin();
     }
@@ -77,7 +75,15 @@ service cloud.firestore {
                     request.resource.data.rating is number &&
                     request.resource.data.rating >= 1 &&
                     request.resource.data.rating <= 5;
-      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.rating is number &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5
+      );
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     // Store Settings: public read; admin write only
