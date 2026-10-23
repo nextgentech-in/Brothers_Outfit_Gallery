@@ -298,7 +298,9 @@ function validateStockPayload(body) {
   const eventIds = new Set();
   const items = rawList.map((raw, index) => {
     const prefix = `items[${index}]`;
-    const eventId = raw?.event_id ? identifier(raw.event_id, `${prefix}.event_id`) : `EVT-${Date.now()}-${index}-${crypto.randomBytes(3).toString('hex')}`;
+    // The POS must retain this ID across retries; generating it here would
+    // deduct the same sale again whenever a request is retried.
+    const eventId = identifier(raw?.event_id, `${prefix}.event_id`);
     const webProductId = String(raw?.web_product_id || raw?.productId || raw?.product_id || raw?.id || raw?.sku || '').trim();
     const sku = canonicalText(raw?.sku || raw?.variant_sku || webProductId, `${prefix}.sku`, { max: 100 });
     const size = canonicalText(raw?.size || '', `${prefix}.size`, { required: false, max: 40 });
@@ -469,6 +471,54 @@ function stockEventFingerprint(item) {
   }));
 }
 
+function selectStockVariant(product, productId, item) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const normItemSku = normalizeKey(item.sku);
+  const normItemWebId = normalizeKey(item.webProductId);
+  const normProdSku = normalizeKey(product.sku);
+  const normProdWebId = normalizeKey(product.webProductId);
+  const normProdId = normalizeKey(productId);
+  // Legacy products can share a parent SKU across sizes/colours. Match all
+  // supplied dimensions before choosing a variant, rather than the first SKU.
+  let candidates = variants.map((variant, index) => ({ variant, index }))
+    .filter(({ variant }) => normalizeKey(variant.sku) === normItemSku);
+  if (!candidates.length && normItemWebId) {
+    candidates = variants.map((variant, index) => ({ variant, index }))
+      .filter(({ variant }) => normalizeKey(variant.sku) === normItemWebId);
+  }
+  if (!candidates.length && [normProdSku, normProdWebId, normProdId, ''].includes(normItemSku)) {
+    candidates = variants.map((variant, index) => ({ variant, index }));
+  }
+  if (!candidates.length) {
+    throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
+  }
+  const itemSize = normalizeKey(item.size);
+  const itemColor = normalizeKey(item.color || '');
+  const isDefaultColor = (c) => !c || c === 'standard' || c === 'default' || c === 'all colors';
+  candidates = candidates.filter(({ variant }) => {
+    const size = normalizeKey(variant.size);
+    return !size || !itemSize || size === itemSize;
+  });
+  const matchingColors = candidates.filter(({ variant }) => {
+    const color = normalizeKey(variant.color || product.primaryColor || '');
+    return isDefaultColor(color) || isDefaultColor(itemColor) || color === itemColor;
+  });
+  if (matchingColors.length) {
+    candidates = matchingColors;
+  } else if (candidates.length === 1) {
+    // Preserve main's compatibility with a different POS colour label when
+    // size/SKU already identify one variant; never guess between variants.
+    console.warn(`[POS Sync] Minor color label discrepancy for SKU ${item.sku}`);
+  }
+  if (!candidates.length) {
+    throw new PosSyncError(409, `SKU ${item.sku} does not match the supplied size/color.`, 'variant_mismatch');
+  }
+  if (candidates.length > 1) {
+    throw new PosSyncError(409, `SKU ${item.sku} matches multiple variants. Supply a unique variant SKU or size and color.`, 'ambiguous_variant');
+  }
+  return candidates[0];
+}
+
 function applyPosStockDelta(product, productId, item) {
   let variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
 
@@ -502,41 +552,7 @@ function applyPosStockDelta(product, productId, item) {
     throw new PosSyncError(409, `web_product_id ${item.webProductId} does not match the resolved product.`, 'identity_conflict');
   }
 
-  // Find matching variant
-  let variantIndex = variants.findIndex(v => normalizeKey(v.sku) === normItemSku);
-  if (variantIndex < 0 && normItemWebId) {
-    variantIndex = variants.findIndex(v => normalizeKey(v.sku) === normItemWebId);
-  }
-  // Only fall back to size if item.sku matches the parent product SKU, webProductId, or is empty
-  if (variantIndex < 0 && (normItemSku === normProdSku || normItemSku === normProdWebId || !normItemSku)) {
-    if (item.size) {
-      const normSize = normalizeKey(item.size);
-      variantIndex = variants.findIndex(v => normalizeKey(v.size) === normSize);
-    }
-    if (variantIndex < 0 && variants.length === 1) {
-      variantIndex = 0;
-    }
-  }
-  if (variantIndex < 0) {
-    throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
-  }
-
-  const variant = variants[variantIndex];
-  const varSize = normalizeKey(variant.size);
-  const itemSize = normalizeKey(item.size);
-  const sizeMatches = !varSize || !itemSize || varSize === itemSize;
-
-  const varColor = normalizeKey(variant.color || product.primaryColor || '');
-  const itemColor = normalizeKey(item.color || '');
-  const isDefaultColor = (c) => !c || c === 'standard' || c === 'default' || c === 'all colors';
-  const colorMatches = isDefaultColor(varColor) || isDefaultColor(itemColor) || varColor === itemColor;
-
-  if (!sizeMatches) {
-    throw new PosSyncError(409, `SKU ${item.sku} does not match the supplied size (${item.size} vs ${variant.size}).`, 'variant_mismatch');
-  }
-  if (!colorMatches) {
-    console.warn(`[POS Sync] Minor color label discrepancy for SKU ${item.sku}: website='${variant.color}', POS='${item.color}'`);
-  }
+  const { variant, index: variantIndex } = selectStockVariant({ ...product, variants }, productId, item);
 
   const before = Number(variant.stock ?? variant.quantity ?? 0);
 
@@ -979,7 +995,6 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
     for (const item of payload.items) {
       const productRef = await findProductRef(db, item.webProductId, item.sku);
       if (!productRef) {
-        console.warn(`[POS Sync] Item not found on website, skipping in batch: webProductId=${item.webProductId}, sku=${item.sku}`);
         unknownItems.push(item);
       } else {
         resolved.push({
@@ -991,8 +1006,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       }
     }
 
-    if (resolved.length === 0 && unknownItems.length > 0) {
-      throw new PosSyncError(409, `Unknown web_product_id ${unknownItems[0].webProductId}.`, 'unknown_product');
+    if (unknownItems.length > 0) {
+      // Keep the documented atomic contract: never acknowledge a batch while
+      // silently dropping sales for products that have not been mapped yet.
+      throw new PosSyncError(409, `Unknown web_product_id ${unknownItems[0].webProductId}. No stock changes were applied.`, 'unknown_product', {
+        rejected_items: unknownItems.map(item => ({ event_id: item.eventId, web_product_id: item.webProductId, sku: item.sku }))
+      });
     }
 
     const { updatedCount, duplicateCount, reconciliation, stockLevels } = await db.runTransaction(async transaction => {
@@ -1019,8 +1038,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           // Still report current stock for duplicates so POS can re-confirm
           const working = workingProducts.get(entry.productRef.path);
           if (working?.snap.exists) {
-            const variants = Array.isArray(working.data.variants) ? working.data.variants : [];
-            const matchedVariant = variants.find(v => normalizeKey(v.sku) === normalizeKey(item.sku));
+            const { variant: matchedVariant } = selectStockVariant(working.data, working.snap.id, item);
             localStockLevels.push({
               event_id: item.eventId,
               sku: item.sku,
