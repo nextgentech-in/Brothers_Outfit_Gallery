@@ -163,18 +163,14 @@ function validateProduct(raw, productIndex) {
     throw new PosSyncError(422, `${prefix}.sizes must contain between 1 and 50 variants.`, 'validation_error');
   }
   const images = validateImages(raw?.images, prefix);
-  const seenSkus = new Set();
   const seenVariants = new Set();
   const variants = raw.sizes.map((variant, variantIndex) => {
     const vp = `${prefix}.sizes[${variantIndex}]`;
     const size = canonicalText(variant?.size, `${vp}.size`, { required: false, max: 40 }) || 'One Size';
     const variantSkuRaw = String(variant?.sku ?? '').trim();
     const variantSku = canonicalText(variantSkuRaw || sku, `${vp}.sku`, { max: 100 });
-    const normalizedSku = normalizeKey(variantSku);
     const variantKey = `${normalizeKey(size)}|${normalizeKey(color)}`;
-    if (seenSkus.has(normalizedSku)) throw new PosSyncError(422, `${vp}.sku is duplicated in this product.`, 'validation_error');
     if (seenVariants.has(variantKey)) throw new PosSyncError(422, `${vp} duplicates a size/color variant.`, 'validation_error');
-    seenSkus.add(normalizedSku);
     seenVariants.add(variantKey);
     const variantCost = (variant?.cost_price != null || variant?.purchase_price != null || variant?.costPrice != null)
       ? money(Number(variant.cost_price ?? variant.purchase_price ?? variant.costPrice), `${vp}.cost_price`, { allowZero: true })
@@ -221,22 +217,120 @@ function validateProduct(raw, productIndex) {
 /** POS often reuses style codes (e.g. 1846) across sizes; sellable SKUs must stay unique. */
 function ensurePosVariantSkus(product) {
   const parentSku = product.sku;
-  const usedWithinProduct = new Set();
+  const skuCounts = new Map();
   for (const variant of product.variants) {
-    const sizeLabel = String(variant.size || 'One Size').trim().replace(/\s+/g, '-');
-    let sku = String(variant.sku || '').trim();
-    const sharesParentCode = !sku || normalizeKey(sku) === normalizeKey(parentSku);
-    if (sharesParentCode) {
-      sku = `${product.webProductId}-${sizeLabel}`.slice(0, 100);
-    }
-    let candidate = sku;
-    let suffix = 2;
-    while (usedWithinProduct.has(normalizeKey(candidate))) {
-      candidate = `${sku}-${suffix++}`.slice(0, 100);
-    }
+    const key = normalizeKey(variant.sku);
+    skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
+  }
+  const usedWithinProduct = new Set();
+  for (let index = 0; index < product.variants.length; index += 1) {
+    const variant = product.variants[index];
+    const originalSku = String(variant.sku || '').trim();
+    const originalKey = normalizeKey(originalSku);
+    const needsScopedSku = !originalSku || originalKey === normalizeKey(parentSku) || skuCounts.get(originalKey) > 1;
+    if (needsScopedSku) variant.posSku = variant.posSku || originalSku || parentSku;
+    const base = needsScopedSku ? scopedVariantSku(product, variant, index) : originalSku;
+    const candidate = uniqueSku(base, usedWithinProduct);
+    if (normalizeKey(candidate) !== originalKey) variant.posSku = variant.posSku || originalSku;
     variant.sku = candidate;
     variant.id = stableHash(`${product.webProductId}|${candidate}`).slice(0, 24);
     usedWithinProduct.add(normalizeKey(candidate));
+  }
+}
+
+function scopedVariantSku(product, variant, index = 0) {
+  const safePart = value => String(value || '').trim().replace(/[^A-Za-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
+  const idPart = safePart(product.webProductId) || stableHash(product.webProductId).slice(0, 16);
+  const sizePart = safePart(variant.size) || `variant-${index + 1}`;
+  const colorPart = safePart(variant.color);
+  const includeColor = colorPart && !['standard', 'default', 'all-colors'].includes(normalizeKey(colorPart));
+  return [idPart, sizePart, includeColor ? colorPart : ''].filter(Boolean).join('-').slice(0, 100);
+}
+
+function uniqueSku(base, usedKeys) {
+  let candidate = String(base || 'variant').slice(0, 100);
+  let suffixNumber = 2;
+  while (usedKeys.has(normalizeKey(candidate))) {
+    const suffix = `-${suffixNumber++}`;
+    candidate = `${String(base || 'variant').slice(0, 100 - suffix.length)}${suffix}`;
+  }
+  return candidate;
+}
+
+function ensureBatchVariantSkus(products) {
+  const groups = new Map();
+  for (const product of products) {
+    for (let index = 0; index < product.variants.length; index += 1) {
+      const variant = product.variants[index];
+      const key = normalizeKey(variant.sku);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ product, variant, index });
+    }
+  }
+  const used = new Set();
+  for (const entries of groups.values()) {
+    for (const entry of entries) {
+      const { product, variant, index } = entry;
+      const originalSku = variant.sku;
+      const base = entries.length > 1 ? scopedVariantSku(product, variant, index) : originalSku;
+      if (entries.length > 1) variant.posSku = variant.posSku || originalSku;
+      const candidate = uniqueSku(base, used);
+      if (normalizeKey(candidate) !== normalizeKey(originalSku)) variant.posSku = variant.posSku || originalSku;
+      variant.sku = candidate;
+      variant.id = stableHash(`${product.webProductId}|${variant.sku}`).slice(0, 24);
+      used.add(normalizeKey(variant.sku));
+    }
+  }
+}
+
+function alignAndReserveCatalogVariantSkus(products, catalogDocs) {
+  const existingById = new Map(catalogDocs.map(doc => [doc.id, doc]));
+  const occupied = new Map();
+  for (const doc of catalogDocs) {
+    const data = doc.data();
+    for (const sku of [data.sku, ...(Array.isArray(data.variants) ? data.variants.flatMap(v => [v.sku, v.posSku]) : [])].filter(Boolean)) {
+      const key = normalizeKey(sku);
+      if (!occupied.has(key)) occupied.set(key, doc.id);
+      else if (occupied.get(key) !== doc.id) occupied.set(key, '__MULTIPLE_LEGACY__');
+    }
+  }
+
+  for (const product of products) {
+    const productId = `pos_${stableHash(product.webProductId).slice(0, 24)}`;
+    const existing = existingById.get(productId)?.data();
+    const existingVariants = Array.isArray(existing?.variants) ? existing.variants : [];
+    for (let index = 0; index < product.variants.length; index += 1) {
+      const variant = product.variants[index];
+      const incomingKeys = new Set([variant.sku, variant.posSku].filter(Boolean).map(normalizeKey));
+      const sizeKey = normalizeKey(variant.size);
+      const colorKey = normalizeKey(variant.color);
+      const matches = existingVariants.filter(candidate => {
+        const aliases = [candidate.sku, candidate.posSku].filter(Boolean).map(normalizeKey);
+        const skuMatches = aliases.some(alias => incomingKeys.has(alias));
+        const sizeMatches = !sizeKey || !candidate.size || normalizeKey(candidate.size) === sizeKey;
+        const candidateColor = normalizeKey(candidate.color);
+        const colorMatches = !colorKey || !candidateColor || colorKey === candidateColor;
+        return skuMatches && sizeMatches && colorMatches;
+      });
+      if (matches.length === 1) {
+        const stored = matches[0];
+        const sourceSku = variant.posSku || variant.sku;
+        variant.sku = stored.sku;
+        variant.posSku = stored.posSku || (normalizeKey(sourceSku) !== normalizeKey(stored.sku) ? sourceSku : undefined);
+        if (!variant.posSku) delete variant.posSku;
+        variant.id = stableHash(`${product.webProductId}|${variant.sku}`).slice(0, 24);
+      }
+
+      const currentKey = normalizeKey(variant.sku);
+      const owner = occupied.get(currentKey);
+      if (owner && owner !== productId) {
+        const sourceSku = variant.posSku || variant.sku;
+        variant.posSku = sourceSku;
+        variant.sku = uniqueSku(scopedVariantSku(product, variant, index), new Set(occupied.keys()));
+        variant.id = stableHash(`${product.webProductId}|${variant.sku}`).slice(0, 24);
+      }
+      occupied.set(normalizeKey(variant.sku), productId);
+    }
   }
 }
 
@@ -283,23 +377,12 @@ function validateProductsPayload(body) {
   }
   const products = body.products.map(validateProduct);
   const ids = new Set();
-  const variantSkus = new Set();
   for (const product of products) {
     const idKey = normalizeKey(product.webProductId);
     if (ids.has(idKey)) throw new PosSyncError(422, `Duplicate web_product_id in batch: ${product.webProductId}`, 'validation_error');
     ids.add(idKey);
-    for (const variant of product.variants) {
-      const skuKey = normalizeKey(variant.sku);
-      if (variantSkus.has(skuKey)) {
-        throw new PosSyncError(
-          422,
-          `Duplicate SKU in batch: ${variant.sku}. Each POS line needs a unique web_product_id or size so variant SKUs stay distinct.`,
-          'validation_error'
-        );
-      }
-      variantSkus.add(skuKey);
-    }
   }
+  ensureBatchVariantSkus(products);
   const estimatedTransactionWrites = products.reduce((total, product) => total + 5 + product.variants.length, 0);
   if (estimatedTransactionWrites > 450) {
     throw new PosSyncError(422, 'Product batch is too complex for one atomic transaction. Split it into smaller batches.', 'batch_too_large');
@@ -553,10 +636,10 @@ function selectStockVariant(product, productId, item) {
   // Legacy products can share a parent SKU across sizes/colours. Match all
   // supplied dimensions before choosing a variant, rather than the first SKU.
   let candidates = variants.map((variant, index) => ({ variant, index }))
-    .filter(({ variant }) => normalizeKey(variant.sku) === normItemSku);
+    .filter(({ variant }) => [variant.sku, variant.posSku].some(sku => normalizeKey(sku) === normItemSku));
   if (!candidates.length && normItemWebId) {
     candidates = variants.map((variant, index) => ({ variant, index }))
-      .filter(({ variant }) => normalizeKey(variant.sku) === normItemWebId);
+      .filter(({ variant }) => [variant.sku, variant.posSku].some(sku => normalizeKey(sku) === normItemWebId));
   }
   if (!candidates.length && [normProdSku, normProdWebId, normProdId, ''].includes(normItemSku)) {
     candidates = variants.map((variant, index) => ({ variant, index }));
@@ -619,7 +702,7 @@ function applyPosStockDelta(product, productId, item) {
     normItemWebId === normProdId ||
     normItemWebId === normProdSku ||
     normalizeKey(item.webProductId || '') === normProdId ||
-    variants.some(v => normalizeKey(v.sku) === normItemWebId || normalizeKey(v.sku) === normItemSku);
+    variants.some(v => [v.sku, v.posSku].some(sku => normalizeKey(sku) === normItemWebId || normalizeKey(sku) === normItemSku));
 
   if (!isAssociated) {
     throw new PosSyncError(409, `web_product_id ${item.webProductId} does not match the resolved product.`, 'identity_conflict');
@@ -720,9 +803,12 @@ async function buildProductLookupCache(db) {
     }
     if (Array.isArray(data.variants)) {
       for (const variant of data.variants) {
-        if (!variant?.sku) continue;
-        const key = normalizeKey(variant.sku);
-        if (!refByVariantSku.has(key)) refByVariantSku.set(key, doc.ref);
+        for (const sku of [variant?.sku, variant?.posSku].filter(Boolean)) {
+          const key = normalizeKey(sku);
+          const existing = refByVariantSku.get(key);
+          if (!existing) refByVariantSku.set(key, doc.ref);
+          else if (existing.path !== doc.ref.path) refByVariantSku.set(key, null);
+        }
       }
     }
   }
@@ -794,6 +880,38 @@ async function findProductRef(db, webProductId, itemSku = '', cache = null) {
   return findProductRefCached(built, webProductId, itemSku);
 }
 
+async function resolveStockProductRefs(db, items) {
+  const directRefs = new Map();
+  const ids = [...new Set(items.map(item => normalizeKey(item.webProductId)).filter(Boolean))];
+  const mappingSnaps = await Promise.all(ids.map(async id => {
+    const snap = await db.collection('posProductMappings').doc(stableHash(id)).get();
+    return [id, snap];
+  }));
+  for (const [id, snap] of mappingSnaps) {
+    if (snap.exists && snap.data()?.productId) directRefs.set(id, db.collection('products').doc(snap.data().productId));
+  }
+
+  const unresolvedIds = ids.filter(id => !directRefs.has(id));
+  const directProductSnaps = await Promise.all(unresolvedIds.map(async id => {
+    const rawId = items.find(item => normalizeKey(item.webProductId) === id)?.webProductId;
+    const snap = await db.collection('products').doc(rawId).get();
+    return [id, snap];
+  }));
+  for (const [id, snap] of directProductSnaps) {
+    if (snap.exists) directRefs.set(id, snap.ref);
+  }
+
+  const needsFallback = items.some(item => !directRefs.has(normalizeKey(item.webProductId)));
+  const cache = needsFallback ? await buildProductLookupCache(db) : null;
+  return items.map(item => directRefs.get(normalizeKey(item.webProductId)) || findProductRefCached(cache, item.webProductId, item.sku));
+}
+
+async function transactionGetMany(transaction, refs) {
+  if (refs.length === 0) return [];
+  if (typeof transaction.getAll === 'function') return transaction.getAll(...refs);
+  return Promise.all(refs.map(ref => transaction.get(ref)));
+}
+
 export async function uploadBase64ToImageKit(base64Data, filenamePrefix = 'pos') {
   if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:image/')) return null;
   const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
@@ -853,8 +971,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       await sanitizeProductBase64Images(product.images, product.slug || 'pos');
     }
     const db = getDb();
-    const catalog = await db.collection('products').get();
-    const slugReservations = await db.collection('productSlugMappings').get();
+    const [catalog, slugReservations] = await Promise.all([
+      db.collection('products').get(),
+      db.collection('productSlugMappings').get()
+    ]);
+    alignAndReserveCatalogVariantSkus(products, catalog.docs);
     const legacySkuOwners = new Map();
     const occupiedSlugs = new Set();
     for (const doc of catalog.docs) {
@@ -894,12 +1015,16 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         const slugRef = db.collection('productSlugMappings').doc(stableHash(normalizeKey(product.resolvedSlug)));
         const allSkus = [...new Set(product.variants.map(v => v.sku).filter(Boolean))];
         const skuRefs = allSkus.map(sku => db.collection('productSkuMappings').doc(stableHash(normalizeKey(sku))));
-        const mappingSnap = await transaction.get(mappingRef);
-        const productSnap = await transaction.get(productRef);
-        const slugSnap = await transaction.get(slugRef);
-        const skuSnaps = [];
-        for (const ref of skuRefs) skuSnaps.push(await transaction.get(ref));
-        contexts.push({ product, mappingRef, mappingSnap, productRef, productSnap, slugRef, slugSnap, skuRefs, skuSnaps, productId, allSkus });
+        contexts.push({ product, mappingRef, productRef, slugRef, skuRefs, productId, allSkus });
+      }
+      const refs = contexts.flatMap(context => [context.mappingRef, context.productRef, context.slugRef, ...context.skuRefs]);
+      const snaps = await transactionGetMany(transaction, refs);
+      const snapByPath = new Map(refs.map((ref, index) => [ref.path, snaps[index]]));
+      for (const context of contexts) {
+        context.mappingSnap = snapByPath.get(context.mappingRef.path);
+        context.productSnap = snapByPath.get(context.productRef.path);
+        context.slugSnap = snapByPath.get(context.slugRef.path);
+        context.skuSnaps = context.skuRefs.map(ref => snapByPath.get(ref.path));
       }
 
       for (const context of contexts) {
@@ -1023,7 +1148,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (update.variants) {
           const existingVariants = Array.isArray(existing.variants) ? existing.variants : [];
           const updatedVariants = existingVariants.map(ev => {
-            const match = update.variants.find(uv => normalizeKey(uv.sku) === normalizeKey(ev.sku));
+            const match = update.variants.find(uv => {
+              const skuMatches = [ev.sku, ev.posSku].some(sku => normalizeKey(uv.sku) === normalizeKey(sku));
+              const sizeMatches = !uv.size || !ev.size || normalizeKey(uv.size) === normalizeKey(ev.size);
+              return skuMatches && sizeMatches;
+            });
             if (!match) return ev;
             const patched = { ...ev };
             if (match.price != null) { patched.price = match.price; patched.salePrice = match.price; }
@@ -1121,11 +1250,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
   const handleStockSyncPost = apiHandler(async (req, res, correlationId) => {
     const payload = validateStockPayload(req.body);
     const db = getDb();
-    const lookupCache = await buildProductLookupCache(db);
+    const productRefs = await resolveStockProductRefs(db, payload.items);
     const resolved = [];
     const unknownItems = [];
-    for (const item of payload.items) {
-      const productRef = findProductRefCached(lookupCache, item.webProductId, item.sku);
+    for (let index = 0; index < payload.items.length; index += 1) {
+      const item = payload.items[index];
+      const productRef = productRefs[index];
       if (!productRef) {
         unknownItems.push(item);
       } else {
@@ -1152,12 +1282,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       const localReconciliation = [];
       const localStockLevels = [];
       const modifiedProductPaths = new Set();
-      const eventSnaps = [];
       const productSnaps = new Map();
-      for (const entry of resolved) eventSnaps.push(await transaction.get(entry.eventRef));
-      for (const entry of resolved) {
-        if (!productSnaps.has(entry.productRef.path)) productSnaps.set(entry.productRef.path, await transaction.get(entry.productRef));
-      }
+      const eventSnaps = await transactionGetMany(transaction, resolved.map(entry => entry.eventRef));
+      const uniqueProductRefs = [...new Map(resolved.map(entry => [entry.productRef.path, entry.productRef])).values()];
+      const uniqueProductSnaps = await transactionGetMany(transaction, uniqueProductRefs);
+      uniqueProductRefs.forEach((ref, index) => productSnaps.set(ref.path, uniqueProductSnaps[index]));
       const workingProducts = new Map([...productSnaps.entries()].map(([path, snap]) => [path, { snap, data: snap.data() }]));
 
       for (let index = 0; index < resolved.length; index += 1) {
