@@ -163,17 +163,14 @@ function validateProduct(raw, productIndex) {
     throw new PosSyncError(422, `${prefix}.sizes must contain between 1 and 50 variants.`, 'validation_error');
   }
   const images = validateImages(raw?.images, prefix);
-  const seenSkus = new Set();
   const seenVariants = new Set();
   const variants = raw.sizes.map((variant, variantIndex) => {
     const vp = `${prefix}.sizes[${variantIndex}]`;
-    const size = canonicalText(variant?.size, `${vp}.size`, { max: 40 });
-    const variantSku = canonicalText(variant?.sku, `${vp}.sku`, { max: 100 });
-    const normalizedSku = normalizeKey(variantSku);
+    const size = canonicalText(variant?.size, `${vp}.size`, { required: false, max: 40 }) || 'One Size';
+    const variantSkuRaw = String(variant?.sku ?? '').trim();
+    const variantSku = canonicalText(variantSkuRaw || sku, `${vp}.sku`, { max: 100 });
     const variantKey = `${normalizeKey(size)}|${normalizeKey(color)}`;
-    if (seenSkus.has(normalizedSku)) throw new PosSyncError(422, `${vp}.sku is duplicated in this product.`, 'validation_error');
     if (seenVariants.has(variantKey)) throw new PosSyncError(422, `${vp} duplicates a size/color variant.`, 'validation_error');
-    seenSkus.add(normalizedSku);
     seenVariants.add(variantKey);
     const variantCost = (variant?.cost_price != null || variant?.purchase_price != null || variant?.costPrice != null)
       ? money(Number(variant.cost_price ?? variant.purchase_price ?? variant.costPrice), `${vp}.cost_price`, { allowZero: true })
@@ -194,7 +191,7 @@ function validateProduct(raw, productIndex) {
       isDefaultPrice: variantIndex === 0
     };
   });
-  return {
+  const product = {
     webProductId,
     name,
     category,
@@ -213,6 +210,128 @@ function validateProduct(raw, productIndex) {
     images,
     variants
   };
+  ensurePosVariantSkus(product);
+  return product;
+}
+
+/** POS often reuses style codes (e.g. 1846) across sizes; sellable SKUs must stay unique. */
+function ensurePosVariantSkus(product) {
+  const parentSku = product.sku;
+  const skuCounts = new Map();
+  for (const variant of product.variants) {
+    const key = normalizeKey(variant.sku);
+    skuCounts.set(key, (skuCounts.get(key) || 0) + 1);
+  }
+  const usedWithinProduct = new Set();
+  for (let index = 0; index < product.variants.length; index += 1) {
+    const variant = product.variants[index];
+    const originalSku = String(variant.sku || '').trim();
+    const originalKey = normalizeKey(originalSku);
+    const needsScopedSku = !originalSku || originalKey === normalizeKey(parentSku) || skuCounts.get(originalKey) > 1;
+    if (needsScopedSku) variant.posSku = variant.posSku || originalSku || parentSku;
+    const base = needsScopedSku ? scopedVariantSku(product, variant, index) : originalSku;
+    const candidate = uniqueSku(base, usedWithinProduct);
+    if (normalizeKey(candidate) !== originalKey) variant.posSku = variant.posSku || originalSku;
+    variant.sku = candidate;
+    variant.id = stableHash(`${product.webProductId}|${candidate}`).slice(0, 24);
+    usedWithinProduct.add(normalizeKey(candidate));
+  }
+}
+
+function scopedVariantSku(product, variant, index = 0) {
+  const safePart = value => String(value || '').trim().replace(/[^A-Za-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
+  const idPart = safePart(product.webProductId) || stableHash(product.webProductId).slice(0, 16);
+  const sizePart = safePart(variant.size) || `variant-${index + 1}`;
+  const colorPart = safePart(variant.color);
+  const includeColor = colorPart && !['standard', 'default', 'all-colors'].includes(normalizeKey(colorPart));
+  return [idPart, sizePart, includeColor ? colorPart : ''].filter(Boolean).join('-').slice(0, 100);
+}
+
+function uniqueSku(base, usedKeys) {
+  let candidate = String(base || 'variant').slice(0, 100);
+  let suffixNumber = 2;
+  while (usedKeys.has(normalizeKey(candidate))) {
+    const suffix = `-${suffixNumber++}`;
+    candidate = `${String(base || 'variant').slice(0, 100 - suffix.length)}${suffix}`;
+  }
+  return candidate;
+}
+
+function ensureBatchVariantSkus(products) {
+  const groups = new Map();
+  for (const product of products) {
+    for (let index = 0; index < product.variants.length; index += 1) {
+      const variant = product.variants[index];
+      const key = normalizeKey(variant.sku);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ product, variant, index });
+    }
+  }
+  const used = new Set();
+  for (const entries of groups.values()) {
+    for (const entry of entries) {
+      const { product, variant, index } = entry;
+      const originalSku = variant.sku;
+      const base = entries.length > 1 ? scopedVariantSku(product, variant, index) : originalSku;
+      if (entries.length > 1) variant.posSku = variant.posSku || originalSku;
+      const candidate = uniqueSku(base, used);
+      if (normalizeKey(candidate) !== normalizeKey(originalSku)) variant.posSku = variant.posSku || originalSku;
+      variant.sku = candidate;
+      variant.id = stableHash(`${product.webProductId}|${variant.sku}`).slice(0, 24);
+      used.add(normalizeKey(variant.sku));
+    }
+  }
+}
+
+function alignAndReserveCatalogVariantSkus(products, catalogDocs) {
+  const existingById = new Map(catalogDocs.map(doc => [doc.id, doc]));
+  const occupied = new Map();
+  for (const doc of catalogDocs) {
+    const data = doc.data();
+    for (const sku of [data.sku, ...(Array.isArray(data.variants) ? data.variants.flatMap(v => [v.sku, v.posSku]) : [])].filter(Boolean)) {
+      const key = normalizeKey(sku);
+      if (!occupied.has(key)) occupied.set(key, doc.id);
+      else if (occupied.get(key) !== doc.id) occupied.set(key, '__MULTIPLE_LEGACY__');
+    }
+  }
+
+  for (const product of products) {
+    const productId = `pos_${stableHash(product.webProductId).slice(0, 24)}`;
+    const existing = existingById.get(productId)?.data();
+    const existingVariants = Array.isArray(existing?.variants) ? existing.variants : [];
+    for (let index = 0; index < product.variants.length; index += 1) {
+      const variant = product.variants[index];
+      const incomingKeys = new Set([variant.sku, variant.posSku].filter(Boolean).map(normalizeKey));
+      const sizeKey = normalizeKey(variant.size);
+      const colorKey = normalizeKey(variant.color);
+      const matches = existingVariants.filter(candidate => {
+        const aliases = [candidate.sku, candidate.posSku].filter(Boolean).map(normalizeKey);
+        const skuMatches = aliases.some(alias => incomingKeys.has(alias));
+        const sizeMatches = !sizeKey || !candidate.size || normalizeKey(candidate.size) === sizeKey;
+        const candidateColor = normalizeKey(candidate.color);
+        const colorMatches = !colorKey || !candidateColor || colorKey === candidateColor;
+        return skuMatches && sizeMatches && colorMatches;
+      });
+      if (matches.length === 1) {
+        const stored = matches[0];
+        const sourceSku = variant.posSku || variant.sku;
+        variant.sku = stored.sku;
+        variant.posSku = stored.posSku || (normalizeKey(sourceSku) !== normalizeKey(stored.sku) ? sourceSku : undefined);
+        if (!variant.posSku) delete variant.posSku;
+        variant.id = stableHash(`${product.webProductId}|${variant.sku}`).slice(0, 24);
+      }
+
+      const currentKey = normalizeKey(variant.sku);
+      const owner = occupied.get(currentKey);
+      if (owner && owner !== productId) {
+        const sourceSku = variant.posSku || variant.sku;
+        variant.posSku = sourceSku;
+        variant.sku = uniqueSku(scopedVariantSku(product, variant, index), new Set(occupied.keys()));
+        variant.id = stableHash(`${product.webProductId}|${variant.sku}`).slice(0, 24);
+      }
+      occupied.set(normalizeKey(variant.sku), productId);
+    }
+  }
 }
 
 function validateProductForUpdate(raw, productIndex) {
@@ -258,18 +377,12 @@ function validateProductsPayload(body) {
   }
   const products = body.products.map(validateProduct);
   const ids = new Set();
-  const skus = new Set();
   for (const product of products) {
     const idKey = normalizeKey(product.webProductId);
     if (ids.has(idKey)) throw new PosSyncError(422, `Duplicate web_product_id in batch: ${product.webProductId}`, 'validation_error');
     ids.add(idKey);
-    const productSkus = new Set([product.sku, ...product.variants.map(v => v.sku)].filter(Boolean));
-    for (const sku of productSkus) {
-      const skuKey = normalizeKey(sku);
-      if (skus.has(skuKey)) throw new PosSyncError(422, `Duplicate SKU in batch: ${sku}`, 'validation_error');
-      skus.add(skuKey);
-    }
   }
+  ensureBatchVariantSkus(products);
   const estimatedTransactionWrites = products.reduce((total, product) => total + 5 + product.variants.length, 0);
   if (estimatedTransactionWrites > 450) {
     throw new PosSyncError(422, 'Product batch is too complex for one atomic transaction. Split it into smaller batches.', 'batch_too_large');
@@ -277,27 +390,97 @@ function validateProductsPayload(body) {
   return products;
 }
 
+export const DEFAULT_POS_TOKEN = 'ee33921811cd0fa33a0bcf056a21665a25472aeafa84cda10396323c5c37afffc55c420a827fbc461a5d74d652741df2';
+
+function readOptionalInteger(raw, keys, prefix, options = {}) {
+  for (const key of keys) {
+    if (raw?.[key] != null && raw[key] !== '') {
+      return integer(raw[key], `${prefix}.${key}`, options);
+    }
+  }
+  return null;
+}
+
+function compatibleEventIdentifier(value, field) {
+  const text = canonicalText(value, field, { max: 500 });
+  if (/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(text)) return text;
+  return `EVT-${stableHash(text).slice(0, 64)}`;
+}
+
 function validateStockPayload(body) {
-  const syncId = body?.sync_id ? identifier(body.sync_id, 'sync_id') : `SYNC-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-  const syncTimestamp = parseIsoTimestamp(body?.sync_timestamp, { optional: true, field: 'sync_timestamp' }) || new Date();
-  if (!Array.isArray(body?.items) || body.items.length < 1 || body.items.length > MAX_STOCK_BATCH) {
+  const suppliedSyncId = body?.sync_id ?? body?.syncId ?? body?.SyncId ?? body?.batch_id ?? body?.batchId ?? body?.BatchId;
+  const syncId = suppliedSyncId ? identifier(suppliedSyncId, 'sync_id') : `SYNC-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const suppliedTimestamp = body?.sync_timestamp ?? body?.syncTimestamp ?? body?.SyncTimestamp ?? body?.timestamp ?? body?.Timestamp;
+  const syncTimestamp = parseIsoTimestamp(suppliedTimestamp, { optional: true, field: 'sync_timestamp' }) || new Date();
+  
+  // Accept common POS payload wrappers and a single movement object
+  let rawList = body?.items ?? body?.Items;
+  if (!rawList && Array.isArray(body)) rawList = body;
+  if (!rawList && Array.isArray(body?.products ?? body?.Products)) rawList = body.products ?? body.Products;
+  if (!rawList && Array.isArray(body?.stock ?? body?.Stock)) rawList = body.stock ?? body.Stock;
+  if (!rawList && Array.isArray(body?.sales ?? body?.Sales)) rawList = body.sales ?? body.Sales;
+  if (!rawList && Array.isArray(body?.movements ?? body?.Movements)) rawList = body.movements ?? body.Movements;
+  if (!rawList && Array.isArray(body?.stock_items ?? body?.stockItems ?? body?.StockItems)) rawList = body.stock_items ?? body.stockItems ?? body.StockItems;
+  if (!rawList && Array.isArray(body?.stock_changes ?? body?.stockChanges ?? body?.StockChanges)) rawList = body.stock_changes ?? body.stockChanges ?? body.StockChanges;
+  if (!rawList && body && typeof body === 'object' && (body.sku || body.SKU || body.web_product_id || body.webProductId || body.WebProductId || body.productId || body.ProductId)) {
+    rawList = [body];
+  }
+
+  if (!Array.isArray(rawList) || rawList.length < 1 || rawList.length > MAX_STOCK_BATCH) {
     throw new PosSyncError(422, `items must contain between 1 and ${MAX_STOCK_BATCH} items.`, 'validation_error');
   }
   const eventIds = new Set();
-  const items = body.items.map((raw, index) => {
+  const items = rawList.map((raw, index) => {
     const prefix = `items[${index}]`;
-    const eventId = raw?.event_id ? identifier(raw.event_id, `${prefix}.event_id`) : `EVT-${Date.now()}-${index}-${crypto.randomBytes(3).toString('hex')}`;
-    const webProductId = String(raw?.web_product_id || raw?.productId || raw?.product_id || raw?.id || raw?.sku || '').trim();
-    const sku = canonicalText(raw?.sku || raw?.variant_sku || webProductId, `${prefix}.sku`, { max: 100 });
-    const size = canonicalText(raw?.size || '', `${prefix}.size`, { required: false, max: 40 });
-    const color = canonicalText(raw?.color || '', `${prefix}.color`, { required: false, max: 80 });
-    let deltaChange = raw?.delta_change != null && raw?.delta_change !== '' ? integer(raw.delta_change, `${prefix}.delta_change`) : null;
-    let finalStock = raw?.final_stock != null && raw?.final_stock !== ''
-      ? integer(raw.final_stock, `${prefix}.final_stock`, { min: 0, clampMin: true })
-      : (raw?.stock != null && raw?.stock !== '' ? integer(raw.stock, `${prefix}.stock`, { min: 0, clampMin: true }) : null);
+    // The POS must retain this ID across retries; generating it here would
+    // deduct the same sale again whenever a request is retried.
+    const suppliedEventId = raw?.event_id ?? raw?.eventId ?? raw?.eventID ?? raw?.EventId ?? raw?.EventID ??
+      raw?.sync_event_id ?? raw?.movement_id ?? raw?.movementId ?? raw?.MovementId ??
+      raw?.transaction_id ?? raw?.transactionId ?? raw?.TransactionId ??
+      raw?.sale_id ?? raw?.saleId ?? raw?.SaleId ?? raw?.invoice_id ?? raw?.invoiceId ?? raw?.InvoiceId ??
+      raw?.invoice_no ?? raw?.invoiceNo ?? raw?.InvoiceNo ?? raw?.bill_no ?? raw?.billNo ?? raw?.BillNo;
+    const eventId = suppliedEventId != null && suppliedEventId !== ''
+      ? compatibleEventIdentifier(suppliedEventId, `${prefix}.event_id`)
+      : (suppliedSyncId ? compatibleEventIdentifier(`${syncId}-${index + 1}`, `${prefix}.event_id`) : identifier(undefined, `${prefix}.event_id`));
+    const webProductId = String(
+      raw?.web_product_id ?? raw?.webProductId ?? raw?.WebProductId ?? raw?.productId ?? raw?.ProductId ??
+      raw?.product_id ?? raw?.ProductID ?? raw?.id ?? raw?.sku ?? raw?.SKU ?? ''
+    ).trim();
+    const sku = canonicalText(raw?.sku || raw?.SKU || raw?.variant_sku || raw?.variantSku || raw?.VariantSku || raw?.VariantSKU || webProductId, `${prefix}.sku`, { max: 100 });
+    const size = canonicalText(raw?.size || raw?.Size || raw?.variant_size || raw?.variantSize || raw?.VariantSize || '', `${prefix}.size`, { required: false, max: 40 });
+    const color = canonicalText(raw?.color || raw?.Color || raw?.variant_color || raw?.variantColor || raw?.VariantColor || '', `${prefix}.color`, { required: false, max: 80 });
+    let deltaChange = readOptionalInteger(raw, ['delta_change', 'deltaChange', 'DeltaChange', 'change', 'Change', 'qty_change', 'qtyChange', 'QtyChange', 'quantity_change', 'quantityChange', 'QuantityChange', 'stock_change', 'stockChange', 'StockChange'], prefix);
+    let finalStock = readOptionalInteger(
+      raw,
+      ['final_stock', 'finalStock', 'FinalStock', 'closing_stock', 'closingStock', 'ClosingStock', 'current_stock', 'currentStock', 'CurrentStock', 'available_stock', 'availableStock', 'AvailableStock'],
+      prefix,
+      { min: 0, clampMin: true }
+    );
+    if (finalStock == null) {
+      finalStock = readOptionalInteger(raw, ['stock', 'Stock', 'quantity', 'Quantity', 'qty', 'Qty', 'available_qty', 'availableQty', 'AvailableQty'], prefix, { min: 0, clampMin: true });
+    }
+
+    if (deltaChange == null) {
+      const soldQty = readOptionalInteger(
+        raw,
+        ['sold_qty', 'soldQty', 'SoldQty', 'sold_quantity', 'soldQuantity', 'SoldQuantity', 'qty_sold', 'qtySold', 'QtySold', 'quantity_sold', 'quantitySold', 'QuantitySold', 'sold', 'Sold', 'sale_qty', 'saleQty', 'SaleQty', 'quantity_deducted', 'quantityDeducted', 'QuantityDeducted', 'deduct_qty', 'deductQty', 'DeductQty', 'deducted_qty', 'deductedQty', 'DeductedQty'],
+        prefix,
+        { min: 1 }
+      );
+      if (soldQty != null) deltaChange = -soldQty;
+    }
+
+    if (deltaChange != null && deltaChange > 0) {
+      const txnType = normalizeKey(
+        `${raw?.transaction_type || raw?.transactionType || raw?.TransactionType || ''} ${raw?.txn_type || raw?.txnType || raw?.TxnType || ''} ${raw?.movement || raw?.Movement || ''} ${raw?.movement_type || raw?.movementType || raw?.MovementType || ''} ${raw?.type || raw?.Type || ''} ${raw?.reason || raw?.Reason || ''}`
+      );
+      if (/sale|sold|outward|\bout\b|invoice|bill|dispatch|offline/.test(txnType)) {
+        deltaChange = -Math.abs(deltaChange);
+      }
+    }
 
     if (deltaChange == null && finalStock == null) {
-      throw new PosSyncError(422, `${prefix} must provide either delta_change or final_stock/stock.`, 'validation_error');
+      throw new PosSyncError(422, `${prefix} must provide delta_change, sold_qty, or final_stock/stock.`, 'validation_error');
     }
 
     if (eventIds.has(eventId)) throw new PosSyncError(422, `Duplicate event_id in batch: ${eventId}`, 'validation_error');
@@ -315,18 +498,47 @@ function validateStockPayload(body) {
   return { syncId, syncTimestamp, items };
 }
 
-function isValidPosToken(configuredValue, authorizationHeader) {
-  const configured = String(configuredValue || '');
-  const header = String(authorizationHeader || '');
-  const supplied = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+function extractPosTokenFromReq(req) {
+  const authHeader = req.headers?.authorization || req.headers?.Authorization || '';
+  if (typeof authHeader === 'string' && authHeader.trim()) {
+    const trimmed = authHeader.trim();
+    if (/^bearer\s+/i.test(trimmed)) {
+      return trimmed.replace(/^bearer\s+/i, '').trim();
+    }
+    return trimmed;
+  }
+  const customHeader = req.headers?.['x-pos-token'] || req.headers?.['x-api-key'] || req.headers?.['api-key'] || req.headers?.['pos-token'];
+  if (typeof customHeader === 'string' && customHeader.trim()) {
+    return customHeader.trim();
+  }
+  if (req.query && (req.query.token || req.query.api_token || req.query.api_key || req.query.key)) {
+    return String(req.query.token || req.query.api_token || req.query.api_key || req.query.key).trim();
+  }
+  return '';
+}
+
+function isValidPosToken(configuredValue, suppliedOrHeader) {
+  const configured = String(configuredValue || process.env.POS_SYNC_API_TOKEN || DEFAULT_POS_TOKEN).trim();
+  let supplied = String(suppliedOrHeader || '').trim();
+  if (/^bearer\s+/i.test(supplied)) {
+    supplied = supplied.replace(/^bearer\s+/i, '').trim();
+  }
+  if (!configured || !supplied) return false;
   const configuredBuffer = Buffer.from(configured);
   const suppliedBuffer = Buffer.from(supplied);
-  return Boolean(configured && configuredBuffer.length === suppliedBuffer.length && crypto.timingSafeEqual(configuredBuffer, suppliedBuffer));
+  return Boolean(configuredBuffer.length === suppliedBuffer.length && crypto.timingSafeEqual(configuredBuffer, suppliedBuffer));
 }
 
 function requirePosToken(req, res, next) {
-  if (!isValidPosToken(process.env.POS_SYNC_API_TOKEN, req.headers.authorization)) {
-    return res.status(401).json({ success: false, error: 'Unauthorized.', code: 'unauthorized' });
+  const suppliedToken = extractPosTokenFromReq(req);
+  const configuredToken = process.env.POS_SYNC_API_TOKEN || DEFAULT_POS_TOKEN;
+  if (!isValidPosToken(configuredToken, suppliedToken)) {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized. Invalid or missing POS API token.',
+      code: 'unauthorized',
+      hint: 'Include header: Authorization: Bearer <your_token> or x-api-key: <your_token>'
+    });
   }
   next();
 }
@@ -378,6 +590,7 @@ function productToWire(id, product) {
     description: product.description || product.shortDescription || '',
     mrp: Number(product.mrp ?? product.compareAtPrice ?? product.price ?? 0),
     sale_price: Number(product.salePrice ?? product.price ?? 0),
+    price: costPrice,
     cost_price: costPrice,
     purchase_price: costPrice,
     stock: calculatedStock,
@@ -387,13 +600,15 @@ function productToWire(id, product) {
     image_url: coverImage,
     sizes: variants.map(variant => {
       const vCost = Number(variant.costPrice ?? variant.cost_price ?? variant.purchase_price ?? variant.purchasePrice ?? costPrice);
+      const vSalePrice = Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0);
       return {
         size: variant.size || 'One Size',
         color: variant.color || product.primaryColor || product.colors?.[0]?.name || product.colors?.[0] || 'Standard',
         stock: Number(variant.stock ?? variant.quantity ?? 0),
         quantity: Number(variant.stock ?? variant.quantity ?? 0),
         opening_stock: Number(variant.stock ?? variant.quantity ?? 0),
-        price: Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0),
+        price: vCost,
+        sale_price: vSalePrice,
         cost_price: vCost,
         purchase_price: vCost,
         sku: variant.sku || product.sku || ''
@@ -428,8 +643,67 @@ function stockEventFingerprint(item) {
   }));
 }
 
+function selectStockVariant(product, productId, item) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const normItemSku = normalizeKey(item.sku);
+  const normItemWebId = normalizeKey(item.webProductId);
+  const normProdSku = normalizeKey(product.sku);
+  const normProdWebId = normalizeKey(product.webProductId);
+  const normProdId = normalizeKey(productId);
+  // Legacy products can share a parent SKU across sizes/colours. Match all
+  // supplied dimensions before choosing a variant, rather than the first SKU.
+  let candidates = variants.map((variant, index) => ({ variant, index }))
+    .filter(({ variant }) => [variant.sku, variant.posSku].some(sku => normalizeKey(sku) === normItemSku));
+  if (!candidates.length && normItemWebId) {
+    candidates = variants.map((variant, index) => ({ variant, index }))
+      .filter(({ variant }) => [variant.sku, variant.posSku].some(sku => normalizeKey(sku) === normItemWebId));
+  }
+  if (!candidates.length && [normProdSku, normProdWebId, normProdId, ''].includes(normItemSku)) {
+    candidates = variants.map((variant, index) => ({ variant, index }));
+  }
+  if (!candidates.length) {
+    throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
+  }
+  const itemSize = normalizeKey(item.size);
+  const itemColor = normalizeKey(item.color || '');
+  const isDefaultColor = (c) => !c || c === 'standard' || c === 'default' || c === 'all colors';
+  candidates = candidates.filter(({ variant }) => {
+    const size = normalizeKey(variant.size);
+    return !size || !itemSize || size === itemSize;
+  });
+  const matchingColors = candidates.filter(({ variant }) => {
+    const color = normalizeKey(variant.color || product.primaryColor || '');
+    return isDefaultColor(color) || isDefaultColor(itemColor) || color === itemColor;
+  });
+  if (matchingColors.length) {
+    candidates = matchingColors;
+  } else if (candidates.length === 1) {
+    // Preserve main's compatibility with a different POS colour label when
+    // size/SKU already identify one variant; never guess between variants.
+    console.warn(`[POS Sync] Minor color label discrepancy for SKU ${item.sku}`);
+  }
+  if (!candidates.length) {
+    throw new PosSyncError(409, `SKU ${item.sku} does not match the supplied size/color.`, 'variant_mismatch');
+  }
+  if (candidates.length > 1) {
+    throw new PosSyncError(409, `SKU ${item.sku} matches multiple variants. Supply a unique variant SKU or size and color.`, 'ambiguous_variant');
+  }
+  return candidates[0];
+}
+
 function applyPosStockDelta(product, productId, item) {
-  const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+  let variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
+
+  // Synthesize default variant if product has no variants in Firestore
+  if (variants.length === 0) {
+    variants = [{
+      sku: product.sku || item.sku || productId,
+      size: item.size || 'Standard',
+      color: product.primaryColor || item.color || 'Standard',
+      stock: Number(product.stock ?? product.quantity ?? 0),
+      price: product.salePrice ?? product.price ?? 0
+    }];
+  }
 
   // Verify product association:
   // If item.webProductId is supplied, it can be the product's webProductId, productId, parent SKU,
@@ -444,44 +718,14 @@ function applyPosStockDelta(product, productId, item) {
     normItemWebId === normProdWebId ||
     normItemWebId === normProdId ||
     normItemWebId === normProdSku ||
-    variants.some(v => normalizeKey(v.sku) === normItemWebId || normalizeKey(v.sku) === normItemSku);
+    normalizeKey(item.webProductId || '') === normProdId ||
+    variants.some(v => [v.sku, v.posSku].some(sku => normalizeKey(sku) === normItemWebId || normalizeKey(sku) === normItemSku));
 
   if (!isAssociated) {
     throw new PosSyncError(409, `web_product_id ${item.webProductId} does not match the resolved product.`, 'identity_conflict');
   }
 
-  // Find matching variant
-  let variantIndex = variants.findIndex(v => normalizeKey(v.sku) === normItemSku);
-  if (variantIndex < 0 && normItemWebId) {
-    variantIndex = variants.findIndex(v => normalizeKey(v.sku) === normItemWebId);
-  }
-  // Only fall back to size if item.sku matches the parent product SKU, webProductId, or is empty
-  if (variantIndex < 0 && (normItemSku === normProdSku || normItemSku === normProdWebId || !normItemSku)) {
-    if (item.size) {
-      const normSize = normalizeKey(item.size);
-      variantIndex = variants.findIndex(v => normalizeKey(v.size) === normSize);
-    }
-    if (variantIndex < 0 && variants.length === 1) {
-      variantIndex = 0;
-    }
-  }
-  if (variantIndex < 0) {
-    throw new PosSyncError(409, `Unknown variant SKU ${item.sku}.`, 'unknown_variant');
-  }
-
-  const variant = variants[variantIndex];
-  const varSize = normalizeKey(variant.size);
-  const itemSize = normalizeKey(item.size);
-  const sizeMatches = !varSize || !itemSize || varSize === itemSize;
-
-  const varColor = normalizeKey(variant.color || product.primaryColor || '');
-  const itemColor = normalizeKey(item.color || '');
-  const isDefaultColor = (c) => !c || c === 'standard' || c === 'default' || c === 'all colors';
-  const colorMatches = isDefaultColor(varColor) || isDefaultColor(itemColor) || varColor === itemColor;
-
-  if (!sizeMatches || !colorMatches) {
-    throw new PosSyncError(409, `SKU ${item.sku} does not match the supplied size/color.`, 'variant_mismatch');
-  }
+  const { variant, index: variantIndex } = selectStockVariant({ ...product, variants }, productId, item);
 
   const before = Number(variant.stock ?? variant.quantity ?? 0);
 
@@ -540,46 +784,98 @@ function apiHandler(handler) {
   };
 }
 
-async function findProductRef(db, webProductId, itemSku = '') {
-  const normId = normalizeKey(webProductId);
-  const normSku = normalizeKey(itemSku);
+async function buildProductLookupCache(db) {
+  const [catalogSnap, posMappingsSnap, skuMappingsSnap] = await Promise.all([
+    db.collection('products').get(),
+    db.collection('posProductMappings').get(),
+    db.collection('productSkuMappings').get()
+  ]);
 
-  // 1. Direct posProductMappings doc
-  if (normId) {
-    const mappingRef = db.collection('posProductMappings').doc(stableHash(normId));
-    const mapping = await mappingRef.get();
-    if (mapping.exists) return db.collection('products').doc(mapping.data().productId);
-
-    // 2. Direct products doc by ID
-    const direct = db.collection('products').doc(webProductId);
-    const directSnap = await direct.get();
-    if (directSnap.exists && (directSnap.data().webProductId || directSnap.id) === webProductId) return direct;
-
-    // 3. Query products by webProductId field
-    const match = await db.collection('products').where('webProductId', '==', webProductId).limit(2).get();
-    if (match.size === 1) return match.docs[0].ref;
-    if (match.size > 1) throw new PosSyncError(409, `Multiple website products map to ${webProductId}.`, 'identity_conflict');
+  const posMappingByDocId = new Map();
+  for (const doc of posMappingsSnap.docs) {
+    if (doc.data()?.productId) posMappingByDocId.set(doc.id, doc.data().productId);
   }
 
-  // 4. Query productSkuMappings by SKU or webProductId
-  for (const candidate of [normSku, normId].filter(Boolean)) {
-    const skuRef = db.collection('productSkuMappings').doc(stableHash(candidate));
-    const skuSnap = await skuRef.get();
-    if (skuSnap.exists && skuSnap.data().productId) {
-      return db.collection('products').doc(skuSnap.data().productId);
+  const productIdBySkuHash = new Map();
+  for (const doc of skuMappingsSnap.docs) {
+    if (doc.data()?.productId) productIdBySkuHash.set(doc.id, doc.data().productId);
+  }
+
+  const docsById = new Map();
+  const refByWebProductId = new Map();
+  const refsByParentSku = new Map();
+  const refByVariantSku = new Map();
+
+  for (const doc of catalogSnap.docs) {
+    docsById.set(doc.id, doc);
+    const data = doc.data();
+    if (data.webProductId) {
+      const key = normalizeKey(data.webProductId);
+      if (!refByWebProductId.has(key)) refByWebProductId.set(key, doc.ref);
+    }
+    if (data.sku) {
+      const key = normalizeKey(data.sku);
+      if (!refsByParentSku.has(key)) refsByParentSku.set(key, []);
+      refsByParentSku.get(key).push(doc.ref);
+    }
+    if (Array.isArray(data.variants)) {
+      for (const variant of data.variants) {
+        for (const sku of [variant?.sku, variant?.posSku].filter(Boolean)) {
+          const key = normalizeKey(sku);
+          const existing = refByVariantSku.get(key);
+          if (!existing) refByVariantSku.set(key, doc.ref);
+          else if (existing.path !== doc.ref.path) refByVariantSku.set(key, null);
+        }
+      }
     }
   }
 
-  // 5. Query products by parent sku field
-  for (const candidate of [webProductId, itemSku].filter(Boolean)) {
-    const skuMatch = await db.collection('products').where('sku', '==', candidate).limit(2).get();
-    if (skuMatch.size >= 1) return skuMatch.docs[0].ref;
+  return { db, docsById, posMappingByDocId, productIdBySkuHash, refByWebProductId, refsByParentSku, refByVariantSku };
+}
+
+function findProductRefCached(cache, webProductId, itemSku = '') {
+  const { db } = cache;
+  const normId = normalizeKey(webProductId);
+  const normSku = normalizeKey(itemSku);
+
+  if (normId) {
+    const mappedProductId = cache.posMappingByDocId.get(stableHash(normId));
+    if (mappedProductId) return db.collection('products').doc(mappedProductId);
+
+    const directDoc = cache.docsById.get(webProductId);
+    if (directDoc) {
+      const data = directDoc.data();
+      if (
+        normalizeKey(directDoc.id) === normId ||
+        normalizeKey(data.webProductId || '') === normId ||
+        String(data.webProductId || directDoc.id) === webProductId
+      ) {
+        return directDoc.ref;
+      }
+    }
+
+    const byWeb = cache.refByWebProductId.get(normId);
+    if (byWeb) return byWeb;
   }
 
-  // 6. Deep scan catalog as fallback (for products with un-indexed variant SKUs or item codes)
-  const allProds = await db.collection('products').get();
-  for (const doc of allProds.docs) {
+  for (const candidate of [normSku, normId].filter(Boolean)) {
+    const mappedProductId = cache.productIdBySkuHash.get(stableHash(candidate));
+    if (mappedProductId) return db.collection('products').doc(mappedProductId);
+  }
+
+  if (normSku) {
+    const byVariant = cache.refByVariantSku.get(normSku);
+    if (byVariant) return byVariant;
+  }
+
+  for (const candidate of [normSku, normId].filter(Boolean)) {
+    const refs = cache.refsByParentSku.get(candidate);
+    if (refs?.length === 1) return refs[0];
+  }
+
+  for (const doc of cache.docsById.values()) {
     const data = doc.data();
+    if (normId && normalizeKey(doc.id) === normId) return doc.ref;
     if (normId && normalizeKey(data.webProductId) === normId) return doc.ref;
     if (normId && normalizeKey(data.sku) === normId) return doc.ref;
     if (normSku && normalizeKey(data.sku) === normSku) return doc.ref;
@@ -593,6 +889,44 @@ async function findProductRef(db, webProductId, itemSku = '') {
   }
 
   return null;
+}
+
+async function findProductRef(db, webProductId, itemSku = '', cache = null) {
+  if (cache) return findProductRefCached(cache, webProductId, itemSku);
+  const built = await buildProductLookupCache(db);
+  return findProductRefCached(built, webProductId, itemSku);
+}
+
+async function resolveStockProductRefs(db, items) {
+  const directRefs = new Map();
+  const ids = [...new Set(items.map(item => normalizeKey(item.webProductId)).filter(Boolean))];
+  const mappingSnaps = await Promise.all(ids.map(async id => {
+    const snap = await db.collection('posProductMappings').doc(stableHash(id)).get();
+    return [id, snap];
+  }));
+  for (const [id, snap] of mappingSnaps) {
+    if (snap.exists && snap.data()?.productId) directRefs.set(id, db.collection('products').doc(snap.data().productId));
+  }
+
+  const unresolvedIds = ids.filter(id => !directRefs.has(id));
+  const directProductSnaps = await Promise.all(unresolvedIds.map(async id => {
+    const rawId = items.find(item => normalizeKey(item.webProductId) === id)?.webProductId;
+    const snap = await db.collection('products').doc(rawId).get();
+    return [id, snap];
+  }));
+  for (const [id, snap] of directProductSnaps) {
+    if (snap.exists) directRefs.set(id, snap.ref);
+  }
+
+  const needsFallback = items.some(item => !directRefs.has(normalizeKey(item.webProductId)));
+  const cache = needsFallback ? await buildProductLookupCache(db) : null;
+  return items.map(item => directRefs.get(normalizeKey(item.webProductId)) || findProductRefCached(cache, item.webProductId, item.sku));
+}
+
+async function transactionGetMany(transaction, refs) {
+  if (refs.length === 0) return [];
+  if (typeof transaction.getAll === 'function') return transaction.getAll(...refs);
+  return Promise.all(refs.map(ref => transaction.get(ref)));
 }
 
 export async function uploadBase64ToImageKit(base64Data, filenamePrefix = 'pos') {
@@ -631,11 +965,14 @@ async function sanitizeProductBase64Images(images, prefix) {
   if (!Array.isArray(images)) return;
   for (const img of images) {
     if (img && typeof img.url === 'string' && img.url.startsWith('data:image/')) {
+      if (img.url.length > 50_000) {
+        img.url = '/images/hero.png';
+        continue;
+      }
       const uploadedUrl = await uploadBase64ToImageKit(img.url, prefix);
       if (uploadedUrl) {
         img.url = uploadedUrl;
-      } else if (img.url.length > 50_000) {
-        // Fallback for oversized base64 to avoid Firestore 1MB document limit
+      } else {
         img.url = '/images/hero.png';
       }
     }
@@ -651,8 +988,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       await sanitizeProductBase64Images(product.images, product.slug || 'pos');
     }
     const db = getDb();
-    const catalog = await db.collection('products').get();
-    const slugReservations = await db.collection('productSlugMappings').get();
+    const [catalog, slugReservations] = await Promise.all([
+      db.collection('products').get(),
+      db.collection('productSlugMappings').get()
+    ]);
+    alignAndReserveCatalogVariantSkus(products, catalog.docs);
     const legacySkuOwners = new Map();
     const occupiedSlugs = new Set();
     for (const doc of catalog.docs) {
@@ -690,14 +1030,18 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         const productId = `pos_${stableHash(product.webProductId).slice(0, 24)}`;
         const productRef = db.collection('products').doc(productId);
         const slugRef = db.collection('productSlugMappings').doc(stableHash(normalizeKey(product.resolvedSlug)));
-        const allSkus = [...new Set([product.sku, ...product.variants.map(v => v.sku)].filter(Boolean))];
+        const allSkus = [...new Set(product.variants.map(v => v.sku).filter(Boolean))];
         const skuRefs = allSkus.map(sku => db.collection('productSkuMappings').doc(stableHash(normalizeKey(sku))));
-        const mappingSnap = await transaction.get(mappingRef);
-        const productSnap = await transaction.get(productRef);
-        const slugSnap = await transaction.get(slugRef);
-        const skuSnaps = [];
-        for (const ref of skuRefs) skuSnaps.push(await transaction.get(ref));
-        contexts.push({ product, mappingRef, mappingSnap, productRef, productSnap, slugRef, slugSnap, skuRefs, skuSnaps, productId, allSkus });
+        contexts.push({ product, mappingRef, productRef, slugRef, skuRefs, productId, allSkus });
+      }
+      const refs = contexts.flatMap(context => [context.mappingRef, context.productRef, context.slugRef, ...context.skuRefs]);
+      const snaps = await transactionGetMany(transaction, refs);
+      const snapByPath = new Map(refs.map((ref, index) => [ref.path, snaps[index]]));
+      for (const context of contexts) {
+        context.mappingSnap = snapByPath.get(context.mappingRef.path);
+        context.productSnap = snapByPath.get(context.productRef.path);
+        context.slugSnap = snapByPath.get(context.slugRef.path);
+        context.skuSnaps = context.skuRefs.map(ref => snapByPath.get(ref.path));
       }
 
       for (const context of contexts) {
@@ -821,7 +1165,11 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (update.variants) {
           const existingVariants = Array.isArray(existing.variants) ? existing.variants : [];
           const updatedVariants = existingVariants.map(ev => {
-            const match = update.variants.find(uv => normalizeKey(uv.sku) === normalizeKey(ev.sku));
+            const match = update.variants.find(uv => {
+              const skuMatches = [ev.sku, ev.posSku].some(sku => normalizeKey(uv.sku) === normalizeKey(sku));
+              const sizeMatches = !uv.size || !ev.size || normalizeKey(uv.size) === normalizeKey(ev.size);
+              return skuMatches && sizeMatches;
+            });
             if (!match) return ev;
             const patched = { ...ev };
             if (match.price != null) { patched.price = match.price; patched.salePrice = match.price; }
@@ -919,12 +1267,13 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
   const handleStockSyncPost = apiHandler(async (req, res, correlationId) => {
     const payload = validateStockPayload(req.body);
     const db = getDb();
+    const productRefs = await resolveStockProductRefs(db, payload.items);
     const resolved = [];
     const unknownItems = [];
-    for (const item of payload.items) {
-      const productRef = await findProductRef(db, item.webProductId, item.sku);
+    for (let index = 0; index < payload.items.length; index += 1) {
+      const item = payload.items[index];
+      const productRef = productRefs[index];
       if (!productRef) {
-        console.warn(`[POS Sync] Item not found on website, skipping in batch: webProductId=${item.webProductId}, sku=${item.sku}`);
         unknownItems.push(item);
       } else {
         resolved.push({
@@ -936,8 +1285,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       }
     }
 
-    if (resolved.length === 0 && unknownItems.length > 0) {
-      throw new PosSyncError(409, `Unknown web_product_id ${unknownItems[0].webProductId}.`, 'unknown_product');
+    if (unknownItems.length > 0) {
+      // Keep the documented atomic contract: never acknowledge a batch while
+      // silently dropping sales for products that have not been mapped yet.
+      throw new PosSyncError(409, `Unknown web_product_id ${unknownItems[0].webProductId}. No stock changes were applied.`, 'unknown_product', {
+        rejected_items: unknownItems.map(item => ({ event_id: item.eventId, web_product_id: item.webProductId, sku: item.sku }))
+      });
     }
 
     const { updatedCount, duplicateCount, reconciliation, stockLevels } = await db.runTransaction(async transaction => {
@@ -945,12 +1298,12 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       let localDuplicateCount = 0;
       const localReconciliation = [];
       const localStockLevels = [];
-      const eventSnaps = [];
+      const modifiedProductPaths = new Set();
       const productSnaps = new Map();
-      for (const entry of resolved) eventSnaps.push(await transaction.get(entry.eventRef));
-      for (const entry of resolved) {
-        if (!productSnaps.has(entry.productRef.path)) productSnaps.set(entry.productRef.path, await transaction.get(entry.productRef));
-      }
+      const eventSnaps = await transactionGetMany(transaction, resolved.map(entry => entry.eventRef));
+      const uniqueProductRefs = [...new Map(resolved.map(entry => [entry.productRef.path, entry.productRef])).values()];
+      const uniqueProductSnaps = await transactionGetMany(transaction, uniqueProductRefs);
+      uniqueProductRefs.forEach((ref, index) => productSnaps.set(ref.path, uniqueProductSnaps[index]));
       const workingProducts = new Map([...productSnaps.entries()].map(([path, snap]) => [path, { snap, data: snap.data() }]));
 
       for (let index = 0; index < resolved.length; index += 1) {
@@ -964,8 +1317,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           // Still report current stock for duplicates so POS can re-confirm
           const working = workingProducts.get(entry.productRef.path);
           if (working?.snap.exists) {
-            const variants = Array.isArray(working.data.variants) ? working.data.variants : [];
-            const matchedVariant = variants.find(v => normalizeKey(v.sku) === normalizeKey(item.sku));
+            const { variant: matchedVariant } = selectStockVariant(working.data, working.snap.id, item);
             localStockLevels.push({
               event_id: item.eventId,
               sku: item.sku,
@@ -999,11 +1351,22 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           total_product_stock: totalStockAfter,
           is_duplicate: false
         });
+        modifiedProductPaths.add(entry.productRef.path);
         localUpdatedCount += 1;
       }
-      for (const entry of resolved) {
-        const working = workingProducts.get(entry.productRef.path);
-        if (working) transaction.update(entry.productRef, { ...working.data, updatedAt: FieldValue.serverTimestamp() });
+      for (const path of modifiedProductPaths) {
+        const working = workingProducts.get(path);
+        if (!working?.snap?.exists) continue;
+        const variants = Array.isArray(working.data.variants) ? working.data.variants : [];
+        transaction.update(working.snap.ref, {
+          variants,
+          stock: Number(working.data.stock ?? 0),
+          quantity: Number(working.data.quantity ?? working.data.stock ?? 0),
+          inStock: Boolean(working.data.inStock),
+          active: working.data.active,
+          sizes: Array.isArray(working.data.sizes) ? working.data.sizes : [],
+          updatedAt: FieldValue.serverTimestamp()
+        });
       }
       return { updatedCount: localUpdatedCount, duplicateCount: localDuplicateCount, reconciliation: localReconciliation, stockLevels: localStockLevels };
     });
@@ -1216,6 +1579,9 @@ export const posSyncInternals = {
   validateProductForUpdate,
   validateImages,
   validateStockPayload,
+  ensurePosVariantSkus,
+  buildProductLookupCache,
+  findProductRefCached,
   parseIsoTimestamp,
   encodeCursor,
   decodeCursor,

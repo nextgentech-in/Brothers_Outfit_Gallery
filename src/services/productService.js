@@ -315,6 +315,17 @@ export const subscribeToProduct = (docId, onUpdate) => {
   }
 };
 
+// Keep an open shop page in sync with stock writes made by the POS server.
+// A one-time getDocs/cache read cannot observe a sale in another process.
+export const subscribeToCatalog = (onUpdate, onError = () => {}) => {
+  const catalogQuery = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));
+  return onSnapshot(catalogQuery, (snapshot) => {
+    const products = snapshot.docs.map(product => ({ id: product.id, ...product.data() }));
+    setCachedProducts(products);
+    onUpdate(products);
+  }, onError);
+};
+
 export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4) => {
   try {
     const rawList = await fetchAllActiveProducts();
