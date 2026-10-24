@@ -279,15 +279,27 @@ function validateProductsPayload(body) {
 
 export const DEFAULT_POS_TOKEN = 'ee33921811cd0fa33a0bcf056a21665a25472aeafa84cda10396323c5c37afffc55c420a827fbc461a5d74d652741df2';
 
+function readOptionalInteger(raw, keys, prefix, options = {}) {
+  for (const key of keys) {
+    if (raw?.[key] != null && raw[key] !== '') {
+      return integer(raw[key], `${prefix}.${key}`, options);
+    }
+  }
+  return null;
+}
+
 function validateStockPayload(body) {
   const syncId = body?.sync_id ? identifier(body.sync_id, 'sync_id') : `SYNC-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
   const syncTimestamp = parseIsoTimestamp(body?.sync_timestamp, { optional: true, field: 'sync_timestamp' }) || new Date();
   
-  // Accept: { items: [...] }, [ ... ], { products: [...] }, { stock: [...] }, or single stock object
+  // Accept common POS payload wrappers and a single movement object
   let rawList = body?.items;
   if (!rawList && Array.isArray(body)) rawList = body;
   if (!rawList && Array.isArray(body?.products)) rawList = body.products;
   if (!rawList && Array.isArray(body?.stock)) rawList = body.stock;
+  if (!rawList && Array.isArray(body?.sales)) rawList = body.sales;
+  if (!rawList && Array.isArray(body?.movements)) rawList = body.movements;
+  if (!rawList && Array.isArray(body?.stock_items)) rawList = body.stock_items;
   if (!rawList && body && typeof body === 'object' && (body.sku || body.web_product_id || body.webProductId || body.productId)) {
     rawList = [body];
   }
@@ -300,18 +312,48 @@ function validateStockPayload(body) {
     const prefix = `items[${index}]`;
     // The POS must retain this ID across retries; generating it here would
     // deduct the same sale again whenever a request is retried.
-    const eventId = identifier(raw?.event_id, `${prefix}.event_id`);
-    const webProductId = String(raw?.web_product_id || raw?.productId || raw?.product_id || raw?.id || raw?.sku || '').trim();
-    const sku = canonicalText(raw?.sku || raw?.variant_sku || webProductId, `${prefix}.sku`, { max: 100 });
-    const size = canonicalText(raw?.size || '', `${prefix}.size`, { required: false, max: 40 });
-    const color = canonicalText(raw?.color || '', `${prefix}.color`, { required: false, max: 80 });
-    let deltaChange = raw?.delta_change != null && raw?.delta_change !== '' ? integer(raw.delta_change, `${prefix}.delta_change`) : null;
-    let finalStock = raw?.final_stock != null && raw?.final_stock !== ''
-      ? integer(raw.final_stock, `${prefix}.final_stock`, { min: 0, clampMin: true })
-      : (raw?.stock != null && raw?.stock !== '' ? integer(raw.stock, `${prefix}.stock`, { min: 0, clampMin: true }) : null);
+    const eventId = identifier(
+      raw?.event_id ?? raw?.eventId ?? raw?.eventID ?? raw?.sync_event_id,
+      `${prefix}.event_id`
+    );
+    const webProductId = String(
+      raw?.web_product_id ?? raw?.webProductId ?? raw?.productId ?? raw?.product_id ?? raw?.id ?? raw?.sku ?? ''
+    ).trim();
+    const sku = canonicalText(raw?.sku || raw?.variant_sku || raw?.variantSku || webProductId, `${prefix}.sku`, { max: 100 });
+    const size = canonicalText(raw?.size || raw?.variant_size || '', `${prefix}.size`, { required: false, max: 40 });
+    const color = canonicalText(raw?.color || raw?.variant_color || '', `${prefix}.color`, { required: false, max: 80 });
+    let deltaChange = readOptionalInteger(raw, ['delta_change', 'deltaChange', 'change', 'qty_change', 'quantity_change', 'stock_change'], prefix);
+    let finalStock = readOptionalInteger(
+      raw,
+      ['final_stock', 'finalStock', 'closing_stock', 'current_stock', 'available_stock'],
+      prefix,
+      { min: 0, clampMin: true }
+    );
+    if (finalStock == null) {
+      finalStock = readOptionalInteger(raw, ['stock', 'quantity', 'qty', 'available_qty'], prefix, { min: 0, clampMin: true });
+    }
+
+    if (deltaChange == null) {
+      const soldQty = readOptionalInteger(
+        raw,
+        ['sold_qty', 'soldQty', 'sold_quantity', 'qty_sold', 'quantity_sold', 'sold', 'sale_qty', 'quantity_deducted', 'deduct_qty'],
+        prefix,
+        { min: 1 }
+      );
+      if (soldQty != null) deltaChange = -soldQty;
+    }
+
+    if (deltaChange != null && deltaChange > 0) {
+      const txnType = normalizeKey(
+        `${raw?.transaction_type || ''} ${raw?.txn_type || ''} ${raw?.movement || ''} ${raw?.movement_type || ''} ${raw?.type || ''} ${raw?.reason || ''}`
+      );
+      if (/sale|sold|outward|\bout\b|invoice|bill|dispatch|offline/.test(txnType)) {
+        deltaChange = -Math.abs(deltaChange);
+      }
+    }
 
     if (deltaChange == null && finalStock == null) {
-      throw new PosSyncError(422, `${prefix} must provide either delta_change or final_stock/stock.`, 'validation_error');
+      throw new PosSyncError(422, `${prefix} must provide delta_change, sold_qty, or final_stock/stock.`, 'validation_error');
     }
 
     if (eventIds.has(eventId)) throw new PosSyncError(422, `Duplicate event_id in batch: ${eventId}`, 'validation_error');
@@ -546,6 +588,7 @@ function applyPosStockDelta(product, productId, item) {
     normItemWebId === normProdWebId ||
     normItemWebId === normProdId ||
     normItemWebId === normProdSku ||
+    normalizeKey(item.webProductId || '') === normProdId ||
     variants.some(v => normalizeKey(v.sku) === normItemWebId || normalizeKey(v.sku) === normItemSku);
 
   if (!isAssociated) {
@@ -624,7 +667,16 @@ async function findProductRef(db, webProductId, itemSku = '') {
     // 2. Direct products doc by ID
     const direct = db.collection('products').doc(webProductId);
     const directSnap = await direct.get();
-    if (directSnap.exists && (directSnap.data().webProductId || directSnap.id) === webProductId) return direct;
+    if (directSnap.exists) {
+      const data = directSnap.data();
+      if (
+        normalizeKey(directSnap.id) === normId ||
+        normalizeKey(data.webProductId || '') === normId ||
+        String(data.webProductId || directSnap.id) === webProductId
+      ) {
+        return direct;
+      }
+    }
 
     // 3. Query products by webProductId field
     const match = await db.collection('products').where('webProductId', '==', webProductId).limit(2).get();
@@ -651,6 +703,7 @@ async function findProductRef(db, webProductId, itemSku = '') {
   const allProds = await db.collection('products').get();
   for (const doc of allProds.docs) {
     const data = doc.data();
+    if (normId && normalizeKey(doc.id) === normId) return doc.ref;
     if (normId && normalizeKey(data.webProductId) === normId) return doc.ref;
     if (normId && normalizeKey(data.sku) === normId) return doc.ref;
     if (normSku && normalizeKey(data.sku) === normSku) return doc.ref;
@@ -1019,6 +1072,7 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
       let localDuplicateCount = 0;
       const localReconciliation = [];
       const localStockLevels = [];
+      const modifiedProductPaths = new Set();
       const eventSnaps = [];
       const productSnaps = new Map();
       for (const entry of resolved) eventSnaps.push(await transaction.get(entry.eventRef));
@@ -1072,11 +1126,22 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
           total_product_stock: totalStockAfter,
           is_duplicate: false
         });
+        modifiedProductPaths.add(entry.productRef.path);
         localUpdatedCount += 1;
       }
-      for (const entry of resolved) {
-        const working = workingProducts.get(entry.productRef.path);
-        if (working) transaction.update(entry.productRef, { ...working.data, updatedAt: FieldValue.serverTimestamp() });
+      for (const path of modifiedProductPaths) {
+        const working = workingProducts.get(path);
+        if (!working?.snap?.exists) continue;
+        const variants = Array.isArray(working.data.variants) ? working.data.variants : [];
+        transaction.update(working.snap.ref, {
+          variants,
+          stock: Number(working.data.stock ?? 0),
+          quantity: Number(working.data.quantity ?? working.data.stock ?? 0),
+          inStock: Boolean(working.data.inStock),
+          active: working.data.active,
+          sizes: Array.isArray(working.data.sizes) ? working.data.sizes : [],
+          updatedAt: FieldValue.serverTimestamp()
+        });
       }
       return { updatedCount: localUpdatedCount, duplicateCount: localDuplicateCount, reconciliation: localReconciliation, stockLevels: localStockLevels };
     });

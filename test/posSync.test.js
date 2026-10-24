@@ -1745,4 +1745,54 @@ test('POS arbitrary ID resolution and stock transition 10 -> 5 -> 0', async () =
   assert.equal(checkStock8.body.in_stock, true);
 });
 
+test('sold_qty and camelCase stock fields map to negative deltas', () => {
+  const parsed = posSyncInternals.validateStockPayload({
+    syncId: 'SYNC-SOLD-QTY',
+    items: [{
+      eventId: 'EVT-SOLD-1',
+      webProductId: 'DOC-123',
+      sku: 'SKU-M',
+      soldQty: 2
+    }]
+  });
+  assert.equal(parsed.items[0].deltaChange, -2);
+
+  const saleType = posSyncInternals.validateStockPayload({
+    sync_id: 'SYNC-TYPE',
+    items: [{
+      event_id: 'EVT-TYPE-1',
+      sku: 'SKU-L',
+      delta_change: 3,
+      type: 'offline_sale'
+    }]
+  });
+  assert.equal(saleType.items[0].deltaChange, -3);
+});
+
+test('Firestore document ID resolves products for stock sync', async () => {
+  await sharedDb.collection('products').doc('website-doc-id-lookup').set({
+    webProductId: 'legacy-web-id',
+    sku: 'LOOKUP-PARENT',
+    active: true,
+    variants: [{ sku: 'LOOKUP-V-M', size: 'M', color: 'Blue', stock: 12 }]
+  });
+  const res = await api('/api/pos/stock-sync', {
+    method: 'POST',
+    body: {
+      sync_id: 'SYNC-DOC-ID',
+      items: [{
+        event_id: 'EVT-DOC-ID-1',
+        web_product_id: 'website-doc-id-lookup',
+        sku: 'LOOKUP-V-M',
+        size: 'M',
+        color: 'Blue',
+        delta_change: -2
+      }]
+    }
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.updated_count, 1);
+  assert.equal(res.body.stock_levels[0].website_stock, 10);
+});
+
 

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   getAdminProducts,
   getCachedAdminProducts,
+  subscribeAdminProducts,
   updateProductVariantStock,
   getPosSyncStatus,
   reconcilePosInventory
@@ -119,7 +120,12 @@ export default function AdminInventory() {
   const [savingId, setSavingId] = useState(null);
   const [isBulkSaving, setIsBulkSaving] = useState(false);
   const [dirtyProductIds, setDirtyProductIds] = useState(new Set());
+  const dirtyProductIdsRef = useRef(new Set());
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    dirtyProductIdsRef.current = dirtyProductIds;
+  }, [dirtyProductIds]);
 
   const { showToast, showConfirm } = useAdminUI();
 
@@ -159,7 +165,26 @@ export default function AdminInventory() {
   }, [products.length, showToast]);
 
   useEffect(() => {
-    fetchProducts();
+    if (cachedInitial.length === 0) {
+      setLoading(true);
+    }
+    const unsubscribe = subscribeAdminProducts(
+      (data) => {
+        setProducts(prev => {
+          const dirty = dirtyProductIdsRef.current;
+          if (!dirty || dirty.size === 0) return data;
+          const freshById = new Map(data.map(p => [p.id, p]));
+          return prev.map(p => (dirty.has(p.id) ? p : (freshById.get(p.id) || p)));
+        });
+        setLoading(false);
+        setIsSyncing(false);
+      },
+      (err) => {
+        console.error('Admin inventory live sync error:', err);
+        fetchProducts(true);
+      }
+    );
+    return () => unsubscribe();
   }, [fetchProducts]);
 
   // Bulk save all modified products
