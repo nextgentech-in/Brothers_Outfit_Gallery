@@ -401,19 +401,28 @@ function readOptionalInteger(raw, keys, prefix, options = {}) {
   return null;
 }
 
+function compatibleEventIdentifier(value, field) {
+  const text = canonicalText(value, field, { max: 500 });
+  if (/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(text)) return text;
+  return `EVT-${stableHash(text).slice(0, 64)}`;
+}
+
 function validateStockPayload(body) {
-  const syncId = body?.sync_id ? identifier(body.sync_id, 'sync_id') : `SYNC-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-  const syncTimestamp = parseIsoTimestamp(body?.sync_timestamp, { optional: true, field: 'sync_timestamp' }) || new Date();
+  const suppliedSyncId = body?.sync_id ?? body?.syncId ?? body?.SyncId ?? body?.batch_id ?? body?.batchId ?? body?.BatchId;
+  const syncId = suppliedSyncId ? identifier(suppliedSyncId, 'sync_id') : `SYNC-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  const suppliedTimestamp = body?.sync_timestamp ?? body?.syncTimestamp ?? body?.SyncTimestamp ?? body?.timestamp ?? body?.Timestamp;
+  const syncTimestamp = parseIsoTimestamp(suppliedTimestamp, { optional: true, field: 'sync_timestamp' }) || new Date();
   
   // Accept common POS payload wrappers and a single movement object
-  let rawList = body?.items;
+  let rawList = body?.items ?? body?.Items;
   if (!rawList && Array.isArray(body)) rawList = body;
-  if (!rawList && Array.isArray(body?.products)) rawList = body.products;
-  if (!rawList && Array.isArray(body?.stock)) rawList = body.stock;
-  if (!rawList && Array.isArray(body?.sales)) rawList = body.sales;
-  if (!rawList && Array.isArray(body?.movements)) rawList = body.movements;
-  if (!rawList && Array.isArray(body?.stock_items)) rawList = body.stock_items;
-  if (!rawList && body && typeof body === 'object' && (body.sku || body.web_product_id || body.webProductId || body.productId)) {
+  if (!rawList && Array.isArray(body?.products ?? body?.Products)) rawList = body.products ?? body.Products;
+  if (!rawList && Array.isArray(body?.stock ?? body?.Stock)) rawList = body.stock ?? body.Stock;
+  if (!rawList && Array.isArray(body?.sales ?? body?.Sales)) rawList = body.sales ?? body.Sales;
+  if (!rawList && Array.isArray(body?.movements ?? body?.Movements)) rawList = body.movements ?? body.Movements;
+  if (!rawList && Array.isArray(body?.stock_items ?? body?.stockItems ?? body?.StockItems)) rawList = body.stock_items ?? body.stockItems ?? body.StockItems;
+  if (!rawList && Array.isArray(body?.stock_changes ?? body?.stockChanges ?? body?.StockChanges)) rawList = body.stock_changes ?? body.stockChanges ?? body.StockChanges;
+  if (!rawList && body && typeof body === 'object' && (body.sku || body.SKU || body.web_product_id || body.webProductId || body.WebProductId || body.productId || body.ProductId)) {
     rawList = [body];
   }
 
@@ -425,31 +434,36 @@ function validateStockPayload(body) {
     const prefix = `items[${index}]`;
     // The POS must retain this ID across retries; generating it here would
     // deduct the same sale again whenever a request is retried.
-    const eventId = identifier(
-      raw?.event_id ?? raw?.eventId ?? raw?.eventID ?? raw?.sync_event_id,
-      `${prefix}.event_id`
-    );
+    const suppliedEventId = raw?.event_id ?? raw?.eventId ?? raw?.eventID ?? raw?.EventId ?? raw?.EventID ??
+      raw?.sync_event_id ?? raw?.movement_id ?? raw?.movementId ?? raw?.MovementId ??
+      raw?.transaction_id ?? raw?.transactionId ?? raw?.TransactionId ??
+      raw?.sale_id ?? raw?.saleId ?? raw?.SaleId ?? raw?.invoice_id ?? raw?.invoiceId ?? raw?.InvoiceId ??
+      raw?.invoice_no ?? raw?.invoiceNo ?? raw?.InvoiceNo ?? raw?.bill_no ?? raw?.billNo ?? raw?.BillNo;
+    const eventId = suppliedEventId != null && suppliedEventId !== ''
+      ? compatibleEventIdentifier(suppliedEventId, `${prefix}.event_id`)
+      : (suppliedSyncId ? compatibleEventIdentifier(`${syncId}-${index + 1}`, `${prefix}.event_id`) : identifier(undefined, `${prefix}.event_id`));
     const webProductId = String(
-      raw?.web_product_id ?? raw?.webProductId ?? raw?.productId ?? raw?.product_id ?? raw?.id ?? raw?.sku ?? ''
+      raw?.web_product_id ?? raw?.webProductId ?? raw?.WebProductId ?? raw?.productId ?? raw?.ProductId ??
+      raw?.product_id ?? raw?.ProductID ?? raw?.id ?? raw?.sku ?? raw?.SKU ?? ''
     ).trim();
-    const sku = canonicalText(raw?.sku || raw?.variant_sku || raw?.variantSku || webProductId, `${prefix}.sku`, { max: 100 });
-    const size = canonicalText(raw?.size || raw?.variant_size || '', `${prefix}.size`, { required: false, max: 40 });
-    const color = canonicalText(raw?.color || raw?.variant_color || '', `${prefix}.color`, { required: false, max: 80 });
-    let deltaChange = readOptionalInteger(raw, ['delta_change', 'deltaChange', 'change', 'qty_change', 'quantity_change', 'stock_change'], prefix);
+    const sku = canonicalText(raw?.sku || raw?.SKU || raw?.variant_sku || raw?.variantSku || raw?.VariantSku || raw?.VariantSKU || webProductId, `${prefix}.sku`, { max: 100 });
+    const size = canonicalText(raw?.size || raw?.Size || raw?.variant_size || raw?.variantSize || raw?.VariantSize || '', `${prefix}.size`, { required: false, max: 40 });
+    const color = canonicalText(raw?.color || raw?.Color || raw?.variant_color || raw?.variantColor || raw?.VariantColor || '', `${prefix}.color`, { required: false, max: 80 });
+    let deltaChange = readOptionalInteger(raw, ['delta_change', 'deltaChange', 'DeltaChange', 'change', 'Change', 'qty_change', 'qtyChange', 'QtyChange', 'quantity_change', 'quantityChange', 'QuantityChange', 'stock_change', 'stockChange', 'StockChange'], prefix);
     let finalStock = readOptionalInteger(
       raw,
-      ['final_stock', 'finalStock', 'closing_stock', 'current_stock', 'available_stock'],
+      ['final_stock', 'finalStock', 'FinalStock', 'closing_stock', 'closingStock', 'ClosingStock', 'current_stock', 'currentStock', 'CurrentStock', 'available_stock', 'availableStock', 'AvailableStock'],
       prefix,
       { min: 0, clampMin: true }
     );
     if (finalStock == null) {
-      finalStock = readOptionalInteger(raw, ['stock', 'quantity', 'qty', 'available_qty'], prefix, { min: 0, clampMin: true });
+      finalStock = readOptionalInteger(raw, ['stock', 'Stock', 'quantity', 'Quantity', 'qty', 'Qty', 'available_qty', 'availableQty', 'AvailableQty'], prefix, { min: 0, clampMin: true });
     }
 
     if (deltaChange == null) {
       const soldQty = readOptionalInteger(
         raw,
-        ['sold_qty', 'soldQty', 'sold_quantity', 'qty_sold', 'quantity_sold', 'sold', 'sale_qty', 'quantity_deducted', 'deduct_qty'],
+        ['sold_qty', 'soldQty', 'SoldQty', 'sold_quantity', 'soldQuantity', 'SoldQuantity', 'qty_sold', 'qtySold', 'QtySold', 'quantity_sold', 'quantitySold', 'QuantitySold', 'sold', 'Sold', 'sale_qty', 'saleQty', 'SaleQty', 'quantity_deducted', 'quantityDeducted', 'QuantityDeducted', 'deduct_qty', 'deductQty', 'DeductQty', 'deducted_qty', 'deductedQty', 'DeductedQty'],
         prefix,
         { min: 1 }
       );
@@ -458,7 +472,7 @@ function validateStockPayload(body) {
 
     if (deltaChange != null && deltaChange > 0) {
       const txnType = normalizeKey(
-        `${raw?.transaction_type || ''} ${raw?.txn_type || ''} ${raw?.movement || ''} ${raw?.movement_type || ''} ${raw?.type || ''} ${raw?.reason || ''}`
+        `${raw?.transaction_type || raw?.transactionType || raw?.TransactionType || ''} ${raw?.txn_type || raw?.txnType || raw?.TxnType || ''} ${raw?.movement || raw?.Movement || ''} ${raw?.movement_type || raw?.movementType || raw?.MovementType || ''} ${raw?.type || raw?.Type || ''} ${raw?.reason || raw?.Reason || ''}`
       );
       if (/sale|sold|outward|\bout\b|invoice|bill|dispatch|offline/.test(txnType)) {
         deltaChange = -Math.abs(deltaChange);
