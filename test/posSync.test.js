@@ -1745,6 +1745,39 @@ test('POS arbitrary ID resolution and stock transition 10 -> 5 -> 0', async () =
   assert.equal(checkStock8.body.in_stock, true);
 });
 
+test('POS style codes can repeat across products in one publish batch', async () => {
+  const batch = {
+    products: [
+      {
+        web_product_id: 'POS-PANT-36',
+        product_name: 'HONDA FORMAL PANT 311 - 36',
+        category: 'FORMAL PANT',
+        sku: '1846',
+        mrp: 1500,
+        sale_price: 1395,
+        sizes: [{ size: '36', sku: '1846', stock: 3, price: 1395 }]
+      },
+      {
+        web_product_id: 'POS-PANT-34',
+        product_name: 'HONDA FORMAL PANT 311 - 34',
+        category: 'FORMAL PANT',
+        sku: '1846',
+        mrp: 1500,
+        sale_price: 1395,
+        sizes: [{ size: '34', sku: '1846', stock: 1, price: 1395 }]
+      }
+    ]
+  };
+  const res = await api('/api/pos/products', { method: 'POST', body: batch });
+  assert.equal(res.status, 200, res.body?.error || 'expected success');
+  assert.equal(res.body.created_count, 2);
+  const snap36 = await api('/api/pos/stock-snapshot?web_product_id=POS-PANT-36');
+  const snap34 = await api('/api/pos/stock-snapshot?web_product_id=POS-PANT-34');
+  assert.notEqual(snap36.body.sku, snap34.body.sku);
+  assert.equal(snap36.body.variant_stock, 3);
+  assert.equal(snap34.body.variant_stock, 1);
+});
+
 test('sold_qty and camelCase stock fields map to negative deltas', () => {
   const parsed = posSyncInternals.validateStockPayload({
     syncId: 'SYNC-SOLD-QTY',
