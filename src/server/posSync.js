@@ -590,6 +590,7 @@ function productToWire(id, product) {
     description: product.description || product.shortDescription || '',
     mrp: Number(product.mrp ?? product.compareAtPrice ?? product.price ?? 0),
     sale_price: Number(product.salePrice ?? product.price ?? 0),
+    price: costPrice,
     cost_price: costPrice,
     purchase_price: costPrice,
     stock: calculatedStock,
@@ -599,13 +600,15 @@ function productToWire(id, product) {
     image_url: coverImage,
     sizes: variants.map(variant => {
       const vCost = Number(variant.costPrice ?? variant.cost_price ?? variant.purchase_price ?? variant.purchasePrice ?? costPrice);
+      const vSalePrice = Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0);
       return {
         size: variant.size || 'One Size',
         color: variant.color || product.primaryColor || product.colors?.[0]?.name || product.colors?.[0] || 'Standard',
         stock: Number(variant.stock ?? variant.quantity ?? 0),
         quantity: Number(variant.stock ?? variant.quantity ?? 0),
         opening_stock: Number(variant.stock ?? variant.quantity ?? 0),
-        price: Number(variant.salePrice ?? variant.price ?? product.salePrice ?? product.price ?? 0),
+        price: vCost,
+        sale_price: vSalePrice,
         cost_price: vCost,
         purchase_price: vCost,
         sku: variant.sku || product.sku || ''
