@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
-import { getShopProducts, isProductInStock } from '../services/productService';
+import { getShopProducts, isProductInStock, subscribeToCatalog } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import { normalizeToStandardColor } from '../data/colorMaster.js';
@@ -139,10 +139,11 @@ export default function ShopPage() {
     }
   };
 
-  // Initial load or restore position + SWR fresh inventory refresh
+  // Listen for POS inventory changes while the shop is open. Keep the cached
+  // initial render, but replace it with live Firebase snapshots as they arrive.
   useEffect(() => {
     if (products.length === 0) {
-      fetchProducts(true);
+      setLoading(true);
     } else {
       // Products already exist in context, restore scroll position smoothly
       const position = scrollPosition || 0;
@@ -152,9 +153,17 @@ export default function ShopPage() {
           behavior: 'instant'
         });
       });
-      // SWR background refresh to ensure newly out-of-stock sizes and products update smoothly
-      fetchProducts(false);
     }
+    return subscribeToCatalog((catalog) => {
+      setProducts(catalog.filter(p => p.active !== false && isProductInStock(p)));
+      setHasMore(false);
+      setLoading(false);
+      setLoadingMore(false);
+    }, (error) => {
+      console.error('Live inventory updates unavailable:', error);
+      // Preserve the existing unordered-query fallback when the live query fails.
+      fetchProducts(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

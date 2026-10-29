@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
 import { invalidateProductCache } from './productService';
@@ -125,6 +125,34 @@ export const invalidateAdminProductsCache = () => {
 };
 
 // Admin fetching all products with instant cache & background sync capability
+/** Live Firestore listener so POS stock sync updates appear in admin without a manual refresh. */
+export const subscribeAdminProducts = (onUpdate, onError = () => {}) => {
+  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const data = snapshot.docs.map(d => {
+        const item = d.data();
+        return {
+          id: d.id,
+          ...item,
+          ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
+        };
+      }).filter(p => p.isDeleted !== true);
+      adminProductsCache = data;
+      adminProductsCacheTimestamp = Date.now();
+      try {
+        sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+          timestamp: adminProductsCacheTimestamp,
+          data
+        }));
+      } catch {}
+      onUpdate(data);
+    },
+    onError
+  );
+};
+
 export const getAdminProducts = async (forceRefresh = false) => {
   if (!forceRefresh) {
     const cached = getCachedAdminProducts();

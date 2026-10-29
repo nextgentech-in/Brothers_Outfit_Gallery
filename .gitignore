@@ -8,6 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.chrome-preview*/
+.edge-preview/
+preview-desktop.png
+preview-mobile.png
 dist
 dist-ssr
 *.local

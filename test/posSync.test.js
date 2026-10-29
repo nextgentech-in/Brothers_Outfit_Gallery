@@ -4,7 +4,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { registerPosSyncRoutes, posSyncInternals } from '../src/server/posSync.js';
 
-const POS_TOKEN = 'test-pos-sync-secure-token-xyz-123';
+let POS_TOKEN = 'test-pos-sync-secure-token-xyz-123';
 process.env.POS_SYNC_API_TOKEN = POS_TOKEN;
 
 function cloneData(data) {
@@ -447,6 +447,13 @@ test.before(async () => {
   await startServer();
 });
 
+test.beforeEach(() => {
+  // Each test represents a separate POS client. Keep production rate limiting
+  // active without accumulating the whole suite against one client's bucket.
+  POS_TOKEN = `test-pos-${crypto.randomUUID()}`;
+  process.env.POS_SYNC_API_TOKEN = POS_TOKEN;
+});
+
 test.after(async () => {
   await stopServer();
 });
@@ -521,11 +528,15 @@ test('Product ID conflict rejection', async () => {
   assert.equal(res.body.code, 'identity_conflict');
 });
 
-test('Variant SKU conflict rejection', async () => {
+test('Variant SKU conflicts receive unique storefront SKUs while retaining POS aliases', async () => {
   const duplicateSkuInBatch = createSampleProduct('W-POS-T7A', 'SKU-T7A');
   duplicateSkuInBatch.sizes[1].sku = duplicateSkuInBatch.sizes[0].sku;
   const res1 = await api('/api/pos/products', { method: 'POST', body: { products: [duplicateSkuInBatch] } });
-  assert.equal(res1.status, 422);
+  assert.equal(res1.status, 200);
+  const firstMapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-t7a').digest('hex')).get();
+  const firstDoc = (await sharedDb.collection('products').doc(firstMapping.data().productId).get()).data();
+  assert.equal(new Set(firstDoc.variants.map(variant => variant.sku)).size, firstDoc.variants.length);
+  assert.equal(firstDoc.variants[1].posSku, duplicateSkuInBatch.sizes[0].sku);
 
   const first = createSampleProduct('W-POS-T7B', 'SKU-T7-EXISTING');
   await api('/api/pos/products', { method: 'POST', body: { products: [first] } });
@@ -533,8 +544,11 @@ test('Variant SKU conflict rejection', async () => {
   const secondWithConflictingSku = createSampleProduct('W-POS-T7C', 'SKU-T7-NEW');
   secondWithConflictingSku.sizes[0].sku = 'SKU-T7-EXISTING-M';
   const res2 = await api('/api/pos/products', { method: 'POST', body: { products: [secondWithConflictingSku] } });
-  assert.equal(res2.status, 409);
-  assert.equal(res2.body.code, 'sku_conflict');
+  assert.equal(res2.status, 200);
+  const secondMapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-t7c').digest('hex')).get();
+  const secondDoc = (await sharedDb.collection('products').doc(secondMapping.data().productId).get()).data();
+  assert.notEqual(secondDoc.variants[0].sku, 'SKU-T7-EXISTING-M');
+  assert.equal(secondDoc.variants[0].posSku, 'SKU-T7-EXISTING-M');
 });
 
 test('POS products excluded from website product feed', async () => {
@@ -1182,7 +1196,7 @@ test('Product creation without images uses hero.png fallback', async () => {
   assert.equal(doc.thumbnailUrl, '/images/hero.png');
 });
 
-test('Product creation with base64 image', async () => {
+test('Product creation with base64 image never stores inline data', async () => {
   // 10-byte JPEG-like base64 (well under 500KB limit)
   const tinyBase64 = 'data:image/jpeg;base64,' + Buffer.from('tiny-image-data').toString('base64');
   const product = {
@@ -1198,7 +1212,8 @@ test('Product creation with base64 image', async () => {
   const mapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-img-3').digest('hex')).get();
   const productId = mapping.data().productId;
   const doc = (await sharedDb.collection('products').doc(productId).get()).data();
-  assert.ok(doc.images[0].url.startsWith('data:image/jpeg;base64,'));
+  assert.ok(!doc.images[0].url.startsWith('data:'));
+  assert.ok(doc.images[0].url === '/images/hero.png' || doc.images[0].url.startsWith('https://'));
 });
 
 test('Invalid image URL scheme rejected', async () => {
@@ -1517,6 +1532,140 @@ test('Non-blocking legacy catalog duplicates allow new POS product, and lenient 
   assert.equal(resStock.body.updated_count, 1);
 });
 
+test('Mixed known/unknown stock batch is rejected without losing or applying sales', async () => {
+  const product = createSampleProduct('W-ATOMIC-UNKNOWN', 'ATOMIC-UNKNOWN');
+  await api('/api/pos/products', { method: 'POST', body: { products: [product] } });
+  const known = {
+    event_id: 'EVT-ATOMIC-KNOWN', web_product_id: product.web_product_id,
+    sku: 'ATOMIC-UNKNOWN-M', size: 'M', color: 'Navy Blue', delta_change: -2
+  };
+  const missing = {
+    event_id: 'EVT-ATOMIC-MISSING', web_product_id: 'MISSING-BATCH-PRODUCT',
+    sku: 'MISSING-BATCH-SKU', delta_change: -1
+  };
+  const rejected = await api('/api/pos/stock-sync', {
+    method: 'POST', body: { sync_id: 'SYNC-ATOMIC-MIXED', items: [known, missing] }
+  });
+  assert.equal(rejected.status, 409);
+  assert.equal(rejected.body.success, false);
+  assert.equal(rejected.body.code, 'unknown_product');
+  assert.equal(rejected.body.details.rejected_items[0].event_id, missing.event_id);
+  const untouched = await api('/api/pos/stock-snapshot?sku=ATOMIC-UNKNOWN-M');
+  assert.equal(untouched.body.variant_stock, 10);
+  const eventRef = sharedDb.collection('posStockEvents').doc(crypto.createHash('sha256').update(known.event_id).digest('hex'));
+  assert.equal((await eventRef.get()).exists, false);
+
+  // The known sale can be resent after fixing/splitting the rejected batch.
+  const retried = await api('/api/pos/stock-sync', {
+    method: 'POST', body: { sync_id: 'SYNC-ATOMIC-RETRY', items: [known] }
+  });
+  assert.equal(retried.status, 200);
+  assert.equal(retried.body.stock_levels[0].website_stock, 8);
+});
+
+test('Stock updates without a stable event ID are rejected before any deduction', async () => {
+  const product = createSampleProduct('W-STABLE-EVENT', 'STABLE-EVENT');
+  await api('/api/pos/products', { method: 'POST', body: { products: [product] } });
+  const result = await api('/api/pos/stock-sync', {
+    method: 'POST', body: { items: [{ web_product_id: product.web_product_id, sku: 'STABLE-EVENT-M', delta_change: -1 }] }
+  });
+  assert.equal(result.status, 422);
+  assert.match(result.body.error, /event_id is required/);
+  const snapshot = await api('/api/pos/stock-snapshot?sku=STABLE-EVENT-M');
+  assert.equal(snapshot.body.variant_stock, 10);
+});
+
+test('Shared parent SKU selects the supplied size and colour instead of the first variant', () => {
+  const product = { sku: 'SHARED', variants: [
+    { sku: 'SHARED', size: 'M', color: 'Blue', stock: 10 },
+    { sku: 'SHARED', size: 'L', color: 'Red', stock: 7 },
+    { sku: 'SHARED', size: 'L', color: 'Blue', stock: 5 }
+  ] };
+  const result = posSyncInternals.applyPosStockDelta(product, 'shared-doc', {
+    eventId: 'EVT-SHARED', webProductId: 'shared-doc', sku: 'SHARED',
+    size: 'L', color: 'Blue', deltaChange: -2, finalStock: 3
+  });
+  assert.equal(result.stockAfter, 3);
+  assert.deepEqual(result.updatedProduct.variants.map(v => v.stock), [10, 7, 3]);
+  assert.equal(result.updatedProduct.stock, 20);
+  assert.throws(() => posSyncInternals.applyPosStockDelta(product, 'shared-doc', {
+    eventId: 'EVT-AMBIGUOUS', webProductId: 'shared-doc', sku: 'SHARED', deltaChange: -1
+  }), error => error.code === 'ambiguous_variant');
+});
+
+test('Website document ID can identify a single-variant product without a parent SKU', () => {
+  const result = posSyncInternals.applyPosStockDelta({ variants: [
+    { size: 'M', color: 'Blue', stock: 4 }
+  ] }, 'website-document', {
+    eventId: 'EVT-DOC-ID', webProductId: 'website-document', sku: 'website-document',
+    size: 'M', color: 'Blue', deltaChange: -1
+  });
+  assert.equal(result.stockAfter, 3);
+});
+
+test('Products without variant records retain main branch stock-sync support', () => {
+  const result = posSyncInternals.applyPosStockDelta({ sku: 'SIMPLE', stock: 6 }, 'simple-product', {
+    eventId: 'EVT-SIMPLE', webProductId: 'simple-product', sku: 'SIMPLE',
+    deltaChange: -2
+  });
+  assert.equal(result.stockAfter, 4);
+  assert.equal(result.updatedProduct.stock, 4);
+  assert.equal(result.updatedProduct.variants.length, 1);
+});
+
+test('A unique variant retains main branch support for different POS colour labels', () => {
+  const result = posSyncInternals.applyPosStockDelta({ sku: 'LABEL', variants: [
+    { sku: 'LABEL-M', size: 'M', color: 'Navy Blue', stock: 5 }
+  ] }, 'label-product', {
+    eventId: 'EVT-LABEL', webProductId: 'label-product', sku: 'LABEL-M',
+    size: 'M', color: 'Navy', deltaChange: -1
+  });
+  assert.equal(result.stockAfter, 4);
+});
+
+test('Flexible stock payload formats on main still validate stable event IDs', () => {
+  const item = { event_id: 'EVT-FORMAT', sku: 'FORMAT-M', delta_change: -1 };
+  for (const body of [[item], { products: [item] }, { stock: [item] }, item]) {
+    const parsed = posSyncInternals.validateStockPayload(body);
+    assert.equal(parsed.items.length, 1);
+    assert.equal(parsed.items[0].eventId, item.event_id);
+    assert.equal(parsed.items[0].deltaChange, -1);
+  }
+});
+
+test('Shared SKU sale and retry report the selected variant stock', async () => {
+  await sharedDb.collection('products').doc('shared-sku-product').set({
+    sku: 'SHARED-HTTP', active: true, variants: [
+      { sku: 'SHARED-HTTP', size: 'M', color: 'Blue', stock: 10 },
+      { sku: 'SHARED-HTTP', size: 'L', color: 'Blue', stock: 5 }
+    ]
+  });
+  const body = { sync_id: 'SYNC-SHARED-HTTP', items: [{
+    event_id: 'EVT-SHARED-HTTP', web_product_id: 'shared-sku-product',
+    sku: 'SHARED-HTTP', size: 'L', color: 'Blue', delta_change: -2
+  }] };
+  const applied = await api('/api/pos/stock-sync', { method: 'POST', body });
+  assert.equal(applied.status, 200);
+  assert.equal(applied.body.stock_levels[0].website_stock, 3);
+  const retry = await api('/api/pos/stock-sync', { method: 'POST', body });
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.updated_count, 0);
+  assert.equal(retry.body.duplicate_count, 1);
+  assert.equal(retry.body.stock_levels[0].website_stock, 3);
+  const saved = (await sharedDb.collection('products').doc('shared-sku-product').get()).data();
+  assert.deepEqual(saved.variants.map(v => v.stock), [10, 3]);
+});
+
+test('A single POS client is still limited to 60 requests per minute', async () => {
+  for (let index = 0; index < 60; index += 1) {
+    assert.equal((await api('/api/pos/products-sync')).status, 200);
+  }
+  const limited = await api('/api/pos/products-sync');
+  assert.equal(limited.status, 429);
+  assert.equal(limited.body.code, 'rate_limited');
+  assert.ok(Number(limited.headers.get('retry-after')) > 0);
+});
+
 test('POS arbitrary ID resolution and stock transition 10 -> 5 -> 0', async () => {
   // 1. Create a product with initial stock 10
   const product = {
@@ -1602,6 +1751,89 @@ test('POS arbitrary ID resolution and stock transition 10 -> 5 -> 0', async () =
   assert.equal(checkStock8.status, 200);
   assert.equal(checkStock8.body.stock, 8);
   assert.equal(checkStock8.body.in_stock, true);
+});
+
+test('POS style codes can repeat across products in one publish batch', async () => {
+  const batch = {
+    products: [
+      {
+        web_product_id: 'POS-PANT-36',
+        product_name: 'HONDA FORMAL PANT 311 - 36',
+        category: 'FORMAL PANT',
+        sku: '1846',
+        mrp: 1500,
+        sale_price: 1395,
+        sizes: [{ size: '36', sku: '1846', stock: 3, price: 1395 }]
+      },
+      {
+        web_product_id: 'POS-PANT-34',
+        product_name: 'HONDA FORMAL PANT 311 - 34',
+        category: 'FORMAL PANT',
+        sku: '1846',
+        mrp: 1500,
+        sale_price: 1395,
+        sizes: [{ size: '34', sku: '1846', stock: 1, price: 1395 }]
+      }
+    ]
+  };
+  const res = await api('/api/pos/products', { method: 'POST', body: batch });
+  assert.equal(res.status, 200, res.body?.error || 'expected success');
+  assert.equal(res.body.created_count, 2);
+  const snap36 = await api('/api/pos/stock-snapshot?web_product_id=POS-PANT-36');
+  const snap34 = await api('/api/pos/stock-snapshot?web_product_id=POS-PANT-34');
+  assert.notEqual(snap36.body.sku, snap34.body.sku);
+  assert.equal(snap36.body.variant_stock, 3);
+  assert.equal(snap34.body.variant_stock, 1);
+});
+
+test('sold_qty and camelCase stock fields map to negative deltas', () => {
+  const parsed = posSyncInternals.validateStockPayload({
+    syncId: 'SYNC-SOLD-QTY',
+    items: [{
+      eventId: 'EVT-SOLD-1',
+      webProductId: 'DOC-123',
+      sku: 'SKU-M',
+      soldQty: 2
+    }]
+  });
+  assert.equal(parsed.items[0].deltaChange, -2);
+
+  const saleType = posSyncInternals.validateStockPayload({
+    sync_id: 'SYNC-TYPE',
+    items: [{
+      event_id: 'EVT-TYPE-1',
+      sku: 'SKU-L',
+      delta_change: 3,
+      type: 'offline_sale'
+    }]
+  });
+  assert.equal(saleType.items[0].deltaChange, -3);
+});
+
+test('Firestore document ID resolves products for stock sync', async () => {
+  await sharedDb.collection('products').doc('website-doc-id-lookup').set({
+    webProductId: 'legacy-web-id',
+    sku: 'LOOKUP-PARENT',
+    active: true,
+    variants: [{ sku: 'LOOKUP-V-M', size: 'M', color: 'Blue', stock: 12 }]
+  });
+  const res = await api('/api/pos/stock-sync', {
+    method: 'POST',
+    body: {
+      sync_id: 'SYNC-DOC-ID',
+      items: [{
+        event_id: 'EVT-DOC-ID-1',
+        web_product_id: 'website-doc-id-lookup',
+        sku: 'LOOKUP-V-M',
+        size: 'M',
+        color: 'Blue',
+        delta_change: -2
+      }]
+    }
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.body.updated_count, 1);
+  assert.equal(res.body.stock_levels[0].website_stock, 10);
 });
 
 

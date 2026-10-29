@@ -61,6 +61,7 @@ app.disable('x-powered-by');
 // 2. Comprehensive Security Headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -257,11 +258,27 @@ const mailTransporter = nodemailer.createTransport({
 });
 
 // Send Admin Email & Log Alert when a new order is placed
-app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-alert'], async (req, res) => {
+app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-alert'], requireAuth, async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 10)) return;
 
-  const { orderId, customerName, totalAmount, paymentMethod, shippingAddress } = req.body;
+  const { orderId } = req.body;
   if (!orderId) return res.status(400).json({ error: 'Order ID required.' });
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(String(orderId))) return res.status(400).json({ error: 'Invalid order ID.' });
+
+  let savedOrder;
+  try {
+    const orderSnapshot = await getTrustedFirestore().collection('orders').doc(String(orderId)).get();
+    if (!orderSnapshot.exists) return res.status(404).json({ error: 'Order not found.' });
+    savedOrder = orderSnapshot.data();
+    if (!req.isAdmin && savedOrder.userId !== req.user?.uid) {
+      return res.status(403).json({ error: 'You cannot send alerts for this order.' });
+    }
+  } catch (error) {
+    console.error('Admin alert order verification failed:', error);
+    return res.status(503).json({ error: 'Order verification is temporarily unavailable.' });
+  }
+  const { totalAmount, paymentMethod, shippingAddress } = savedOrder;
+  const customerName = shippingAddress?.fullName || 'Customer';
 
   const alertMsg = `🚨 NEW ORDER RECEIVED!\n\nOrder ID: #${orderId}\nCustomer: ${customerName || 'Guest'}\nTotal Amount: ₹${totalAmount}\nPayment Method: ${paymentMethod}\nAddress: ${shippingAddress?.addressLine || ''}, ${shippingAddress?.city || ''} - ${shippingAddress?.pincode || ''}\nPhone: ${shippingAddress?.phone || ''}`;
 
@@ -3818,10 +3835,14 @@ app.all(['/api/*splat', '/api'], (req, res) => {
 });
 
 // Global Express Error Middleware to guarantee structured JSON errors
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
   console.error('Unhandled server error:', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'An unexpected server error occurred.'
+  if (res.headersSent) return next(err);
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  res.status(status).json({
+    error: status >= 500 && IS_PRODUCTION
+      ? 'An unexpected server error occurred.'
+      : (err.message || 'An unexpected server error occurred.')
   });
 });
 
