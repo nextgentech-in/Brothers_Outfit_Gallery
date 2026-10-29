@@ -528,11 +528,15 @@ test('Product ID conflict rejection', async () => {
   assert.equal(res.body.code, 'identity_conflict');
 });
 
-test('Variant SKU conflict rejection', async () => {
+test('Variant SKU conflicts receive unique storefront SKUs while retaining POS aliases', async () => {
   const duplicateSkuInBatch = createSampleProduct('W-POS-T7A', 'SKU-T7A');
   duplicateSkuInBatch.sizes[1].sku = duplicateSkuInBatch.sizes[0].sku;
   const res1 = await api('/api/pos/products', { method: 'POST', body: { products: [duplicateSkuInBatch] } });
-  assert.equal(res1.status, 422);
+  assert.equal(res1.status, 200);
+  const firstMapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-t7a').digest('hex')).get();
+  const firstDoc = (await sharedDb.collection('products').doc(firstMapping.data().productId).get()).data();
+  assert.equal(new Set(firstDoc.variants.map(variant => variant.sku)).size, firstDoc.variants.length);
+  assert.equal(firstDoc.variants[1].posSku, duplicateSkuInBatch.sizes[0].sku);
 
   const first = createSampleProduct('W-POS-T7B', 'SKU-T7-EXISTING');
   await api('/api/pos/products', { method: 'POST', body: { products: [first] } });
@@ -540,8 +544,11 @@ test('Variant SKU conflict rejection', async () => {
   const secondWithConflictingSku = createSampleProduct('W-POS-T7C', 'SKU-T7-NEW');
   secondWithConflictingSku.sizes[0].sku = 'SKU-T7-EXISTING-M';
   const res2 = await api('/api/pos/products', { method: 'POST', body: { products: [secondWithConflictingSku] } });
-  assert.equal(res2.status, 409);
-  assert.equal(res2.body.code, 'sku_conflict');
+  assert.equal(res2.status, 200);
+  const secondMapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-t7c').digest('hex')).get();
+  const secondDoc = (await sharedDb.collection('products').doc(secondMapping.data().productId).get()).data();
+  assert.notEqual(secondDoc.variants[0].sku, 'SKU-T7-EXISTING-M');
+  assert.equal(secondDoc.variants[0].posSku, 'SKU-T7-EXISTING-M');
 });
 
 test('POS products excluded from website product feed', async () => {
@@ -1189,7 +1196,7 @@ test('Product creation without images uses hero.png fallback', async () => {
   assert.equal(doc.thumbnailUrl, '/images/hero.png');
 });
 
-test('Product creation with base64 image', async () => {
+test('Product creation with base64 image never stores inline data', async () => {
   // 10-byte JPEG-like base64 (well under 500KB limit)
   const tinyBase64 = 'data:image/jpeg;base64,' + Buffer.from('tiny-image-data').toString('base64');
   const product = {
@@ -1205,7 +1212,8 @@ test('Product creation with base64 image', async () => {
   const mapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-img-3').digest('hex')).get();
   const productId = mapping.data().productId;
   const doc = (await sharedDb.collection('products').doc(productId).get()).data();
-  assert.ok(doc.images[0].url.startsWith('data:image/jpeg;base64,'));
+  assert.ok(!doc.images[0].url.startsWith('data:'));
+  assert.ok(doc.images[0].url === '/images/hero.png' || doc.images[0].url.startsWith('https://'));
 });
 
 test('Invalid image URL scheme rejected', async () => {

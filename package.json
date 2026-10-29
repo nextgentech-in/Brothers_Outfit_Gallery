@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test:pos-sync": "node --test test/posSync.test.js",
     "test:stock-sync": "node --test test/posSync.test.js test/productStockSubscription.test.js",
+    "test:api-smoke": "node test/api-safe-smoke.js",
     "migrate:pos-sync": "node scripts/backfill-pos-integration.js",
     "preview": "vite preview"
   },

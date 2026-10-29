@@ -1,6 +1,7 @@
 import { collection, doc, setDoc, getDocs, query, orderBy, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
+import { auth } from '../firebase/firebaseConfig';
 
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
@@ -30,7 +31,10 @@ export const createAdminOrderNotification = async (orderId, orderPayload) => {
       const backendUrl = getBackendUrl();
       await fetch(`${backendUrl}/api/notifications/send-admin-alert`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await auth.currentUser?.getIdToken() || ''}`
+        },
         body: JSON.stringify({
           orderId,
           customerName: orderPayload.shippingAddress?.fullName || 'Customer',
