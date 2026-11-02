@@ -92,7 +92,7 @@ export default function ShopByCategory() {
 
         // Filter to only active + in-stock products
         const activeProducts = allProducts.filter(
-          p => p.active !== false && productService.isProductInStock(p)
+          p => p.active !== false
         );
 
         // Group by categoryId

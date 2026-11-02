@@ -27,6 +27,37 @@ Rollback can remove code and routes, but already-consumed products or movements 
 
 ## Authentication and limits
 
+### Connection and deployment checklist
+
+This website receives POS updates; it does not poll an external POS stock API.
+An API token alone does not establish a connection. Configure the POS software to
+send HTTPS `POST /api/pos/stock-sync` requests to the deployed website, using the
+stock payload below. If the POS instead exposes a stock API for the website to
+call, its URL, authentication contract, stock semantics, pagination and network
+access requirements are needed for a separate fetch integration.
+
+Configure `POS_SYNC_API_TOKEN` securely on the deployed server, together with
+Firebase Admin credentials for the same project used by the storefront. Redeploy
+after changing deployment environment variables. Never put the token in browser
+code, a `VITE_` variable, source control or a query string.
+
+For one staging sale, inspect the HTTP status and JSON response. `updated_count`
+must reflect newly applied events; `duplicate_count` means those event IDs were
+already accepted and were not deducted again. Each sale needs a stable, unique
+`event_id`, reused for retries. Requests missing it return `422`.
+
+Unknown products reject the entire stock batch with `409 unknown_product` and
+`details.rejected_items`; no stock or replay records from that batch are written.
+Fix product mappings before resending. Shared parent SKUs need enough size/colour
+information to select exactly one variant; ambiguous matches return
+`409 ambiguous_variant` rather than changing an arbitrary variant.
+
+Confirm the result using `GET /api/pos/stock-snapshot?sku=<variant-sku>` with the
+same bearer authentication. The shop page subscribes to Firebase catalog updates,
+so accepted stock changes are reflected while the page is open. The existing
+500-product catalog limit still applies. This does not bypass missing Firebase
+permissions, different project configurations or a POS that never sends updates.
+
 Every route requires:
 
 ```http

@@ -151,12 +151,17 @@ export default function HomePage() {
         ]);
 
         // Fetch concurrently
-        const [saleRes, newRes, shopRes, configRes] = await Promise.all([
+        const [saleResult, newResult, shopResult, configResult] = await Promise.allSettled([
           getSaleProducts(4),
           getNewArrivals(4),
           getShopProducts('All', 'featured', null, 8),
           getHomepageConfig()
         ]);
+
+        const saleRes = saleResult.status === 'fulfilled' ? saleResult.value || [] : [];
+        const newRes = newResult.status === 'fulfilled' ? newResult.value || [] : [];
+        const shopRes = shopResult.status === 'fulfilled' ? shopResult.value : { products: [] };
+        const configRes = configResult.status === 'fulfilled' ? configResult.value : null;
 
         setSaleProducts(saleRes);
         setNewArrivals(newRes);
@@ -165,10 +170,11 @@ export default function HomePage() {
         }
 
         const excludeIds = new Set([...saleRes, ...newRes].map(p => p.id));
-        const filteredShop = shopRes.products.filter(p => !excludeIds.has(p.id)).slice(0, 4);
+        const availableShopProducts = Array.isArray(shopRes?.products) ? shopRes.products : [];
+        const filteredShop = availableShopProducts.filter(p => !excludeIds.has(p.id)).slice(0, 4);
         
         if (filteredShop.length < 4) {
-          const additional = shopRes.products.filter(p => excludeIds.has(p.id)).slice(0, 4 - filteredShop.length);
+          const additional = availableShopProducts.filter(p => excludeIds.has(p.id)).slice(0, 4 - filteredShop.length);
           filteredShop.push(...additional);
         }
 

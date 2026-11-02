@@ -1,0 +1,103 @@
+/* Storefront surface system. Keep the same markup and shopping interactions. */
+:root {
+  --glass-fill: rgba(255, 255, 255, .72);
+  --glass-edge: rgba(255, 255, 255, .9);
+  --glass-shadow: 0 18px 48px rgba(35, 31, 27, .11), inset 0 1px 0 rgba(255, 255, 255, .92);
+  --glass-radius: 24px;
+}
+
+body {
+  background: radial-gradient(ellipse at 10% 14%, rgba(255,255,255,.96), transparent 36%),
+    radial-gradient(ellipse at 92% 30%, rgba(214,192,155,.29), transparent 35%),
+    linear-gradient(145deg, #f7f4ef, #e9e4dc 54%, #f7f5f0);
+  background-attachment: fixed;
+}
+
+.navbar, .navbar--scrolled {
+  background: linear-gradient(115deg, rgba(5,6,8,.98), rgba(15,16,19,.96)) !important;
+  border-bottom: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 12px 32px rgba(0,0,0,.34), inset 0 1px rgba(255,255,255,.08);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+}
+.top-announcement-bar { background: rgba(0,0,0,.7); }
+.navbar__link:hover, .navbar__icon-btn:hover {
+  background: rgba(255,255,255,.09);
+}
+.hero__image-wrap::after {
+  background: linear-gradient(125deg, rgba(255,255,255,.13), transparent 37%, rgba(212,181,133,.12));
+}
+.hero__eyebrow, .hero__btn--primary {
+  background: rgba(255,255,255,.13);
+  border-color: rgba(255,255,255,.55);
+  box-shadow: inset 0 1px rgba(255,255,255,.3), 0 10px 26px rgba(0,0,0,.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.hero__btn--sale { box-shadow: inset 0 1px rgba(255,255,255,.6), 0 14px 32px rgba(0,0,0,.23); }
+
+.trending, .sbc-section, .new-arrivals-section, .about-preview-section, .trust-bar-section {
+  background: rgba(255,255,255,.18);
+}
+.home-section, .sbc-section, .trending, .trust-bar-section {
+  border-color: rgba(255,255,255,.65);
+}
+.product-card, .trending__card, .trust-item, .trust-bar-card,
+.shop-controls, .shop-filters, .checkout-address-section, .checkout-summary-section,
+.glass-panel {
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--glass-radius);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+.product-card, .trending__card { overflow: hidden; }
+.product-card__image-wrap, .trending__card-image-wrap { background: #e8e2d8; }
+.trust-bar-card { border-radius: 18px; }
+.trust-bar-icon {
+  background: linear-gradient(145deg, #34302a, #151515);
+  color: #e8c483;
+  border-radius: 14px;
+}
+.trust-bar-text strong { color: #25211d; }
+.trust-bar-text span { color: #625b52; }
+.btn-view-all, .newsletter-btn, .btn-primary { border-radius: 999px; }
+.shop-search, .shop-sort__select, .shop-filter-toggle {
+  background: rgba(255,255,255,.68);
+  border-color: rgba(255,255,255,.86);
+  border-radius: 16px;
+}
+.site-footer {
+  background: linear-gradient(150deg, #20201f, #111213 65%, #27221c);
+  border-top-color: rgba(255,255,255,.22);
+}
+
+@media (max-width: 768px) {
+  body { background-attachment: scroll; }
+  .navbar, .navbar--scrolled { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .product-card, .trending__card, .trust-item, .trust-bar-card,
+  .shop-controls, .shop-filters, .checkout-address-section, .checkout-summary-section {
+    border-radius: 18px;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: rgba(255,255,255,.88);
+  }
+  .hero__content { padding-left: clamp(20px, 5vw, 40px); padding-right: clamp(20px, 5vw, 40px); }
+  .hero__actions { gap: 10px; }
+  .hero__btn { min-height: 46px; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .home-section { padding-top: 58px; padding-bottom: 58px; }
+  .section-header { margin-bottom: 30px; }
+  .hero__actions { align-items: stretch; }
+  .hero__btn { width: 100%; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .navbar, .navbar--scrolled { background: #08090b !important; }
+  .product-card, .trending__card, .trust-item, .trust-bar-card,
+  .shop-controls, .shop-filters, .checkout-address-section, .checkout-summary-section,
+  .glass-panel { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
