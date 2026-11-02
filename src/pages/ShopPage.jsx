@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
-import { getShopProducts, isProductInStock, subscribeToCatalog } from '../services/productService';
+import { getShopProducts, subscribeToCatalog } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import { normalizeToStandardColor } from '../data/colorMaster.js';
@@ -155,7 +155,7 @@ export default function ShopPage() {
       });
     }
     return subscribeToCatalog((catalog) => {
-      setProducts(catalog.filter(p => p.active !== false && isProductInStock(p)));
+      setProducts(catalog.filter(p => p.active !== false));
       setHasMore(false);
       setLoading(false);
       setLoadingMore(false);
@@ -183,7 +183,7 @@ export default function ShopPage() {
 
   // Comprehensive catalog filtering for category, search, price ranges, sizes, colors, and sorting
   const filtered = useMemo(() => {
-    let result = products.filter(p => p.active !== false && isProductInStock(p));
+    let result = products.filter(p => p.active !== false);
 
     // Category Filter
     if (category && category !== 'All') {

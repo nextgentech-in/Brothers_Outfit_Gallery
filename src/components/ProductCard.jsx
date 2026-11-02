@@ -4,7 +4,7 @@ import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../util
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
-import { getAvailableProductSizes } from '../utils/productUtils';
+import { getAvailableProductSizes, getAvailableStock } from '../utils/productUtils';
 import { flyProductToCart } from '../utils/cartFlyAnimation';
 import './ProductCard.css';
 
@@ -80,8 +80,8 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   const [selectedSize, setSelectedSize] = useState(null);
   const [sizePrompt, setSizePrompt] = useState(false);
   const totalStock = product.variants?.length > 0
-    ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock ?? v.quantity, 10) || 0), 0)
-    : (parseInt(product.stock ?? product.quantity, 10) || 0);
+    ? product.variants.reduce((acc, v) => acc + getAvailableStock(v), 0)
+    : getAvailableStock(product);
   
   // Strictly filter out discontinued and 0-stock sizes (matches ProductInfo)
   const availableSizes = getAvailableProductSizes(product);

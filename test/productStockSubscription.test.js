@@ -64,7 +64,9 @@ test('Live POS inventory snapshots replace cached shop stock and stop on unsubsc
   deliverSnapshot(snapshot(1));
   assert.equal((await service.getShopProducts()).products[0].stock, 1);
   deliverSnapshot(snapshot(0));
-  assert.equal((await service.getShopProducts()).products.length, 0, 'Sold-out stock must disappear from the shop.');
+  const soldOut = (await service.getShopProducts()).products;
+  assert.equal(soldOut.length, 1, 'Published sold-out products remain visible with an out-of-stock state.');
+  assert.equal(service.isProductInStock(soldOut[0]), false);
   assert.equal(updates.length, 3);
   const error = new Error('Firestore permission denied');
   deliverError(error);

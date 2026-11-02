@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '../firebase/firebaseConfig';
 import { useAuth } from '../context/AuthContext';
 import { getUserOrders, cancelUserOrder } from '../services/orderService';
 import ExchangeRequestModal from '../components/exchange/ExchangeRequestModal';
@@ -84,6 +86,21 @@ export default function Profile() {
   useEffect(() => {
     loadUserOrders();
   }, [loadUserOrders]);
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const ownedOrders = query(collection(db, 'orders'), where('userId', '==', currentUser.uid));
+    return onSnapshot(ownedOrders, snapshot => {
+      setUserOrders(previous => {
+        const merged = new Map(previous.map(order => [order.id, order]));
+        snapshot.docs.forEach(record => merged.set(record.id, { id: record.id, ...record.data() }));
+        return [...merged.values()].sort((a, b) => {
+          const timestamp = value => value?.toMillis?.() ?? (Number(value?.seconds) || 0) * 1000;
+          return timestamp(b.createdAt) - timestamp(a.createdAt);
+        });
+      });
+    }, error => console.warn('Live order status unavailable:', error.message));
+  }, [currentUser?.uid]);
 
   // Real-time subscription to customer's exchange requests
   useEffect(() => {

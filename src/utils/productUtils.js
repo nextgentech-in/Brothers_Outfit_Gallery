@@ -58,7 +58,7 @@ export function getAvailableProductSizes(product, targetColor = null) {
   if (!product) return [];
   if (product.active === false || product.inStock === false) return [];
 
-  const totalStock = parseInt(product.stock ?? product.quantity ?? product.qty, 10);
+  const totalStock = getAvailableStock(product);
   if (!isNaN(totalStock) && totalStock <= 0) return [];
 
   // 1. If product has variants, evaluate variant-level inventory
@@ -71,7 +71,7 @@ export function getAvailableProductSizes(product, targetColor = null) {
       const vSize = String(v.size || '').trim();
       if (!vSize) return;
 
-      const vStock = parseInt(v.stock ?? v.quantity ?? v.qty, 10);
+      const vStock = getAvailableStock(v);
       // Skip out-of-stock / discontinued sizes (stock <= 0)
       if (isNaN(vStock) || vStock <= 0) return;
 
@@ -106,6 +106,12 @@ export function getAvailableProductSizes(product, targetColor = null) {
   }
 
   return [];
+}
+
+export function getAvailableStock(item) {
+  const onHand = parseInt(item?.stock ?? item?.quantity ?? item?.qty, 10);
+  const reserved = parseInt(item?.reserved ?? 0, 10);
+  return Math.max(0, (Number.isFinite(onHand) ? onHand : 0) - (Number.isFinite(reserved) ? reserved : 0));
 }
 
 /**

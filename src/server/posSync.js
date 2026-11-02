@@ -746,7 +746,8 @@ function applyPosStockDelta(product, productId, item) {
   }
 
   const after = before + delta;
-  if (!Number.isSafeInteger(before) || after < 0) {
+  const reserved = Number(variant.reserved ?? 0);
+  if (!Number.isSafeInteger(before) || !Number.isSafeInteger(reserved) || reserved < 0 || after < reserved) {
     throw new PosSyncError(409, `Stock event ${item.eventId} would make ${item.sku} negative. Manual reconciliation is required.`, 'insufficient_stock');
   }
 
@@ -763,8 +764,8 @@ function applyPosStockDelta(product, productId, item) {
       stock: totalStock,
       quantity: totalStock,
       inStock: totalStock > 0,
-      active: totalStock > 0 ? true : product.active,
-      sizes: [...new Set(variants.filter(candidate => Number(candidate.stock ?? candidate.quantity ?? 0) > 0).map(candidate => candidate.size))]
+      active: product.active,
+      sizes: [...new Set(variants.filter(candidate => Number(candidate.stock ?? candidate.quantity ?? 0) - Number(candidate.reserved ?? 0) > 0).map(candidate => candidate.size))]
     }
   };
 }
