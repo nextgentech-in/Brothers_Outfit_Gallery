@@ -12,8 +12,12 @@ The website catalog reset is recorded in `scripts/reset-website-catalog.js`.
 It archived 82 previous product records in place, preserving their IDs for
 processing orders, then created three clearly labeled demo products with zero
 stock. A local recovery snapshot was written outside the Git repository under
-`../.codex/catalog-backups/`. No POS, order, or stock movement records were
-removed.
+`../.codex/catalog-backups/`. No POS or stock movement records were removed.
+
+After the catalog reset, the website's 16 order documents, 29 customer profile
+documents, 27 customer sign-in accounts, five reviews, and eight order
+notifications were removed at the owner's request. Two admin profiles and their
+sign-in accounts remain. POS and ERP collections were left untouched.
 
 ## Production setup
 
