@@ -125,7 +125,7 @@ export const invalidateAdminProductsCache = () => {
 };
 
 // Admin fetching all products with instant cache & background sync capability
-/** Live Firestore listener so POS stock sync updates appear in admin without a manual refresh. */
+/** Live Firestore listener for product and stock changes in admin. */
 export const subscribeAdminProducts = (onUpdate, onError = () => {}) => {
   const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
   return onSnapshot(

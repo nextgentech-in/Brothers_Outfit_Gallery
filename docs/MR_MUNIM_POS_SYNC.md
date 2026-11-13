@@ -1,6 +1,19 @@
 # Mr. Munim POS synchronization
 
-This integration is a button-triggered, offline-first synchronization between Mr. Munim and Brothers Outfit Gallery. It is not real time. The website remains vulnerable to an overselling window between POS syncs; operational stock buffers or more frequent syncs are still required.
+> Retired on 13 November 2026. The production website returns `410 pos_disconnected`
+> for every `/api/pos/*` request. This document records the former integration
+> contract only. Do not configure a POS client against these endpoints. The website
+> catalog was archived in place so existing order cancellations can still restore
+> stock; historical POS records and Mr. Munim data were not deleted.
+
+Previously, this integration used button-triggered, offline-first synchronization between Mr. Munim and Brothers Outfit Gallery. The details below are retained for historical reference.
+
+The website catalog reset is recorded in `scripts/reset-website-catalog.js`.
+It archived 82 previous product records in place, preserving their IDs for
+processing orders, then created three clearly labeled demo products with zero
+stock. A local recovery snapshot was written outside the Git repository under
+`../.codex/catalog-backups/`. No POS, order, or stock movement records were
+removed.
 
 ## Production setup
 
