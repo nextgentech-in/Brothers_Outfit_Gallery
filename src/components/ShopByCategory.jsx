@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
 import './ShopByCategory.css';
@@ -71,60 +71,6 @@ export default function ShopByCategory() {
   // categories are enhanced after first paint instead of delaying the page.
   const [categories, setCategories] = useState(getCuratedCategories);
   const [loading, setLoading] = useState(false);
-  const railRef = useRef(null);
-
-  // Enable buttery-smooth horizontal mouse wheel scrolling with momentum
-  useEffect(() => {
-    const el = railRef.current;
-    if (!el) return;
-
-    let targetScroll = el.scrollLeft;
-    let animationFrameId = null;
-
-    const smoothStep = () => {
-      const maxScroll = el.scrollWidth - el.clientWidth;
-      if (maxScroll <= 0) {
-        animationFrameId = null;
-        return;
-      }
-
-      const diff = targetScroll - el.scrollLeft;
-      if (Math.abs(diff) > 0.5) {
-        el.scrollLeft += diff * 0.16;
-        animationFrameId = requestAnimationFrame(smoothStep);
-      } else {
-        el.scrollLeft = targetScroll;
-        animationFrameId = null;
-      }
-    };
-
-    const handleWheel = (e) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        const maxScroll = el.scrollWidth - el.clientWidth;
-        if (maxScroll <= 0) return;
-
-        if ((e.deltaY > 0 && el.scrollLeft < maxScroll - 1) || (e.deltaY < 0 && el.scrollLeft > 1)) {
-          e.preventDefault();
-
-          if (!animationFrameId) {
-            targetScroll = el.scrollLeft;
-          }
-
-          targetScroll = Math.max(0, Math.min(maxScroll, targetScroll + e.deltaY * 1.15));
-
-          if (!animationFrameId) {
-            animationFrameId = requestAnimationFrame(smoothStep);
-          }
-        }
-      }
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      el.removeEventListener('wheel', handleWheel);
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    };
-  }, [categories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,7 +179,7 @@ export default function ShopByCategory() {
         </div>
 
         {/* Horizontally scrollable catalog rail */}
-        <div className="sbc-grid" role="list" ref={railRef}>
+        <div className="sbc-grid" role="list">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
               <div key={`skel-${i}`} className="sbc-card sbc-skeleton" role="listitem" aria-hidden="true">

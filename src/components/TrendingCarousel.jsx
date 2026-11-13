@@ -1,12 +1,10 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../utils/imageUtils';
 import trendingItems from '../data/trendingData';
 import './TrendingCarousel.css';
 
 export default function TrendingCarousel({ trendingConfig }) {
-  const trackRef = useRef(null);
-  const carouselRef = useRef(null);
   const [paused, setPaused] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,65 +30,6 @@ export default function TrendingCarousel({ trendingConfig }) {
       });
     return () => { isMounted = false; };
   }, []);
-
-  // Handle mouse wheel horizontal scrolling with smooth physics and auto-scroll ticker
-  useEffect(() => {
-    const el = carouselRef.current;
-    if (!el) return;
-
-    let wheelVelocity = 0;
-
-    const handleWheel = (e) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        wheelVelocity += e.deltaY * 0.55;
-        // Clamp impulse for natural feel
-        wheelVelocity = Math.max(-50, Math.min(50, wheelVelocity));
-      }
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-
-    let animationFrameId;
-    let lastTime = performance.now();
-
-    const step = (time) => {
-      const dt = Math.min(32, time - lastTime);
-      lastTime = time;
-
-      if (el) {
-        const halfWidth = el.scrollWidth / 2;
-        const autoScrollDelta = paused ? 0 : (28 * dt) / 1000;
-        const totalDelta = autoScrollDelta + wheelVelocity;
-
-        if (Math.abs(totalDelta) > 0.001) {
-          el.scrollLeft += totalDelta;
-          if (halfWidth > 0) {
-            if (el.scrollLeft >= halfWidth) {
-              el.scrollLeft -= halfWidth;
-            } else if (el.scrollLeft <= 0) {
-              el.scrollLeft += halfWidth;
-            }
-          }
-        }
-
-        // Smooth exponential damping on wheel impulse
-        wheelVelocity *= 0.92;
-        if (Math.abs(wheelVelocity) < 0.05) {
-          wheelVelocity = 0;
-        }
-      }
-
-      animationFrameId = requestAnimationFrame(step);
-    };
-
-    animationFrameId = requestAnimationFrame(step);
-
-    return () => {
-      el.removeEventListener('wheel', handleWheel);
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [paused]);
 
   // Determine items to display: dynamic products if any are marked trending, otherwise fallback curated categories
   let displayItems = [];
@@ -142,13 +81,11 @@ export default function TrendingCarousel({ trendingConfig }) {
       {/* Carousel */}
       <div
         className="trending__carousel"
-        ref={carouselRef}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
         <div
           className={`trending__track ${paused ? 'trending__track--paused' : ''}`}
-          ref={trackRef}
         >
           {loopItems.map((item, index) => (
             <Link

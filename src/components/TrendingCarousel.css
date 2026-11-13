@@ -44,27 +44,30 @@
 /* Carousel Container */
 .trending__carousel {
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  cursor: grab;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  cursor: default;
 }
 
-.trending__carousel::-webkit-scrollbar {
-  display: none;
-}
-
-/* Track */
+/* Track — scrolls right-to-left */
 .trending__track {
   display: flex;
   gap: 24px;
-  width: max-content;
-  will-change: scroll-position;
+  width: fit-content;
+  animation: scrollTrack 40s linear infinite;
 }
 
 .trending__track--paused {
-  cursor: grab;
+  animation-play-state: paused;
+}
+
+@keyframes scrollTrack {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    /* Move exactly half (cards + gaps) so duplicate set replaces seamlessly */
+    transform: translateX(calc(-50% - 12px));
+  }
 }
 
 /* Card */
