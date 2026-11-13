@@ -778,6 +778,9 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/.test(productId) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId) || !productData || typeof productData !== 'object' || Array.isArray(productData)) {
       return res.status(422).json({ error: 'Valid productId, requestId, and productData values are required.' });
     }
+    if (productData.gstEnabled === true && (!Number.isFinite(Number(productData.gstPercent)) || Number(productData.gstPercent) <= 0 || Number(productData.gstPercent) > 100)) {
+      return res.status(422).json({ error: 'GST percentage must be between 0.01 and 100.' });
+    }
     const variants = Array.isArray(productData.variants) ? productData.variants : [];
     const rawSkus = [productData.sku, ...variants.map(variant => variant?.sku)].map(value => String(value || '').trim()).filter(Boolean);
     if (!String(productData.sku || '').trim() || variants.some(variant => !String(variant?.sku || '').trim())) {
@@ -1420,29 +1423,75 @@ app.get(['/api/imagekit/auth', '/imagekit/auth'], requireAdminAuth, (req, res) =
   }
 });
 
+// Check every live website reference before removing a file from ImageKit.
+async function deleteUnusedImageKitFile(db, fileId) {
+  if (!/^[a-f0-9]{24}$/i.test(String(fileId))) throw new Error('Invalid ImageKit file ID.');
+  const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
+  if (!privateKey) throw new Error('ImageKit is not configured.');
+  const headers = { Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}` };
+  const details = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}/details`, { headers });
+  if (details.status === 404) return { fileId, status: 'already_deleted' };
+  if (!details.ok) throw new Error(`ImageKit file lookup failed (${details.status}).`);
+  const file = await details.json();
+  const url = String(file.url || '').split('?')[0];
+  if (!url) throw new Error('ImageKit file URL is unavailable.');
+  const [products, settings] = await Promise.all([db.collection('products').get(), db.collection('settings').get()]);
+  const references = [
+    ...products.docs.filter(doc => doc.data().active !== false && doc.data().isDeleted !== true).map(doc => doc.data()),
+    ...settings.docs.map(doc => doc.data())
+  ];
+  if (references.some(data => JSON.stringify(data).includes(fileId) || JSON.stringify(data).includes(url))) {
+    return { fileId, status: 'in_use' };
+  }
+  const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, { method: 'DELETE', headers });
+  if (response.status === 404) return { fileId, status: 'already_deleted' };
+  if (!response.ok) throw new Error(`ImageKit deletion failed (${response.status}).`);
+  return { fileId, status: 'deleted' };
+}
+
+app.post(['/api/admin/products/:productId/delete', '/admin/products/:productId/delete'], requireAdminAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    const ref = db.collection('products').doc(String(req.params.productId));
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: 'Product not found.' });
+    const productImages = Array.isArray(snapshot.data().images) ? snapshot.data().images : [];
+    const imageIds = new Set(productImages.map(image => image?.publicId || image?.fileId).filter(Boolean));
+    const imageUrls = new Set([snapshot.data().image, snapshot.data().thumbnailUrl,
+      ...productImages.map(image => typeof image === 'string' ? image : image?.url)]
+      .filter(url => typeof url === 'string' && url.includes('ik.imagekit.io'))
+      .map(url => url.split('?')[0]));
+    if (imageUrls.size && process.env.IMAGEKIT_PRIVATE_KEY) {
+      const headers = { Authorization: `Basic ${Buffer.from(`${process.env.IMAGEKIT_PRIVATE_KEY.trim()}:`).toString('base64')}` };
+      for (let skip = 0; skip < 10000; skip += 100) {
+        const response = await fetch(`https://api.imagekit.io/v1/files?skip=${skip}&limit=100`, { headers });
+        if (!response.ok) throw new Error(`ImageKit listing failed (${response.status}).`);
+        const page = await response.json();
+        page.filter(file => imageUrls.has(String(file.url || '').split('?')[0])).forEach(file => imageIds.add(file.fileId));
+        if (page.length < 100) break;
+      }
+    }
+    await ref.update({ active: false, isDeleted: true, deletedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    productCatalogCache = { products: null, expiresAt: 0 };
+    const imageCleanup = await Promise.all([...imageIds].map(async fileId => {
+      try { return await deleteUnusedImageKitFile(db, fileId); }
+      catch (error) { return { fileId, status: 'failed', error: error.message }; }
+    }));
+    return res.json({ success: true, imageCleanup });
+  } catch (error) {
+    console.error('Product deletion failed:', error);
+    return res.status(500).json({ error: 'Unable to delete product.' });
+  }
+});
+
 // Admin-Protected Media Management API
 app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], requireAdminAuth, async (req, res) => {
   const { fileId } = req.params;
   if (!fileId) return res.status(400).json({ error: "Missing fileId" });
 
   try {
-    const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
-    if (!privateKey) return res.status(503).json({ error: 'ImageKit is not configured.' });
-
-    const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}`
-      }
-    });
-    if (response.status === 404) {
-      return res.json({ success: true, message: 'File already deleted.' });
-    }
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`ImageKit deletion failed (${response.status}): ${body.slice(0, 200)}`);
-    }
-    return res.json({ success: true });
+    const result = await deleteUnusedImageKitFile(getTrustedFirestore(), fileId);
+    return res.json({ success: true, ...result });
   } catch (error) {
     console.error("ImageKit Delete Error:", error);
     res.status(502).json({ error: 'Image deletion failed.' });

@@ -9,6 +9,7 @@ import {
 } from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminInventory.css';
+import { stockValueRows } from '../../utils/stockGst';
 
 export default function AdminInventory() {
   // 1. Instant loading from cache: 0ms initial render if data exists in cache
@@ -517,7 +518,12 @@ export default function AdminInventory() {
       else inStockCount++;
     });
 
-    return { totalItems, totalStockUnits, lowStockCount, outOfStockCount, inStockCount };
+    const valuation = stockValueRows(products).reduce((sum, row) => ({
+      beforeGst: sum.beforeGst + row.baseValue,
+      gst: sum.gst + row.gstValue,
+      withGst: sum.withGst + row.totalValue
+    }), { beforeGst: 0, gst: 0, withGst: 0 });
+    return { totalItems, totalStockUnits, lowStockCount, outOfStockCount, inStockCount, valuation };
   }, [products]);
 
   // Filtering & Sorting
@@ -853,6 +859,9 @@ export default function AdminInventory() {
 
       {/* Quick Metrics Bar */}
       <div className="inventory-metrics-strip">
+        <div className="metric-chip"><span className="metric-chip-label">Stock value before GST</span><span className="metric-chip-val">₹{stats.valuation.beforeGst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
+        <div className="metric-chip"><span className="metric-chip-label">GST on stock</span><span className="metric-chip-val">₹{stats.valuation.gst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
+        <div className="metric-chip"><span className="metric-chip-label">Stock value with GST</span><span className="metric-chip-val">₹{stats.valuation.withGst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
         <div className="metric-chip">
           <span className="metric-chip-label">Total Products</span>
           <span className="metric-chip-val">{stats.totalItems}</span>

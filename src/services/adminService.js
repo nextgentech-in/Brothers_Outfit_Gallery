@@ -26,10 +26,11 @@ export const deleteProductImage = async (fileId) => {
     const token = await auth.currentUser?.getIdToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
+    const response = await fetch(`${backendUrl}/api/imagekit/delete/${encodeURIComponent(fileId)}`, {
       method: 'DELETE',
       headers
     });
+    if (!response.ok) throw new Error(`ImageKit cleanup failed (${response.status}).`);
   } catch (err) {
     console.error("ImageKit delete error:", err);
   }
@@ -305,15 +306,16 @@ export const toggleProductTrending = async (id, isTrending) => {
 
 // Hard Delete
 export const deleteProduct = async (id) => {
-  const docRef = doc(db, PRODUCTS, id);
-  await updateDoc(docRef, {
-    active: false,
-    isDeleted: true,
-    deletedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/products/${encodeURIComponent(id)}/delete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }
   });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Unable to delete product.');
   invalidateProductCache();
   invalidateAdminProductsCache();
+  return result;
 };
 
 // Simple Stats Method

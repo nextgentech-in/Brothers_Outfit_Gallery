@@ -86,16 +86,17 @@ export default function AdminProducts() {
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm({
-      title: 'Permanently Delete Product',
-      message: 'WARNING: Are you sure you want to PERMANENTLY delete this product? This action cannot be undone.',
-      confirmText: 'Delete Permanently',
+      title: 'Remove Product',
+      message: 'Remove this product from the catalog and delete its unused ImageKit images?',
+      confirmText: 'Remove Product',
       cancelText: 'Cancel',
       isDestructive: true
     });
 
     if (confirmed) {
-      await deleteProduct(id);
-      showToast('Product deleted permanently.', 'success');
+      const result = await deleteProduct(id);
+      const failed = result.imageCleanup?.filter(item => item.status === 'failed').length || 0;
+      showToast(failed ? `Product removed; ${failed} ImageKit image(s) need cleanup.` : 'Product and unused ImageKit images removed.', failed ? 'error' : 'success');
       fetchProducts();
     }
   };

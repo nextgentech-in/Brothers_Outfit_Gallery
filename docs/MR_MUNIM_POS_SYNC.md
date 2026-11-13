@@ -1,8 +1,10 @@
 # Mr. Munim POS synchronization
 
-> Retired on 13 November 2026. The production website returns `410 pos_disconnected`
-> for every `/api/pos/*` request. This document records the former integration
-> contract only. Do not configure a POS client against these endpoints. The website
+> The former Mr. Munim HTTP integration was retired on 13 November 2026. The
+> website returns `410 pos_disconnected` for every `/api/pos/*` request. The
+> separate Brothers Outfit Gallery POS shares the Firestore catalog directly and
+> remains connected. This document records the former Mr. Munim contract only.
+> The website
 > catalog was archived in place so existing order cancellations can still restore
 > stock; historical POS records and Mr. Munim data were not deleted.
 
@@ -18,6 +20,13 @@ After the catalog reset, the website's 16 order documents, 29 customer profile
 documents, 27 customer sign-in accounts, five reviews, and eight order
 notifications were removed at the owner's request. Two admin profiles and their
 sign-in accounts remain. POS and ERP collections were left untouched.
+
+The website product editor now stores `gstEnabled` and `gstPercent`, matching the
+separate POS stock valuation. The website inventory shows the same before-GST,
+GST, and total stock values. Retail bills do not add GST. The separate POS now
+shows explicitly marked `demoOnly` catalog entries, including the three accessory
+samples. They have zero stock and cannot be sold. The ImageKit cleanup script
+retains all images referenced by product records or website settings.
 
 ## Production setup
 
