@@ -488,8 +488,8 @@
 }
 
 .sbc-heading {
-  margin: 0 auto 32px;
-  max-width: 1400px;
+  margin: 0 0 32px;
+  width: 100%;
   padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px));
 }
 
@@ -580,9 +580,9 @@
 }
 
 .sbc-footer {
-  margin: 34px auto 0;
-  max-width: 1400px;
-  padding: 0 48px;
+  margin: 34px 0 0;
+  width: 100%;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px));
   text-align: left;
 }
 
@@ -605,7 +605,7 @@
 
 @media (max-width: 768px) {
   .sbc-section { padding: 58px 0 54px; }
-  .sbc-heading { padding: 0 22px; margin-bottom: 28px; }
+  .sbc-heading { padding: 0 16px; margin-bottom: 28px; }
   .sbc-heading-eyebrow { font-size: 14px; }
   .sbc-heading-title { font-size: 34px; }
   .sbc-grid {
@@ -619,5 +619,5 @@
   .sbc-card-bg { height: calc(100% - 48px); padding: 0; }
   .sbc-card-info { padding-top: 8px; }
   .sbc-card-name { font-size: 11px; letter-spacing: -0.4px; }
-  .sbc-footer { padding: 0 22px; margin-top: 24px; }
+  .sbc-footer { padding: 0 16px; margin-top: 24px; }
 }
