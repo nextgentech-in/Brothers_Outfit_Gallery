@@ -1067,7 +1067,7 @@ export default function AdminProductForm() {
     const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && !isNaN(Number(formData.costPrice))
       ? parseFloat(formData.costPrice)
       : null;
-    if (costVal !== null && costVal < 0) return setError("Cost Price cannot be negative.");
+    if (costVal !== null && costVal < 0) return setError("Purchase Rate cannot be negative.");
     const gstPercent = Number(formData.gstPercent);
     if (formData.gstEnabled && (!Number.isFinite(gstPercent) || gstPercent <= 0 || gstPercent > 100))
       return setError('Enter a GST percentage from 0.01 to 100.');
@@ -1710,7 +1710,7 @@ export default function AdminProductForm() {
                 </div>
               </div>
               <div className="admin-form-group price-field cost-field">
-                <label>COST PRICE (Synced to POS)</label>
+                <label>PURCHASE RATE (Synced to POS)</label>
                 <div className="price-input-wrapper">
                   <span>₹</span>
                   <input
@@ -1724,7 +1724,7 @@ export default function AdminProductForm() {
                   />
                 </div>
                 <span style={{ fontSize: '11px', color: '#166534', fontWeight: 600, marginTop: '6px', display: 'block' }}>
-                  Purchase/Mfg cost. Synced to POS system.
+                  Purchase/Mfg rate. Synced to POS system.
                 </span>
               </div>
             </div>
@@ -2203,7 +2203,7 @@ export default function AdminProductForm() {
                         <th>SIZE / VOLUME</th>
                         <th>SKU</th>
                         <th>PRICE (₹)</th>
-                        <th>COST (₹)</th>
+                        <th>PURCHASE RATE (₹)</th>
                         <th>STOCK QUANTITY (LIVE)</th>
                         <th>STATUS</th>
                         <th>ACTIONS</th>
@@ -2269,10 +2269,10 @@ export default function AdminProductForm() {
                                 type="number"
                                 min="0"
                                 step="any"
-                                placeholder={formData.costPrice || "Cost"}
+                                placeholder={formData.costPrice || "Purchase Rate"}
                                 value={v.costPrice !== undefined ? v.costPrice : ''}
                                 onChange={(e) => updateVariantCost(v.id, e.target.value)}
-                                title="Variant cost price synced to POS"
+                                title="Variant purchase rate synced to POS"
                                 style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #bbf7d0', fontWeight: 700, fontSize: '14px', background: '#f0fdf4', color: '#14532d' }}
                               />
                             </div>

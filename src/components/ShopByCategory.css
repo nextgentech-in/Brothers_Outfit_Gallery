@@ -478,8 +478,7 @@
 /* ── Catalog rail redesign ─────────────────────────────────────────────── */
 .sbc-section {
   padding: 88px 0 84px;
-  /* Keep the image canvases visually continuous with their section. */
-  background: #f7f5f0;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -489,9 +488,9 @@
 }
 
 .sbc-heading {
-  margin: 0 auto 38px;
+  margin: 0 auto 32px;
   max-width: 1400px;
-  padding: 0 48px;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px));
 }
 
 .sbc-heading-eyebrow {
@@ -519,7 +518,7 @@
   display: flex;
   width: 100%;
   gap: 28px;
-  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px)) 8px;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px)) 12px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scroll-snap-type: x proximity;
@@ -534,7 +533,7 @@
   flex: 0 0 clamp(190px, 17vw, 258px);
   aspect-ratio: 0.78 / 1;
   overflow: visible;
-  background: #f7f5f0;
+  background: transparent !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -550,7 +549,7 @@
   width: 100%;
   height: calc(100% - 70px);
   object-fit: contain;
-  object-position: center center;
+  object-position: center top;
   padding: 4px 8px;
   /* White JPEG canvases multiply into the matching section colour. */
   mix-blend-mode: multiply !important;

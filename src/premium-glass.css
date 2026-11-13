@@ -37,12 +37,12 @@ body {
 .hero__btn--sale { box-shadow: inset 0 1px rgba(255,255,255,.6), 0 14px 32px rgba(0,0,0,.23); }
 
 .trending, .sbc-section, .new-arrivals-section, .about-preview-section, .trust-bar-section {
-  background: rgba(255,255,255,.18);
+  background: transparent;
 }
 .home-section, .sbc-section, .trending, .trust-bar-section {
   border-color: rgba(255,255,255,.65);
 }
-.product-card, .trending__card, .trust-item, .trust-bar-card,
+.trust-item, .trust-bar-card,
 .shop-controls, .shop-filters.shop-filters--open, .checkout-address-section, .checkout-summary-section,
 .glass-panel {
   background: var(--glass-fill);
@@ -52,8 +52,14 @@ body {
   backdrop-filter: blur(14px) saturate(120%);
   -webkit-backdrop-filter: blur(14px) saturate(120%);
 }
-.product-card, .trending__card { overflow: hidden; }
-.product-card__image-wrap, .trending__card-image-wrap { background: #e8e2d8; }
+.product-card, .trending__card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.product-card__image-wrap, .trending__card-image-wrap { background: transparent; }
 .trust-bar-card { border-radius: 18px; }
 .trust-bar-icon {
   background: linear-gradient(145deg, #34302a, #151515);
@@ -76,7 +82,7 @@ body {
 @media (max-width: 768px) {
   body { background-attachment: scroll; }
   .navbar, .navbar--scrolled { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-  .product-card, .trending__card, .trust-item, .trust-bar-card,
+  .trust-item, .trust-bar-card,
   .shop-controls, .shop-filters.shop-filters--open, .checkout-address-section, .checkout-summary-section {
     border-radius: 18px;
     backdrop-filter: none;
@@ -97,7 +103,7 @@ body {
 
 @media (prefers-reduced-transparency: reduce) {
   .navbar, .navbar--scrolled { background: #08090b !important; }
-  .product-card, .trending__card, .trust-item, .trust-bar-card,
+  .trust-item, .trust-bar-card,
   .shop-controls, .shop-filters.shop-filters--open, .checkout-address-section, .checkout-summary-section,
   .glass-panel { background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
 }

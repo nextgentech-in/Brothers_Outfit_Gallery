@@ -6,6 +6,7 @@ import './TrendingCarousel.css';
 
 export default function TrendingCarousel({ trendingConfig }) {
   const trackRef = useRef(null);
+  const carouselRef = useRef(null);
   const [paused, setPaused] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,53 @@ export default function TrendingCarousel({ trendingConfig }) {
       });
     return () => { isMounted = false; };
   }, []);
+
+  // Handle mouse wheel horizontal scrolling and smooth auto-scroll ticker
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY * 1.2;
+        const halfWidth = el.scrollWidth / 2;
+        if (halfWidth > 0) {
+          if (el.scrollLeft >= halfWidth) {
+            el.scrollLeft -= halfWidth;
+          } else if (el.scrollLeft <= 0) {
+            el.scrollLeft += halfWidth;
+          }
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+
+    let animationFrameId;
+    let lastTime = performance.now();
+
+    const step = (time) => {
+      const dt = time - lastTime;
+      lastTime = time;
+
+      if (!paused && el) {
+        el.scrollLeft += (30 * dt) / 1000;
+        const halfWidth = el.scrollWidth / 2;
+        if (halfWidth > 0 && el.scrollLeft >= halfWidth) {
+          el.scrollLeft -= halfWidth;
+        }
+      }
+      animationFrameId = requestAnimationFrame(step);
+    };
+
+    animationFrameId = requestAnimationFrame(step);
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [paused]);
 
   // Determine items to display: dynamic products if any are marked trending, otherwise fallback curated categories
   let displayItems = [];
@@ -82,6 +130,7 @@ export default function TrendingCarousel({ trendingConfig }) {
       {/* Carousel */}
       <div
         className="trending__carousel"
+        ref={carouselRef}
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >

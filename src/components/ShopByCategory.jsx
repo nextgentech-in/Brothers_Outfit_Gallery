@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getOptimizedImageSrcSet, optimizeImage } from '../utils/imageUtils';
 import './ShopByCategory.css';
@@ -71,6 +71,30 @@ export default function ShopByCategory() {
   // categories are enhanced after first paint instead of delaying the page.
   const [categories, setCategories] = useState(getCuratedCategories);
   const [loading, setLoading] = useState(false);
+  const railRef = useRef(null);
+
+  // Enable horizontal mouse wheel scrolling
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+
+    const handleWheel = (e) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const maxScroll = el.scrollWidth - el.clientWidth;
+        if (maxScroll <= 0) return;
+        if ((e.deltaY > 0 && el.scrollLeft < maxScroll) || (e.deltaY < 0 && el.scrollLeft > 0)) {
+          e.preventDefault();
+          el.scrollBy({
+            left: e.deltaY * 1.5,
+            behavior: 'auto'
+          });
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [categories]);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,7 +203,7 @@ export default function ShopByCategory() {
         </div>
 
         {/* Horizontally scrollable catalog rail */}
-        <div className="sbc-grid" role="list">
+        <div className="sbc-grid" role="list" ref={railRef}>
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
               <div key={`skel-${i}`} className="sbc-card sbc-skeleton" role="listitem" aria-hidden="true">
