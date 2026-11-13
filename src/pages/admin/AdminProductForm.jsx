@@ -277,8 +277,9 @@ const buildVariantSku = (productSku, color, size, fallbackProductId = '') => {
   return `${base}-${colorPart}-${sizePart}`;
 };
 
-export default function AdminProductForm() {
-  const { id } = useParams();
+export default function AdminProductForm({ modalProductId, isModal = false, onClose, onSaved } = {}) {
+  const routeParams = useParams();
+  const id = modalProductId !== undefined ? modalProductId : routeParams.id;
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   const { showToast } = useAdminUI();
@@ -1290,7 +1291,10 @@ export default function AdminProductForm() {
         setImageColorSuggestion(null);
         setError(null);
         setSubmitting(false);
-        if (isEdit) navigate('/admin/products/new');
+        if (isEdit) {
+          if (isModal && onSaved) onSaved();
+          else navigate('/admin/products/new');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1300,7 +1304,11 @@ export default function AdminProductForm() {
       } else {
         showToast(`Product ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
       }
-      navigate('/admin/products');
+      if (isModal && onSaved) {
+        onSaved();
+      } else {
+        navigate('/admin/products');
+      }
     } catch (err) {
       console.error('Save Error:', err);
       if (err.message && err.code?.includes('storage/unauthorized')) {
@@ -1327,12 +1335,15 @@ export default function AdminProductForm() {
   const calculatedTotalStock = formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
 
   return (
-    <div className="admin-product-form-container">
+    <div className={`admin-product-form-container ${isModal ? 'admin-product-form-container--modal' : ''}`}>
       <div className="admin-form-header-bar">
         <div className="admin-header-title-wrap">
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              else navigate('/admin/products');
+            }}
             className="admin-top-back-link"
             style={{
               background: 'none',
@@ -1399,7 +1410,10 @@ export default function AdminProductForm() {
 
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              else navigate('/admin/products');
+            }}
             className="admin-btn-secondary admin-top-cancel-btn"
             disabled={submitting}
           >
@@ -2882,7 +2896,10 @@ export default function AdminProductForm() {
             )}
             <button
               type="button"
-              onClick={() => navigate('/admin/products')}
+              onClick={() => {
+                if (isModal && onClose) onClose();
+                else navigate('/admin/products');
+              }}
               className="admin-btn-secondary"
               style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '14px' }}
               disabled={submitting}

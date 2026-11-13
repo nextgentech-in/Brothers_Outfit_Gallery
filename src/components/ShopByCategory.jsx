@@ -12,15 +12,15 @@ const CATEGORY_DISPLAY_ORDER = [
 
 // Polished local fallbacks keep the storefront useful before every category has an admin upload.
 const CATEGORY_FALLBACK_IMAGES = {
-  Kurta: '/images/category-rail/kurta-cutout.jpg',
-  Shirts: '/images/category-rail/shirts-cutout-v2.jpg',
-  'T-Shirts': '/images/category-rail/tshirts-cutout.jpg',
-  Jeans: '/images/category-rail/jeans-cutout.jpg',
-  Trousers: '/images/category-rail/trousers-cutout.jpg',
-  Shorts: '/images/category-rail/shorts-cutout.jpg',
+  Kurta: '/images/category-rail/kurta-cutout.png',
+  Shirts: '/images/category-rail/shirts-cutout-v2.png',
+  'T-Shirts': '/images/category-rail/tshirts-cutout.png',
+  Jeans: '/images/category-rail/jeans-cutout.png',
+  Trousers: '/images/category-rail/trousers-cutout.png',
+  Shorts: '/images/category-rail/shorts-cutout.png',
   Accessories: '/images/category-rail/accessories-cutout.jpg',
-  Perfumes: '/images/category-rail/perfumes-cutout.jpg',
-  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.jpg'
+  Perfumes: '/images/category-rail/perfumes-cutout.png',
+  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.png'
 };
 
 const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
