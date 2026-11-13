@@ -5,8 +5,7 @@ import {
   getCachedAdminProducts,
   subscribeAdminProducts,
   updateProductVariantStock,
-  getPosSyncStatus,
-  reconcilePosInventory
+  getPosSyncStatus
 } from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminInventory.css';
@@ -21,8 +20,6 @@ export default function AdminInventory() {
   // POS Sync Monitoring & Reconciliation
   const [posStatus, setPosStatus] = useState(null);
   const [loadingPosStatus, setLoadingPosStatus] = useState(false);
-  const [isReconciling, setIsReconciling] = useState(false);
-  const [showPosDetails, setShowPosDetails] = useState(false);
 
   // Activity Log state
   const [showActivityLog, setShowActivityLog] = useState(false);
@@ -45,27 +42,6 @@ export default function AdminInventory() {
   useEffect(() => {
     fetchPosStatus();
   }, [fetchPosStatus]);
-
-  const handleReconcile = async () => {
-    const confirmed = await showConfirm({
-      title: 'Reconcile Inventory & Refresh Cache',
-      message: 'This will re-verify stock counts across all product variants, re-align parent totals, and clear the website storefront catalog cache. Continue?',
-      confirmText: 'Reconcile Now',
-      cancelText: 'Cancel'
-    });
-    if (!confirmed) return;
-
-    try {
-      setIsReconciling(true);
-      const res = await reconcilePosInventory();
-      showToast(res.message || 'Inventory reconciled successfully!', 'success');
-      await Promise.all([fetchProducts(true), fetchPosStatus()]);
-    } catch (err) {
-      showToast(err.message || 'Failed to reconcile inventory', 'error');
-    } finally {
-      setIsReconciling(false);
-    }
-  };
 
   const formatSyncTime = (timestamp) => {
     if (!timestamp) return 'No sync events recorded yet';
@@ -706,160 +682,6 @@ export default function AdminInventory() {
           </div>
         </div>
       )}
-
-      {/* POS Sync Status & Reconciliation Card */}
-      <div className="pos-sync-card">
-        <div className="pos-sync-card-header">
-          <div className="pos-sync-card-info">
-            <div className="pos-sync-badge-row">
-              <span className="pos-sync-badge">
-                <span className="pos-sync-pulse-dot" />
-                MR. MUNIM POS SYNC
-              </span>
-              {posStatus?.discrepancies?.length > 0 && (
-                <span className="pos-discrepancy-pill">
-                  ⚠️ {posStatus.discrepancies.length} Discrepanc{posStatus.discrepancies.length === 1 ? 'y' : 'ies'}
-                </span>
-              )}
-            </div>
-            <div className="pos-sync-time-row">
-              <span className="pos-sync-time-label">Last Synced:</span>
-              <strong className="pos-sync-time-val">
-                {formatSyncTime(posStatus?.lastSync?.timestamp)}
-              </strong>
-              {posStatus?.lastSync?.timestamp && (
-                <span className="pos-sync-time-ago">
-                  ({getTimeAgo(posStatus.lastSync.timestamp)})
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="pos-sync-card-actions">
-            <button
-              type="button"
-              className="pos-btn-details"
-              onClick={() => setShowPosDetails(prev => !prev)}
-              title="View recent POS stock inward, sales movements, and discrepancies"
-            >
-              {showPosDetails ? 'Hide Activity ▲' : 'View Movements & Discrepancies ▼'}
-            </button>
-            <button
-              type="button"
-              className="pos-btn-reconcile"
-              onClick={handleReconcile}
-              disabled={isReconciling}
-              title="Recalculate variant totals, align product stock, and clear website cache"
-            >
-              {isReconciling ? (
-                <>
-                  <span className="pos-spinner" />
-                  Reconciling...
-                </>
-              ) : (
-                <>
-                  🔄 Reconcile Inventory
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Expandable Details Drawer */}
-        {showPosDetails && (
-          <div className="pos-sync-details-drawer">
-            <div className="pos-drawer-grid">
-              {/* Movements Column */}
-              <div className="pos-drawer-col">
-                <div className="pos-col-header">
-                  <h4>📦 Recent In-Store & Online Stock Movements</h4>
-                  <span className="pos-col-count">{posStatus?.recentMovements?.length || 0} recent</span>
-                </div>
-                {(!posStatus?.recentMovements || posStatus.recentMovements.length === 0) ? (
-                  <div className="pos-empty-state">
-                    No recent POS or online stock movements recorded yet.
-                  </div>
-                ) : (
-                  <div className="pos-movement-list">
-                    {posStatus.recentMovements.map(m => {
-                      const isAddition = m.deltaChange > 0;
-                      return (
-                        <div key={m.id} className="pos-movement-item">
-                          <div className="pos-movement-main">
-                            <span className="pos-movement-sku">{m.sku}</span>
-                            <span className="pos-movement-meta">
-                              {[m.size, m.color].filter(Boolean).join(' • ')}
-                            </span>
-                          </div>
-                          <div className="pos-movement-reason-col">
-                            <span className={`pos-reason-badge pos-reason--${m.reason}`}>
-                              {m.reason === 'offline_sale' ? 'Offline Sale (POS)' :
-                               m.reason === 'pos_stock_inward' ? 'Stock Inward (POS)' :
-                               m.reason === 'admin_adjustment' ? 'Admin Adjustment' :
-                               m.reason === 'online_order' ? 'Online Order' : m.reason}
-                            </span>
-                            <span className="pos-movement-time">{getTimeAgo(m.createdAt)}</span>
-                          </div>
-                          <div className="pos-movement-delta-col">
-                            <span className={`pos-delta-val ${isAddition ? 'pos-delta--plus' : 'pos-delta--minus'}`}>
-                              {isAddition ? `+${m.deltaChange}` : m.deltaChange}
-                            </span>
-                            <span className="pos-stock-after">After: {m.stockAfter}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Discrepancies Column */}
-              <div className="pos-drawer-col">
-                <div className="pos-col-header">
-                  <h4>⚖️ Reconciliation Discrepancies</h4>
-                  <span className="pos-col-count">
-                    {posStatus?.discrepancies?.length || 0} open
-                  </span>
-                </div>
-                {(!posStatus?.discrepancies || posStatus.discrepancies.length === 0) ? (
-                  <div className="pos-clean-state">
-                    <span className="pos-clean-icon">✅</span>
-                    <div>
-                      <strong>All Stock In Perfect Balance</strong>
-                      <p>No discrepancies detected between POS physical counts and website inventory.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pos-discrepancy-list">
-                    {posStatus.discrepancies.map(d => (
-                      <div key={d.id} className="pos-discrepancy-item">
-                        <div className="pos-discrepancy-main">
-                          <span className="pos-discrepancy-sku">{d.sku}</span>
-                          <span className="pos-discrepancy-date">{formatSyncTime(d.createdAt)}</span>
-                        </div>
-                        <div className="pos-discrepancy-numbers">
-                          <div className="pos-num-cell">
-                            <span className="pos-num-lbl">POS Reported:</span>
-                            <strong>{d.posFinalStock}</strong>
-                          </div>
-                          <div className="pos-num-cell">
-                            <span className="pos-num-lbl">Web Computed:</span>
-                            <strong>{d.websiteStockAfterDelta}</strong>
-                          </div>
-                          <div className="pos-num-cell">
-                            <span className="pos-num-lbl">Variance:</span>
-                            <strong className="text-danger">{d.discrepancy > 0 ? `+${d.discrepancy}` : d.discrepancy}</strong>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* ──── Activity Log Panel ──── */}
       {showActivityLog && (

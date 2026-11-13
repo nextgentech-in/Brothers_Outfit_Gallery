@@ -23,7 +23,6 @@ import {
   isValidExchangeTransition,
   DEFAULT_EXCHANGE_WINDOW_DAYS
 } from './src/utils/exchangeConstants.js';
-import { registerPosSyncRoutes } from './src/server/posSync.js';
 import { registerReservationRoutes } from './src/server/reservationRoutes.js';
 import { applyStockAction, linesFingerprint, reservationIdFor } from './src/server/stockReservation.js';
 
@@ -736,13 +735,13 @@ app.get(['/api/auth/admin-status', '/auth/admin-status'], requireAuth, (req, res
   res.json({ isAdmin: Boolean(req.isAdmin) });
 });
 
-registerPosSyncRoutes(app, {
-  getDb: getTrustedFirestore,
-  FieldValue,
-  invalidateProductCache: () => {
-    productCatalogCache = { products: null, expiresAt: 0 };
-  }
-});
+// The external POS connection has been retired. Keep all POS traffic closed so
+// old clients cannot reimport products or alter website stock after catalog reset.
+app.use('/api/pos', (_req, res) => res.status(410).json({
+  success: false,
+  code: 'pos_disconnected',
+  error: 'The POS connection is disabled.'
+}));
 registerReservationRoutes(app, {
   getDb: getTrustedFirestore, requireAuth,
   calculateTotal: calculateServerOrderTotal, rateLimit: checkSensitiveRateLimit

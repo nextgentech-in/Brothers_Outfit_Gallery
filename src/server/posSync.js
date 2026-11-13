@@ -390,8 +390,6 @@ function validateProductsPayload(body) {
   return products;
 }
 
-export const DEFAULT_POS_TOKEN = 'ee33921811cd0fa33a0bcf056a21665a25472aeafa84cda10396323c5c37afffc55c420a827fbc461a5d74d652741df2';
-
 function readOptionalInteger(raw, keys, prefix, options = {}) {
   for (const key of keys) {
     if (raw?.[key] != null && raw[key] !== '') {
@@ -518,7 +516,7 @@ function extractPosTokenFromReq(req) {
 }
 
 function isValidPosToken(configuredValue, suppliedOrHeader) {
-  const configured = String(configuredValue || process.env.POS_SYNC_API_TOKEN || DEFAULT_POS_TOKEN).trim();
+  const configured = String(configuredValue || process.env.POS_SYNC_API_TOKEN || '').trim();
   let supplied = String(suppliedOrHeader || '').trim();
   if (/^bearer\s+/i.test(supplied)) {
     supplied = supplied.replace(/^bearer\s+/i, '').trim();
@@ -531,7 +529,7 @@ function isValidPosToken(configuredValue, suppliedOrHeader) {
 
 function requirePosToken(req, res, next) {
   const suppliedToken = extractPosTokenFromReq(req);
-  const configuredToken = process.env.POS_SYNC_API_TOKEN || DEFAULT_POS_TOKEN;
+  const configuredToken = process.env.POS_SYNC_API_TOKEN || '';
   if (!isValidPosToken(configuredToken, suppliedToken)) {
     return res.status(401).json({
       success: false,
