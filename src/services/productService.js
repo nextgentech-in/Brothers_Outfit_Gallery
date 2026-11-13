@@ -136,7 +136,7 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
 
 export const isProductInStock = (product) => {
   if (!product) return false;
-  if (product.active === false || product.inStock === false) return false;
+  if (product.active === false || product.isDeleted === true) return false;
 
   // Check product-level stock or quantity field
   const totalStock = getAvailableStock(product);

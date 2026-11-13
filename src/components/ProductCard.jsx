@@ -86,7 +86,7 @@ function ProductCard({ product, onAddToCart, showNewBadge = false, showOffer = f
   // Strictly filter out discontinued and 0-stock sizes (matches ProductInfo)
   const availableSizes = getAvailableProductSizes(product);
 
-  const isOutOfStock = totalStock <= 0 || product.inStock === false || product.active === false || (product.variants?.length > 0 && availableSizes.length === 0);
+  const isOutOfStock = totalStock <= 0 || product.active === false || product.isDeleted === true || (product.variants?.length > 0 && availableSizes.length === 0);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const hasMultipleSizes = availableSizes.length > 1;
   const needsSizeSelection = hasMultipleSizes && !selectedSize;

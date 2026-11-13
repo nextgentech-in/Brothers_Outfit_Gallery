@@ -1051,7 +1051,8 @@ app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth,
           stock: calculatedTotal,
           quantity: calculatedTotal,
           inStock: calculatedTotal > 0,
-          active: product.active,
+          active: calculatedTotal > 0 ? true : product.active,
+          ...(calculatedTotal > 0 ? { isDeleted: false, deletedAt: FieldValue.delete() } : {}),
           sizes: [...new Set(updatedVariants.filter(variant => variant.stock > Number(variant.reserved ?? 0)).map(variant => variant.size).filter(Boolean))],
           updatedAt: FieldValue.serverTimestamp()
         });
@@ -1076,7 +1077,14 @@ app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth,
             createdAt: FieldValue.serverTimestamp()
           });
         }
-        transaction.update(productRef, { stock: requestedTotal, quantity: requestedTotal, inStock: requestedTotal > 0, active: product.active, updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(productRef, {
+          stock: requestedTotal,
+          quantity: requestedTotal,
+          inStock: requestedTotal > 0,
+          active: requestedTotal > 0 ? true : product.active,
+          ...(requestedTotal > 0 ? { isDeleted: false, deletedAt: FieldValue.delete() } : {}),
+          updatedAt: FieldValue.serverTimestamp()
+        });
       }
     });
     productCatalogCache = { products: null, expiresAt: 0 };

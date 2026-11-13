@@ -56,7 +56,7 @@ export function isClothingProduct(product) {
  */
 export function getAvailableProductSizes(product, targetColor = null) {
   if (!product) return [];
-  if (product.active === false || product.inStock === false) return [];
+  if (product.active === false || product.isDeleted === true) return [];
 
   const totalStock = getAvailableStock(product);
   if (!isNaN(totalStock) && totalStock <= 0) return [];

@@ -216,7 +216,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
 
   // Stock status for selected size or whole product
   const activeVariantStock = matchedVariant ? getAvailableStock(matchedVariant) : productTotalStock;
-  const isEntirelySoldOut = productTotalStock <= 0 || product.inStock === false || product.active === false || (productSizes.length > 0 && visibleSizes.length === 0);
+  const isEntirelySoldOut = productTotalStock <= 0 || product.active === false || product.isDeleted === true || (productSizes.length > 0 && visibleSizes.length === 0);
   const outOfStock = isEntirelySoldOut || (selectedSize && activeVariantStock <= 0);
   const stock = selectedSize && matchedVariant ? activeVariantStock : productTotalStock;
 
