@@ -3733,6 +3733,10 @@ app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], req
     if (!orderDoc.exists) {
       return res.status(404).json({ error: `Order #${orderId} not found.` });
     }
+    const order = orderDoc.data();
+    if (order.createdBy === 'admin-pos' || String(order.channel).toLowerCase() === 'pos' || /^(POS|EX)-/.test(orderId)) {
+      return res.status(409).json({ error: 'Select a website order for delivery updates.' });
+    }
 
     if (status === 'Cancelled') {
       const result = await cancelOrderAndRestoreStock(db, orderRef, {

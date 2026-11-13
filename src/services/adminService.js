@@ -344,7 +344,7 @@ export const getAdminStats = async (products) => {
   let totalOrders = 0;
   try {
     const ordersSnap = await getDocs(collection(db, 'orders'));
-    totalOrders = ordersSnap.size;
+    totalOrders = ordersSnap.docs.filter(isWebsiteOrder).length;
   } catch (e) {
     console.log('No orders yet or security rule restriction:', e.message);
   }
@@ -353,11 +353,16 @@ export const getAdminStats = async (products) => {
 }
 
 // ─── ADMIN: ORDERS ────────────────────────────────────────────────────────────
+function isWebsiteOrder(snapshot) {
+  const order = snapshot.data();
+  return order.createdBy !== 'admin-pos' && String(order.channel).toLowerCase() !== 'pos' && !/^(POS|EX)-/.test(snapshot.id);
+}
+
 export const getAdminOrders = async () => {
   try {
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snap.docs.filter(isWebsiteOrder).map(d => ({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error('Error fetching admin orders:', err);
     return [];
@@ -400,6 +405,10 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
 
   // 2. Direct Firestore fallback
   const docRef = doc(db, 'orders', orderId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists() || !isWebsiteOrder(snapshot)) {
+    throw new Error('Select a website order for delivery updates.');
+  }
   const firestorePayload = { status, ...extraPayload, updatedAt: serverTimestamp() };
   if (status === 'Delivered') {
     firestorePayload.shipmentStatus = 'DELIVERED';
@@ -420,6 +429,10 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
 
 export const updateOrderShipment = async (orderId, shipmentData) => {
   const docRef = doc(db, 'orders', orderId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists() || !isWebsiteOrder(snapshot)) {
+    throw new Error('Select a website order for shipment.');
+  }
   await updateDoc(docRef, {
     status: 'Shipped',
     waybill: shipmentData.waybill,
