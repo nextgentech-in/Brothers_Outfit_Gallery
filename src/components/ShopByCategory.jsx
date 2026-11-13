@@ -18,7 +18,7 @@ const CATEGORY_FALLBACK_IMAGES = {
   Jeans: '/images/category-rail/jeans-cutout.png',
   Trousers: '/images/category-rail/trousers-cutout.png',
   Shorts: '/images/category-rail/shorts-cutout.png',
-  Accessories: '/images/category-rail/accessories-cutout.jpg',
+  Accessories: '/images/category-rail/accessories-cutout.png',
   Perfumes: '/images/category-rail/perfumes-cutout.png',
   'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.png'
 };
@@ -73,27 +73,57 @@ export default function ShopByCategory() {
   const [loading, setLoading] = useState(false);
   const railRef = useRef(null);
 
-  // Enable horizontal mouse wheel scrolling
+  // Enable buttery-smooth horizontal mouse wheel scrolling with momentum
   useEffect(() => {
     const el = railRef.current;
     if (!el) return;
+
+    let targetScroll = el.scrollLeft;
+    let animationFrameId = null;
+
+    const smoothStep = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      if (maxScroll <= 0) {
+        animationFrameId = null;
+        return;
+      }
+
+      const diff = targetScroll - el.scrollLeft;
+      if (Math.abs(diff) > 0.5) {
+        el.scrollLeft += diff * 0.16;
+        animationFrameId = requestAnimationFrame(smoothStep);
+      } else {
+        el.scrollLeft = targetScroll;
+        animationFrameId = null;
+      }
+    };
 
     const handleWheel = (e) => {
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         const maxScroll = el.scrollWidth - el.clientWidth;
         if (maxScroll <= 0) return;
-        if ((e.deltaY > 0 && el.scrollLeft < maxScroll) || (e.deltaY < 0 && el.scrollLeft > 0)) {
+
+        if ((e.deltaY > 0 && el.scrollLeft < maxScroll - 1) || (e.deltaY < 0 && el.scrollLeft > 1)) {
           e.preventDefault();
-          el.scrollBy({
-            left: e.deltaY * 1.5,
-            behavior: 'auto'
-          });
+
+          if (!animationFrameId) {
+            targetScroll = el.scrollLeft;
+          }
+
+          targetScroll = Math.max(0, Math.min(maxScroll, targetScroll + e.deltaY * 1.15));
+
+          if (!animationFrameId) {
+            animationFrameId = requestAnimationFrame(smoothStep);
+          }
         }
       }
     };
 
     el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
   }, [categories]);
 
   useEffect(() => {

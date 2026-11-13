@@ -33,23 +33,19 @@ export default function TrendingCarousel({ trendingConfig }) {
     return () => { isMounted = false; };
   }, []);
 
-  // Handle mouse wheel horizontal scrolling and smooth auto-scroll ticker
+  // Handle mouse wheel horizontal scrolling with smooth physics and auto-scroll ticker
   useEffect(() => {
     const el = carouselRef.current;
     if (!el) return;
 
+    let wheelVelocity = 0;
+
     const handleWheel = (e) => {
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         e.preventDefault();
-        el.scrollLeft += e.deltaY * 1.2;
-        const halfWidth = el.scrollWidth / 2;
-        if (halfWidth > 0) {
-          if (el.scrollLeft >= halfWidth) {
-            el.scrollLeft -= halfWidth;
-          } else if (el.scrollLeft <= 0) {
-            el.scrollLeft += halfWidth;
-          }
-        }
+        wheelVelocity += e.deltaY * 0.55;
+        // Clamp impulse for natural feel
+        wheelVelocity = Math.max(-50, Math.min(50, wheelVelocity));
       }
     };
 
@@ -59,16 +55,32 @@ export default function TrendingCarousel({ trendingConfig }) {
     let lastTime = performance.now();
 
     const step = (time) => {
-      const dt = time - lastTime;
+      const dt = Math.min(32, time - lastTime);
       lastTime = time;
 
-      if (!paused && el) {
-        el.scrollLeft += (30 * dt) / 1000;
+      if (el) {
         const halfWidth = el.scrollWidth / 2;
-        if (halfWidth > 0 && el.scrollLeft >= halfWidth) {
-          el.scrollLeft -= halfWidth;
+        const autoScrollDelta = paused ? 0 : (28 * dt) / 1000;
+        const totalDelta = autoScrollDelta + wheelVelocity;
+
+        if (Math.abs(totalDelta) > 0.001) {
+          el.scrollLeft += totalDelta;
+          if (halfWidth > 0) {
+            if (el.scrollLeft >= halfWidth) {
+              el.scrollLeft -= halfWidth;
+            } else if (el.scrollLeft <= 0) {
+              el.scrollLeft += halfWidth;
+            }
+          }
+        }
+
+        // Smooth exponential damping on wheel impulse
+        wheelVelocity *= 0.92;
+        if (Math.abs(wheelVelocity) < 0.05) {
+          wheelVelocity = 0;
         }
       }
+
       animationFrameId = requestAnimationFrame(step);
     };
 

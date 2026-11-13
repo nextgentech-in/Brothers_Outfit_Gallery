@@ -521,7 +521,7 @@
   padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px)) 12px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scroll-snap-type: x proximity;
+  scroll-behavior: auto;
   scrollbar-width: none;
 }
 
