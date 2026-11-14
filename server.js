@@ -23,7 +23,8 @@ import {
   isValidExchangeTransition,
   DEFAULT_EXCHANGE_WINDOW_DAYS
 } from './src/utils/exchangeConstants.js';
-import { registerPosSyncRoutes } from './src/server/posSync.js';
+import { registerReservationRoutes } from './src/server/reservationRoutes.js';
+import { applyStockAction, linesFingerprint, reservationIdFor } from './src/server/stockReservation.js';
 
 // Basic .env parsing for local dev without requiring dotenv package
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,7 @@ app.disable('x-powered-by');
 // 2. Comprehensive Security Headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -257,11 +259,27 @@ const mailTransporter = nodemailer.createTransport({
 });
 
 // Send Admin Email & Log Alert when a new order is placed
-app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-alert'], async (req, res) => {
+app.post(['/api/notifications/send-admin-alert', '/notifications/send-admin-alert'], requireAuth, async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 10)) return;
 
-  const { orderId, customerName, totalAmount, paymentMethod, shippingAddress } = req.body;
+  const { orderId } = req.body;
   if (!orderId) return res.status(400).json({ error: 'Order ID required.' });
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(String(orderId))) return res.status(400).json({ error: 'Invalid order ID.' });
+
+  let savedOrder;
+  try {
+    const orderSnapshot = await getTrustedFirestore().collection('orders').doc(String(orderId)).get();
+    if (!orderSnapshot.exists) return res.status(404).json({ error: 'Order not found.' });
+    savedOrder = orderSnapshot.data();
+    if (!req.isAdmin && savedOrder.userId !== req.user?.uid) {
+      return res.status(403).json({ error: 'You cannot send alerts for this order.' });
+    }
+  } catch (error) {
+    console.error('Admin alert order verification failed:', error);
+    return res.status(503).json({ error: 'Order verification is temporarily unavailable.' });
+  }
+  const { totalAmount, paymentMethod, shippingAddress } = savedOrder;
+  const customerName = shippingAddress?.fullName || 'Customer';
 
   const alertMsg = `🚨 NEW ORDER RECEIVED!\n\nOrder ID: #${orderId}\nCustomer: ${customerName || 'Guest'}\nTotal Amount: ₹${totalAmount}\nPayment Method: ${paymentMethod}\nAddress: ${shippingAddress?.addressLine || ''}, ${shippingAddress?.city || ''} - ${shippingAddress?.pincode || ''}\nPhone: ${shippingAddress?.phone || ''}`;
 
@@ -717,12 +735,16 @@ app.get(['/api/auth/admin-status', '/auth/admin-status'], requireAuth, (req, res
   res.json({ isAdmin: Boolean(req.isAdmin) });
 });
 
-registerPosSyncRoutes(app, {
-  getDb: getTrustedFirestore,
-  FieldValue,
-  invalidateProductCache: () => {
-    productCatalogCache = { products: null, expiresAt: 0 };
-  }
+// The external POS connection has been retired. Keep all POS traffic closed so
+// old clients cannot reimport products or alter website stock after catalog reset.
+app.use('/api/pos', (_req, res) => res.status(410).json({
+  success: false,
+  code: 'pos_disconnected',
+  error: 'The POS connection is disabled.'
+}));
+registerReservationRoutes(app, {
+  getDb: getTrustedFirestore, requireAuth,
+  calculateTotal: calculateServerOrderTotal, rateLimit: checkSensitiveRateLimit
 });
 
 // Admin Store Settings endpoint
@@ -755,6 +777,9 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
     const create = req.body?.create === true;
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/.test(productId) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(requestId) || !productData || typeof productData !== 'object' || Array.isArray(productData)) {
       return res.status(422).json({ error: 'Valid productId, requestId, and productData values are required.' });
+    }
+    if (productData.gstEnabled === true && (!Number.isFinite(Number(productData.gstPercent)) || Number(productData.gstPercent) <= 0 || Number(productData.gstPercent) > 100)) {
+      return res.status(422).json({ error: 'GST percentage must be between 0.01 and 100.' });
     }
     const variants = Array.isArray(productData.variants) ? productData.variants : [];
     const rawSkus = [productData.sku, ...variants.map(variant => variant?.sku)].map(value => String(value || '').trim()).filter(Boolean);
@@ -835,6 +860,26 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
       });
 
       const { webProductId: _ignoredWebId, integrationOrigin: _ignoredOrigin, integrationCreatedAt: _ignoredIntegrationCreatedAt, createdAt: _ignoredCreatedAt, updatedAt: _ignoredUpdatedAt, ...editableData } = productData;
+      const previousBySkuForHolds = new Map((Array.isArray(oldData.variants) ? oldData.variants : [])
+        .map(variant => [String(variant.sku || '').trim().toLowerCase(), variant]));
+      if (Array.isArray(editableData.variants) && editableData.variants.length > 0) {
+        editableData.variants = editableData.variants.map(variant => {
+          const reserved = create ? 0 : Number(previousBySkuForHolds.get(String(variant.sku || '').trim().toLowerCase())?.reserved ?? 0);
+          const onHand = Number(variant.stock ?? variant.quantity ?? 0);
+          if (!Number.isSafeInteger(reserved) || !Number.isSafeInteger(onHand) || onHand < reserved)
+            throw Object.assign(new Error('Cannot set stock below reserved checkout quantity.'), { statusCode: 409 });
+          return { ...variant, reserved };
+        });
+        editableData.reserved = editableData.variants.reduce((sum, variant) => sum + variant.reserved, 0);
+        editableData.sizes = [...new Set(editableData.variants.filter(variant => Number(variant.stock ?? variant.quantity ?? 0) > variant.reserved)
+          .map(variant => variant.size).filter(Boolean))];
+      } else {
+        const reserved = create ? 0 : Number(oldData.reserved ?? 0);
+        const onHand = Number(editableData.stock ?? editableData.quantity ?? oldData.stock ?? 0);
+        if (!Number.isSafeInteger(reserved) || !Number.isSafeInteger(onHand) || onHand < reserved)
+          throw Object.assign(new Error('Cannot set stock below reserved checkout quantity.'), { statusCode: 409 });
+        editableData.reserved = reserved;
+      }
       const identity = existingProduct.exists ? {
         webProductId: oldData.webProductId || productId,
         integrationOrigin: oldData.integrationOrigin || 'website',
@@ -969,7 +1014,7 @@ app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth,
         const updatedVariants = existingVariants.map((variant, index) => {
           const target = requestedBySku.get(String(variant.sku).trim().toLowerCase());
           const targetStock = Number(target?.stock);
-          if (!Number.isSafeInteger(targetStock) || targetStock < 0) {
+          if (!Number.isSafeInteger(targetStock) || targetStock < Number(variant.reserved ?? 0)) {
             const invalid = new Error(`Variant ${variant.sku} has invalid stock.`);
             invalid.statusCode = 422;
             throw invalid;
@@ -1007,11 +1052,13 @@ app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth,
           quantity: calculatedTotal,
           inStock: calculatedTotal > 0,
           active: calculatedTotal > 0 ? true : product.active,
-          sizes: [...new Set(updatedVariants.filter(variant => variant.stock > 0).map(variant => variant.size).filter(Boolean))],
+          ...(calculatedTotal > 0 ? { isDeleted: false, deletedAt: FieldValue.delete() } : {}),
+          sizes: [...new Set(updatedVariants.filter(variant => variant.stock > Number(variant.reserved ?? 0)).map(variant => variant.size).filter(Boolean))],
           updatedAt: FieldValue.serverTimestamp()
         });
       } else {
         const previousStock = Number(product.stock ?? product.quantity ?? 0);
+        if (requestedTotal < Number(product.reserved ?? 0)) throw Object.assign(new Error('Cannot set stock below reserved checkout quantity.'), { statusCode: 409 });
         const delta = requestedTotal - previousStock;
         if (delta !== 0) {
           const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|product`).digest('hex')}`;
@@ -1030,7 +1077,14 @@ app.post(['/api/admin/inventory/set', '/admin/inventory/set'], requireAdminAuth,
             createdAt: FieldValue.serverTimestamp()
           });
         }
-        transaction.update(productRef, { stock: requestedTotal, quantity: requestedTotal, inStock: requestedTotal > 0, active: requestedTotal > 0 ? true : product.active, updatedAt: FieldValue.serverTimestamp() });
+        transaction.update(productRef, {
+          stock: requestedTotal,
+          quantity: requestedTotal,
+          inStock: requestedTotal > 0,
+          active: requestedTotal > 0 ? true : product.active,
+          ...(requestedTotal > 0 ? { isDeleted: false, deletedAt: FieldValue.delete() } : {}),
+          updatedAt: FieldValue.serverTimestamp()
+        });
       }
     });
     productCatalogCache = { products: null, expiresAt: 0 };
@@ -1377,29 +1431,75 @@ app.get(['/api/imagekit/auth', '/imagekit/auth'], requireAdminAuth, (req, res) =
   }
 });
 
+// Check every live website reference before removing a file from ImageKit.
+async function deleteUnusedImageKitFile(db, fileId) {
+  if (!/^[a-f0-9]{24}$/i.test(String(fileId))) throw new Error('Invalid ImageKit file ID.');
+  const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
+  if (!privateKey) throw new Error('ImageKit is not configured.');
+  const headers = { Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}` };
+  const details = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}/details`, { headers });
+  if (details.status === 404) return { fileId, status: 'already_deleted' };
+  if (!details.ok) throw new Error(`ImageKit file lookup failed (${details.status}).`);
+  const file = await details.json();
+  const url = String(file.url || '').split('?')[0];
+  if (!url) throw new Error('ImageKit file URL is unavailable.');
+  const [products, settings] = await Promise.all([db.collection('products').get(), db.collection('settings').get()]);
+  const references = [
+    ...products.docs.filter(doc => doc.data().active !== false && doc.data().isDeleted !== true).map(doc => doc.data()),
+    ...settings.docs.map(doc => doc.data())
+  ];
+  if (references.some(data => JSON.stringify(data).includes(fileId) || JSON.stringify(data).includes(url))) {
+    return { fileId, status: 'in_use' };
+  }
+  const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, { method: 'DELETE', headers });
+  if (response.status === 404) return { fileId, status: 'already_deleted' };
+  if (!response.ok) throw new Error(`ImageKit deletion failed (${response.status}).`);
+  return { fileId, status: 'deleted' };
+}
+
+app.post(['/api/admin/products/:productId/delete', '/admin/products/:productId/delete'], requireAdminAuth, async (req, res) => {
+  try {
+    const db = getTrustedFirestore();
+    const ref = db.collection('products').doc(String(req.params.productId));
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ error: 'Product not found.' });
+    const productImages = Array.isArray(snapshot.data().images) ? snapshot.data().images : [];
+    const imageIds = new Set(productImages.map(image => image?.publicId || image?.fileId).filter(Boolean));
+    const imageUrls = new Set([snapshot.data().image, snapshot.data().thumbnailUrl,
+      ...productImages.map(image => typeof image === 'string' ? image : image?.url)]
+      .filter(url => typeof url === 'string' && url.includes('ik.imagekit.io'))
+      .map(url => url.split('?')[0]));
+    if (imageUrls.size && process.env.IMAGEKIT_PRIVATE_KEY) {
+      const headers = { Authorization: `Basic ${Buffer.from(`${process.env.IMAGEKIT_PRIVATE_KEY.trim()}:`).toString('base64')}` };
+      for (let skip = 0; skip < 10000; skip += 100) {
+        const response = await fetch(`https://api.imagekit.io/v1/files?skip=${skip}&limit=100`, { headers });
+        if (!response.ok) throw new Error(`ImageKit listing failed (${response.status}).`);
+        const page = await response.json();
+        page.filter(file => imageUrls.has(String(file.url || '').split('?')[0])).forEach(file => imageIds.add(file.fileId));
+        if (page.length < 100) break;
+      }
+    }
+    await ref.update({ active: false, isDeleted: true, deletedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    productCatalogCache = { products: null, expiresAt: 0 };
+    const imageCleanup = await Promise.all([...imageIds].map(async fileId => {
+      try { return await deleteUnusedImageKitFile(db, fileId); }
+      catch (error) { return { fileId, status: 'failed', error: error.message }; }
+    }));
+    return res.json({ success: true, imageCleanup });
+  } catch (error) {
+    console.error('Product deletion failed:', error);
+    return res.status(500).json({ error: 'Unable to delete product.' });
+  }
+});
+
 // Admin-Protected Media Management API
 app.delete(['/api/imagekit/delete/:fileId', '/imagekit/delete/:fileId'], requireAdminAuth, async (req, res) => {
   const { fileId } = req.params;
   if (!fileId) return res.status(400).json({ error: "Missing fileId" });
 
   try {
-    const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
-    if (!privateKey) return res.status(503).json({ error: 'ImageKit is not configured.' });
-
-    const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${privateKey}:`).toString('base64')}`
-      }
-    });
-    if (response.status === 404) {
-      return res.json({ success: true, message: 'File already deleted.' });
-    }
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`ImageKit deletion failed (${response.status}): ${body.slice(0, 200)}`);
-    }
-    return res.json({ success: true });
+    const result = await deleteUnusedImageKitFile(getTrustedFirestore(), fileId);
+    return res.json({ success: true, ...result });
   } catch (error) {
     console.error("ImageKit Delete Error:", error);
     res.status(502).json({ error: 'Image deletion failed.' });
@@ -1583,13 +1683,42 @@ async function verifyRazorpayPayment({ razorpay_order_id, razorpay_payment_id, r
   return { orderId: razorpay_order_id, paymentId: razorpay_payment_id };
 }
 
+function currentFinancialYear(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric' }).formatToParts(now);
+  const year = Number(parts.find(part => part.type === 'year')?.value);
+  const month = Number(parts.find(part => part.type === 'month')?.value);
+  const start = month >= 4 ? year : year - 1;
+  return `${start}-${String(start + 1).slice(-2)}`;
+}
+function sharedCustomerKey(phone, email) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  const local = digits.length >= 10 ? digits.slice(-10) : '';
+  if (/^[6-9]\d{9}$/.test(local)) return `phone_${crypto.createHash('sha256').update(local).digest('hex')}`;
+  const canonicalEmail = String(email || '').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(canonicalEmail)
+    ? `email_${crypto.createHash('sha256').update(canonicalEmail).digest('hex')}` : '';
+}
+async function notifyAdminReceipt(orderId, invoiceId) {
+  const target = String(process.env.ERP_ADMIN_RECEIPT_URL || '').trim();
+  const secret = String(process.env.ERP_SYNC_SECRET || '');
+  if (!target || !secret || !invoiceId) return;
+  const body = JSON.stringify({ orderId, invoiceId, eventId: `invoice_${crypto.createHash('sha256').update(orderId).digest('hex')}` });
+  const signature = crypto.createHmac('sha256', secret).update(body).digest('hex');
+  try {
+    const response = await fetch(target, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-erp-signature': signature },
+      body, signal: AbortSignal.timeout(5000) });
+    if (!response.ok) console.warn('Receipt delivery notifier returned a non-success status.');
+  } catch { console.warn('Receipt delivery notifier unavailable; outbox record remains pending.'); }
+}
+
 // Creates an immutable, server-validated order. Firebase Admin bypasses client
 // Firestore rules, so users cannot forge prices or a paid order in the browser.
 app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res) => {
   if (!checkSensitiveRateLimit(req, res, 10)) return;
 
   try {
-    const { items, couponCode, shippingAddress, paymentMethod, payment, checkout_id: checkoutIdInput } = req.body;
+    const { items, couponCode, shippingAddress, paymentMethod, payment, checkout_id: checkoutIdInput,
+      whatsappInvoiceOptIn } = req.body;
     const normalizedPaymentMethod = String(paymentMethod || '').toLowerCase();
     if (!['cod', 'razorpay'].includes(normalizedPaymentMethod)) {
       return res.status(400).json({ error: 'Unsupported payment method.' });
@@ -1606,14 +1735,19 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
     }
 
     const checkoutId = String(checkoutIdInput || '').trim();
-    if (normalizedPaymentMethod === 'cod' && !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(checkoutId)) {
-      return res.status(422).json({ error: 'A stable checkout_id is required for cash-on-delivery retry safety.' });
+    const reservationsEnabled = process.env.ERP_RESERVATIONS_ENABLED === 'enabled';
+    if ((normalizedPaymentMethod === 'cod' || reservationsEnabled) && !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/.test(checkoutId)) {
+      return res.status(422).json({ error: 'A stable checkout_id is required for retry-safe checkout.' });
     }
     const orderId = paymentDetails
       ? `ORD-${paymentDetails.paymentId.replace(/[^A-Za-z0-9_-]/g, '')}`
       : `ORD-COD-${crypto.createHash('sha256').update(`${req.user.uid}|${checkoutId}`).digest('hex').slice(0, 32)}`;
     const db = getTrustedFirestore();
     const orderRef = db.collection('orders').doc(orderId);
+    const autoReceiptEnabled = process.env.ERP_AUTO_RECEIPTS_ENABLED === 'enabled';
+    const financialYear = currentFinancialYear();
+    const receiptCounterRef = db.collection('erp_invoiceSequences').doc(financialYear);
+    const customerKey = sharedCustomerKey(address.phone, address.email);
     const order = {
       userId: req.user.uid,
       userEmail: address.email,
@@ -1629,6 +1763,7 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       paymentMethod: normalizedPaymentMethod === 'cod' ? 'Cash on Delivery' : 'Razorpay Online Payment',
       paymentStatus: normalizedPaymentMethod === 'cod' ? 'Pending (COD)' : 'Paid',
       paymentId: paymentDetails?.paymentId || null,
+      whatsappInvoiceOptIn: whatsappInvoiceOptIn === true,
       razorpayOrderId: paymentDetails?.orderId || null,
       status: 'Processing',
       createdAt: FieldValue.serverTimestamp(),
@@ -1639,7 +1774,7 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
       userId: req.user.uid,
       paymentMethod: normalizedPaymentMethod,
       paymentId: paymentDetails?.paymentId || null,
-      checkoutId: normalizedPaymentMethod === 'cod' ? checkoutId : null,
+      checkoutId: checkoutId || null,
       address,
       items: calculation.items,
       totalAmount: calculation.finalTotal
@@ -1655,6 +1790,14 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
         }
         return { duplicate: true };
       }
+      const reservationRef = reservationsEnabled ? db.collection('erp_reservations').doc(reservationIdFor(req.user.uid, checkoutId)) : null;
+      const reservationSnap = reservationRef ? await transaction.get(reservationRef) : null;
+      const hold = reservationSnap?.data();
+      if (reservationsEnabled && (!hold || hold.userId !== req.user.uid || hold.state !== 'active' ||
+          hold.expiresAt.toMillis() <= Date.now() || hold.fingerprint !== linesFingerprint(calculation.items))) {
+        throw Object.assign(new Error('Checkout reservation expired or changed. Refresh your cart before placing the order.'), { statusCode: 409 });
+      }
+      const receiptCounter = autoReceiptEnabled ? await transaction.get(receiptCounterRef) : null;
 
       const productRefs = new Map();
       for (const item of calculation.items) {
@@ -1678,93 +1821,91 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
         working.set(productId, { ref: productRef, data: snapshot.data() });
       }
 
+      const unusedHeldLines = hold ? [...hold.lines] : [];
       calculation.items.forEach((item, itemIndex) => {
         const productId = String(item.productId || item.id);
         const state = working.get(productId);
         const product = state.data;
         const quantity = Math.max(1, Number.parseInt(item.quantity, 10) || 1);
-        const variants = Array.isArray(product.variants) ? product.variants.map(variant => ({ ...variant })) : [];
-        let sku = product.sku || '';
-        let size = item.size || item.selectedSize || 'One Size';
-        let color = item.color || item.selectedColor || product.primaryColor || 'Standard';
-        let stockAfter;
-
-        if (variants.length > 0) {
-          const wantedSize = String(size).trim().toLowerCase();
-          const wantedColor = String(color).trim().toLowerCase();
-          let variantIndex = variants.findIndex(variant => {
-            const variantSize = String(variant.size || '').trim().toLowerCase();
-            const variantColor = String(variant.color || 'standard').trim().toLowerCase();
-            return variantSize === wantedSize && (variantColor === wantedColor || variantColor === 'standard' || variantColor === 'default');
-          });
-          if (variantIndex < 0) variantIndex = variants.findIndex(variant => String(variant.size || '').trim().toLowerCase() === wantedSize);
-          if (variantIndex < 0) {
-            const mismatch = new Error(`The selected variant for ${product.name || 'an item'} no longer exists.`);
-            mismatch.statusCode = 409;
-            throw mismatch;
-          }
-          const variant = variants[variantIndex];
-          const current = Number.parseInt(variant.stock ?? variant.quantity, 10) || 0;
-          if (current < quantity) {
-            const shortage = new Error(`${product.name || 'An item'} does not have enough stock available.`);
-            shortage.statusCode = 409;
-            throw shortage;
-          }
-          stockAfter = current - quantity;
-          sku = variant.sku || sku;
-          size = variant.size || size;
-          color = variant.color || color;
-          variants[variantIndex] = { ...variant, stock: stockAfter, quantity: stockAfter };
-          const totalStock = variants.reduce((sum, variantItem) => sum + (Number.parseInt(variantItem.stock ?? variantItem.quantity, 10) || 0), 0);
-          state.data = {
-            ...product,
-            variants,
-            stock: totalStock,
-            quantity: totalStock,
-            inStock: totalStock > 0,
-            active: totalStock > 0 ? true : product.active,
-            sizes: [...new Set(variants.filter(variantItem => (Number.parseInt(variantItem.stock ?? variantItem.quantity, 10) || 0) > 0).map(variantItem => variantItem.size))]
-          };
-        } else {
-          const current = Number.parseInt(product.stock ?? product.quantity, 10) || 0;
-          if (current < quantity) {
-            const shortage = new Error(`${product.name || 'An item'} does not have enough stock available.`);
-            shortage.statusCode = 409;
-            throw shortage;
-          }
-          stockAfter = current - quantity;
-          state.data = { ...product, stock: stockAfter, quantity: stockAfter, inStock: stockAfter > 0, active: stockAfter > 0 ? true : product.active };
-        }
+        const heldIndex = hold ? unusedHeldLines.findIndex(line => line.productId === productId && line.quantity === quantity &&
+          line.size === String(item.size || item.selectedSize || '').trim().toLowerCase() &&
+          line.color === String(item.color || item.selectedColor || '').trim().toLowerCase()) : -1;
+        if (hold && heldIndex < 0) throw Object.assign(new Error('Reserved item changed. Refresh checkout.'), { statusCode: 409 });
+        const heldLine = heldIndex >= 0 ? unusedHeldLines.splice(heldIndex, 1)[0] : null;
+        let changed;
+        try { changed = applyStockAction(product, { ...item, ...(heldLine ? { sku: heldLine.sku } : {}) }, hold ? 'finalize' : 'sale'); }
+        catch { throw Object.assign(new Error(`${product.name || 'An item'} does not have enough stock available.`), { statusCode: 409 }); }
+        state.data = changed.product;
 
         const movementId = `web_${crypto.createHash('sha256').update(`${orderId}|${itemIndex}|deduction`).digest('hex')}`;
         transaction.create(db.collection('stockMovements').doc(movementId), {
           movementId,
           productId,
           webProductId: product.webProductId || productId,
-          sku,
-          size,
-          color,
+          sku: changed.sku,
+          size: changed.size,
+          color: changed.color,
           deltaChange: -quantity,
           source: 'website',
           reason: 'online_order',
           orderId,
           externalReference: orderId,
-          stockAfter,
+          stockAfter: changed.stockAfter,
           createdAt: FieldValue.serverTimestamp()
         });
       });
 
+      if (reservationRef) {
+        transaction.update(reservationRef, { state: 'finalized', orderId, finalizedAt: FieldValue.serverTimestamp() });
+        transaction.create(db.collection('erp_reservationEvents').doc(`${reservationRef.id}_finalize`), {
+          reservationId: reservationRef.id, event: 'finalize', orderId, createdAt: FieldValue.serverTimestamp()
+        });
+      }
+
       for (const state of working.values()) {
         transaction.update(state.ref, { ...state.data, updatedAt: FieldValue.serverTimestamp() });
+      }
+      let invoiceId = null;
+      if (autoReceiptEnabled) {
+        const invoiceNumber = Number(receiptCounter?.data()?.lastNumber || 0) + 1;
+        invoiceId = `BOG-${financialYear}-${String(invoiceNumber).padStart(5, '0')}`;
+        transaction.set(receiptCounterRef, { lastNumber: invoiceNumber, updatedAt: FieldValue.serverTimestamp() });
+        transaction.set(db.collection('erp_orderMeta').doc(orderId), {
+          channel: 'Website', invoiceId, customerKey: customerKey || null, createdAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+        transaction.create(db.collection('erp_invoices').doc(invoiceId), {
+          orderId, invoiceNumber, fiscalYear: financialYear, lines: calculation.items,
+          subtotal: calculation.subtotal, discount: calculation.discount + calculation.couponDiscount,
+          total: calculation.finalTotal, customerName: address.fullName, customerPhone: address.phone,
+          customerEmail: address.email, customerKey: customerKey || null,
+          paymentMethod: order.paymentMethod, paymentId: paymentDetails?.paymentId || null,
+          channel: 'Website', kind: 'sales_receipt', whatsappOptIn: whatsappInvoiceOptIn === true,
+          createdAt: FieldValue.serverTimestamp()
+        });
+        transaction.create(db.collection('erp_syncLog').doc(`invoice_${crypto.createHash('sha256').update(orderId).digest('hex')}`), {
+          event: 'invoice_delivery', source: 'website', status: whatsappInvoiceOptIn === true ? 'awaiting_provider' : 'consent_missing',
+          invoiceId, retryCount: 0, createdAt: FieldValue.serverTimestamp()
+        });
+      }
+      if (customerKey) {
+        transaction.set(db.collection('erp_customerProfiles').doc(customerKey), {
+          customerKey, name: address.fullName, phone: address.phone, email: address.email,
+          websiteUserId: req.user.uid, updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+        transaction.create(db.collection('erp_customerLedger').doc(orderId), {
+          customerKey, orderId, invoiceId: invoiceId || null, channel: 'Website',
+          creditDelta: 0, loyaltyDelta: normalizedPaymentMethod === 'razorpay' ? Math.floor(calculation.finalTotal / 100) : 0,
+          createdAt: FieldValue.serverTimestamp()
+        });
       }
       transaction.create(orderRef, {
         ...order,
         requestFingerprint,
-        checkoutId: normalizedPaymentMethod === 'cod' ? checkoutId : null,
+        checkoutId: checkoutId || null,
         inventoryDeducted: true,
         inventoryDeductedAt: FieldValue.serverTimestamp()
       });
-      return { duplicate: false };
+      return { duplicate: false, invoiceId };
     });
 
     if (transactionResult.duplicate) return res.json({ success: true, orderId, duplicate: true });
@@ -1802,8 +1943,12 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
     });
 
     productCatalogCache = { products: null, expiresAt: 0 };
+    if (whatsappInvoiceOptIn === true && transactionResult.invoiceId) {
+      await notifyAdminReceipt(orderId, transactionResult.invoiceId);
+    }
 
-    res.status(201).json({ success: true, orderId, totalAmount: calculation.finalTotal });
+    res.status(201).json({ success: true, orderId, invoiceId: transactionResult.invoiceId,
+      totalAmount: calculation.finalTotal });
   } catch (error) {
     console.error('Secure order creation failed:', error.message);
     res.status(error.statusCode || 400).json({ error: error.message || 'Unable to create order.' });
@@ -3485,7 +3630,7 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
 
         const totalStock = variants.reduce((total, variant) => total + (parseInt(variant.stock ?? variant.quantity, 10) || 0), 0);
         const availableSizes = [...new Set(variants
-          .filter(variant => (parseInt(variant.stock ?? variant.quantity, 10) || 0) > 0)
+          .filter(variant => (parseInt(variant.stock ?? variant.quantity, 10) || 0) - (parseInt(variant.reserved ?? 0, 10) || 0) > 0)
           .map(variant => variant.size)
           .filter(Boolean))];
         transaction.update(ref, {
@@ -3493,7 +3638,7 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
           stock: totalStock,
           quantity: totalStock,
           inStock: totalStock > 0,
-          active: totalStock > 0 ? true : product.active,
+          active: product.active,
           sizes: availableSizes,
           updatedAt: FieldValue.serverTimestamp()
         });
@@ -3523,7 +3668,7 @@ async function cancelOrderAndRestoreStock(db, orderRef, { cancelledBy, cancellat
           stock,
           quantity: stock,
           inStock: stock > 0,
-          active: stock > 0 ? true : product.active,
+          active: product.active,
           updatedAt: FieldValue.serverTimestamp()
         });
       }
@@ -3587,6 +3732,10 @@ app.post(['/api/admin/orders/update-status', '/admin/orders/update-status'], req
 
     if (!orderDoc.exists) {
       return res.status(404).json({ error: `Order #${orderId} not found.` });
+    }
+    const order = orderDoc.data();
+    if (order.createdBy === 'admin-pos' || String(order.channel).toLowerCase() === 'pos' || /^(POS|EX)-/.test(orderId)) {
+      return res.status(409).json({ error: 'Select a website order for delivery updates.' });
     }
 
     if (status === 'Cancelled') {
@@ -3818,10 +3967,14 @@ app.all(['/api/*splat', '/api'], (req, res) => {
 });
 
 // Global Express Error Middleware to guarantee structured JSON errors
-app.use((err, req, res, _next) => {
+app.use((err, req, res, next) => {
   console.error('Unhandled server error:', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'An unexpected server error occurred.'
+  if (res.headersSent) return next(err);
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  res.status(status).json({
+    error: status >= 500 && IS_PRODUCTION
+      ? 'An unexpected server error occurred.'
+      : (err.message || 'An unexpected server error occurred.')
   });
 });
 

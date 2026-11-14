@@ -100,7 +100,8 @@ const BASE_CATEGORIES = [
   'Watches',
   'Belts',
   'Caps',
-  'Sunglasses'
+  'Sunglasses',
+  'Accessories'
 ];
 
 // Prebuilt size guide templates per category
@@ -276,8 +277,9 @@ const buildVariantSku = (productSku, color, size, fallbackProductId = '') => {
   return `${base}-${colorPart}-${sizePart}`;
 };
 
-export default function AdminProductForm() {
-  const { id } = useParams();
+export default function AdminProductForm({ modalProductId, isModal = false, onClose, onSaved } = {}) {
+  const routeParams = useParams();
+  const id = modalProductId !== undefined ? modalProductId : routeParams.id;
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   const { showToast } = useAdminUI();
@@ -298,6 +300,8 @@ export default function AdminProductForm() {
     mrp: '',
     salePrice: '',
     costPrice: '',
+    gstEnabled: false,
+    gstPercent: '5',
     colors: [],
     variants: [],
     offerEnabled: false,
@@ -420,6 +424,8 @@ export default function AdminProductForm() {
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
             costPrice: data.costPrice ?? data.cost_price ?? data.purchase_price ?? '',
+            gstEnabled: data.gstEnabled === true,
+            gstPercent: data.gstPercent ?? '5',
             variants: loadedVariants,
             colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
@@ -1062,7 +1068,10 @@ export default function AdminProductForm() {
     const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && !isNaN(Number(formData.costPrice))
       ? parseFloat(formData.costPrice)
       : null;
-    if (costVal !== null && costVal < 0) return setError("Cost Price cannot be negative.");
+    if (costVal !== null && costVal < 0) return setError("Purchase Rate cannot be negative.");
+    const gstPercent = Number(formData.gstPercent);
+    if (formData.gstEnabled && (!Number.isFinite(gstPercent) || gstPercent <= 0 || gstPercent > 100))
+      return setError('Enter a GST percentage from 0.01 to 100.');
 
     if (existingImages.length === 0 && pendingImages.length === 0) {
       return setError("Please upload at least one valid product image.");
@@ -1092,12 +1101,7 @@ export default function AdminProductForm() {
     try {
       const finalProductId = isEdit ? id : productId;
 
-      // 1. Delete removed images from ImageKit
-      for (const publicId of imagesToDelete) {
-        await deleteProductImage(publicId);
-      }
-
-      // 2. Upload pending images with resilient multi-tier pipeline (ImageKit -> Firebase Storage -> Canvas <60KB)
+      // Upload pending images with resilient multi-tier pipeline (ImageKit -> Firebase Storage -> Canvas <60KB)
       const newlyUploaded = [];
       if (pendingImages.length > 0) {
         for (let i = 0; i < pendingImages.length; i++) {
@@ -1224,6 +1228,8 @@ export default function AdminProductForm() {
         salePrice: finalFrontPrice,
         price: finalFrontPrice,
         costPrice: finalCostPrice,
+        gstEnabled: formData.gstEnabled === true,
+        gstPercent: formData.gstEnabled ? gstPercent : 0,
         cost_price: finalCostPrice,
         purchasePrice: finalCostPrice,
         purchase_price: finalCostPrice,
@@ -1245,6 +1251,8 @@ export default function AdminProductForm() {
       } else {
         result = await createProduct(payload, finalProductId); // Passing explicit ID
       }
+      // Remove old files only after the product no longer references them.
+      for (const fileId of imagesToDelete) await deleteProductImage(fileId);
       invalidateProductCache();
 
       if (saveAndNew) {
@@ -1264,6 +1272,8 @@ export default function AdminProductForm() {
           mrp: '',
           salePrice: '',
           costPrice: '',
+          gstEnabled: false,
+          gstPercent: '5',
           colors: [],
           variants: [],
           offerEnabled: false,
@@ -1281,7 +1291,10 @@ export default function AdminProductForm() {
         setImageColorSuggestion(null);
         setError(null);
         setSubmitting(false);
-        if (isEdit) navigate('/admin/products/new');
+        if (isEdit) {
+          if (isModal && onSaved) onSaved();
+          else navigate('/admin/products/new');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1291,7 +1304,11 @@ export default function AdminProductForm() {
       } else {
         showToast(`Product ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
       }
-      navigate('/admin/products');
+      if (isModal && onSaved) {
+        onSaved();
+      } else {
+        navigate('/admin/products');
+      }
     } catch (err) {
       console.error('Save Error:', err);
       if (err.message && err.code?.includes('storage/unauthorized')) {
@@ -1318,12 +1335,15 @@ export default function AdminProductForm() {
   const calculatedTotalStock = formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
 
   return (
-    <div className="admin-product-form-container">
+    <div className={`admin-product-form-container ${isModal ? 'admin-product-form-container--modal' : ''}`}>
       <div className="admin-form-header-bar">
         <div className="admin-header-title-wrap">
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              else navigate('/admin/products');
+            }}
             className="admin-top-back-link"
             style={{
               background: 'none',
@@ -1390,7 +1410,10 @@ export default function AdminProductForm() {
 
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              else navigate('/admin/products');
+            }}
             className="admin-btn-secondary admin-top-cancel-btn"
             disabled={submitting}
           >
@@ -1701,7 +1724,7 @@ export default function AdminProductForm() {
                 </div>
               </div>
               <div className="admin-form-group price-field cost-field">
-                <label>COST PRICE (Synced to POS)</label>
+                <label>PURCHASE RATE (Synced to POS)</label>
                 <div className="price-input-wrapper">
                   <span>₹</span>
                   <input
@@ -1715,10 +1738,24 @@ export default function AdminProductForm() {
                   />
                 </div>
                 <span style={{ fontSize: '11px', color: '#166534', fontWeight: 600, marginTop: '6px', display: 'block' }}>
-                  Purchase/Mfg cost. Synced to POS system.
+                  Purchase/Mfg rate. Synced to POS system.
                 </span>
               </div>
             </div>
+
+            <div className="admin-form-row" style={{ marginTop: 16, alignItems: 'end' }}>
+              <label className="admin-form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" name="gstEnabled" checked={formData.gstEnabled === true}
+                  onChange={e => setFormData(prev => ({ ...prev, gstEnabled: e.target.checked }))} />
+                Include GST in stock value
+              </label>
+              {formData.gstEnabled && <div className="admin-form-group price-field">
+                <label htmlFor="gstPercent">GST percentage</label>
+                <input id="gstPercent" type="number" min="0.01" max="100" step="0.01"
+                  value={formData.gstPercent} onChange={e => setFormData(prev => ({ ...prev, gstPercent: e.target.value }))} />
+              </div>}
+            </div>
+            <p style={{ fontSize: 12, color: '#64748b' }}>Matches POS stock valuation. GST is not added to retail bills.</p>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
               {currentDiscount > 0 && (
@@ -2180,7 +2217,7 @@ export default function AdminProductForm() {
                         <th>SIZE / VOLUME</th>
                         <th>SKU</th>
                         <th>PRICE (₹)</th>
-                        <th>COST (₹)</th>
+                        <th>PURCHASE RATE (₹)</th>
                         <th>STOCK QUANTITY (LIVE)</th>
                         <th>STATUS</th>
                         <th>ACTIONS</th>
@@ -2246,10 +2283,10 @@ export default function AdminProductForm() {
                                 type="number"
                                 min="0"
                                 step="any"
-                                placeholder={formData.costPrice || "Cost"}
+                                placeholder={formData.costPrice || "Purchase Rate"}
                                 value={v.costPrice !== undefined ? v.costPrice : ''}
                                 onChange={(e) => updateVariantCost(v.id, e.target.value)}
-                                title="Variant cost price synced to POS"
+                                title="Variant purchase rate synced to POS"
                                 style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #bbf7d0', fontWeight: 700, fontSize: '14px', background: '#f0fdf4', color: '#14532d' }}
                               />
                             </div>
@@ -2859,7 +2896,10 @@ export default function AdminProductForm() {
             )}
             <button
               type="button"
-              onClick={() => navigate('/admin/products')}
+              onClick={() => {
+                if (isModal && onClose) onClose();
+                else navigate('/admin/products');
+              }}
               className="admin-btn-secondary"
               style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '14px' }}
               disabled={submitting}

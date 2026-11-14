@@ -478,8 +478,7 @@
 /* ── Catalog rail redesign ─────────────────────────────────────────────── */
 .sbc-section {
   padding: 88px 0 84px;
-  /* Keep the image canvases visually continuous with their section. */
-  background: #f7f5f0;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -489,9 +488,9 @@
 }
 
 .sbc-heading {
-  margin: 0 auto 38px;
-  max-width: 1400px;
-  padding: 0 48px;
+  margin: 0 0 32px;
+  width: 100%;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px));
 }
 
 .sbc-heading-eyebrow {
@@ -519,7 +518,7 @@
   display: flex;
   width: 100%;
   gap: 28px;
-  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px)) 8px;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px)) 12px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scroll-snap-type: x proximity;
@@ -534,15 +533,12 @@
   flex: 0 0 clamp(190px, 17vw, 258px);
   aspect-ratio: 0.78 / 1;
   overflow: visible;
-  background: #f7f5f0;
+  background: transparent !important;
   border: 0;
   border-radius: 0;
   box-shadow: none;
   color: var(--color-charcoal, #111111);
   scroll-snap-align: start;
-  content-visibility: auto;
-  contain-intrinsic-size: 258px 330px;
-  isolation: isolate;
 }
 
 .sbc-card-bg {
@@ -550,7 +546,7 @@
   width: 100%;
   height: calc(100% - 70px);
   object-fit: contain;
-  object-position: center center;
+  object-position: center top;
   padding: 4px 8px;
   /* White JPEG canvases multiply into the matching section colour. */
   mix-blend-mode: multiply !important;
@@ -584,9 +580,9 @@
 }
 
 .sbc-footer {
-  margin: 34px auto 0;
-  max-width: 1400px;
-  padding: 0 48px;
+  margin: 34px 0 0;
+  width: 100%;
+  padding: 0 max(28px, calc((100vw - 1400px) / 2 + 48px));
   text-align: left;
 }
 
@@ -609,7 +605,7 @@
 
 @media (max-width: 768px) {
   .sbc-section { padding: 58px 0 54px; }
-  .sbc-heading { padding: 0 22px; margin-bottom: 28px; }
+  .sbc-heading { padding: 0 16px; margin-bottom: 28px; }
   .sbc-heading-eyebrow { font-size: 14px; }
   .sbc-heading-title { font-size: 34px; }
   .sbc-grid {
@@ -623,5 +619,5 @@
   .sbc-card-bg { height: calc(100% - 48px); padding: 0; }
   .sbc-card-info { padding-top: 8px; }
   .sbc-card-name { font-size: 11px; letter-spacing: -0.4px; }
-  .sbc-footer { padding: 0 22px; margin-top: 24px; }
+  .sbc-footer { padding: 0 16px; margin-top: 24px; }
 }

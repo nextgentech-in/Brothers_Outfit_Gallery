@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getAdminProducts, deactivateProduct, deleteProduct, toggleProductTrending } from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
+import AdminProductForm from './AdminProductForm';
 import './AdminProducts.css';
 
 export default function AdminProducts() {
@@ -11,6 +12,8 @@ export default function AdminProducts() {
   const [filterType, setFilterType] = useState('all'); // 'all' | 'trending' | 'sale' | 'inactive'
   const [togglingId, setTogglingId] = useState(null);
   const [previewImageModal, setPreviewImageModal] = useState(null);
+  const [editModalProductId, setEditModalProductId] = useState(null);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
   const { showToast, showConfirm } = useAdminUI();
 
   const getProductImage = (p) => {
@@ -86,16 +89,17 @@ export default function AdminProducts() {
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm({
-      title: 'Permanently Delete Product',
-      message: 'WARNING: Are you sure you want to PERMANENTLY delete this product? This action cannot be undone.',
-      confirmText: 'Delete Permanently',
+      title: 'Remove Product',
+      message: 'Remove this product from the catalog and delete its unused ImageKit images?',
+      confirmText: 'Remove Product',
       cancelText: 'Cancel',
       isDestructive: true
     });
 
     if (confirmed) {
-      await deleteProduct(id);
-      showToast('Product deleted permanently.', 'success');
+      const result = await deleteProduct(id);
+      const failed = result.imageCleanup?.filter(item => item.status === 'failed').length || 0;
+      showToast(failed ? `Product removed; ${failed} ImageKit image(s) need cleanup.` : 'Product and unused ImageKit images removed.', failed ? 'error' : 'success');
       fetchProducts();
     }
   };
@@ -127,9 +131,13 @@ export default function AdminProducts() {
             Manage catalog, pricing, inventory stock and homepage trending placement.
           </p>
         </div>
-        <Link to="/admin/products/new" className="admin-btn-primary">
+        <button
+          type="button"
+          onClick={() => setIsAddingProduct(true)}
+          className="admin-btn-primary"
+        >
           + ADD PRODUCT
-        </Link>
+        </button>
       </div>
 
       <div className="admin-products-controls" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
@@ -373,7 +381,13 @@ export default function AdminProducts() {
                     {p.active ? <span className="admin-badge admin-badge--active">Active</span> : <span className="admin-badge admin-badge--inactive">Inactive</span>}
                   </td>
                   <td className="admin-table-actions">
-                    <Link to={`/admin/products/${p.id}/edit`} className="admin-action-btn edit">EDIT</Link>
+                    <button
+                      type="button"
+                      onClick={() => setEditModalProductId(p.id)}
+                      className="admin-action-btn edit"
+                    >
+                      EDIT
+                    </button>
                     {p.active ? (
                         <button onClick={() => handleDeactivate(p.id)} className="admin-action-btn deactivate">DEACTIVATE</button>
                     ) : (
@@ -429,6 +443,53 @@ export default function AdminProducts() {
               style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '8px' }}
               onError={(e) => { e.target.src = '/images/hero.png'; }}
             />
+          </div>
+        </div>
+      )}
+      {/* Single-window Edit / Add Product Modal */}
+      {(editModalProductId || isAddingProduct) && (
+        <div
+          className="admin-product-modal-overlay"
+          onClick={() => {
+            setEditModalProductId(null);
+            setIsAddingProduct(false);
+          }}
+        >
+          <div
+            className="admin-product-modal-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="admin-product-modal-topbar">
+              <span className="admin-product-modal-title">
+                {editModalProductId ? 'Edit Product' : 'Add New Product'}
+              </span>
+              <button
+                type="button"
+                className="admin-product-modal-close"
+                onClick={() => {
+                  setEditModalProductId(null);
+                  setIsAddingProduct(false);
+                }}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="admin-product-modal-content">
+              <AdminProductForm
+                modalProductId={editModalProductId}
+                isModal={true}
+                onClose={() => {
+                  setEditModalProductId(null);
+                  setIsAddingProduct(false);
+                }}
+                onSaved={() => {
+                  setEditModalProductId(null);
+                  setIsAddingProduct(false);
+                  fetchProducts();
+                }}
+              />
+            </div>
           </div>
         </div>
       )}

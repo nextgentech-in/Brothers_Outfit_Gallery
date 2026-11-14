@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
 import { invalidateProductCache } from './productService';
@@ -26,10 +26,11 @@ export const deleteProductImage = async (fileId) => {
     const token = await auth.currentUser?.getIdToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
+    const response = await fetch(`${backendUrl}/api/imagekit/delete/${encodeURIComponent(fileId)}`, {
       method: 'DELETE',
       headers
     });
+    if (!response.ok) throw new Error(`ImageKit cleanup failed (${response.status}).`);
   } catch (err) {
     console.error("ImageKit delete error:", err);
   }
@@ -125,6 +126,34 @@ export const invalidateAdminProductsCache = () => {
 };
 
 // Admin fetching all products with instant cache & background sync capability
+/** Live Firestore listener for product and stock changes in admin. */
+export const subscribeAdminProducts = (onUpdate, onError = () => {}) => {
+  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const data = snapshot.docs.map(d => {
+        const item = d.data();
+        return {
+          id: d.id,
+          ...item,
+          ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
+        };
+      }).filter(p => p.isDeleted !== true);
+      adminProductsCache = data;
+      adminProductsCacheTimestamp = Date.now();
+      try {
+        sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+          timestamp: adminProductsCacheTimestamp,
+          data
+        }));
+      } catch {}
+      onUpdate(data);
+    },
+    onError
+  );
+};
+
 export const getAdminProducts = async (forceRefresh = false) => {
   if (!forceRefresh) {
     const cached = getCachedAdminProducts();
@@ -277,15 +306,16 @@ export const toggleProductTrending = async (id, isTrending) => {
 
 // Hard Delete
 export const deleteProduct = async (id) => {
-  const docRef = doc(db, PRODUCTS, id);
-  await updateDoc(docRef, {
-    active: false,
-    isDeleted: true,
-    deletedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/products/${encodeURIComponent(id)}/delete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }
   });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Unable to delete product.');
   invalidateProductCache();
   invalidateAdminProductsCache();
+  return result;
 };
 
 // Simple Stats Method
@@ -314,7 +344,7 @@ export const getAdminStats = async (products) => {
   let totalOrders = 0;
   try {
     const ordersSnap = await getDocs(collection(db, 'orders'));
-    totalOrders = ordersSnap.size;
+    totalOrders = ordersSnap.docs.filter(isWebsiteOrder).length;
   } catch (e) {
     console.log('No orders yet or security rule restriction:', e.message);
   }
@@ -323,11 +353,16 @@ export const getAdminStats = async (products) => {
 }
 
 // ─── ADMIN: ORDERS ────────────────────────────────────────────────────────────
+function isWebsiteOrder(snapshot) {
+  const order = snapshot.data();
+  return order.createdBy !== 'admin-pos' && String(order.channel).toLowerCase() !== 'pos' && !/^(POS|EX)-/.test(snapshot.id);
+}
+
 export const getAdminOrders = async () => {
   try {
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snap.docs.filter(isWebsiteOrder).map(d => ({ id: d.id, ...d.data() }));
   } catch (err) {
     console.error('Error fetching admin orders:', err);
     return [];
@@ -370,6 +405,10 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
 
   // 2. Direct Firestore fallback
   const docRef = doc(db, 'orders', orderId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists() || !isWebsiteOrder(snapshot)) {
+    throw new Error('Select a website order for delivery updates.');
+  }
   const firestorePayload = { status, ...extraPayload, updatedAt: serverTimestamp() };
   if (status === 'Delivered') {
     firestorePayload.shipmentStatus = 'DELIVERED';
@@ -390,6 +429,10 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
 
 export const updateOrderShipment = async (orderId, shipmentData) => {
   const docRef = doc(db, 'orders', orderId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists() || !isWebsiteOrder(snapshot)) {
+    throw new Error('Select a website order for shipment.');
+  }
   await updateDoc(docRef, {
     status: 'Shipped',
     waybill: shipmentData.waybill,

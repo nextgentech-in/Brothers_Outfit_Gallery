@@ -1,5 +1,6 @@
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { getAvailableStock } from '../utils/productUtils.js';
 
 const PRODUCTS = 'products';
 const CATEGORIES = 'categories';
@@ -103,6 +104,11 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
 
   inFlightFetch = (async () => {
     try {
+      // Release timed-out checkout holds before reading the catalog. This is
+      // also the lazy expiry path on hosts without a frequent background job.
+      if (typeof window !== 'undefined') {
+        await fetch('/api/checkout/reservations/sweep', { cache: 'no-store', signal: AbortSignal.timeout(3000) }).catch(() => {});
+      }
       let snapshot;
       try {
         const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));
@@ -130,22 +136,21 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
 
 export const isProductInStock = (product) => {
   if (!product) return false;
-  if (product.active === false || product.inStock === false) return false;
+  if (product.active === false || product.isDeleted === true) return false;
 
   // Check product-level stock or quantity field
-  const totalStock = parseInt(product.stock ?? product.quantity ?? product.qty, 10);
-  if (!isNaN(totalStock) && totalStock <= 0) {
+  const totalStock = getAvailableStock(product);
+  if (totalStock <= 0) {
     return false;
   }
 
   // If product has variants, at least one variant must have stock > 0, and total variant stock must be > 0
   if (Array.isArray(product.variants) && product.variants.length > 0) {
-    const totalVarStock = product.variants.reduce((sum, v) => sum + (parseInt(v.stock ?? v.quantity ?? v.qty, 10) || 0), 0);
+    const totalVarStock = product.variants.reduce((sum, v) => sum + getAvailableStock(v), 0);
     if (totalVarStock <= 0) return false;
 
     const hasVariantInStock = product.variants.some(v => {
-      const vQty = parseInt(v.stock ?? v.quantity ?? v.qty, 10);
-      return !isNaN(vQty) && vQty > 0;
+      return getAvailableStock(v) > 0;
     });
     if (!hasVariantInStock) return false;
   }
@@ -173,7 +178,7 @@ export const searchProducts = async (searchQuery, maxResults = 8) => {
 
 export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12, forceRefresh = false) => {
   const rawList = await fetchAllActiveProducts(forceRefresh);
-  let products = rawList.filter(p => p.active !== false && isProductInStock(p));
+  let products = rawList.filter(p => p.active !== false);
 
   // 1. Filter Category
   if (category && category !== 'All') {
@@ -313,6 +318,17 @@ export const subscribeToProduct = (docId, onUpdate) => {
     console.warn('Could not establish product subscription:', err);
     return () => {};
   }
+};
+
+// Keep an open shop page in sync with stock and catalog writes.
+// A one-time getDocs/cache read cannot observe changes in another process.
+export const subscribeToCatalog = (onUpdate, onError = () => {}) => {
+  const catalogQuery = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));
+  return onSnapshot(catalogQuery, (snapshot) => {
+    const products = snapshot.docs.map(product => ({ id: product.id, ...product.data() }));
+    setCachedProducts(products);
+    onUpdate(products);
+  }, onError);
 };
 
 export const getRelatedProducts = async (categoryOrId, excludeProductId, qty = 4) => {

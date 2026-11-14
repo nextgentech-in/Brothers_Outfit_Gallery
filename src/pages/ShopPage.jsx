@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
-import { getShopProducts, isProductInStock } from '../services/productService';
+import { getShopProducts, subscribeToCatalog } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import { normalizeToStandardColor } from '../data/colorMaster.js';
@@ -139,10 +139,11 @@ export default function ShopPage() {
     }
   };
 
-  // Initial load or restore position + SWR fresh inventory refresh
+  // Listen for POS inventory changes while the shop is open. Keep the cached
+  // initial render, but replace it with live Firebase snapshots as they arrive.
   useEffect(() => {
     if (products.length === 0) {
-      fetchProducts(true);
+      setLoading(true);
     } else {
       // Products already exist in context, restore scroll position smoothly
       const position = scrollPosition || 0;
@@ -152,9 +153,17 @@ export default function ShopPage() {
           behavior: 'instant'
         });
       });
-      // SWR background refresh to ensure newly out-of-stock sizes and products update smoothly
-      fetchProducts(false);
     }
+    return subscribeToCatalog((catalog) => {
+      setProducts(catalog.filter(p => p.active !== false));
+      setHasMore(false);
+      setLoading(false);
+      setLoadingMore(false);
+    }, (error) => {
+      console.error('Live inventory updates unavailable:', error);
+      // Preserve the existing unordered-query fallback when the live query fails.
+      fetchProducts(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -174,7 +183,7 @@ export default function ShopPage() {
 
   // Comprehensive catalog filtering for category, search, price ranges, sizes, colors, and sorting
   const filtered = useMemo(() => {
-    let result = products.filter(p => p.active !== false && isProductInStock(p));
+    let result = products.filter(p => p.active !== false);
 
     // Category Filter
     if (category && category !== 'All') {
@@ -314,15 +323,16 @@ export default function ShopPage() {
     setSubCategory('All');
   };
 
-  const hasActiveFilters = Boolean(
-    search ||
+  const hasFilterTags = Boolean(
+    (search && search.trim()) ||
     category !== 'All' ||
     priceRange !== 0 ||
     (selectedSizes && selectedSizes.length > 0) ||
     (selectedColors && selectedColors.length > 0) ||
-    sortBy !== 'featured' ||
     (subCategory && subCategory !== 'All')
   );
+
+  const hasActiveFilters = hasFilterTags || sortBy !== 'featured';
 
   const handleAddToCart = (productData) => {
     const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
@@ -483,6 +493,57 @@ export default function ShopPage() {
             {filtered.length} {filtered.length === 1 ? 'Product' : 'Products'}{hasActiveFilters ? ' Found' : ''}
           </span>
         </div>
+
+        {/* Active Filter Tags */}
+        {hasFilterTags && (
+          <div className="shop-active-filters" role="region" aria-label="Active filters">
+            <span className="shop-active-filters__label">Active Filters:</span>
+            {search.trim() && (
+              <span className="shop-active-tag">
+                Search: "{search.trim()}"
+                <button type="button" onClick={() => setSearch('')} aria-label="Clear search">✕</button>
+              </span>
+            )}
+            {category !== 'All' && (
+              <span className="shop-active-tag">
+                Category: {category}
+                <button type="button" onClick={() => { setCategory('All'); setSubCategory('All'); }} aria-label="Clear category">✕</button>
+              </span>
+            )}
+            {subCategory && subCategory !== 'All' && (
+              <span className="shop-active-tag">
+                Type: {subCategory}
+                <button type="button" onClick={() => setSubCategory('All')} aria-label="Clear type filter">✕</button>
+              </span>
+            )}
+            {priceRange !== 0 && PRICE_RANGES[priceRange] && (
+              <span className="shop-active-tag">
+                Price: {PRICE_RANGES[priceRange].label}
+                <button type="button" onClick={() => setPriceRange(0)} aria-label="Clear price filter">✕</button>
+              </span>
+            )}
+            {selectedSizes.map(size => (
+              <span key={size} className="shop-active-tag">
+                Size: {size}
+                <button type="button" onClick={() => toggleSize(size)} aria-label={`Remove size ${size}`}>✕</button>
+              </span>
+            ))}
+            {selectedColors.map(color => (
+              <span key={color} className="shop-active-tag">
+                Color: {color}
+                <button type="button" onClick={() => toggleColor(color)} aria-label={`Remove color ${color}`}>✕</button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="shop-active-filters__reset"
+              aria-label="Reset all filters"
+            >
+              Reset All
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -643,46 +704,6 @@ export default function ShopPage() {
           </button>
         )}
       </div>
-
-      {/* Active Filter Tags Bar */}
-      {hasActiveFilters && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '0 24px 16px', maxWidth: '1440px', margin: '0 auto' }}>
-          <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#64748b' }}>
-            Active Filters:
-          </span>
-          {category !== 'All' && (
-            <span style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Category: {category}
-              <button type="button" onClick={() => setCategory('All')} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          )}
-          {priceRange !== 0 && PRICE_RANGES[priceRange] && (
-            <span style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Price: {PRICE_RANGES[priceRange].label}
-              <button type="button" onClick={() => setPriceRange(0)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          )}
-          {selectedSizes.map(size => (
-            <span key={size} style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Size: {size}
-              <button type="button" onClick={() => toggleSize(size)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          ))}
-          {selectedColors.map(color => (
-            <span key={color} style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Color: {color}
-              <button type="button" onClick={() => toggleColor(color)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          ))}
-          <button 
-            type="button" 
-            onClick={clearFilters}
-            style={{ fontSize: '11.5px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '3px 10px', borderRadius: '14px', cursor: 'pointer', fontWeight: '700' }}
-          >
-            Reset All
-          </button>
-        </div>
-      )}
 
       {/* Loading Initial Data */}
       {loading && products.length === 0 ? (

@@ -5,6 +5,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react()],
   server: {
+    watch: {
+      ignored: ['**/.chrome-preview*/**', '**/.edge-preview/**']
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

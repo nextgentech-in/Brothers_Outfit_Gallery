@@ -1,6 +1,32 @@
 # Mr. Munim POS synchronization
 
-This integration is a button-triggered, offline-first synchronization between Mr. Munim and Brothers Outfit Gallery. It is not real time. The website remains vulnerable to an overselling window between POS syncs; operational stock buffers or more frequent syncs are still required.
+> The former Mr. Munim HTTP integration was retired on 13 November 2026. The
+> website returns `410 pos_disconnected` for every `/api/pos/*` request. The
+> separate Brothers Outfit Gallery POS shares the Firestore catalog directly and
+> remains connected. This document records the former Mr. Munim contract only.
+> The website
+> catalog was archived in place so existing order cancellations can still restore
+> stock; historical POS records and Mr. Munim data were not deleted.
+
+Previously, this integration used button-triggered, offline-first synchronization between Mr. Munim and Brothers Outfit Gallery. The details below are retained for historical reference.
+
+The website catalog reset is recorded in `scripts/reset-website-catalog.js`.
+It archived 82 previous product records in place, preserving their IDs for
+processing orders, then created three clearly labeled demo products with zero
+stock. A local recovery snapshot was written outside the Git repository under
+`../.codex/catalog-backups/`. No POS or stock movement records were removed.
+
+After the catalog reset, the website's 16 order documents, 29 customer profile
+documents, 27 customer sign-in accounts, five reviews, and eight order
+notifications were removed at the owner's request. Two admin profiles and their
+sign-in accounts remain. POS and ERP collections were left untouched.
+
+The website product editor now stores `gstEnabled` and `gstPercent`, matching the
+separate POS stock valuation. The website inventory shows the same before-GST,
+GST, and total stock values. Retail bills do not add GST. The separate POS now
+shows explicitly marked `demoOnly` catalog entries, including the three accessory
+samples. They have zero stock and cannot be sold. The ImageKit cleanup script
+retains all images referenced by product records or website settings.
 
 ## Production setup
 
@@ -26,6 +52,37 @@ Firestore has no SQL-style schema migration. The backfill preserves all product/
 Rollback can remove code and routes, but already-consumed products or movements cannot safely be “un-synced.” Preserve movement/event collections and coordinate any data rollback with the POS checkpoint state.
 
 ## Authentication and limits
+
+### Connection and deployment checklist
+
+This website receives POS updates; it does not poll an external POS stock API.
+An API token alone does not establish a connection. Configure the POS software to
+send HTTPS `POST /api/pos/stock-sync` requests to the deployed website, using the
+stock payload below. If the POS instead exposes a stock API for the website to
+call, its URL, authentication contract, stock semantics, pagination and network
+access requirements are needed for a separate fetch integration.
+
+Configure `POS_SYNC_API_TOKEN` securely on the deployed server, together with
+Firebase Admin credentials for the same project used by the storefront. Redeploy
+after changing deployment environment variables. Never put the token in browser
+code, a `VITE_` variable, source control or a query string.
+
+For one staging sale, inspect the HTTP status and JSON response. `updated_count`
+must reflect newly applied events; `duplicate_count` means those event IDs were
+already accepted and were not deducted again. Each sale needs a stable, unique
+`event_id`, reused for retries. Requests missing it return `422`.
+
+Unknown products reject the entire stock batch with `409 unknown_product` and
+`details.rejected_items`; no stock or replay records from that batch are written.
+Fix product mappings before resending. Shared parent SKUs need enough size/colour
+information to select exactly one variant; ambiguous matches return
+`409 ambiguous_variant` rather than changing an arbitrary variant.
+
+Confirm the result using `GET /api/pos/stock-snapshot?sku=<variant-sku>` with the
+same bearer authentication. The shop page subscribes to Firebase catalog updates,
+so accepted stock changes are reflected while the page is open. The existing
+500-product catalog limit still applies. This does not bypass missing Firebase
+permissions, different project configurations or a POS that never sends updates.
 
 Every route requires:
 

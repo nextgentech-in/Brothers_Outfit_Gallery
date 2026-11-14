@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "crons": [
+    { "path": "/api/jobs/release-reservations", "schedule": "0 2 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
