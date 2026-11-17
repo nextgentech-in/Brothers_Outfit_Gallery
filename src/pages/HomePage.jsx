@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import Hero from '../components/Hero';
 import TrendingCarousel from '../components/TrendingCarousel';
@@ -138,55 +138,43 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    const fetchHomeData = async () => {
-      try {
-        setLoading(true);
-        // Dynamically load catalog and config modules so initial bundle doesn't block on Firestore
-        const [
-          { getSaleProducts, getNewArrivals, getShopProducts },
-          { getHomepageConfig }
-        ] = await Promise.all([
-          import('../services/productService'),
-          import('../services/configService')
-        ]);
-
-        // Fetch concurrently
-        const [saleResult, newResult, shopResult, configResult] = await Promise.allSettled([
-          getSaleProducts(4),
-          getNewArrivals(4),
-          getShopProducts('All', 'featured', null, 8),
-          getHomepageConfig()
-        ]);
-
-        const saleRes = saleResult.status === 'fulfilled' ? saleResult.value || [] : [];
-        const newRes = newResult.status === 'fulfilled' ? newResult.value || [] : [];
-        const shopRes = shopResult.status === 'fulfilled' ? shopResult.value : { products: [] };
-        const configRes = configResult.status === 'fulfilled' ? configResult.value : null;
-
-        setSaleProducts(saleRes);
-        setNewArrivals(newRes);
-        if (configRes && Object.keys(configRes).length > 0) {
-          setHomepageConfig(prev => ({ ...prev, ...configRes }));
-        }
-
-        const excludeIds = new Set([...saleRes, ...newRes].map(p => p.id));
-        const availableShopProducts = Array.isArray(shopRes?.products) ? shopRes.products : [];
-        const filteredShop = availableShopProducts.filter(p => !excludeIds.has(p.id)).slice(0, 4);
-        
-        if (filteredShop.length < 4) {
-          const additional = availableShopProducts.filter(p => excludeIds.has(p.id)).slice(0, 4 - filteredShop.length);
-          filteredShop.push(...additional);
-        }
-
-        setShopProducts(filteredShop);
-      } catch (err) {
-        console.error("Error fetching homepage data:", err);
-      } finally {
-        setLoading(false);
-      }
+    let active = true;
+    let unsubscribe;
+    const updateProducts = (sale, arrivals, shop) => {
+      const featuredIds = new Set([...sale, ...arrivals].map(product => product.id));
+      setSaleProducts(sale);
+      setNewArrivals(arrivals);
+      setShopProducts([
+        ...shop.filter(product => !featuredIds.has(product.id)),
+        ...shop.filter(product => featuredIds.has(product.id))
+      ].slice(0, 4));
+      setLoading(false);
     };
 
-    fetchHomeData();
+    import('../services/configService').then(({ getHomepageConfig }) => getHomepageConfig())
+      .then(config => {
+        if (active && config && Object.keys(config).length) setHomepageConfig(previous => ({ ...previous, ...config }));
+      }).catch(error => console.error('Error fetching homepage configuration:', error));
+
+    import('../services/productService').then(async service => {
+      if (!active) return;
+      let receivedSnapshot = false;
+      unsubscribe = service.subscribeToCatalog(catalog => {
+        receivedSnapshot = true;
+        updateProducts(service.selectSaleProducts(catalog), service.selectNewArrivals(catalog),
+          service.selectShopProducts(catalog, 'All', 'featured').products);
+      });
+      const [sale, arrivals, shop] = await Promise.all([
+        service.getSaleProducts(4), service.getNewArrivals(4), service.getShopProducts('All', 'featured')
+      ]);
+      if (active && !receivedSnapshot) updateProducts(sale, arrivals, shop.products);
+    }).catch(error => {
+      if (!active) return;
+      console.error('Error fetching homepage products:', error);
+      setLoading(false);
+    });
+
+    return () => { active = false; unsubscribe?.(); };
   }, []);
 
   return (

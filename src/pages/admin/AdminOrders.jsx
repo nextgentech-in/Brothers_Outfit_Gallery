@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { getAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
+import { getAdminOrders, subscribeToAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
 import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
 import { fetchAllActiveProducts } from '../../services/productService';
 import { useAdminUI } from '../../context/AdminUIContext';
@@ -27,6 +27,7 @@ export default function AdminOrders() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [channelFilter, setChannelFilter] = useState('ALL');
   const [activeTracking, setActiveTracking] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
@@ -86,14 +87,16 @@ export default function AdminOrders() {
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
-    const data = await getAdminOrders();
+    const data = await getAdminOrders({ includePOS: true });
     setOrders(data);
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+  useEffect(() => subscribeToAdminOrders(data => {
+    setOrders(data);
+    setSelectedOrder(previous => previous && (data.find(order => order.id === previous.id) ?? previous));
+    setLoading(false);
+  }, () => { void fetchOrders(); }), [fetchOrders]);
 
   const handleStatusChange = async (orderId, newStatus) => {
     // 1. Optimistic UI update so the change reflects immediately in UI
@@ -245,9 +248,11 @@ export default function AdminOrders() {
     const matchesSearch = o.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           o.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           o.shippingAddress?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.customerPhone?.includes(searchTerm.trim()) ||
                           o.waybill?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || o.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && (channelFilter === 'ALL' || o.channel === channelFilter);
   });
 
   return (
@@ -267,7 +272,7 @@ export default function AdminOrders() {
       <div className="admin-orders-controls">
         <input 
           type="text" 
-          placeholder="Search by Order ID, Email, Name or Waybill..." 
+          placeholder="Search by order, customer, mobile or waybill"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="admin-search-input"
@@ -283,6 +288,10 @@ export default function AdminOrders() {
           <option value="Out for Delivery">Out for Delivery</option>
           <option value="Delivered">Delivered</option>
           <option value="Cancelled">Cancelled</option>
+        </select>
+        <select className="admin-filter-select" aria-label="Sales channel" value={channelFilter}
+          onChange={event => setChannelFilter(event.target.value)}>
+          <option value="ALL">All channels</option><option value="Website">Website</option><option value="POS">In-store POS</option>
         </select>
         <div className="admin-view-toggle">
           <button 
@@ -339,6 +348,7 @@ export default function AdminOrders() {
                       📋
                     </button>
                     <span className="admin-order-card-date">
+                      {o.channel === 'POS' && 'POS · '}
                       {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
                     </span>
                   </div>
@@ -353,12 +363,12 @@ export default function AdminOrders() {
                 {/* Customer Details */}
                 <div className="admin-order-card-customer">
                   <div className="admin-order-customer-name">
-                    👤 {o.shippingAddress?.fullName || 'Guest Customer'}
+                    👤 {o.shippingAddress?.fullName || o.customerName || (o.channel === 'POS' ? 'Walk-in' : 'Guest Customer')}
                   </div>
                   <div className="admin-order-customer-contact">
-                    {o.shippingAddress?.phone && (
-                      <a href={`tel:${o.shippingAddress.phone}`} className="admin-order-customer-link">
-                        📞 {o.shippingAddress.phone}
+                    {(o.shippingAddress?.phone || o.customerPhone) && (
+                      <a href={`tel:${o.shippingAddress?.phone || o.customerPhone}`} className="admin-order-customer-link">
+                        📞 {o.shippingAddress?.phone || o.customerPhone}
                       </a>
                     )}
                     {o.userEmail && (
@@ -418,7 +428,7 @@ export default function AdminOrders() {
                 {/* Order Status Selector */}
                 <div className="admin-order-card-status-row">
                   <label className="admin-order-card-status-label">Order Status:</label>
-                  <select 
+                  {o.channel === 'POS' ? <strong>POS · {o.status}</strong> : <select
                     value={o.status || 'Processing'} 
                     onChange={(e) => handleStatusChange(o.id, e.target.value)}
                     className="admin-status-dropdown"
@@ -431,11 +441,12 @@ export default function AdminOrders() {
                     <option value="Out for Delivery">Out for Delivery</option>
                     <option value="Delivered">Delivered</option>
                     <option value="Cancelled">Cancelled</option>
-                  </select>
+                  </select>}
                 </div>
 
                 {/* Admin Actions */}
                 <div className="admin-order-card-actions">
+                  {o.channel !== 'POS' && <>
                   {/* Option 1: Cancel Order */}
                   {o.status !== 'Cancelled' ? (
                     <button
@@ -478,7 +489,8 @@ export default function AdminOrders() {
                     </button>
                   )}
 
-                  <button 
+                  </>}
+                  <button
                     onClick={() => setSelectedOrder(o)}
                     className="admin-action-btn edit btn-view-order-details"
                   >
@@ -561,10 +573,10 @@ export default function AdminOrders() {
                     </td>
                     <td style={{ maxWidth: '160px' }}>
                       <div style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.shippingAddress?.fullName}>
-                        {o.shippingAddress?.fullName || 'Guest Customer'}
+                        {o.shippingAddress?.fullName || o.customerName || (o.channel === 'POS' ? 'Walk-in' : 'Guest Customer')}
                       </div>
-                      <div style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.userEmail || o.shippingAddress?.phone}>
-                        {o.userEmail || o.shippingAddress?.phone}
+                      <div style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={o.userEmail || o.shippingAddress?.phone || o.customerPhone}>
+                        {o.userEmail || o.shippingAddress?.phone || o.customerPhone}
                       </div>
                     </td>
                     <td>
@@ -618,7 +630,7 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td>
-                      <select 
+                      {o.channel === 'POS' ? <strong>POS · {o.status}</strong> : <select
                         value={o.status || 'Processing'} 
                         onChange={(e) => handleStatusChange(o.id, e.target.value)}
                         className="admin-status-dropdown"
@@ -631,14 +643,15 @@ export default function AdminOrders() {
                         <option value="Out for Delivery">Out for Delivery</option>
                         <option value="Delivered">Delivered</option>
                         <option value="Cancelled">Cancelled</option>
-                      </select>
+                      </select>}
                     </td>
                     <td style={{fontSize: '11.5px', whiteSpace: 'nowrap', color: '#475569'}}>
                       {o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-IN') : (o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-IN') : 'Recent')}
                     </td>
                     <td className="admin-controls-td">
                       <div className="admin-controls-box">
-                        {/* Option 1: Cancel Order */}
+                        {o.channel !== 'POS' && <>
+                  {/* Option 1: Cancel Order */}
                         {o.status !== 'Cancelled' ? (
                           <button
                             onClick={() => openCancelModal(o)}
@@ -680,7 +693,8 @@ export default function AdminOrders() {
                           </button>
                         )}
 
-                        <button 
+                        </>}
+                        <button
                           onClick={() => setSelectedOrder(o)}
                           className="admin-action-btn edit btn-view-order-details"
                         >
@@ -713,7 +727,7 @@ export default function AdminOrders() {
                 <div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>Order Status</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                    <select
+                    {selectedOrder.channel === 'POS' ? <strong>POS · {selectedOrder.status}</strong> : <select
                       value={selectedOrder.status || 'Processing'}
                       onChange={(e) => handleStatusChange(selectedOrder.id, e.target.value)}
                       className="admin-status-dropdown"
@@ -728,7 +742,7 @@ export default function AdminOrders() {
                       <option value="Shipped">Shipped</option>
                       <option value="Delivered">Delivered</option>
                       <option value="Cancelled">Cancelled</option>
-                    </select>
+                    </select>}
                   </div>
                 </div>
 
@@ -750,12 +764,17 @@ export default function AdminOrders() {
               {/* Customer & Delivery Address */}
               <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '14px', borderRadius: '8px' }}>
                 <h4 style={{ margin: '0 0 8px', fontSize: '13px', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Customer & Shipping Address
+                  {selectedOrder.channel === 'POS' ? 'Customer' : 'Customer & Shipping Address'}
                 </h4>
                 <div style={{ fontSize: '13px', color: '#334155', lineHeight: '1.5' }}>
-                  <strong>{selectedOrder.shippingAddress?.fullName}</strong> ({selectedOrder.userEmail})<br />
-                  📞 Phone: <strong>{selectedOrder.shippingAddress?.phone}</strong><br />
-                  📍 {selectedOrder.shippingAddress?.addressLine}, {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.state} - <strong>{selectedOrder.shippingAddress?.pincode}</strong>
+                  <strong>{selectedOrder.shippingAddress?.fullName || selectedOrder.customerName || 'Walk-in'}</strong>
+                  {selectedOrder.userEmail && ` (${selectedOrder.userEmail})`}<br />
+                  {(selectedOrder.shippingAddress?.phone || selectedOrder.customerPhone) && <>
+                    📞 Phone: <strong>{selectedOrder.shippingAddress?.phone || selectedOrder.customerPhone}</strong><br />
+                  </>}
+                  {selectedOrder.shippingAddress && <>
+                    📍 {selectedOrder.shippingAddress.addressLine}, {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} - <strong>{selectedOrder.shippingAddress.pincode}</strong>
+                  </>}
                 </div>
               </div>
 
@@ -807,15 +826,14 @@ export default function AdminOrders() {
                         </td>
                         <td><strong>{item.quantity}</strong></td>
                         <td>₹{item.price}</td>
-                        <td><strong>₹{(item.price || 0) * (item.quantity || 1)}</strong></td>
+                        <td><strong>₹{selectedOrder.channel === 'POS' && item.amount != null ? item.amount : (item.price || 0) * (item.quantity || 1)}</strong></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Delhivery AWB & Pickup Section */}
-              <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              {selectedOrder.channel !== 'POS' && <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <div style={{ fontSize: '11px', color: '#166534', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     DELHIVERY COURIER PICKUP & DISPATCH
@@ -860,6 +878,7 @@ export default function AdminOrders() {
                 </div>
               </div>
 
+              }
               {/* Action Buttons Footer */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
                 <div>
@@ -870,7 +889,7 @@ export default function AdminOrders() {
                       {selectedOrder.cancelledBy && <div style={{ fontSize: '10px', color: '#9b1c1c', marginTop: '2px' }}>Cancelled by: {selectedOrder.cancelledBy}</div>}
                     </div>
                   )}
-                  {selectedOrder.status !== 'Cancelled' && (
+                  {selectedOrder.channel !== 'POS' && selectedOrder.status !== 'Cancelled' && (
                     <button
                       onClick={() => openCancelModal(selectedOrder)}
                       disabled={actionLoadingId === selectedOrder.id}

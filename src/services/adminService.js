@@ -358,11 +358,17 @@ function isWebsiteOrder(snapshot) {
   return order.createdBy !== 'admin-pos' && String(order.channel).toLowerCase() !== 'pos' && !/^(POS|EX)-/.test(snapshot.id);
 }
 
-export const getAdminOrders = async () => {
+const adminOrdersQuery = () => query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+const adminOrderRows = (snapshot, includePOS) => snapshot.docs
+  .filter(order => includePOS || isWebsiteOrder(order))
+  .map(order => ({ ...order.data(), id: order.id, channel: isWebsiteOrder(order) ? 'Website' : 'POS' }));
+
+export const subscribeToAdminOrders = (onUpdate, onError) =>
+  onSnapshot(adminOrdersQuery(), snapshot => onUpdate(adminOrderRows(snapshot, true)), onError);
+
+export const getAdminOrders = async ({ includePOS = false } = {}) => {
   try {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-    const snap = await getDocs(q);
-    return snap.docs.filter(isWebsiteOrder).map(d => ({ id: d.id, ...d.data() }));
+    return adminOrderRows(await getDocs(adminOrdersQuery()), includePOS);
   } catch (err) {
     console.error('Error fetching admin orders:', err);
     return [];

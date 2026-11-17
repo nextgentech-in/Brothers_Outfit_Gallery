@@ -176,8 +176,7 @@ export const searchProducts = async (searchQuery, maxResults = 8) => {
   return matched.slice(0, maxResults);
 };
 
-export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12, forceRefresh = false) => {
-  const rawList = await fetchAllActiveProducts(forceRefresh);
+export const selectShopProducts = (rawList, category = 'All', sortBy = 'newest') => {
   let products = rawList.filter(p => p.active !== false);
 
   // 1. Filter Category
@@ -218,9 +217,11 @@ export const getShopProducts = async (category = 'All', sortBy = 'newest', _last
   };
 };
 
-export const getNewArrivals = async (qty = 4, forceRefresh = false) => {
-  const rawList = await fetchAllActiveProducts(forceRefresh);
-  let products = rawList.filter(p => p.active !== false && isProductInStock(p));
+export const getShopProducts = async (category = 'All', sortBy = 'newest', _lastDocSnap = null, _pageSize = 12, forceRefresh = false) =>
+  selectShopProducts(await fetchAllActiveProducts(forceRefresh), category, sortBy);
+
+export const selectNewArrivals = (rawList, qty = 4) => {
+  const products = rawList.filter(p => p.active !== false && isProductInStock(p));
 
   const tenDaysAgo = new Date();
   tenDaysAgo.setDate(tenDaysAgo.getDate() - 15);
@@ -238,8 +239,10 @@ export const getNewArrivals = async (qty = 4, forceRefresh = false) => {
   return list.slice(0, qty);
 };
 
-export const getSaleProducts = async (qty = 4) => {
-  const rawList = await fetchAllActiveProducts();
+export const getNewArrivals = async (qty = 4, forceRefresh = false) =>
+  selectNewArrivals(await fetchAllActiveProducts(forceRefresh), qty);
+
+export const selectSaleProducts = (rawList, qty = 4) => {
   const now = new Date();
 
   // Filter locally
@@ -257,6 +260,9 @@ export const getSaleProducts = async (qty = 4) => {
 
   return saleList.slice(0, qty);
 };
+
+export const getSaleProducts = async (qty = 4) =>
+  selectSaleProducts(await fetchAllActiveProducts(), qty);
 
 export const getTrendingProducts = async (qty = 12) => {
   const rawList = await fetchAllActiveProducts();
