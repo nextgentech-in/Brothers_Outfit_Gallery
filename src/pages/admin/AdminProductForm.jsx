@@ -384,6 +384,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         if (data) {
           let loadedVariants = (data.variants || []).map((v) => ({
             ...v,
+            costPrice: v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? '',
             isDefaultPrice: v.isDefaultPrice !== undefined ? !!v.isDefaultPrice : false
           }));
 
@@ -423,7 +424,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
-            costPrice: data.costPrice ?? data.cost_price ?? data.purchase_price ?? '',
+            costPrice: data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price ?? '',
             gstEnabled: data.gstEnabled === true,
             gstPercent: data.gstPercent ?? '5',
             variants: loadedVariants,
