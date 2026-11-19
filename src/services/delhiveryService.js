@@ -1,6 +1,25 @@
 import { getBackendUrl } from '../utils/apiConfig';
 import { auth } from '../firebase/firebaseConfig';
 
+/** Retrieve the courier's original PDF for the order's saved AWB. */
+export async function downloadDelhiveryLabel(orderId) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Sign in as an admin to download courier labels.');
+  const response = await fetch(`${getBackendUrl()}/api/delhivery/orders/${encodeURIComponent(orderId)}/label`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store'
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'The courier label could not load. Please try again.');
+  }
+  if (!response.headers.get('content-type')?.includes('application/pdf')) throw new Error('The courier did not return a PDF label.');
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url; link.download = `delhivery-${String(orderId).replace(/[^\w.:-]/g, '-')}.pdf`;
+  document.body.append(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /**
  * Check Delhivery PIN code serviceability
  * @param {string} pincode 

@@ -24,6 +24,7 @@ import {
   DEFAULT_EXCHANGE_WINDOW_DAYS
 } from './src/utils/exchangeConstants.js';
 import { registerReservationRoutes } from './src/server/reservationRoutes.js';
+import { registerDelhiveryLabelRoutes } from './src/server/delhiveryLabels.js';
 import { applyStockAction, linesFingerprint, reservationIdFor } from './src/server/stockReservation.js';
 
 // Basic .env parsing for local dev without requiring dotenv package
@@ -2576,6 +2577,8 @@ app.post(['/api/delhivery/pincode/lookup-by-place', '/delhivery/pincode/lookup-b
   }
 });
 
+
+registerDelhiveryLabelRoutes(app, { getDb: getTrustedFirestore, requireAdminAuth });
 
 // ─── Delhivery One: Create Order Shipment (Generate AWB) ──────────────────
 app.post(['/api/delhivery/create-shipment', '/delhivery/create-shipment'], requireAdminAuth, async (req, res) => {

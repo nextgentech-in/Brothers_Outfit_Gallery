@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { getAdminOrders, subscribeToAdminOrders, updateOrderStatus, updateOrderShipment } from '../../services/adminService';
-import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment } from '../../services/delhiveryService';
+import { createDelhiveryShipment, trackDelhiveryShipment, cancelDelhiveryShipment, downloadDelhiveryLabel } from '../../services/delhiveryService';
 import { fetchAllActiveProducts } from '../../services/productService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminOrders.css';
@@ -24,6 +24,16 @@ export default function AdminOrders() {
   const [previewImageModal, setPreviewImageModal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [shippingOrderId, setShippingOrderId] = useState(null);
+  const [labelOrderId, setLabelOrderId] = useState(null);
+  async function handleDownloadLabel(order) {
+    if (labelOrderId) return;
+    setLabelOrderId(order.id);
+    try {
+      await downloadDelhiveryLabel(order.id);
+      showToast('Courier label downloaded. Open the PDF and print on 4 × 6 inch paper at actual size.', 'success', 6500);
+    } catch (error) { showToast(error.message || 'Courier label download failed.', 'error', 6500); }
+    finally { setLabelOrderId(null); }
+  }
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -478,6 +488,9 @@ export default function AdminOrders() {
                       >
                         Track Courier ↗
                       </button>
+                      <button type="button" className="btn-print-courier-label" onClick={() => void handleDownloadLabel(o)} disabled={Boolean(labelOrderId)}>
+                        {labelOrderId === o.id ? 'Getting label…' : 'Download label / print'}
+                      </button>
                     </div>
                   ) : (
                     <button
@@ -682,6 +695,9 @@ export default function AdminOrders() {
                             >
                               Track Courier ↗
                             </button>
+                            <button type="button" className="btn-print-courier-label" onClick={() => void handleDownloadLabel(o)} disabled={Boolean(labelOrderId)}>
+                              {labelOrderId === o.id ? 'Getting label…' : 'Download label / print'}
+                            </button>
                           </div>
                         ) : (
                           <button
@@ -859,6 +875,7 @@ export default function AdminOrders() {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {selectedOrder.waybill && selectedOrder.status !== 'Cancelled' && <button type="button" className="btn-print-courier-label" onClick={() => void handleDownloadLabel(selectedOrder)} disabled={Boolean(labelOrderId)}>{labelOrderId === selectedOrder.id ? 'Getting label…' : 'Download label / print'}</button>}
                   {selectedOrder.waybill ? (
                     <button
                       onClick={() => handleOpenTracking(selectedOrder.waybill)}
