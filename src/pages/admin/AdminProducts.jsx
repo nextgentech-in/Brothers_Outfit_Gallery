@@ -326,6 +326,7 @@ export default function AdminProducts() {
                             <span>ID: #{p.id ? (p.id.length > 10 ? `${p.id.slice(0, 8)}…` : p.id) : 'N/A'}</span>
                             <span style={{ fontSize: '10px', opacity: 0.7 }}>📋</span>
                           </span>
+                          <span className="admin-table-sku" style={{ fontSize: '11px', color: '#64748b' }}>Barcode: {p.barcode || '—'}</span>
                           {p.sku ? (
                             <span className="admin-table-sku" style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
                               SKU: {p.sku}

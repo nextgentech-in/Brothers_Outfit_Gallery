@@ -421,6 +421,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             ...data,
             categoryId: prodCat,
             subCategory: data.subCategory || '',
+            productNumber: data.productNumber, barcode: data.barcode || '',
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
@@ -1059,7 +1060,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
   const handleSave = async (saveAndNew = false) => {
     // Validations
     if (!formData.name) return setError("Name is required.");
-    const productSku = String(formData.sku || '').trim();
+    const productSku = isEdit ? String(formData.sku || '').trim() : 'AUTO';
     if (!productSku) return setError("Product SKU is required. Enter a unique SKU such as SHT-BLK-001.");
     const mrp = parseFloat(formData.mrp);
     const sale = parseFloat(formData.salePrice);
@@ -1502,14 +1503,15 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                   name="sku"
                   value={formData.sku}
                   onChange={handleChange}
-                  placeholder="e.g. SHT-BLK-001"
-                  readOnly={isEdit}
-                  title={isEdit ? 'SKU identity cannot be changed after product creation.' : 'Use a unique SKU; variant SKUs are generated from it.'}
+                  placeholder="Assigned automatically when saved"
+                  readOnly
+                  title={isEdit ? 'SKU identity cannot be changed after product creation.' : 'Sequential SKU and barcodes are assigned when saved.'}
                 />
                 <small style={{ color: '#64748b' }}>
-                  {isEdit ? 'SKU is locked after publishing.' : 'Must be unique. Variant SKUs update automatically.'}
+                  {isEdit ? 'SKU is locked after publishing.' : 'Auto sequence: BOG-000001. Assigned safely when saved.'}
                 </small>
               </div>
+              <div className="admin-form-group"><label>Barcode number</label><input readOnly value={formData.barcode || ''} placeholder="Assigned automatically when saved" /></div>
               <div className="admin-form-group">
                 <label>Slug (URL Friendly)</label>
                 <input type="text" name="slug" value={formData.slug} onChange={handleChange} />
@@ -2263,7 +2265,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                               {v.size}
                             </span>
                           </td>
-                          <td style={{ fontSize: '12px', color: '#64748b' }}>{v.sku}</td>
+                          <td style={{ fontSize: '12px', color: '#64748b' }}>{isEdit ? v.sku : 'Assigned on save'}<small style={{ display: 'block' }}>Barcode: {v.barcode || 'Assigned on save'}</small></td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>₹</span>
