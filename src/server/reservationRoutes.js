@@ -114,20 +114,21 @@ export function registerReservationRoutes(app, { getDb, requireAuth, calculateTo
     } catch (error) { res.status(error.status || 503).json({ error: error.status ? error.message : 'Reservation release unavailable.' }); }
   });
 
-  app.get('/api/jobs/release-reservations', async (req, res) => {
-    const secret = String(process.env.CRON_SECRET || '');
-    const supplied = String(req.get('authorization') || '').replace(/^Bearer /, '');
-    if (!secret || secret.length !== supplied.length || !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(supplied)))
+  function authorizeCron(req, res, next) {
+    const secret = Buffer.from(process.env.CRON_SECRET || '');
+    const header = req.get('authorization') || '';
+    const supplied = Buffer.from(header.startsWith('Bearer ') ? header.slice(7) : '');
+    if (!secret.length || secret.length !== supplied.length || !crypto.timingSafeEqual(secret, supplied)) {
       return res.status(401).json({ error: 'Unauthorized.' });
+    }
+    next();
+  }
+  app.get('/api/jobs/release-reservations', authorizeCron, async (req, res) => {
     try {
       res.json(await sweep());
     } catch { res.status(503).json({ error: 'Expiry worker unavailable.' }); }
   });
-  app.get('/api/jobs/drain-reservations', async (req, res) => {
-    const secret = String(process.env.CRON_SECRET || '');
-    const supplied = String(req.get('authorization') || '').replace(/^Bearer /, '');
-    if (!secret || secret.length !== supplied.length || !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(supplied)))
-      return res.status(401).json({ error: 'Unauthorized.' });
+  app.get('/api/jobs/drain-reservations', authorizeCron, async (req, res) => {
     if (enabled()) return res.status(409).json({ error: 'Disable ERP_RESERVATIONS_ENABLED before draining holds.' });
     try {
       const db = getDb();

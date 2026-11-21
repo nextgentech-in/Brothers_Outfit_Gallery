@@ -156,18 +156,18 @@ export default function HomePage() {
         if (active && config && Object.keys(config).length) setHomepageConfig(previous => ({ ...previous, ...config }));
       }).catch(error => console.error('Error fetching homepage configuration:', error));
 
-    import('../services/productService').then(async service => {
+    import('../services/productService').then(service => {
       if (!active) return;
-      let receivedSnapshot = false;
-      unsubscribe = service.subscribeToCatalog(catalog => {
-        receivedSnapshot = true;
-        updateProducts(service.selectSaleProducts(catalog), service.selectNewArrivals(catalog),
+      const showCatalog = catalog => {
+        if (active) updateProducts(service.selectSaleProducts(catalog), service.selectNewArrivals(catalog),
           service.selectShopProducts(catalog, 'All', 'featured').products);
+      };
+      const cached = service.getCachedProducts();
+      if (cached) showCatalog(cached);
+      void service.refreshExpiredReservations();
+      unsubscribe = service.subscribeToCatalog(showCatalog, () => {
+        void service.fetchAllActiveProducts().then(showCatalog);
       });
-      const [sale, arrivals, shop] = await Promise.all([
-        service.getSaleProducts(4), service.getNewArrivals(4), service.getShopProducts('All', 'featured')
-      ]);
-      if (active && !receivedSnapshot) updateProducts(sale, arrivals, shop.products);
     }).catch(error => {
       if (!active) return;
       console.error('Error fetching homepage products:', error);

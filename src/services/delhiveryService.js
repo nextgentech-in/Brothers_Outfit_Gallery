@@ -128,7 +128,7 @@ export const trackDelhiveryShipment = async (waybill) => {
     console.error('Delhivery track error:', error);
     return {
       waybill,
-      status: 'In Transit',
+      status: 'Tracking unavailable',
       courier: 'Delhivery Express',
       trackingUrl: `https://www.delhivery.com/track/package/${waybill}`,
     };

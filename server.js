@@ -64,7 +64,7 @@ app.disable('x-powered-by');
 // 2. Comprehensive Security Headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -107,7 +107,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-request', 'x-forwarded-for'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 86400
 }));
 
@@ -207,8 +207,13 @@ function sanitizeValue(val) {
 
 // Media uploads go directly to ImageKit/Firebase, so API JSON never needs to be
 // huge. A tight limit reduces memory-exhaustion and slow-body abuse.
-// POS product payloads may include base64 images, so /api/pos/ gets a higher limit.
-app.use('/api/pos', express.json({ limit: '10mb' }));
+// The external POS connection has been retired. Keep all POS traffic closed so
+// old clients cannot reimport products or alter website stock after catalog reset.
+app.use('/api/pos', (_req, res) => res.status(410).json({
+  success: false,
+  code: 'pos_disconnected',
+  error: 'The POS connection is disabled.'
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 100 }));
 
@@ -695,11 +700,6 @@ async function requireAdminAuth(req, res, next) {
     }
   }
 
-  if (!IS_PRODUCTION && req.headers['x-admin-request'] === 'true') {
-    req.isAdmin = true;
-    return next();
-  }
-
   return res.status(401).json({
     error: 'Unauthorized: Admin authentication is required.'
   });
@@ -737,13 +737,6 @@ app.get(['/api/auth/admin-status', '/auth/admin-status'], requireAuth, (req, res
   res.json({ isAdmin: Boolean(req.isAdmin) });
 });
 
-// The external POS connection has been retired. Keep all POS traffic closed so
-// old clients cannot reimport products or alter website stock after catalog reset.
-app.use('/api/pos', (_req, res) => res.status(410).json({
-  success: false,
-  code: 'pos_disconnected',
-  error: 'The POS connection is disabled.'
-}));
 registerReservationRoutes(app, {
   getDb: getTrustedFirestore, requireAuth,
   calculateTotal: calculateServerOrderTotal, rateLimit: checkSensitiveRateLimit
@@ -2515,31 +2508,16 @@ app.post(['/api/delhivery/cancel-shipment', '/delhivery/cancel-shipment'], requi
 // ─── Delhivery One: Track Shipment ────────────────────────────────────────
 app.get(['/api/delhivery/track/:waybill', '/delhivery/track/:waybill'], async (req, res) => {
   const { waybill } = req.params;
-  if (!waybill) return res.status(400).json({ error: 'Waybill number required.' });
+  if (!/^[A-Za-z0-9-]{5,48}$/.test(waybill)) return res.status(400).json({ error: 'Enter a valid waybill number.' });
+  if (!checkSensitiveRateLimit(req, res, 30)) return;
 
   try {
-    const trackingData = await syncDelhiveryTrackingForWaybill(waybill, { forceRefresh: true });
+    const trackingData = await syncDelhiveryTrackingForWaybill(waybill);
     if (trackingData) {
       return res.json(trackingData);
     }
 
-    // Structured response fallback for generated waybills
-    res.json({
-      waybill,
-      status: 'In Transit',
-      shipmentStatus: INTERNAL_STATUS.IN_TRANSIT,
-      courier: 'Delhivery Express',
-      statusLocation: 'Delhivery Central Logistics Hub',
-      origin: 'Brothers Outfit Warehouse',
-      trackingUrl: `https://www.delhivery.com/track/package/${waybill}`,
-      timelineStep: 3,
-      isDelivered: false,
-      scans: [
-        { time: new Date(Date.now() - 3600000 * 24).toLocaleString(), title: 'Manifested & Picked Up by Delhivery Agent' },
-        { time: new Date(Date.now() - 3600000 * 12).toLocaleString(), title: 'Arrived at Delhivery Regional Processing Facility' },
-        { time: new Date(Date.now() - 3600000 * 2).toLocaleString(), title: 'In Transit to Destination Hub' }
-      ]
-    });
+    return res.status(404).json({ error: 'No tracking information is available for this waybill.' });
   } catch (error) {
     console.error('Delhivery tracking error:', error);
     res.status(500).json({ error: error.message });

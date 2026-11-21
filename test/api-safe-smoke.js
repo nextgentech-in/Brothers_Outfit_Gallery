@@ -24,6 +24,13 @@ const protectedRoutes = [
   ['POST', '/api/notifications/customer/mark-read'],
   ['POST', '/api/orders/cancel'],
   ['POST', '/api/admin/orders/update-status'],
+  ['GET', '/api/delhivery/orders/fake-order/label'],
+  ['GET', '/api/jobs/release-reservations'],
+  ['GET', '/api/jobs/drain-reservations'],
+  ['POST', '/api/checkout/reservations'],
+  ['POST', '/api/checkout/reservations/release']
+];
+const retiredRoutes = [
   ['POST', '/api/pos/products'],
   ['PUT', '/api/pos/products'],
   ['DELETE', '/api/pos/products'],
@@ -42,7 +49,8 @@ const publicValidationRoutes = [
   ['POST', '/api/orders/track', {}],
   ['POST', '/api/delhivery/pincode/check', {}],
   ['POST', '/api/delhivery/pincode/lookup-by-place', {}],
-  ['POST', '/api/delhivery/webhook', {}]
+  ['GET', '/api/delhivery/track/x'],
+  ['GET', '/api/checkout/reservations/capability']
 ];
 
 async function probe(method, path, body) {
@@ -68,6 +76,13 @@ for (const [method, path] of protectedRoutes) {
     passed++;
   } catch (error) { failures.push(`${method} ${path}: ${error.message}`); }
 }
+for (const [method, path] of retiredRoutes) {
+  try {
+    const status = await probe(method, path);
+    if (status !== 410) throw new Error('expected 410, received ' + status);
+    passed++;
+  } catch (error) { failures.push(method + ' ' + path + ': ' + error.message); }
+}
 for (const [method, path, body] of publicValidationRoutes) {
   try {
     const status = await probe(method, path, body);
@@ -81,6 +96,6 @@ try {
   passed++;
 } catch (error) { failures.push(`GET /api/health: ${error.message}`); }
 
-console.log(`API smoke: ${passed}/${protectedRoutes.length + publicValidationRoutes.length + 1} passed`);
+console.log(`API smoke: ${passed}/${protectedRoutes.length + retiredRoutes.length + publicValidationRoutes.length + 1} passed`);
 for (const failure of failures) console.error(`FAIL ${failure}`);
 if (failures.length) process.exitCode = 1;

@@ -12,7 +12,7 @@ let cacheTimestamp = 0;
 let inFlightFetch = null;
 
 // Read from session storage if memory cache is empty
-function getCachedProducts() {
+export function getCachedProducts() {
   const now = Date.now();
   if (memoryCache && (now - cacheTimestamp < CACHE_TTL_MS)) {
     return memoryCache;
@@ -87,6 +87,13 @@ export const invalidateProductCache = () => {
   } catch {}
 };
 
+export async function refreshExpiredReservations() {
+  if (typeof window === 'undefined') return;
+  try {
+    await fetch('/api/checkout/reservations/sweep', { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+  } catch { /* Catalog reads remain available if the expiry service is unavailable. */ }
+}
+
 /**
  * Fetch products from Firestore with single-flight deduplication & caching.
  * Resolves in 0ms when cached, and combines simultaneous queries into 1 network call.
@@ -106,9 +113,7 @@ export const fetchAllActiveProducts = async (forceRefresh = false) => {
     try {
       // Release timed-out checkout holds before reading the catalog. This is
       // also the lazy expiry path on hosts without a frequent background job.
-      if (typeof window !== 'undefined') {
-        await fetch('/api/checkout/reservations/sweep', { cache: 'no-store', signal: AbortSignal.timeout(3000) }).catch(() => {});
-      }
+      await refreshExpiredReservations();
       let snapshot;
       try {
         const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'), limit(500));

@@ -27,7 +27,7 @@ body {
 .hero__image-wrap::after {
   background: linear-gradient(125deg, rgba(255,255,255,.13), transparent 37%, rgba(212,181,133,.12));
 }
-.hero__eyebrow, .hero__btn--primary {
+.hero__eyebrow {
   background: rgba(255,255,255,.13);
   border-color: rgba(255,255,255,.55);
   box-shadow: inset 0 1px rgba(255,255,255,.3), 0 10px 26px rgba(0,0,0,.12);
