@@ -5,7 +5,7 @@ import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../util
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
-import { getAvailableProductSizes } from '../utils/productUtils';
+import { getAvailableProductSizes, getAvailableStock } from '../utils/productUtils';
 import { flyProductToCart } from '../utils/cartFlyAnimation';
 import './SaleProductCard.css';
 
@@ -18,13 +18,13 @@ export default function SaleProductCard({ product, onAddToCart, onOfferExpire, p
   const [addedAnimation, setAddedAnimation] = useState(false);
   const [sizePrompt, setSizePrompt] = useState(false);
   const totalStock = product.variants?.length > 0
-    ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock ?? v.quantity, 10) || 0), 0)
-    : (parseInt(product.stock ?? product.quantity, 10) || 0);
+    ? product.variants.reduce((acc, v) => acc + getAvailableStock(v), 0)
+    : getAvailableStock(product);
 
   // Strictly filter out discontinued and 0-stock sizes
   const availableSizes = getAvailableProductSizes(product);
 
-  const isOutOfStock = totalStock <= 0 || product.inStock === false || product.active === false || (product.variants?.length > 0 && availableSizes.length === 0);
+  const isOutOfStock = totalStock <= 0 || product.active === false || product.isDeleted === true || (product.variants?.length > 0 && availableSizes.length === 0);
   const inWishlist = isInWishlist ? isInWishlist(product.id) : false;
   const hasMultipleSizes = availableSizes.length > 1;
   const needsSizeSelection = hasMultipleSizes && !selectedSize;

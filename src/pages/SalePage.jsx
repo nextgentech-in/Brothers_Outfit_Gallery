@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { getSaleProducts } from '../services/productService';
+import { getSaleProducts, selectSaleProducts, subscribeToCatalog } from '../services/productService';
 import SaleProductCard from '../components/SaleProductCard';
 import SEO from '../components/common/SEO';
 import './SalePage.css';
@@ -40,26 +40,29 @@ export default function SalePage() {
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
 
-  const fetchActiveSales = async () => {
-    try {
-      const activeProducts = await getSaleProducts(12);
-      setSaleProducts(activeProducts);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
-    const init = async () => {
-      setLoading(true);
-      await fetchActiveSales();
-      setLoading(false);
+    let active = true;
+    let catalog;
+    const refreshOffers = async () => {
+      try {
+        if (catalog) setSaleProducts(selectSaleProducts(catalog, 12));
+        else {
+          const products = await getSaleProducts(12);
+          if (active && !catalog) setSaleProducts(products);
+        }
+      } catch (error) {
+        console.error('Error loading sale products:', error);
+      } finally {
+        if (active) setLoading(false);
+      }
     };
-    init();
-    
-    // Optional: Auto-refresh the entire grid every 1 minute to prune any products that naturally expired
-    const interval = setInterval(fetchActiveSales, 60000);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeToCatalog(products => {
+      catalog = products;
+      void refreshOffers();
+    });
+    void refreshOffers();
+    const interval = setInterval(refreshOffers, 60_000);
+    return () => { active = false; unsubscribe(); clearInterval(interval); };
   }, []);
 
   if (loading) {

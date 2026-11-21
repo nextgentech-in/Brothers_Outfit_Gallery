@@ -152,7 +152,7 @@ export default function ProductPage() {
     );
   }
 
-  if (!product || product.active === false || !isProductInStock(product)) {
+  if (!product || product.active === false) {
     return (
       <div className="product-not-found">
         <SEO title="Product Not Available | Brother’s Outfit Gallery" noindex={true} />

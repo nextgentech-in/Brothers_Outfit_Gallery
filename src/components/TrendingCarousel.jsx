@@ -1,11 +1,10 @@
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getOptimizedImageSrcSet, optimizeImage, getCardImageUrl } from '../utils/imageUtils';
 import trendingItems from '../data/trendingData';
 import './TrendingCarousel.css';
 
 export default function TrendingCarousel({ trendingConfig }) {
-  const trackRef = useRef(null);
   const [paused, setPaused] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +86,6 @@ export default function TrendingCarousel({ trendingConfig }) {
       >
         <div
           className={`trending__track ${paused ? 'trending__track--paused' : ''}`}
-          ref={trackRef}
         >
           {loopItems.map((item, index) => (
             <Link

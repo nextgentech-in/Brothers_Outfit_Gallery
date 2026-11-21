@@ -33,15 +33,14 @@ service cloud.firestore {
     }
 
     // Orders: created only by the trusted server (Firebase Admin SDK bypasses these
-    // rules). Browser clients may read their own orders, request cancellation, or link an exchange request.
+    // rules). Browser clients may read their own orders or link an exchange request.
+    // Cancellation uses the trusted server so stock restoration is transactional.
     match /orders/{orderId} {
       allow create: if isAdmin();
       allow read: if isAdmin() || (isAuthenticated() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email));
       allow update: if isAdmin() || (
         isAuthenticated() &&
         resource.data.userId == request.auth.uid && (
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancellationReason', 'cancelledAt', 'updatedAt']) &&
-           request.resource.data.status == 'Cancelled') ||
           (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasExchangeRequest', 'latestExchangeId', 'latestExchangeStatus', 'updatedAt']) &&
            request.resource.data.latestExchangeStatus == 'PENDING_ADMIN_REVIEW')
         )

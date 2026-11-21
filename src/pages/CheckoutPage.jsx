@@ -17,7 +17,38 @@ export default function CheckoutPage() {
   const { cartItems, cartSubtotal, clearCart, appliedCoupon, applyCoupon, removeCoupon } = useCart();
   const { currentUser, userProfile, updateFirestoreProfile } = useAuth();
   const navigate = useNavigate();
-  const [checkoutAttemptId] = useState(() => globalThis.crypto.randomUUID());
+  const [checkoutAttemptId, setCheckoutAttemptId] = useState(() => globalThis.crypto.randomUUID());
+  const checkoutItems = () => cartItems.map(item => ({
+    id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
+    slug: item.slug, name: item.name, size: item.size || item.selectedSize,
+    selectedSize: item.selectedSize || item.size, color: item.color || item.selectedColor,
+    selectedColor: item.selectedColor || item.color, quantity: item.quantity
+  }));
+  const reserveCheckout = async () => {
+    const capability = await fetch(`${getBackendUrl()}/api/checkout/reservations/capability`).then(res => res.json());
+    if (!capability.enabled) return false;
+    let activeUser = currentUser || auth.currentUser;
+    if (!activeUser) {
+      const { signInAnonymously } = await import('firebase/auth');
+      activeUser = (await signInAnonymously(auth)).user;
+    }
+    const response = await fetch(`${getBackendUrl()}/api/checkout/reservations`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await activeUser.getIdToken()}` },
+      body: JSON.stringify({ checkout_id: checkoutAttemptId, items: checkoutItems(), couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'The cart could not be reserved. Refresh it and try again.');
+    return true;
+  };
+  const releaseCheckout = async () => {
+    const activeUser = currentUser || auth.currentUser;
+    if (!activeUser) return;
+    const response = await fetch(`${getBackendUrl()}/api/checkout/reservations/release`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await activeUser.getIdToken()}` },
+      body: JSON.stringify({ checkout_id: checkoutAttemptId })
+    });
+    if (response.ok) setCheckoutAttemptId(globalThis.crypto.randomUUID());
+  };
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -70,6 +101,7 @@ export default function CheckoutPage() {
   );
 
   const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
+  const [whatsappInvoiceOptIn, setWhatsappInvoiceOptIn] = useState(false);
 
   // Pricing math: Free delivery for orders >= ₹1000, else ₹70
   const discount = cartSubtotal >= 2500 ? 250 : 0;
@@ -105,6 +137,7 @@ export default function CheckoutPage() {
       body: JSON.stringify({
         checkout_id: checkoutAttemptId,
         paymentMethod: method,
+        whatsappInvoiceOptIn,
         payment,
         couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null,
         shippingAddress: {
@@ -112,16 +145,7 @@ export default function CheckoutPage() {
           phone: cleanActivePhone,
           email: finalEmail
         },
-        items: cartItems.map(item => ({
-          id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
-          slug: item.slug,
-          name: item.name,
-          size: item.size || item.selectedSize,
-          selectedSize: item.selectedSize || item.size,
-          color: item.color || item.selectedColor,
-          selectedColor: item.selectedColor || item.color,
-          quantity: item.quantity
-        }))
+        items: checkoutItems()
       })
     });
 
@@ -364,6 +388,7 @@ export default function CheckoutPage() {
 
     try {
       const backendUrl = getBackendUrl();
+      await reserveCheckout();
 
       if (paymentMethod === 'cod') {
         // Cash on Delivery flow
@@ -412,16 +437,7 @@ export default function CheckoutPage() {
           'Authorization': `Bearer ${await currentUser.getIdToken()}`
         },
         body: JSON.stringify({
-          items: cartItems.map(item => ({
-            id: item.id || item.productId || (typeof item.cartItemId === 'string' ? item.cartItemId.split('-')[0] : null),
-            slug: item.slug,
-            name: item.name,
-            size: item.size || item.selectedSize,
-            selectedSize: item.selectedSize || item.size,
-            color: item.color || item.selectedColor,
-            selectedColor: item.selectedColor || item.color,
-            quantity: item.quantity
-          })),
+          items: checkoutItems(),
           couponCode: appliedCoupon?.coupon?.code || appliedCoupon?.code || null
         }),
       });
@@ -464,6 +480,7 @@ export default function CheckoutPage() {
         },
         modal: {
           ondismiss: function () {
+            void releaseCheckout().catch(() => {});
             setLoading(false);
           },
         },
@@ -506,6 +523,7 @@ export default function CheckoutPage() {
 
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
+        void releaseCheckout().catch(() => {});
         setError(`Payment Failed: ${response.error.description}`);
         setLoading(false);
       });
@@ -800,6 +818,10 @@ export default function CheckoutPage() {
                 </div>
               </label>
             </div>
+            <label className="checkout-whatsapp-optin">
+              <input type="checkbox" checked={whatsappInvoiceOptIn} onChange={event => setWhatsappInvoiceOptIn(event.target.checked)} />
+              <span>Send my purchase bill to my verified phone on WhatsApp.</span>
+            </label>
           </div>
 
           {/* Right Column: Order Summary */}

@@ -81,9 +81,6 @@ export function AuthProvider({ children }) {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (!isAdmin && data.email && adminEmails.includes(data.email)) {
-          isAdmin = true;
-        }
         setUserProfile({ id: docSnap.id, ...data, isAdmin });
       } else {
         // Auto-create a basic profile for newly authenticated users.

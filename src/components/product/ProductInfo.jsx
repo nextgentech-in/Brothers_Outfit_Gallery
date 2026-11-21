@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
-import { isClothingProduct, getAvailableProductSizes } from '../../utils/productUtils';
+import { isClothingProduct, getAvailableProductSizes, getAvailableStock } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
 import SizeGuideModal from '../common/SizeGuideModal';
 import { flyProductToCart } from '../../utils/cartFlyAnimation';
@@ -141,8 +141,8 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
   }, [product.variants, product.sizes]);
 
   const productTotalStock = useMemo(() => {
-    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0) : (product.stock || 0);
-  }, [product.variants, product.stock]);
+    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + getAvailableStock(v), 0) : getAvailableStock(product);
+  }, [product.variants, product.stock, product.reserved]);
 
   // Available colors that have stock > 0
   const inStockColors = useMemo(() => {
@@ -153,7 +153,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         const vCol = String(v.color || '').trim().toLowerCase();
         return vCol === colName || vCol === 'standard' || vCol === 'default';
       });
-      return colVariants.length === 0 || colVariants.some(v => (parseInt(v.stock, 10) || 0) > 0);
+      return colVariants.length === 0 || colVariants.some(v => getAvailableStock(v) > 0);
     });
   }, [availableColors, product.variants]);
 
@@ -215,8 +215,8 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
   } = product;
 
   // Stock status for selected size or whole product
-  const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock ?? matchedVariant.quantity, 10) : productTotalStock;
-  const isEntirelySoldOut = productTotalStock <= 0 || product.inStock === false || product.active === false || (productSizes.length > 0 && visibleSizes.length === 0);
+  const activeVariantStock = matchedVariant ? getAvailableStock(matchedVariant) : productTotalStock;
+  const isEntirelySoldOut = productTotalStock <= 0 || product.active === false || product.isDeleted === true || (productSizes.length > 0 && visibleSizes.length === 0);
   const outOfStock = isEntirelySoldOut || (selectedSize && activeVariantStock <= 0);
   const stock = selectedSize && matchedVariant ? activeVariantStock : productTotalStock;
 

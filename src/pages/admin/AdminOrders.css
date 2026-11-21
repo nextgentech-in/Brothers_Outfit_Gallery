@@ -821,6 +821,19 @@
   text-align: center;
 }
 
+.btn-print-courier-label {
+  background: #0f172a;
+  color: #fff;
+  border: none;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-order-pickup-scheduled .btn-print-courier-label { width: 100%; margin-top: 4px; }
+.btn-print-courier-label:disabled { opacity: .6; cursor: wait; }
+
 .admin-search-input {
   flex: 1;
   padding: 10px 16px;

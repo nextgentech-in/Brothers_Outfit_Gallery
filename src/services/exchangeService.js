@@ -57,7 +57,6 @@ async function getAuthHeaders() {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  headers['x-admin-request'] = 'true';
   return headers;
 }
 

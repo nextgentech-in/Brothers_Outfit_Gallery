@@ -71,7 +71,7 @@ export const CartProvider = ({ children }) => {
 
         if (!product) {
           isSoldOut = true;
-        } else if (product.active === false || product.inStock === false) {
+        } else if (product.active === false || product.isDeleted === true) {
           isSoldOut = true;
         } else if (Array.isArray(product.variants) && product.variants.length > 0 && item.size) {
           const cleanSize = String(item.size).trim().toLowerCase();
