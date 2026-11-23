@@ -98,8 +98,9 @@ export default function ShopByCategory() {
         // Group by categoryId
         const categoryMap = {};
         activeProducts.forEach(product => {
-          const catKey = product.categoryId || product.category || '';
-          if (!catKey) return;
+          const rawCat = (product.categoryId || product.category || '').trim();
+          if (!rawCat) return;
+          const catKey = rawCat.toLowerCase();
           if (!categoryMap[catKey]) {
             categoryMap[catKey] = [];
           }
@@ -113,7 +114,7 @@ export default function ShopByCategory() {
         // Build category entries with representative image
         const categoryEntries = Array.from(allCategoryNames)
           .map(name => {
-            const products = categoryMap[name] || [];
+            const products = categoryMap[name.toLowerCase()] || [];
             // Prefer the actual product cutout for a catalog-style category rail.
             let imageUrl = CATEGORY_FALLBACK_IMAGES[name] || getProductImageUrl(products[0]) || adminCategoryImages[name] || null;
             if (!imageUrl) {

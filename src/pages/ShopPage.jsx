@@ -9,28 +9,34 @@ import { normalizeToStandardColor } from '../data/colorMaster.js';
 import SEO from '../components/common/SEO';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'Kurta', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Vest', 'Underwear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+const CATEGORIES = ['All', 'KURTA', 'T-SHIRTS', 'SHIRTS', 'JEANS', 'TROUSERS', 'SHORTS', 'JACKETS', 'HOODIES', 'ETHNIC WEAR', 'VEST', 'UNDERWEAR', 'SLIPPERS', 'PERFUMES', 'CAPS', 'SUNGLASSES', 'ACCESSORIES', 'WATCHES', 'WALLETS', 'BELTS'];
 
 const SUB_CATEGORIES = {
-  'Kurta': ['All', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
-  'T-Shirts': ['All', 'Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley', 'Full Sleeve', 'Full Sleeve Collar'],
-  'Shirts': ['All', 'Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
-  'Jeans': ['All', 'Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
-  'Trousers': ['All', 'Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
-  'Shorts': ['All', 'Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
-  'Jackets': ['All', 'Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
-  'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
-  'Ethnic Wear': ['All', 'Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
-  'Vest': ['All', 'Plain', 'Lining', 'Coloring'],
-  'Underwear': ['All', 'Long Trunk', 'Mini Trunk', 'Brief'],
-  'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
-  'Caps': ['All', 'Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
-  'Sunglasses': ['All', 'Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
-  'Accessories': ['All', 'Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
-  'Watches': ['All', 'Analog', 'Digital', 'Smart Watch', 'Chronograph'],
-  'Wallets': ['All', 'Bifold', 'Trifold', 'Card Holder', 'Money Clip'],
-  'Belts': ['All', 'Leather', 'Canvas', 'Reversible', 'Auto-Lock'],
+  'KURTA': ['All', 'LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA'],
+  'T-SHIRTS': ['All', 'OVERSIZED', 'REGULAR FIT', 'SLIM FIT', 'POLO', 'GRAPHIC', 'DROP SHOULDER', 'ACID WASH', 'HENLEY', 'FULL SLEEVE', 'FULL SLEEVE COLLAR'],
+  'SHIRTS': ['All', 'CASUAL', 'FORMAL', 'PRINTED', 'LINEN', 'DENIM', 'OXFORD', 'MANDARIN COLLAR', 'HALF SLEEVE'],
+  'JEANS': ['All', 'SKINNY', 'SLIM FIT', 'REGULAR', 'BAGGY', 'WIDE LEG', 'RIPPED', 'BOOTCUT', 'TAPERED'],
+  'TROUSERS': ['All', 'CARGO', 'CHINO', 'JOGGER', 'FORMAL', 'PLEATED', 'STRAIGHT FIT', 'SLIM FIT'],
+  'SHORTS': ['All', 'CARGO', 'CHINO', 'DENIM', 'SPORTS', 'CASUAL', 'BERMUDA', 'RUNNING'],
+  'JACKETS': ['All', 'BOMBER', 'DENIM', 'PUFFER', 'WINDBREAKER', 'VARSITY', 'LEATHER', 'QUILTED'],
+  'HOODIES': ['All', 'PULLOVER', 'ZIP-UP', 'CROPPED', 'OVERSIZED', 'SLEEVELESS', 'GRAPHIC'],
+  'ETHNIC WEAR': ['All', 'KURTA', 'LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA', 'SHERWANI', 'PATHANI SUIT', 'NEHRU JACKET', 'DHOTI SET'],
+  'VEST': ['All', 'PLAIN', 'LINING', 'COLORING'],
+  'UNDERWEAR': ['All', 'LONG TRUNK', 'MINI TRUNK', 'BRIEF'],
+  'SLIPPERS': ['All', 'SLIDES', 'FLIP FLOPS', 'SPORTS', 'CASUAL', 'PLATFORM', 'MEMORY FOAM'],
+  'PERFUMES': ['All', 'EAU DE PARFUM', 'EAU DE TOILETTE', 'BODY SPRAY', 'APPAREL SPRAY', 'ATTAR', 'AIR FRESHENER', 'ROOM FRESHENER'],
+  'CAPS': ['All', 'BASEBALL CAP', 'SNAPBACK', 'TRUCKER HAT', 'BEANIE', 'BUCKET HAT', 'VISOR', 'DAD HAT'],
+  'SUNGLASSES': ['All', 'AVIATOR', 'WAYFARER', 'ROUND', 'SQUARE', 'POLARIZED', 'CLUBMASTER', 'SPORT', 'HEXAGONAL'],
+  'ACCESSORIES': ['All', 'CAP', 'BELT', 'SUNGLASSES', 'BRACELET', 'RING', 'CHAIN', 'KEYCHAIN'],
+  'WATCHES': ['All', 'ANALOG', 'DIGITAL', 'SMART WATCH', 'CHRONOGRAPH'],
+  'WALLETS': ['All', 'BIFOLD', 'TRIFOLD', 'CARD HOLDER', 'MONEY CLIP'],
+  'BELTS': ['All', 'LEATHER', 'CANVAS', 'REVERSIBLE', 'AUTO-LOCK'],
+};
+
+const getSubCategoriesForCat = (cat) => {
+  if (!cat || cat.toLowerCase() === 'all') return ['All'];
+  const matchKey = Object.keys(SUB_CATEGORIES).find(k => k.toLowerCase() === cat.toLowerCase());
+  return matchKey ? SUB_CATEGORIES[matchKey] : ['All'];
 };
 
 const PRICE_RANGES = [
@@ -291,7 +297,7 @@ export default function ShopPage() {
     products.forEach(p => {
       const c = (p.category || p.categoryId || '').trim();
       if (c && !CATEGORIES.some(base => base.toLowerCase() === c.toLowerCase())) {
-        extra.add(c);
+        extra.add(c.toUpperCase());
       }
     });
     return [...CATEGORIES, ...Array.from(extra)];
@@ -299,12 +305,12 @@ export default function ShopPage() {
 
   const activeSubCategories = useMemo(() => {
     if (category === 'All') return null;
-    const baseSubs = SUB_CATEGORIES[category] || ['All'];
+    const baseSubs = getSubCategoriesForCat(category);
     const extraSubs = new Set(baseSubs);
     products.forEach(p => {
       const pCat = (p.category || p.categoryId || '').trim().toLowerCase();
       if (pCat === category.toLowerCase() && p.subCategory && typeof p.subCategory === 'string') {
-        const sub = p.subCategory.trim();
+        const sub = p.subCategory.trim().toUpperCase();
         if (sub && !Array.from(extraSubs).some(s => s.toLowerCase() === sub.toLowerCase())) {
           extraSubs.add(sub);
         }

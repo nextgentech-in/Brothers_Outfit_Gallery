@@ -23,89 +23,89 @@ import { detectDominantColor } from '../../utils/imageColorDetector.js';
 import { normalizeToStandardColor } from '../../data/colorMaster.js';
 
 const CATEGORY_SIZES_MAP = {
-  'Kurta': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
-  'T-Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
-  'Jeans': ['28', '30', '32', '34', '36', '38', '40', '42'],
-  'Trousers': ['28', '30', '32', '34', '36', '38', '40', '42'],
-  'Shorts': ['28', '30', '32', '34', '36', '38', '40', '42'],
-  'Jackets': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  'Hoodies': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  'Ethnic Wear': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
-  'Vest': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', 'Free Size'],
-  'Underwear': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', '28', '30', '32', '34', '36', '38', '40'],
-  'Perfumes': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
-  'Slippers': ['6', '7', '8', '9', '10', '11', 'Custom'],
-  'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
-  'Watches': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
-  'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
-  'Caps': ['Free Size', 'Adjustable', 'S/M', 'L/XL', 'Snapback', 'Standard'],
-  'Sunglasses': ['Standard', 'Free Size', 'Medium (54mm)', 'Large (58mm)', 'Small (50mm)'],
+  'KURTA': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'SHIRTS': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
+  'T-SHIRTS': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
+  'JEANS': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'TROUSERS': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'SHORTS': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'JACKETS': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'HOODIES': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'ETHNIC WEAR': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
+  'VEST': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', 'Free Size'],
+  'UNDERWEAR': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', '28', '30', '32', '34', '36', '38', '40'],
+  'PERFUMES': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
+  'SLIPPERS': ['6', '7', '8', '9', '10', '11', 'Custom'],
+  'WALLETS': ['Standard', 'Slim', 'Bifold', 'Trifold'],
+  'WATCHES': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
+  'BELTS': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
+  'CAPS': ['Free Size', 'Adjustable', 'S/M', 'L/XL', 'Snapback', 'Standard'],
+  'SUNGLASSES': ['Standard', 'Free Size', 'Medium (54mm)', 'Large (58mm)', 'Small (50mm)'],
   'DEFAULT': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', 'Free Size']
 };
 
 const SUB_CATEGORY_MAP = {
-  'Kurta': ['Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
-  'T-Shirts': ['Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley', 'Full Sleeve', 'Full Sleeve Collar'],
-  'Shirts': ['Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
-  'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered', 'Mom Fit', 'Straight Fit', 'Narrow Fit'],
-  'Trousers': ['Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
-  'Shorts': ['Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
-  'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
-  'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
-  'Ethnic Wear': ['Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
-  'Vest': ['Plain', 'Lining', 'Coloring'],
-  'Underwear': ['Long Trunk', 'Mini Trunk', 'Brief'],
-  'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
-  'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
-  'Watches': ['Analog', 'Digital', 'Smart Watch', 'Chronograph', 'Dress Watch'],
-  'Belts': ['Leather', 'Canvas', 'Reversible', 'Auto-Lock', 'Braided'],
-  'Caps': ['Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
-  'Sunglasses': ['Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
+  'KURTA': ['LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA'],
+  'T-SHIRTS': ['OVERSIZED', 'REGULAR FIT', 'SLIM FIT', 'POLO', 'GRAPHIC', 'DROP SHOULDER', 'ACID WASH', 'HENLEY', 'FULL SLEEVE', 'FULL SLEEVE COLLAR'],
+  'SHIRTS': ['CASUAL', 'FORMAL', 'PRINTED', 'LINEN', 'DENIM', 'OXFORD', 'MANDARIN COLLAR', 'HALF SLEEVE'],
+  'JEANS': ['SKINNY', 'SLIM FIT', 'REGULAR', 'BAGGY', 'WIDE LEG', 'RIPPED', 'BOOTCUT', 'TAPERED', 'MOM FIT', 'STRAIGHT FIT', 'NARROW FIT'],
+  'TROUSERS': ['CARGO', 'CHINO', 'JOGGER', 'FORMAL', 'PLEATED', 'STRAIGHT FIT', 'SLIM FIT'],
+  'SHORTS': ['CARGO', 'CHINO', 'DENIM', 'SPORTS', 'CASUAL', 'BERMUDA', 'RUNNING'],
+  'JACKETS': ['BOMBER', 'DENIM', 'PUFFER', 'WINDBREAKER', 'VARSITY', 'LEATHER', 'QUILTED'],
+  'HOODIES': ['PULLOVER', 'ZIP-UP', 'CROPPED', 'OVERSIZED', 'SLEEVELESS', 'GRAPHIC'],
+  'ETHNIC WEAR': ['KURTA', 'LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA', 'SHERWANI', 'PATHANI SUIT', 'NEHRU JACKET', 'DHOTI SET'],
+  'VEST': ['PLAIN', 'LINING', 'COLORING'],
+  'UNDERWEAR': ['LONG TRUNK', 'MINI TRUNK', 'BRIEF'],
+  'SLIPPERS': ['SLIDES', 'FLIP FLOPS', 'SPORTS', 'CASUAL', 'PLATFORM', 'MEMORY FOAM'],
+  'PERFUMES': ['EAU DE PARFUM', 'EAU DE TOILETTE', 'BODY SPRAY', 'APPAREL SPRAY', 'ATTAR', 'AIR FRESHENER', 'ROOM FRESHENER', 'DEODORANT', 'GIFT SET'],
+  'WALLETS': ['BIFOLD', 'TRIFOLD', 'CARD HOLDER', 'MONEY CLIP', 'CHAIN WALLET'],
+  'WATCHES': ['ANALOG', 'DIGITAL', 'SMART WATCH', 'CHRONOGRAPH', 'DRESS WATCH'],
+  'BELTS': ['LEATHER', 'CANVAS', 'REVERSIBLE', 'AUTO-LOCK', 'BRAIDED'],
+  'CAPS': ['BASEBALL CAP', 'SNAPBACK', 'TRUCKER HAT', 'BEANIE', 'BUCKET HAT', 'VISOR', 'DAD HAT'],
+  'SUNGLASSES': ['AVIATOR', 'WAYFARER', 'ROUND', 'SQUARE', 'POLARIZED', 'CLUBMASTER', 'SPORT', 'HEXAGONAL'],
 };
 
 const COMMON_BATCH_SIZES = {
-  'Kurta': ['36', '38', '40', '42', '44', '46'],
-  'Vest': ['S', 'M', 'L', 'XL', 'XXL'],
-  'Underwear': ['S', 'M', 'L', 'XL', 'XXL'],
-  'Perfumes': ['30ml', '50ml', '100ml'],
-  'Jeans': ['30', '32', '34', '36', '38'],
-  'Trousers': ['30', '32', '34', '36', '38'],
-  'Shorts': ['30', '32', '34', '36', '38'],
-  'Slippers': ['7', '8', '9', '10', '11'],
-  'Wallets': ['Standard', 'Slim'],
-  'Watches': ['Standard', 'Dial 40mm'],
-  'Belts': ['32-36', '36-40'],
-  'Caps': ['Free Size', 'Adjustable'],
-  'Sunglasses': ['Standard', 'Free Size'],
+  'KURTA': ['36', '38', '40', '42', '44', '46'],
+  'VEST': ['S', 'M', 'L', 'XL', 'XXL'],
+  'UNDERWEAR': ['S', 'M', 'L', 'XL', 'XXL'],
+  'PERFUMES': ['30ml', '50ml', '100ml'],
+  'JEANS': ['30', '32', '34', '36', '38'],
+  'TROUSERS': ['30', '32', '34', '36', '38'],
+  'SHORTS': ['30', '32', '34', '36', '38'],
+  'SLIPPERS': ['7', '8', '9', '10', '11'],
+  'WALLETS': ['Standard', 'Slim'],
+  'WATCHES': ['Standard', 'Dial 40mm'],
+  'BELTS': ['32-36', '36-40'],
+  'CAPS': ['Free Size', 'Adjustable'],
+  'SUNGLASSES': ['Standard', 'Free Size'],
   'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
 };
 
 const BASE_CATEGORIES = [
-  'Kurta',
-  'Shirts',
-  'T-Shirts',
-  'Jeans',
-  'Trousers',
-  'Shorts',
-  'Jackets',
-  'Hoodies',
-  'Ethnic Wear',
-  'Vest',
-  'Underwear',
-  'Perfumes',
-  'Wallets',
-  'Slippers',
-  'Watches',
-  'Belts',
-  'Caps',
-  'Sunglasses',
-  'Accessories'
+  'KURTA',
+  'SHIRTS',
+  'T-SHIRTS',
+  'JEANS',
+  'TROUSERS',
+  'SHORTS',
+  'JACKETS',
+  'HOODIES',
+  'ETHNIC WEAR',
+  'VEST',
+  'UNDERWEAR',
+  'PERFUMES',
+  'WALLETS',
+  'SLIPPERS',
+  'WATCHES',
+  'BELTS',
+  'CAPS',
+  'SUNGLASSES',
+  'ACCESSORIES'
 ];
 // Prebuilt size guide templates per category
 const SIZE_GUIDE_TEMPLATES = {
-  'Shirts': {
+  'SHIRTS': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -115,7 +115,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['XXL', '', '', '', ''],
     ]
   },
-  'T-Shirts': {
+  'T-SHIRTS': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -126,7 +126,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL', '', '', '', ''],
     ]
   },
-  'Jeans': {
+  'JEANS': {
     columns: ['Size', 'Waist (in)', 'Hip (in)', 'Inseam (in)', 'Length (in)', 'Thigh (in)'],
     rows: [
       ['28', '', '', '', '', ''],
@@ -137,7 +137,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['38', '', '', '', '', ''],
     ]
   },
-  'Trousers': {
+  'TROUSERS': {
     columns: ['Size', 'Waist (in)', 'Hip (in)', 'Inseam (in)', 'Length (in)'],
     rows: [
       ['28', '', '', '', ''],
@@ -148,7 +148,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['38', '', '', '', ''],
     ]
   },
-  'Shorts': {
+  'SHORTS': {
     columns: ['Size', 'Waist (in)', 'Hip (in)', 'Length (in)', 'Thigh (in)'],
     rows: [
       ['28', '', '', '', ''],
@@ -158,7 +158,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['36', '', '', '', ''],
     ]
   },
-  'Jackets': {
+  'JACKETS': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -169,7 +169,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL', '', '', '', ''],
     ]
   },
-  'Hoodies': {
+  'HOODIES': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -180,7 +180,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL', '', '', '', ''],
     ]
   },
-  'Kurta': {
+  'KURTA': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['36', '38', '40', '17', '24'],
@@ -195,7 +195,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['XXL', '46', '46', '19', '26'],
     ]
   },
-  'Ethnic Wear': {
+  'ETHNIC WEAR': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['M', '', '', '', ''],
@@ -208,7 +208,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['42', '', '', '', ''],
     ]
   },
-  'Slippers': {
+  'SLIPPERS': {
     columns: ['UK / IND Size', 'US Size', 'EU Size', 'Foot Length (cm)'],
     rows: [
       ['6', '', '', ''],
@@ -219,7 +219,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['11', '', '', ''],
     ]
   },
-  'Belts': {
+  'BELTS': {
     columns: ['Trouser Waist', 'Recommended Belt Size', 'Adjustment Range'],
     rows: [
       ['28"-30"', '', ''],
@@ -228,7 +228,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['40"-42"', '', ''],
     ]
   },
-  'Vest': {
+  'VEST': {
     columns: ['Size', 'Chest (in)', 'Length (in)'],
     rows: [
       ['S (80cm)', '32', '26'],
@@ -239,7 +239,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL (105cm)', '42', '31'],
     ]
   },
-  'Underwear': {
+  'UNDERWEAR': {
     columns: ['Size', 'Waist (in)', 'Waist (cm)'],
     rows: [
       ['S (75cm)', '28-30', '70-75'],
@@ -259,6 +259,30 @@ const SIZE_GUIDE_TEMPLATES = {
       ['XL', '', ''],
     ]
   }
+};
+
+const getCategorySizes = (cat) => {
+  if (!cat) return CATEGORY_SIZES_MAP['DEFAULT'];
+  const upper = String(cat).trim().toUpperCase();
+  return CATEGORY_SIZES_MAP[upper] || CATEGORY_SIZES_MAP['DEFAULT'];
+};
+
+const getSubCategories = (cat) => {
+  if (!cat) return [];
+  const upper = String(cat).trim().toUpperCase();
+  return SUB_CATEGORY_MAP[upper] || [];
+};
+
+const getCommonBatchSizes = (cat) => {
+  if (!cat) return COMMON_BATCH_SIZES['DEFAULT'];
+  const upper = String(cat).trim().toUpperCase();
+  return COMMON_BATCH_SIZES[upper] || COMMON_BATCH_SIZES['DEFAULT'];
+};
+
+const getSizeGuideTemplate = (cat) => {
+  if (!cat) return SIZE_GUIDE_TEMPLATES['SHIRTS'];
+  const upper = String(cat).trim().toUpperCase();
+  return SIZE_GUIDE_TEMPLATES[upper] || SIZE_GUIDE_TEMPLATES['SHIRTS'] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
 };
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -293,7 +317,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
     name: '',
     slug: '',
     sku: '',
-    categoryId: 'Shirts',
+    categoryId: 'SHIRTS',
     shortDescription: '',
     description: '',
     mrp: '',
@@ -341,7 +365,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
 
   // Size Guide Builder States
   const [newColumnName, setNewColumnName] = useState('');
-  const [selectedSgTemplate, setSelectedSgTemplate] = useState('Shirts');
+  const [selectedSgTemplate, setSelectedSgTemplate] = useState('SHIRTS');
   const [sgInputMode, setSgInputMode] = useState('dual'); // 'dual' | 'in' | 'cm'
   const [rawDualInputs, setRawDualInputs] = useState({});
 
@@ -367,7 +391,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         prods.forEach(p => {
           const c = (p.categoryId || p.category || '').trim();
           if (c && !BASE_CATEGORIES.some(b => b.toLowerCase() === c.toLowerCase())) {
-            extraCats.add(c);
+            extraCats.add(c.toUpperCase());
           }
         });
         if (extraCats.size > 0) {
@@ -396,7 +420,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             }
           }
 
-          const prodCat = data.categoryId || data.category || 'Shirts';
+          const prodCat = (data.categoryId || data.category || 'SHIRTS').toUpperCase();
           const isKnownCat = BASE_CATEGORIES.some(b => b.toLowerCase() === prodCat.toLowerCase());
           if (!isKnownCat && prodCat) {
             setIsCustomCategory(true);
@@ -406,11 +430,12 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             setCustomCategoryInput('');
           }
 
-          const knownSubs = SUB_CATEGORY_MAP[prodCat] || [];
-          const isKnownSub = knownSubs.some(s => s.toLowerCase() === (data.subCategory || '').toLowerCase());
-          if (data.subCategory && !isKnownSub) {
+          const knownSubs = getSubCategories(prodCat);
+          const currentSub = (data.subCategory || '').toUpperCase();
+          const isKnownSub = knownSubs.some(s => s.toLowerCase() === currentSub.toLowerCase());
+          if (currentSub && !isKnownSub) {
             setIsCustomSubCategory(true);
-            setCustomSubCategoryInput(data.subCategory);
+            setCustomSubCategoryInput(currentSub);
           } else {
             setIsCustomSubCategory(false);
             setCustomSubCategoryInput('');
@@ -419,6 +444,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
           setFormData({
             ...data,
             categoryId: prodCat,
+            subCategory: currentSub,
             subCategory: data.subCategory || '',
             productNumber: data.productNumber, barcode: data.barcode || '',
             gsl: data.gsl || '',
@@ -791,8 +817,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
   };
 
   const handleLoadSizeGuideTemplate = (templateKey = null) => {
-    const keyToUse = templateKey || selectedSgTemplate || formData.categoryId || 'Shirts';
-    const template = SIZE_GUIDE_TEMPLATES[keyToUse] || SIZE_GUIDE_TEMPLATES['Shirts'] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
+    const keyToUse = templateKey || selectedSgTemplate || formData.categoryId || 'SHIRTS';
+    const template = getSizeGuideTemplate(keyToUse);
     const currentBaseUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
     const targetUnit = sgInputMode === 'cm' ? 'cm' : currentBaseUnit;
 
@@ -1208,8 +1234,10 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         items: cleanOffersItems
       };
 
-      const finalCategory = (isCustomCategory ? customCategoryInput.trim() : formData.categoryId) || 'Shirts';
-      const finalSubCategory = (isCustomSubCategory ? customSubCategoryInput.trim() : (formData.subCategory || '')).trim();
+      const rawCategory = (isCustomCategory ? customCategoryInput.trim() : formData.categoryId) || 'SHIRTS';
+      const finalCategory = rawCategory.toUpperCase();
+      const rawSubCategory = (isCustomSubCategory ? customSubCategoryInput.trim() : (formData.subCategory || '')).trim();
+      const finalSubCategory = rawSubCategory ? rawSubCategory.toUpperCase() : '';
       const finalCategoryKey = finalCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const finalSubCategoryKey = finalSubCategory ? finalSubCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
 
@@ -1267,7 +1295,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
           name: '',
           slug: '',
           sku: '',
-          categoryId: formData.categoryId || 'Shirts',
+          categoryId: formData.categoryId || 'SHIRTS',
           shortDescription: '',
           description: '',
           mrp: '',
@@ -1538,7 +1566,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                       onClick={() => {
                         setIsCustomCategory(false);
                         setCustomCategoryInput('');
-                        setFormData(prev => ({ ...prev, categoryId: 'Shirts', category: 'Shirts' }));
+                        setFormData(prev => ({ ...prev, categoryId: 'SHIRTS', category: 'SHIRTS' }));
                       }}
                     >
                       ✕ Choose From List
@@ -1549,18 +1577,19 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 {!isCustomCategory ? (
                   <select
                     name="categoryId"
-                    value={formData.categoryId}
+                    value={(formData.categoryId || 'SHIRTS').toUpperCase()}
                     onChange={(e) => {
                       if (e.target.value === '__custom__') {
                         setIsCustomCategory(true);
                         setCustomCategoryInput('');
                         setIsCustomSubCategory(false);
                       } else {
+                        const val = e.target.value.toUpperCase();
                         handleChange(e);
                         setFormData(prev => ({
                           ...prev,
-                          categoryId: e.target.value,
-                          category: e.target.value,
+                          categoryId: val,
+                          category: val,
                           subCategory: ''
                         }));
                         setIsCustomSubCategory(false);
@@ -1568,7 +1597,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                     }}
                   >
                     {availableCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat} value={cat.toUpperCase()}>{cat.toUpperCase()}</option>
                     ))}
                     <option value="__custom__">+ Custom Category...</option>
                   </select>
@@ -1576,10 +1605,11 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                   <div className="admin-custom-input-group">
                     <input
                       type="text"
-                      placeholder="Enter custom category (e.g. Vest, Underwear, Gym Wear)"
+                      placeholder="Enter custom category in CAPITAL (e.g. VEST, UNDERWEAR, GYM WEAR)"
                       value={customCategoryInput}
+                      style={{ textTransform: 'uppercase' }}
                       onChange={(e) => {
-                        const val = e.target.value;
+                        const val = e.target.value.toUpperCase();
                         setCustomCategoryInput(val);
                         setFormData(prev => ({ ...prev, categoryId: val, category: val }));
                       }}
@@ -1591,7 +1621,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                       onClick={() => {
                         setIsCustomCategory(false);
                         setCustomCategoryInput('');
-                        setFormData(prev => ({ ...prev, categoryId: 'Shirts', category: 'Shirts' }));
+                        setFormData(prev => ({ ...prev, categoryId: 'SHIRTS', category: 'SHIRTS' }));
                       }}
                     >
                       Cancel
@@ -1604,14 +1634,14 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
               <div className="admin-form-group">
                 <div className="admin-field-header">
                   <label style={{ margin: 0 }}>Sub-Category / Fit Type</label>
-                  {SUB_CATEGORY_MAP[formData.categoryId] && (
+                  {getSubCategories(formData.categoryId).length > 0 && (
                     !isCustomSubCategory ? (
                       <button
                         type="button"
                         className="admin-toggle-custom-btn"
                         onClick={() => {
                           setIsCustomSubCategory(true);
-                          setCustomSubCategoryInput(formData.subCategory || '');
+                          setCustomSubCategoryInput((formData.subCategory || '').toUpperCase());
                         }}
                       >
                         + Custom Sub-Category
@@ -1632,23 +1662,24 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                   )}
                 </div>
 
-                {SUB_CATEGORY_MAP[formData.categoryId] && !isCustomSubCategory ? (
+                {getSubCategories(formData.categoryId).length > 0 && !isCustomSubCategory ? (
                   <select
                     name="subCategory"
-                    value={formData.subCategory || ''}
+                    value={(formData.subCategory || '').toUpperCase()}
                     onChange={(e) => {
                       if (e.target.value === '__custom__') {
                         setIsCustomSubCategory(true);
                         setCustomSubCategoryInput('');
                         setFormData(prev => ({ ...prev, subCategory: '' }));
                       } else {
-                        handleChange(e);
+                        const val = e.target.value.toUpperCase();
+                        setFormData(prev => ({ ...prev, subCategory: val }));
                       }
                     }}
                   >
                     <option value="">— Select Sub-Category —</option>
-                    {SUB_CATEGORY_MAP[formData.categoryId].map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
+                    {getSubCategories(formData.categoryId).map(sub => (
+                      <option key={sub} value={sub.toUpperCase()}>{sub.toUpperCase()}</option>
                     ))}
                     <option value="__custom__">+ Custom Sub-Category...</option>
                   </select>
@@ -1657,21 +1688,22 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                     <input
                       type="text"
                       name="subCategory"
+                      style={{ textTransform: 'uppercase' }}
                       placeholder={
-                        formData.categoryId === 'Vest'
-                          ? 'e.g. Plain, Lining, Coloring or custom type'
-                          : formData.categoryId === 'Underwear'
-                          ? 'e.g. Long Trunk, Mini Trunk, Brief or custom type'
-                          : 'Enter custom sub-category or fit type'
+                        (formData.categoryId || '').toUpperCase() === 'VEST'
+                          ? 'e.g. PLAIN, LINING, COLORING or custom type'
+                          : (formData.categoryId || '').toUpperCase() === 'UNDERWEAR'
+                          ? 'e.g. LONG TRUNK, MINI TRUNK, BRIEF or custom type'
+                          : 'Enter custom sub-category or fit type (in CAPITAL)'
                       }
                       value={formData.subCategory || ''}
                       onChange={(e) => {
-                        const val = e.target.value;
+                        const val = e.target.value.toUpperCase();
                         setCustomSubCategoryInput(val);
-                        handleChange(e);
+                        setFormData(prev => ({ ...prev, subCategory: val }));
                       }}
                     />
-                    {SUB_CATEGORY_MAP[formData.categoryId] && (
+                    {getSubCategories(formData.categoryId).length > 0 && (
                       <button
                         type="button"
                         className="admin-custom-cancel-btn"
@@ -1689,7 +1721,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
               </div>
             </div>
             {/* GSL Field for Shirts and T-Shirts */}
-            {(formData.categoryId === 'T-Shirts' || formData.categoryId === 'Shirts') && (
+            {((formData.categoryId || '').toUpperCase() === 'T-SHIRTS' || (formData.categoryId || '').toUpperCase() === 'SHIRTS') && (
               <div className="admin-form-group">
                 <label>GSL (Garment Spec Label — GSM / Fabric Weight / Quality)</label>
                 <input
@@ -1996,7 +2028,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 </p>
               </div>
               <span style={{ padding: '4px 10px', background: '#f1f5f9', color: '#0f172a', borderRadius: '6px', fontSize: '12px', fontWeight: 700, border: '1px solid #cbd5e1' }}>
-                Mode: {formData.categoryId || 'Shirts'} ({((formData.categoryId || '').toLowerCase().includes('perfume')) ? 'Volumes in ml' : (formData.categoryId === 'Jeans' || formData.categoryId === 'Trousers') ? 'Waist Inches' : 'Apparel / Standard'})
+                Mode: {formData.categoryId || 'SHIRTS'} ({((formData.categoryId || '').toLowerCase().includes('perfume')) ? 'Volumes in ml' : ((formData.categoryId || '').toUpperCase() === 'JEANS' || (formData.categoryId || '').toUpperCase() === 'TROUSERS') ? 'Waist Inches' : 'Apparel / Standard'})
               </span>
             </div>
 
@@ -2032,8 +2064,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
 
             {/* Step 1: 1-Click Quick Add Common Sizes */}
             {(() => {
-              const activeCat = formData.categoryId || 'Shirts';
-              const batchPresets = COMMON_BATCH_SIZES[activeCat] || COMMON_BATCH_SIZES['DEFAULT'];
+              const activeCat = (formData.categoryId || 'SHIRTS').toUpperCase();
+              const batchPresets = getCommonBatchSizes(activeCat);
               return (
                 <div style={{ padding: '16px 20px', background: '#fafaf9', border: '1px solid #e7e5e4', borderRadius: '10px', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -2079,8 +2111,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
 
             {/* Step 2: Category Preset Chips & Custom Size Input */}
             {(() => {
-              const activeCat = formData.categoryId || 'Shirts';
-              const catSizes = CATEGORY_SIZES_MAP[activeCat] || CATEGORY_SIZES_MAP['Shirts'];
+              const activeCat = (formData.categoryId || 'SHIRTS').toUpperCase();
+              const catSizes = getCategorySizes(activeCat);
               const isPerfume = (activeCat || '').toLowerCase().includes('perfume');
               return (
                 <div style={{ marginBottom: '24px' }}>
