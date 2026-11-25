@@ -18,11 +18,26 @@ const navLinks = [
 
 
 
-const announcements = [
-  { text: "FREE EXPRESS SHIPPING ON ALL ORDERS ABOVE ₹999", link: "/shop" },
-  { text: "USE CODE BROTHERS10 FOR 10% OFF YOUR ORDER", link: "/shop" },
+const baseAnnouncements = [
+  { text: "FREE DELIVERY ON ALL PREPAID ORDERS", link: "/shop" },
   { text: "VISIT OUR STORE IN HIMATNAGAR • TRY BEFORE YOU BUY", link: "/about" }
 ];
+
+// Coupon chosen in Admin → Coupons → "Top bar". Shown first when it is active and unexpired.
+async function fetchTopBarCouponAnnouncement() {
+  const { collection, query, where, getDocs } = await import('firebase/firestore');
+  const { db } = await import('../firebase/firebaseConfig');
+  const snap = await getDocs(query(collection(db, 'coupons'), where('showInTopBar', '==', true)));
+  const today = new Date().toISOString().slice(0, 10);
+  const coupon = snap.docs.map(d => d.data())
+    .find(c => c.code && c.active !== false && !(c.expiryDate && c.expiryDate < today));
+  if (!coupon) return null;
+  const value = Number(coupon.discountValue) || 0;
+  const discount = coupon.discountType === 'percentage' ? `${value}% OFF` : `₹${value.toLocaleString('en-IN')} OFF`;
+  const min = Number(coupon.minOrderAmount) || 0;
+  const condition = min > 0 ? ` ON ORDERS ABOVE ₹${min.toLocaleString('en-IN')}` : ' YOUR ORDER';
+  return { text: `USE CODE ${String(coupon.code).toUpperCase()} FOR ${discount}${condition}`, link: "/shop" };
+}
 
 export default function Navbar() {
   const navRef = useRef(null);
@@ -30,6 +45,7 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [announcementIdx, setAnnouncementIdx] = useState(0);
+  const [couponAnnouncement, setCouponAnnouncement] = useState(null);
   const searchInputRef = useRef(null);
   const navigate = useNavigate();
   const { currentUser, userProfile, logout } = useAuth() || {};
@@ -114,13 +130,25 @@ export default function Navbar() {
     }
   };
 
+  // Load the admin-featured coupon (if any) for the top bar
+  useEffect(() => {
+    let active = true;
+    fetchTopBarCouponAnnouncement()
+      .then(item => { if (active) setCouponAnnouncement(item); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const announcements = couponAnnouncement ? [couponAnnouncement, ...baseAnnouncements] : baseAnnouncements;
+  const currentAnnouncement = announcements[announcementIdx % announcements.length];
+
   // Rotate announcement ticker every 4 seconds
   useEffect(() => {
     const timer = setInterval(() => {
       setAnnouncementIdx((prev) => (prev + 1) % announcements.length);
     }, 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [announcements.length]);
 
   const authAccountLink = currentUser ? '/profile' : '/login';
 
@@ -204,9 +232,9 @@ export default function Navbar() {
       <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`} ref={navRef}>
         {/* Luxury Top Announcement Bar */}
         <div className="top-announcement-bar">
-          <Link to={announcements[announcementIdx].link} className="top-announcement-bar__link">
+          <Link to={currentAnnouncement.link} className="top-announcement-bar__link">
             <span className="announcement-pill">OFFER</span>
-            <span className="announcement-text">{announcements[announcementIdx].text}</span>
+            <span className="announcement-text">{currentAnnouncement.text}</span>
             <span className="announcement-arrow">SHOP NOW →</span>
           </Link>
         </div>

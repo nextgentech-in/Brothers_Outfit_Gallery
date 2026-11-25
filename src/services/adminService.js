@@ -590,6 +590,15 @@ export const deleteCoupon = async (id) => {
   await deleteDoc(doc(db, 'coupons', id));
 };
 
+// Only one coupon can be featured in the storefront top announcement bar.
+// Pass null to stop showing any coupon there.
+export const setTopBarCoupon = async (id, coupons = []) => {
+  await Promise.all(coupons
+    .filter(c => c.id !== id && c.showInTopBar === true)
+    .map(c => updateDoc(doc(db, 'coupons', c.id), { showInTopBar: false })));
+  if (id) await updateDoc(doc(db, 'coupons', id), { showInTopBar: true });
+};
+
 // ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
 export const DEFAULT_OFFERS_CONFIG = {
   enabled: true,
