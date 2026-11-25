@@ -103,10 +103,13 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' or 'cod'
   const [whatsappInvoiceOptIn, setWhatsappInvoiceOptIn] = useState(false);
 
-  // Pricing math: Free delivery for orders >= ₹1000, else ₹70
+  // Pricing math: Free delivery on all prepaid orders; COD free for orders >= ₹1000, else ₹70
+  // (must match calculateServerOrderTotal in server.js)
   const discount = cartSubtotal >= 2500 ? 250 : 0;
   const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountAmount || 0) : 0;
-  const shippingCost = cartSubtotal >= 1000 ? 0 : 70;
+  const isPrepaid = paymentMethod === 'razorpay';
+  const freeDelivery = isPrepaid || cartSubtotal >= 1000;
+  const shippingCost = freeDelivery ? 0 : 70;
   const finalTotal = Math.max(0, cartSubtotal - discount - couponDiscount + shippingCost);
 
   // The server derives every price and writes the order. The browser only sends
@@ -769,20 +772,22 @@ export default function CheckoutPage() {
             )}
 
             {/* Free Shipping Banner */}
-            <div className={`free-shipping-bar ${cartSubtotal >= 1000 ? 'unlocked' : 'pending'}`} style={{
+            <div className={`free-shipping-bar ${freeDelivery ? 'unlocked' : 'pending'}`} style={{
               marginTop: '16px',
               padding: '10px 14px',
               borderRadius: '8px',
               fontSize: '12px',
               fontWeight: '700',
-              background: cartSubtotal >= 1000 ? '#f0fdf4' : '#fffbeb',
-              color: cartSubtotal >= 1000 ? '#15803d' : '#b45309',
-              border: `1px solid ${cartSubtotal >= 1000 ? '#bbf7d0' : '#fde68a'}`
+              background: freeDelivery ? '#f0fdf4' : '#fffbeb',
+              color: freeDelivery ? '#15803d' : '#b45309',
+              border: `1px solid ${freeDelivery ? '#bbf7d0' : '#fde68a'}`
             }}>
-              {cartSubtotal >= 1000 ? (
+              {isPrepaid ? (
+                <span>🎉 FREE Delivery on all prepaid orders!</span>
+              ) : cartSubtotal >= 1000 ? (
                 <span>🎉 Congratulations! You unlocked FREE Delivery (Order over ₹1,000)!</span>
               ) : (
-                <span>🚚 Add ₹{(1000 - cartSubtotal).toLocaleString('en-IN')} more for FREE Express Shipping!</span>
+                <span>🚚 Pay online for FREE Delivery, or add ₹{(1000 - cartSubtotal).toLocaleString('en-IN')} more for free COD delivery.</span>
               )}
             </div>
 
@@ -800,7 +805,7 @@ export default function CheckoutPage() {
                 />
                 <div>
                   <strong>💳 Online Payment (Razorpay)</strong>
-                  <p>Pay securely via UPI, Google Pay, PhonePe, Cards, or Net Banking.</p>
+                  <p>Pay securely via UPI, Google Pay, PhonePe, Cards, or Net Banking. <strong style={{ color: '#15803d' }}>FREE Delivery.</strong></p>
                 </div>
               </label>
 

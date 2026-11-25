@@ -223,8 +223,26 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
     invalidateCatalog();
     return res.status(create ? 201 : 200).json({ success: true, id: productId });
   } catch (error) {
-    console.error('Admin product upsert failed:', error.message);
-    return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Unable to save product.' });
+    console.error('Admin product upsert failed:', error);
+    if (error.statusCode) return res.status(error.statusCode).json({ error: error.message });
+    const message = String(error?.message || '');
+    const code = error?.code;
+    if (/maximum allowed size|exceeds the maximum|too large/i.test(message)) {
+      return res.status(413).json({ error: 'Product is too large to save (over 1 MB). This usually means one or more images did not upload to ImageKit and were embedded directly. Remove those images and upload them again.' });
+    }
+    if (code === 3) {
+      return res.status(422).json({ error: `Invalid product data: ${message.slice(0, 200)}` });
+    }
+    if (code === 10 || /aborted|contention/i.test(message)) {
+      return res.status(409).json({ error: 'Another save happened at the same moment. Please click Publish again.' });
+    }
+    if (code === 7 || code === 16 || /credential|permission|unauthenticated/i.test(message)) {
+      return res.status(500).json({ error: 'Server database credentials are missing or invalid. Check the Firebase Admin environment variables.' });
+    }
+    if (code === 4 || code === 14 || /deadline|unavailable|timeout/i.test(message)) {
+      return res.status(503).json({ error: 'Database is temporarily unreachable. Please try again in a moment.' });
+    }
+    return res.status(500).json({ error: `Unable to save product (${code || 'server error'}). Check the server logs for details.` });
   }
 });
 

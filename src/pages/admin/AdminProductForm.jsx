@@ -341,7 +341,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       useCustomOffers: false,
       title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
       items: [
-        'Buy 2 & Get Flat Rs. 300 OFF',
+        'FREE Delivery on all Prepaid Orders!',
         'Buy 4 & get Flat Rs. 1250 OFF',
         'Enjoy an Additional 5% OFF on prepaid orders!',
         'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'

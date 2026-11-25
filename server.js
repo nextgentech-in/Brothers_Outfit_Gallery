@@ -1081,7 +1081,7 @@ app.post(['/api/admin/pos/reconcile', '/admin/pos/reconcile'], requireAdminAuth,
   }
 });
 
-async function calculateServerOrderTotal(items, couponCode) {
+async function calculateServerOrderTotal(items, couponCode, paymentMethod = 'cod') {
   if (!Array.isArray(items) || items.length === 0 || items.length > 30) {
     throw new Error('Cart must contain between 1 and 30 items.');
   }
@@ -1177,8 +1177,9 @@ async function calculateServerOrderTotal(items, couponCode) {
     }
   }
 
-  // Free shipping for orders >= ₹1000, else ₹70
-  const shippingCost = subtotal >= 1000 ? 0 : 70;
+  // Free shipping on every prepaid (online) order; COD orders get it at >= ₹1000, else ₹70
+  const isPrepaid = String(paymentMethod || '').toLowerCase() === 'razorpay';
+  const shippingCost = isPrepaid || subtotal >= 1000 ? 0 : 70;
   const finalTotal = Math.max(1, subtotal - discount - couponDiscount + shippingCost);
 
   return {
@@ -1315,7 +1316,7 @@ app.post(['/api/create-order', '/create-order', '/api/razorpay/create-order', '/
   // Case 1: Items array supplied (Calculate authoritative total server-side)
   if (items && Array.isArray(items) && items.length > 0) {
     try {
-      const serverCalc = await calculateServerOrderTotal(items, couponCode);
+      const serverCalc = await calculateServerOrderTotal(items, couponCode, 'razorpay');
       amountInPaise = Math.round(serverCalc.finalTotal * 100);
     } catch (calcErr) {
       console.error('Server order total calculation error:', calcErr);
@@ -1511,7 +1512,7 @@ app.post(['/api/orders/create', '/orders/create'], requireAuth, async (req, res)
     }
 
     const [calculation, address] = await Promise.all([
-      calculateServerOrderTotal(items, couponCode),
+      calculateServerOrderTotal(items, couponCode, normalizedPaymentMethod),
       Promise.resolve(normalizeShippingAddress(shippingAddress))
     ]);
 

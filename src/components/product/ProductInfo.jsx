@@ -74,6 +74,8 @@ function MiniCountdown({ targetDate }) {
   );
 }
 
+const PREPAID_FREE_DELIVERY_OFFER = { id: 'offer-prepaid-free-delivery', text: 'FREE Delivery on all Prepaid Orders!', icon: 'shipping', link: '' };
+
 export default function ProductInfo({ product, onColorChange, offersConfig }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
@@ -395,11 +397,12 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         }
 
         const rawItems = effectiveConfig.items || [];
-        const items = (Array.isArray(rawItems) ? rawItems : []).filter(item => {
+        const savedItems = (Array.isArray(rawItems) ? rawItems : []).filter(item => {
           const t = typeof item === 'string' ? item : item?.text;
           return Boolean(t && String(t).trim());
         });
-        if (items.length === 0) return null;
+        // First line is always the prepaid free-delivery offer (enforced in server.js pricing).
+        const items = [PREPAID_FREE_DELIVERY_OFFER, ...savedItems.slice(1)];
 
         return (
           <div className="product-offers-container" aria-label="Special Offers">

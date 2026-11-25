@@ -8,13 +8,24 @@ const PRODUCTS = 'products';
 async function saveProductThroughServer(productId, productData, create) {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('Admin authentication is required to save products.');
+  const body = JSON.stringify({ productId, productData, create, requestId: globalThis.crypto.randomUUID() });
+  const embeddedImages = (body.match(/data:image\//g) || []).length;
+  if (body.length > 900 * 1024) {
+    throw new Error(embeddedImages
+      ? `Product is too large to save because ${embeddedImages} image(s) failed to upload to ImageKit and were embedded directly. Remove those images and upload them again.`
+      : 'Product is too large to save (over 900 KB). Shorten the description or reduce the number of variants.');
+  }
   const response = await fetch(`${getBackendUrl()}/api/admin/products/upsert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ productId, productData, create, requestId: globalThis.crypto.randomUUID() })
+    body
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Unable to save product.');
+  if (!response.ok) {
+    if (response.status === 413) throw new Error('Product data is too large to send. Remove images that failed to upload and upload them again.');
+    if (response.status === 401 || response.status === 403) throw new Error('Your admin login has expired. Please sign out and sign in again.');
+    throw new Error(data.error || `Unable to save product (server returned ${response.status}).`);
+  }
   return data;
 }
 
@@ -587,8 +598,8 @@ export const DEFAULT_OFFERS_CONFIG = {
   items: [
     {
       id: 'offer-1',
-      text: 'Buy 2 & Get Flat Rs. 300 OFF',
-      icon: 'discount',
+      text: 'FREE Delivery on all Prepaid Orders!',
+      icon: 'shipping',
       link: ''
     },
     {
