@@ -405,11 +405,16 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
     if (isEdit) {
       getAdminProductById(id).then(data => {
         if (data) {
-          let loadedVariants = (data.variants || []).map((v) => ({
+          let loadedVariants = (data.variants || []).map((v) => {
+            // A saved variant rate of 0 means "not set" (old blank saves). Load it empty so the
+            // variant inherits the product Purchase Rate instead of overriding it with ₹0.
+            const savedCost = v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? '';
+            return {
             ...v,
-            costPrice: v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? '',
+            costPrice: Number(savedCost) > 0 ? savedCost : '',
             isDefaultPrice: v.isDefaultPrice !== undefined ? !!v.isDefaultPrice : false
-          }));
+            };
+          });
 
           if (loadedVariants.length > 0 && !loadedVariants.some(v => v.isDefaultPrice)) {
             const matchedIdx = loadedVariants.findIndex(v => Number(v.price) === Number(data.salePrice || data.price));
@@ -450,7 +455,9 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
-            costPrice: data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price ?? '',
+            costPrice: Number(data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price ?? 0) > 0
+              ? (data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price)
+              : '',
             gstEnabled: data.gstEnabled === true,
             gstPercent: data.gstPercent ?? '5',
             variants: loadedVariants,
