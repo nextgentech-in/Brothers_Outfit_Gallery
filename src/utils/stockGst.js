@@ -9,6 +9,34 @@ export function stockValue(quantity, unitCostPrice, gstPercent) {
   return { baseValue: basePaise / 100, gstValue: gstPaise / 100, totalValue: (basePaise + gstPaise) / 100 };
 }
 
+// Mirrors the POS /products endpoint (pos/server/commerce.ts publicProduct + filter):
+// the POS values stock from these normalized records, not raw Firestore documents.
+function posProductView(data) {
+  const productCost = data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price ?? 0;
+  return {
+    id: data.id, name: data.name || '', sku: data.sku || '', costPrice: productCost,
+    gstEnabled: data.gstEnabled === true, gstPercent: data.gstEnabled === true ? Number(data.gstPercent || 0) : 0,
+    stock: Number(data.stock ?? 0) - Number(data.reserved ?? 0), reserved: 0,
+    price: data.salePrice ?? data.price ?? 0,
+    variants: (Array.isArray(data.variants) ? data.variants : []).map(v => ({
+      sku: v.sku, size: v.size, color: v.color, reserved: 0,
+      stock: Number(v.stock ?? v.quantity ?? 0) - Number(v.reserved ?? 0),
+      price: Number(v.price ?? v.salePrice ?? data.salePrice ?? data.price ?? 0),
+      costPrice: Number(v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? productCost)
+    }))
+  };
+}
+
+// Use this for the website inventory so totals equal the POS "Total stock value".
+export function posStockValueRows(rawProducts) {
+  const included = rawProducts.filter(data => {
+    if (data.isDeleted === true) return false;
+    if (data.demoOnly === true) return true;
+    return !(data.isDemo === true || data.preview === true || data.isPreview === true || data.isSample === true);
+  });
+  return stockValueRows(included.map(posProductView));
+}
+
 export function stockValueRows(products) {
   return products.flatMap(product => {
     if (product.isDeleted === true || product.isDemo === true || product.preview === true || product.isPreview === true || product.isSample === true) return [];

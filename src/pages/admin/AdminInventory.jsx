@@ -9,7 +9,7 @@ import {
 } from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import './AdminInventory.css';
-import { stockValueRows } from '../../utils/stockGst';
+import { posStockValueRows } from '../../utils/stockGst';
 
 export default function AdminInventory() {
   // 1. Instant loading from cache: 0ms initial render if data exists in cache
@@ -518,7 +518,7 @@ export default function AdminInventory() {
       else inStockCount++;
     });
 
-    const valuation = stockValueRows(products).reduce((sum, row) => ({
+    const valuation = posStockValueRows(products).reduce((sum, row) => ({
       beforeGst: sum.beforeGst + row.baseValue,
       gst: sum.gst + row.gstValue,
       withGst: sum.withGst + row.totalValue

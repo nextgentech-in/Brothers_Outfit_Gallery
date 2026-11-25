@@ -136,10 +136,15 @@ export const invalidateAdminProductsCache = () => {
   } catch {}
 };
 
+// Sort in the browser instead of Firestore orderBy('createdAt'), which silently drops
+// products that have no createdAt field (the POS counts every product).
+const createdMillis = p => { const c = p?.createdAt; if (!c) return 0; if (typeof c.toMillis === 'function') return c.toMillis(); if (typeof c.seconds === 'number') return c.seconds * 1000; const t = Date.parse(c); return Number.isFinite(t) ? t : 0; };
+const newestFirst = (a, b) => createdMillis(b) - createdMillis(a);
+
 // Admin fetching all products with instant cache & background sync capability
 /** Live Firestore listener for product and stock changes in admin. */
 export const subscribeAdminProducts = (onUpdate, onError = () => {}) => {
-  const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, PRODUCTS));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -150,7 +155,7 @@ export const subscribeAdminProducts = (onUpdate, onError = () => {}) => {
           ...item,
           ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
         };
-      }).filter(p => p.isDeleted !== true);
+      }).filter(p => p.isDeleted !== true).sort(newestFirst);
       adminProductsCache = data;
       adminProductsCacheTimestamp = Date.now();
       try {
@@ -174,7 +179,7 @@ export const getAdminProducts = async (forceRefresh = false) => {
 
   inFlightAdminFetch = (async () => {
     try {
-      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, PRODUCTS));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => {
         const item = d.data();
@@ -183,7 +188,7 @@ export const getAdminProducts = async (forceRefresh = false) => {
           ...item,
           ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
         };
-      }).filter(p => p.isDeleted !== true);
+      }).filter(p => p.isDeleted !== true).sort(newestFirst);
       adminProductsCache = data;
       adminProductsCacheTimestamp = Date.now();
       try {
