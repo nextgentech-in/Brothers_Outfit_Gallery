@@ -1092,10 +1092,14 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
     if (!mrp || mrp <= 0) return setError("MRP must be > 0.");
     if (!sale || sale <= 0) return setError("Sale Price must be > 0.");
     if (sale > mrp) return setError("Sale price cannot be greater than MRP.");
-    const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && !isNaN(Number(formData.costPrice))
+    const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && formData.costPrice !== null && !isNaN(Number(formData.costPrice))
       ? parseFloat(formData.costPrice)
       : null;
-    if (costVal !== null && costVal < 0) return setError("Purchase Rate cannot be negative.");
+    // Purchase Rate is required: stock value (web inventory and POS) is calculated from it.
+    if (costVal === null || costVal <= 0) return setError("Purchase Rate is required and must be greater than ₹0. Stock value is calculated from it.");
+    const badVariantCost = (formData.variants || []).find(v =>
+      v.costPrice !== undefined && v.costPrice !== null && v.costPrice !== '' && !(Number(v.costPrice) > 0));
+    if (badVariantCost) return setError(`Purchase Rate for ${[badVariantCost.color, badVariantCost.size].filter(Boolean).join(' / ') || 'a variant'} must be greater than ₹0 (or leave it empty to use the product Purchase Rate).`);
     const gstPercent = Number(formData.gstPercent);
     if (formData.gstEnabled && (!Number.isFinite(gstPercent) || gstPercent <= 0 || gstPercent > 100))
       return setError('Enter a GST percentage from 0.01 to 100.');
@@ -1758,7 +1762,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 </div>
               </div>
               <div className="admin-form-group price-field cost-field">
-                <label>PURCHASE RATE (Synced to POS)</label>
+                <label>PURCHASE RATE (Synced to POS) <span style={{ color: '#dc2626' }} aria-hidden="true">*</span></label>
                 <div className="price-input-wrapper">
                   <span>₹</span>
                   <input
@@ -1767,8 +1771,9 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                     value={formData.costPrice}
                     onChange={handleChange}
                     placeholder="e.g. 750"
-                    min="0"
+                    min="0.01"
                     step="any"
+                    aria-required="true"
                   />
                 </div>
                 <span style={{ fontSize: '11px', color: '#166534', fontWeight: 600, marginTop: '6px', display: 'block' }}>
