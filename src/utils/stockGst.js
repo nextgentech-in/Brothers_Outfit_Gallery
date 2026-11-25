@@ -22,7 +22,10 @@ function posProductView(data) {
       sku: v.sku, size: v.size, color: v.color, reserved: 0,
       stock: Number(v.stock ?? v.quantity ?? 0) - Number(v.reserved ?? 0),
       price: Number(v.price ?? v.salePrice ?? data.salePrice ?? data.price ?? 0),
-      costPrice: Number(v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? productCost)
+      // A ₹0 variant rate means "not set" (older blank saves), so fall back to the product rate.
+      costPrice: Number(v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? 0) > 0
+        ? Number(v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price)
+        : Number(productCost)
     }))
   };
 }
