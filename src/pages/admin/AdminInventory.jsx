@@ -859,7 +859,7 @@ export default function AdminInventory() {
 
       {/* Quick Metrics Bar */}
       <div className="inventory-metrics-strip">
-        <div className="metric-chip"><span className="metric-chip-label">Stock value before GST</span><span className="metric-chip-val">₹{stats.valuation.beforeGst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
+        <div className="metric-chip"><span className="metric-chip-label" title="Available stock × purchase rate, same as the POS">Stock value before GST (purchase rate)</span><span className="metric-chip-val">₹{stats.valuation.beforeGst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
         <div className="metric-chip"><span className="metric-chip-label">GST on stock</span><span className="metric-chip-val">₹{stats.valuation.gst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
         <div className="metric-chip"><span className="metric-chip-label">Stock value with GST</span><span className="metric-chip-val">₹{stats.valuation.withGst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span></div>
         <div className="metric-chip">
