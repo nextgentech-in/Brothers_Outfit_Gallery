@@ -1104,9 +1104,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       : null;
     // Purchase Rate is required: stock value (web inventory and POS) is calculated from it.
     if (costVal === null || costVal <= 0) return setError("Purchase Rate is required and must be greater than ₹0. Stock value is calculated from it.");
-    const badVariantCost = (formData.variants || []).find(v =>
-      v.costPrice !== undefined && v.costPrice !== null && v.costPrice !== '' && !(Number(v.costPrice) > 0));
-    if (badVariantCost) return setError(`Purchase Rate for ${[badVariantCost.color, badVariantCost.size].filter(Boolean).join(' / ') || 'a variant'} must be greater than ₹0 (or leave it empty to use the product Purchase Rate).`);
+    const badVariantCost = (formData.variants || []).find(v => Number(v.costPrice) < 0);
+    if (badVariantCost) return setError(`Purchase Rate for ${[badVariantCost.color, badVariantCost.size].filter(Boolean).join(' / ') || 'a variant'} cannot be negative.`);
     const gstPercent = Number(formData.gstPercent);
     if (formData.gstEnabled && (!Number.isFinite(gstPercent) || gstPercent <= 0 || gstPercent > 100))
       return setError('Enter a GST percentage from 0.01 to 100.');
@@ -1201,9 +1200,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         const vPrice = (v.price !== undefined && v.price !== '' && !isNaN(Number(v.price)))
           ? parseFloat(v.price)
           : sale;
-        const vCost = (v.costPrice !== undefined && v.costPrice !== '' && !isNaN(Number(v.costPrice)))
-          ? parseFloat(v.costPrice)
-          : finalCostPrice;
+        // Empty or ₹0 variant rate = inherit the product Purchase Rate.
+        const vCost = Number(v.costPrice) > 0 ? parseFloat(v.costPrice) : finalCostPrice;
         const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
