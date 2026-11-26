@@ -1145,7 +1145,15 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         if (update.name) { patch.name = update.name; }
         if (update.category) { patch.category = update.category; patch.categoryId = update.category; patch.categoryKey = normalizeKey(update.category); }
         if (update.subCategory) { patch.subCategory = update.subCategory; patch.subCategoryKey = normalizeKey(update.subCategory); }
-        if (update.color) { patch.primaryColor = update.color; patch.colors = [{ name: update.color }]; }
+        if (update.color) {
+          patch.primaryColor = update.color;
+          // Keep colours added on the website; only add the POS colour when it is new.
+          const existingColors = Array.isArray(existing.colors) ? existing.colors : [];
+          const colorName = c => normalizeKey(typeof c === 'object' && c ? c.name : c);
+          if (!existingColors.some(c => colorName(c) === normalizeKey(update.color))) {
+            patch.colors = existingColors.length > 1 ? [...existingColors, { name: update.color }] : [{ name: update.color }];
+          }
+        }
         if (update.mrp != null) { patch.mrp = update.mrp; patch.compareAtPrice = update.mrp; }
         if (update.salePrice != null) { patch.salePrice = update.salePrice; patch.price = update.salePrice; }
         if (update.costPrice != null) {
@@ -1156,7 +1164,20 @@ export function registerPosSyncRoutes(app, { getDb, FieldValue, invalidateProduc
         }
         if (update.description) { patch.description = update.description; patch.shortDescription = update.description.slice(0, 240); }
         if (update.images.length > 0) {
-          patch.images = update.images;
+          // POS images usually carry no colour tag: keep the colour link and colour cover
+          // set on the website for the same image URL instead of resetting it to "All Colors".
+          const previous = new Map((Array.isArray(existing.images) ? existing.images : [])
+            .filter(img => img && typeof img === 'object' && img.url)
+            .map(img => [img.url, img]));
+          patch.images = update.images.map(img => {
+            const prev = previous.get(img.url);
+            if (!prev) return img;
+            return {
+              ...img,
+              ...(img.color ? {} : (prev.color ? { color: prev.color } : {})),
+              ...(prev.isColorPrimary && (!img.color || img.color === prev.color) ? { isColorPrimary: true } : {})
+            };
+          });
           const cover = update.images.find(img => img.isPrimary) || update.images[0];
           patch.image = cover?.url || existing.image;
           patch.thumbnailUrl = cover?.url || existing.thumbnailUrl;

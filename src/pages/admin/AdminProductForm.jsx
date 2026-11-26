@@ -426,6 +426,29 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             }
           }
 
+          // POS purchases update only the received variant's rate, so the product-level rate can
+          // still be ₹0. Fall back to the default variant's rate, then any variant with a rate.
+          const productCost = [data.costPrice, data.cost_price, data.purchasePrice, data.purchase_price]
+            .map(Number).find(n => n > 0);
+          const variantCost = [loadedVariants.find(v => v.isDefaultPrice), ...loadedVariants]
+            .map(v => Number(v?.costPrice)).find(n => n > 0);
+          const loadedCost = productCost || variantCost || '';
+
+          // Keep saved colour names exactly as stored (only fill in a missing swatch hex).
+          // Renaming "Dark Indigo Blue" to a standard alias broke the link with its images.
+          const loadedColors = (data.colors || []).map(c => {
+            const raw = typeof c === 'object' && c ? c : { name: String(c || '') };
+            const std = normalizeToStandardColor(raw);
+            if (!std) return raw;
+            const sameName = String(std.name).trim().toLowerCase() === String(raw.name || '').trim().toLowerCase();
+            return sameName ? std : { ...std, ...raw, name: String(raw.name).trim(), hex: raw.hex || std.hex };
+          }).filter(c => c.name);
+          const canonicalColor = (name) => {
+            const n = String(name || '').trim();
+            const hit = loadedColors.find(c => c.name.toLowerCase() === n.toLowerCase());
+            return hit ? hit.name : n;
+          };
+
           const prodCat = (data.categoryId || data.category || 'SHIRTS').toUpperCase();
           const isKnownCat = BASE_CATEGORIES.some(b => b.toLowerCase() === prodCat.toLowerCase());
           if (!isKnownCat && prodCat) {
@@ -456,13 +479,11 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
-            costPrice: Number(data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price ?? 0) > 0
-              ? (data.costPrice ?? data.cost_price ?? data.purchasePrice ?? data.purchase_price)
-              : '',
+            costPrice: loadedCost,
             gstEnabled: data.gstEnabled === true,
             gstPercent: data.gstPercent ?? '5',
             variants: loadedVariants,
-            colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
+            colors: loadedColors,
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
             sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
             offersConfig: data.offersConfig ? {
@@ -515,7 +536,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 url: img.url,
                 publicId: img.publicId || img.path,
                 isPrimary: img.isPrimary || (idx === 0 && !data.images?.some(i => i.isPrimary)),
-                color: img.color || '',
+                color: canonicalColor(img.color),
                 isColorPrimary: !!img.isColorPrimary
               };
             });
@@ -1161,28 +1182,46 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       const finalProductId = isEdit ? id : productId;
 
       // Upload pending images with resilient multi-tier pipeline (ImageKit -> Firebase Storage -> Canvas <60KB)
-      const newlyUploaded = [];
-      if (pendingImages.length > 0) {
-        for (let i = 0; i < pendingImages.length; i++) {
+      // Upload 3 images at a time instead of one by one; keep the original order.
+      const uploadedSlots = new Array(pendingImages.length).fill(null);
+      const failedUploads = [];
+      let doneCount = 0;
+      let nextIndex = 0;
+      const uploadWorker = async () => {
+        while (nextIndex < pendingImages.length) {
+          const i = nextIndex++;
           const item = pendingImages[i];
-          setUploadStatus(`Optimizing & uploading image ${i + 1} of ${pendingImages.length}...`);
           try {
             const uploadResult = await uploadImageToImageKit(item.file, `products/${finalProductId}`);
             if (uploadResult?.url) {
-              newlyUploaded.push({
+              uploadedSlots[i] = {
                 url: uploadResult.url,
                 publicId: uploadResult.fileId || null,
                 alt: formData.name + ' - ' + (i + 1),
                 isPrimary: item.isPrimary,
                 color: item.color || '',
                 isColorPrimary: !!item.isColorPrimary
-              });
+              };
+            } else {
+              failedUploads.push(item.name);
             }
           } catch (uploadErr) {
             console.warn(`Upload error for ${item.name}:`, uploadErr);
+            failedUploads.push(item.name);
           }
+          doneCount += 1;
+          setUploadStatus(`Uploading images… ${doneCount} of ${pendingImages.length} done`);
         }
+      };
+      if (pendingImages.length > 0) {
+        setUploadStatus(`Uploading images… 0 of ${pendingImages.length} done`);
+        await Promise.all(Array.from({ length: Math.min(3, pendingImages.length) }, uploadWorker));
       }
+      // Stop instead of silently saving the product without the photos that failed.
+      if (failedUploads.length > 0) {
+        throw new Error(`${failedUploads.length} image(s) failed to upload (${failedUploads.join(', ')}). Nothing was saved — check your connection and press Save again.`);
+      }
+      const newlyUploaded = uploadedSlots.filter(Boolean);
       setUploadStatus('Publishing product to store catalog...');
 
       // 3. Combine images and fix sort ordering with primary image guaranteed first (index 0)
@@ -1314,7 +1353,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         result = await createProduct(payload, finalProductId); // Passing explicit ID
       }
       // Remove old files only after the product no longer references them.
-      for (const fileId of imagesToDelete) await deleteProductImage(fileId);
+      // Clean up removed files in the background; the save itself is already done.
+      Promise.allSettled(imagesToDelete.map(fileId => deleteProductImage(fileId)));
       invalidateProductCache();
 
       if (saveAndNew) {
@@ -1957,6 +1997,9 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                         {formData.colors.map(c => (
                           <option key={c.name} value={c.name}>{c.name}</option>
                         ))}
+                        {img.color && !formData.colors.some(c => c.name === img.color) && (
+                          <option value={img.color}>{img.color} (not in colour list)</option>
+                        )}
                       </select>
                     </div>
 
@@ -1975,8 +2018,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                       )}
                       {img.isPrimary && <span className="primary-label">PRIMARY</span>}
                       {img.color && (isColorPrimaryShown('existing', idx)
-                        ? <span className="primary-label" style={{ background: '#0f766e' }} title={`Shown first when customers pick ${img.color}`}>★ {img.color} PRIMARY</span>
-                        : <button type="button" onClick={() => setColorPrimaryImage('existing', idx)} className="btn-set-primary" title={`Show this image first when customers pick ${img.color}`}>★ Make {img.color} Primary</button>
+                        ? <span className="color-primary-label" title={`Shown first when customers pick ${img.color}`}>★ {img.color} cover</span>
+                        : <button type="button" onClick={() => setColorPrimaryImage('existing', idx)} className="btn-set-color-primary" title={`Show this image first when customers pick ${img.color}`}>☆ Set as {img.color} cover</button>
                       )}
                       <button onClick={() => removeExistingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
@@ -2011,6 +2054,9 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                         {formData.colors.map(c => (
                           <option key={c.name} value={c.name}>{c.name}</option>
                         ))}
+                        {fileObj.color && !formData.colors.some(c => c.name === fileObj.color) && (
+                          <option value={fileObj.color}>{fileObj.color} (not in colour list)</option>
+                        )}
                       </select>
                     </div>
 
@@ -2029,8 +2075,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                       )}
                       {fileObj.isPrimary && <span className="primary-label">PRIMARY</span>}
                       {fileObj.color && (isColorPrimaryShown('pending', idx)
-                        ? <span className="primary-label" style={{ background: '#0f766e' }} title={`Shown first when customers pick ${fileObj.color}`}>★ {fileObj.color} PRIMARY</span>
-                        : <button type="button" onClick={() => setColorPrimaryImage('pending', idx)} className="btn-set-primary" title={`Show this image first when customers pick ${fileObj.color}`}>★ Make {fileObj.color} Primary</button>
+                        ? <span className="color-primary-label" title={`Shown first when customers pick ${fileObj.color}`}>★ {fileObj.color} cover</span>
+                        : <button type="button" onClick={() => setColorPrimaryImage('pending', idx)} className="btn-set-color-primary" title={`Show this image first when customers pick ${fileObj.color}`}>☆ Set as {fileObj.color} cover</button>
                       )}
                       <button onClick={() => removePendingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>

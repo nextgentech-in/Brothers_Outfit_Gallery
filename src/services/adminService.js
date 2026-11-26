@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db, auth } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
 import { invalidateProductCache } from './productService';
@@ -221,9 +221,6 @@ export const getAdminProductById = async (id) => {
 // Auto-detect duplicate product names and slugs
 export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = null) => {
   try {
-    const products = await getAdminProducts();
-    const otherProducts = products.filter(p => !excludeId || p.id !== excludeId);
-
     // 1. Keep original Name (Don't append numbers)
     let finalName = String(name || '').trim();
 
@@ -236,8 +233,16 @@ export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = nul
     }
     let finalSlug = baseSlug;
     if (finalSlug) {
+      // Only fetch products whose slug starts with this base (was: download the whole catalogue).
+      const snap = await getDocs(query(
+        collection(db, PRODUCTS),
+        where('slug', '>=', baseSlug),
+        where('slug', '<=', `${baseSlug}`)
+      ));
       const existingSlugs = new Set(
-        otherProducts.map(p => String(p.slug || '').trim().toLowerCase())
+        snap.docs
+          .filter(d => (!excludeId || d.id !== excludeId) && d.data().isDeleted !== true)
+          .map(d => String(d.data().slug || '').trim().toLowerCase())
       );
 
       if (existingSlugs.has(finalSlug.toLowerCase())) {

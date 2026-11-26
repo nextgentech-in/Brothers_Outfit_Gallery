@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
-import { optimizeImage, getThumbnailImageUrl, getProductDetailImageUrl, getZoomImageUrl } from '../../utils/imageUtils';
+import { getThumbnailImageUrl, getProductDetailImageUrl, getZoomImageUrl } from '../../utils/imageUtils';
 import { sortColorImages } from '../../utils/colorImages';
 import './ProductGallery.css';
 
@@ -17,12 +17,6 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
   const isGeneralImage = (img) => {
     const c = extractColor(img).toLowerCase();
     return !c || c === 'all' || c === 'general' || c === 'all colors' || c === 'standard' || c === 'default';
-  };
-
-  const isColorMatch = (img, targetColor) => {
-    if (!targetColor) return false;
-    const c = extractColor(img).toLowerCase();
-    return c === String(targetColor).trim().toLowerCase();
   };
 
   // Filter images linked specifically to the selected color or show all for 'All'

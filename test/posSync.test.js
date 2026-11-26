@@ -1317,6 +1317,44 @@ test('PUT /api/pos/products updates product fields', async () => {
   assert.equal(mVariant.stock, 10, 'Stock must not be changed by PUT');
 });
 
+test('PUT /api/pos/products keeps website colour tags and extra colours', async () => {
+  const product = createSampleProduct('W-POS-COLOR-1', 'SKU-COLOR-1');
+  const createRes = await api('/api/pos/products', { method: 'POST', body: { products: [product] } });
+  assert.equal(createRes.status, 200);
+  const mapping = await sharedDb.collection('posProductMappings').doc(crypto.createHash('sha256').update('w-pos-color-1').digest('hex')).get();
+  const productId = mapping.data().productId;
+
+  // Admin links images to colours on the website
+  await sharedDb.collection('products').doc(productId).update({
+    colors: [{ name: 'Dark Indigo Blue' }, { name: 'Black' }],
+    images: [
+      { url: 'https://cdn.example.com/indigo.jpg', isPrimary: true, color: 'Dark Indigo Blue', isColorPrimary: true },
+      { url: 'https://cdn.example.com/black.jpg', color: 'Black' }
+    ]
+  });
+
+  // POS re-sends the same images without colour tags
+  const updateRes = await api('/api/pos/products', {
+    method: 'PUT',
+    body: { products: [{
+      web_product_id: 'W-POS-COLOR-1',
+      color: 'Black',
+      images: [
+        { url: 'https://cdn.example.com/indigo.jpg', is_cover: true },
+        { url: 'https://cdn.example.com/black.jpg' },
+        { url: 'https://cdn.example.com/new.jpg' }
+      ]
+    }] }
+  });
+  assert.equal(updateRes.status, 200);
+  const doc = (await sharedDb.collection('products').doc(productId).get()).data();
+  assert.equal(doc.images[0].color, 'Dark Indigo Blue');
+  assert.equal(doc.images[0].isColorPrimary, true);
+  assert.equal(doc.images[1].color, 'Black');
+  assert.equal(doc.images[2].color, undefined);
+  assert.deepEqual(doc.colors.map(c => c.name), ['Dark Indigo Blue', 'Black']);
+});
+
 test('PUT /api/pos/products preserves stock and unchanged fields', async () => {
   const product = createSampleProduct('W-POS-EDIT-2', 'SKU-EDIT-2');
   await api('/api/pos/products', { method: 'POST', body: { products: [product] } });
