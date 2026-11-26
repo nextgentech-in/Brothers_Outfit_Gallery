@@ -20,6 +20,7 @@ import {
 } from '../../components/common/SizeGuideModal';
 import VisualColorSelector from '../../components/admin/VisualColorSelector.jsx';
 import { detectDominantColor } from '../../utils/imageColorDetector.js';
+import { normalizeColorPrimaries } from '../../utils/colorImages.js';
 import { normalizeToStandardColor } from '../../data/colorMaster.js';
 
 const CATEGORY_SIZES_MAP = {
@@ -514,10 +515,11 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 url: img.url,
                 publicId: img.publicId || img.path,
                 isPrimary: img.isPrimary || (idx === 0 && !data.images?.some(i => i.isPrimary)),
-                color: img.color || ''
+                color: img.color || '',
+                isColorPrimary: !!img.isColorPrimary
               };
             });
-            setExistingImages(mappedImages);
+            setExistingImages(normalizeColorPrimaries(mappedImages));
           }
         }
         setLoading(false);
@@ -1031,15 +1033,35 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
 
   const handleImageColorChange = (type, index, newColor) => {
     if (type === 'existing') {
-      setExistingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor } : img));
+      setExistingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor, isColorPrimary: false } : img));
     } else {
-      setPendingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor } : img));
+      setPendingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor, isColorPrimary: false } : img));
     }
   };
 
+  // Mark one image as the cover photo for its linked colour (one per colour across stored + new images)
+  const setColorPrimaryImage = (type, index) => {
+    const list = type === 'existing' ? existingImages : pendingImages;
+    const color = String(list[index]?.color || '').trim().toLowerCase();
+    if (!color) return;
+    const update = (isTarget) => (img, i) => {
+      if (String(img.color || '').trim().toLowerCase() !== color) return img;
+      return { ...img, isColorPrimary: isTarget(i) };
+    };
+    setExistingImages(prev => prev.map(update(i => type === 'existing' && i === index)));
+    setPendingImages(prev => prev.map(update(i => type === 'pending' && i === index)));
+    showToast(`Set as primary image for ${list[index].color}`, 'success');
+  };
+
+  const isColorPrimaryShown = (type, index) => {
+    const all = normalizeColorPrimaries([...existingImages, ...pendingImages]);
+    const offset = type === 'existing' ? 0 : existingImages.length;
+    return !!all[offset + index]?.isColorPrimary;
+  };
+
   const handleBulkTagAllImages = (targetColor) => {
-    setExistingImages(prev => prev.map(img => ({ ...img, color: targetColor })));
-    setPendingImages(prev => prev.map(img => ({ ...img, color: targetColor })));
+    setExistingImages(prev => prev.map(img => ({ ...img, color: targetColor, isColorPrimary: false })));
+    setPendingImages(prev => prev.map(img => ({ ...img, color: targetColor, isColorPrimary: false })));
     showToast(`Tagged all product images with color "${targetColor || 'All Colors'}"`, 'success');
   };
 
@@ -1152,7 +1174,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 publicId: uploadResult.fileId || null,
                 alt: formData.name + ' - ' + (i + 1),
                 isPrimary: item.isPrimary,
-                color: item.color || ''
+                color: item.color || '',
+                isColorPrimary: !!item.isColorPrimary
               });
             }
           } catch (uploadErr) {
@@ -1177,11 +1200,12 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         return 0;
       });
 
-      combinedImages = combinedImages.map((img, idx) => ({
+      combinedImages = normalizeColorPrimaries(combinedImages).map((img, idx) => ({
         url: img.url,
         publicId: img.publicId || null,
         isPrimary: idx === 0, // First item is primary
         color: img.color || '',
+        isColorPrimary: !!img.isColorPrimary,
         alt: img.alt || `${formData.name} - ${idx + 1}`,
         sortOrder: idx
       }));
@@ -1950,6 +1974,10 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                         <button onClick={() => setPrimaryImage('existing', idx)} className="btn-set-primary">Make Primary</button>
                       )}
                       {img.isPrimary && <span className="primary-label">PRIMARY</span>}
+                      {img.color && (isColorPrimaryShown('existing', idx)
+                        ? <span className="primary-label" style={{ background: '#0f766e' }} title={`Shown first when customers pick ${img.color}`}>★ {img.color} PRIMARY</span>
+                        : <button type="button" onClick={() => setColorPrimaryImage('existing', idx)} className="btn-set-primary" title={`Show this image first when customers pick ${img.color}`}>★ Make {img.color} Primary</button>
+                      )}
                       <button onClick={() => removeExistingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
                   </div>
@@ -2000,6 +2028,10 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                         <button onClick={() => setPrimaryImage('pending', idx)} className="btn-set-primary">Make Primary</button>
                       )}
                       {fileObj.isPrimary && <span className="primary-label">PRIMARY</span>}
+                      {fileObj.color && (isColorPrimaryShown('pending', idx)
+                        ? <span className="primary-label" style={{ background: '#0f766e' }} title={`Shown first when customers pick ${fileObj.color}`}>★ {fileObj.color} PRIMARY</span>
+                        : <button type="button" onClick={() => setColorPrimaryImage('pending', idx)} className="btn-set-primary" title={`Show this image first when customers pick ${fileObj.color}`}>★ Make {fileObj.color} Primary</button>
+                      )}
                       <button onClick={() => removePendingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
                   </div>

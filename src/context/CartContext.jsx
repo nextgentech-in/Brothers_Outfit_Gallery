@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { getColorPrimaryImageUrl } from '../utils/colorImages';
 
 const CartContext = createContext();
 
@@ -232,7 +233,7 @@ export const CartProvider = ({ children }) => {
         id: product.id,
         productId: product.id,
         name: product.name,
-        image: product.image || product.thumbnailUrl,
+        image: getColorPrimaryImageUrl(product, safeColor) || product.image || product.thumbnailUrl,
         slug: product.slug,
         size: safeSize,
         color: safeColor,
@@ -245,7 +246,7 @@ export const CartProvider = ({ children }) => {
     showToast({
       id: product.id,
       name: product.name,
-      image: product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
+      image: getColorPrimaryImageUrl(product, safeColor) || product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
       size: safeSize,
       color: safeColor,
       price: activePrice,
@@ -265,7 +266,7 @@ export const CartProvider = ({ children }) => {
       id: product.id,
       productId: product.id,
       name: product.name,
-      image: product.image || product.thumbnailUrl,
+      image: getColorPrimaryImageUrl(product, safeColor) || product.image || product.thumbnailUrl,
       slug: product.slug,
       size: safeSize,
       color: safeColor,

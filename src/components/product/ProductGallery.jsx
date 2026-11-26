@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
 import { optimizeImage, getThumbnailImageUrl, getProductDetailImageUrl, getZoomImageUrl } from '../../utils/imageUtils';
+import { sortColorImages } from '../../utils/colorImages';
 import './ProductGallery.css';
 
 export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors, isOutOfStock = false, productName = 'Men’s Wear' }) {
@@ -38,7 +39,8 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     }
 
     const target = String(selectedColor).trim().toLowerCase();
-    const colorMatched = validImages.filter(img => isColorMatch(img, target));
+    // Colour's own primary image (set in admin) comes first
+    const colorMatched = sortColorImages(validImages, target);
     const generalImages = validImages.filter(img => isGeneralImage(img));
 
     // When a specific color is chosen, include color-matched images + untagged/general images
