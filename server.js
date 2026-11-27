@@ -1219,7 +1219,16 @@ app.get(['/api/imagekit/auth', '/imagekit/auth'], requireAdminAuth, (req, res) =
 });
 
 // Check every live website reference before removing a file from ImageKit.
-async function deleteUnusedImageKitFile(db, fileId) {
+// Load the live references once and reuse them for every image of a delete.
+async function loadImageReferences(db) {
+  const [products, settings] = await Promise.all([db.collection('products').get(), db.collection('settings').get()]);
+  return [
+    ...products.docs.filter(doc => doc.data().active !== false && doc.data().isDeleted !== true).map(doc => JSON.stringify(doc.data())),
+    ...settings.docs.map(doc => JSON.stringify(doc.data()))
+  ];
+}
+
+async function deleteUnusedImageKitFile(db, fileId, preloadedReferences = null) {
   if (!/^[a-f0-9]{24}$/i.test(String(fileId))) throw new Error('Invalid ImageKit file ID.');
   const privateKey = (process.env.IMAGEKIT_PRIVATE_KEY || '').trim();
   if (!privateKey) throw new Error('ImageKit is not configured.');
@@ -1230,12 +1239,8 @@ async function deleteUnusedImageKitFile(db, fileId) {
   const file = await details.json();
   const url = String(file.url || '').split('?')[0];
   if (!url) throw new Error('ImageKit file URL is unavailable.');
-  const [products, settings] = await Promise.all([db.collection('products').get(), db.collection('settings').get()]);
-  const references = [
-    ...products.docs.filter(doc => doc.data().active !== false && doc.data().isDeleted !== true).map(doc => doc.data()),
-    ...settings.docs.map(doc => doc.data())
-  ];
-  if (references.some(data => JSON.stringify(data).includes(fileId) || JSON.stringify(data).includes(url))) {
+  const references = preloadedReferences || await loadImageReferences(db);
+  if (references.some(json => json.includes(fileId) || json.includes(url))) {
     return { fileId, status: 'in_use' };
   }
   const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`, { method: 'DELETE', headers });
@@ -1251,25 +1256,33 @@ app.post(['/api/admin/products/:productId/delete', '/admin/products/:productId/d
     const snapshot = await ref.get();
     if (!snapshot.exists) return res.status(404).json({ error: 'Product not found.' });
     const productImages = Array.isArray(snapshot.data().images) ? snapshot.data().images : [];
-    const imageIds = new Set(productImages.map(image => image?.publicId || image?.fileId).filter(Boolean));
-    const imageUrls = new Set([snapshot.data().image, snapshot.data().thumbnailUrl,
+    const imageIds = new Set(productImages.map(image => image?.publicId || image?.fileId).filter(id => /^[a-f0-9]{24}$/i.test(String(id || ''))));
+    const clean = url => String(url || '').split('?')[0];
+    const knownUrls = new Set(productImages.filter(image => image && typeof image === 'object' && /^[a-f0-9]{24}$/i.test(String(image.publicId || image.fileId || ''))).map(image => clean(image.url)));
+    // Only legacy images saved without an ImageKit ID need a library search.
+    const unknownUrls = new Set([snapshot.data().image, snapshot.data().thumbnailUrl,
       ...productImages.map(image => typeof image === 'string' ? image : image?.url)]
       .filter(url => typeof url === 'string' && url.includes('ik.imagekit.io'))
-      .map(url => url.split('?')[0]));
-    if (imageUrls.size && process.env.IMAGEKIT_PRIVATE_KEY) {
+      .map(clean)
+      .filter(url => !knownUrls.has(url)));
+    if (unknownUrls.size && process.env.IMAGEKIT_PRIVATE_KEY) {
       const headers = { Authorization: `Basic ${Buffer.from(`${process.env.IMAGEKIT_PRIVATE_KEY.trim()}:`).toString('base64')}` };
-      for (let skip = 0; skip < 10000; skip += 100) {
+      for (let skip = 0; skip < 10000 && unknownUrls.size > 0; skip += 100) {
         const response = await fetch(`https://api.imagekit.io/v1/files?skip=${skip}&limit=100`, { headers });
         if (!response.ok) throw new Error(`ImageKit listing failed (${response.status}).`);
         const page = await response.json();
-        page.filter(file => imageUrls.has(String(file.url || '').split('?')[0])).forEach(file => imageIds.add(file.fileId));
+        page.forEach(file => {
+          const url = clean(file.url);
+          if (unknownUrls.has(url)) { imageIds.add(file.fileId); unknownUrls.delete(url); }
+        });
         if (page.length < 100) break;
       }
     }
     await ref.update({ active: false, isDeleted: true, deletedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     productCatalogCache = { products: null, expiresAt: 0 };
+    const references = imageIds.size ? await loadImageReferences(db) : [];
     const imageCleanup = await Promise.all([...imageIds].map(async fileId => {
-      try { return await deleteUnusedImageKitFile(db, fileId); }
+      try { return await deleteUnusedImageKitFile(db, fileId, references); }
       catch (error) { return { fileId, status: 'failed', error: error.message }; }
     }));
     return res.json({ success: true, imageCleanup });

@@ -96,12 +96,20 @@ export default function AdminProducts() {
       isDestructive: true
     });
 
-    if (confirmed) {
+    if (!confirmed) return;
+    // Take it off the list straight away; put it back if the server refuses.
+    const removed = products.find(p => p.id === id);
+    setProducts(prev => prev.filter(p => p.id !== id));
+    showToast('Removing product…', 'info');
+    try {
       const result = await deleteProduct(id);
       const failed = result.imageCleanup?.filter(item => item.status === 'failed').length || 0;
       showToast(failed ? `Product removed; ${failed} ImageKit image(s) need cleanup.` : 'Product and unused ImageKit images removed.', failed ? 'error' : 'success');
-      fetchProducts();
+    } catch (err) {
+      if (removed) setProducts(prev => (prev.some(p => p.id === id) ? prev : [removed, ...prev]));
+      showToast(`Could not remove the product: ${err.message}`, 'error', 7000);
     }
+    fetchProducts();
   };
 
   // Counts for filter pills

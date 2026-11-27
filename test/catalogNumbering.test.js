@@ -73,15 +73,17 @@ test('edits can add variants with the next sequential SKU and remove only empty 
   assert.equal(saved.nextVariantSequence, 3);
   assert.ok([...records.keys()].some(key => key.startsWith('stockMovements/') && records.get(key).sku === 'BOG-000041-V002' && records.get(key).deltaChange === 3));
 
-  const removeStocked = await save('product-001', { ...saved, variants: [saved.variants[0]] }, false);
-  assert.equal(removeStocked.status, 409); assert.match(removeStocked.body.error, /Set stock to 0/);
+  // A size held in a customer's checkout cannot be removed.
+  records.set('products/product-001', { ...saved, variants: [saved.variants[0], { ...saved.variants[1], reserved: 1 }] });
+  const removeHeld = await save('product-001', { ...saved, variants: [saved.variants[0]] }, false);
+  assert.equal(removeHeld.status, 409); assert.match(removeHeld.body.error, /checking out/);
+  records.set('products/product-001', saved);
 
-  const emptied = await save('product-001', { ...saved, variants: [saved.variants[0], { ...saved.variants[1], stock: 0 }] }, false);
-  assert.equal(emptied.status, 200, JSON.stringify(emptied.body));
-  saved = records.get('products/product-001');
+  // Removing a stocked size in one save writes its stock off in the ledger.
   const removed = await save('product-001', { ...saved, variants: [saved.variants[0]] }, false);
   assert.equal(removed.status, 200, JSON.stringify(removed.body));
   assert.equal(records.get('products/product-001').variants.length, 1);
+  assert.ok([...records.keys()].some(key => key.startsWith('stockMovements/') && records.get(key).sku === 'BOG-000041-V002' && records.get(key).reason === 'variant_removed' && records.get(key).deltaChange === -3));
 
   const readded = await save('product-001', { ...records.get('products/product-001'), variants: [records.get('products/product-001').variants[0], { size: 'XL', color: 'Black', stock: 1, price: 800 }] }, false);
   assert.equal(readded.status, 200, JSON.stringify(readded.body));

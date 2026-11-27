@@ -557,6 +557,18 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         [name]: type === 'checkbox' ? checked : value
       };
 
+      // The storefront price comes from the size marked "Front Price", so a change to
+      // the main Sale Price must reach the sizes or it is silently lost on save.
+      // Sizes still on the old price (or with no own price) follow; sizes given
+      // their own special price keep it.
+      if (name === 'salePrice' && Array.isArray(prev.variants) && prev.variants.length > 0) {
+        const oldPrice = prev.salePrice === '' ? null : Number(prev.salePrice);
+        const nextPrice = value === '' || isNaN(Number(value)) ? '' : Number(value);
+        updated.variants = prev.variants.map(variant => {
+          const own = variant.price === undefined || variant.price === '' ? null : Number(variant.price);
+          return own === null || own === oldPrice ? { ...variant, price: nextPrice, salePrice: nextPrice } : variant;
+        });
+      }
       if (name === 'name' && !isEdit) {
         updated.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       }

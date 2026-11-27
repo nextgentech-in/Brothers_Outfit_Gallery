@@ -101,6 +101,7 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
 
       const oldSkus = [oldData.sku, ...(Array.isArray(oldData.variants) ? oldData.variants.map(variant => variant?.sku) : [])]
         .map(value => String(value || '').trim()).filter(Boolean);
+      let removedVariants = [];
       if (!create) {
         // The parent SKU is the product's identity in the POS and on printed tags.
         const oldParent = String(oldData.sku || '').trim().toLowerCase();
@@ -108,17 +109,18 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
           throw Object.assign(new Error(`The product SKU (${oldData.sku}) cannot be changed after creation. Create a new product instead.`), { statusCode: 409 });
         }
         // Variants may be added (they get new SKUs; the store POS reads this same
-        // Firestore catalog, so it sees them immediately). A variant can only be removed once it holds no
-        // stock, so no physical item is left with a SKU the website no longer knows.
+        // Firestore catalog, so it sees them immediately). A removed variant's stock is
+        // written off as an admin adjustment so the ledger stays complete. Only variants
+        // held in a customer's checkout right now are protected.
         const keptSkus = new Set(normalizedSkus);
-        const removedWithStock = (Array.isArray(oldData.variants) ? oldData.variants : []).filter(variant => {
+        removedVariants = (Array.isArray(oldData.variants) ? oldData.variants : []).filter(variant => {
           const sku = String(variant?.sku || '').trim().toLowerCase();
-          if (!sku || keptSkus.has(sku)) return false;
-          return Number(variant.stock ?? variant.quantity ?? 0) > 0 || Number(variant.reserved ?? 0) > 0;
+          return sku && !keptSkus.has(sku);
         });
-        if (removedWithStock.length > 0) {
-          const names = removedWithStock.map(variant => [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku).join(', ');
-          throw Object.assign(new Error(`Set stock to 0 before removing ${names}. Variants that still hold stock cannot be deleted.`), { statusCode: 409 });
+        const held = removedVariants.filter(variant => Number(variant.reserved ?? 0) > 0);
+        if (held.length > 0) {
+          const names = held.map(variant => [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku).join(', ');
+          throw Object.assign(new Error(`${names} cannot be removed right now because a customer is checking out with it. Try again in a few minutes.`), { statusCode: 409 });
         }
       }
       const allNormalized = [...new Set([...oldSkus, ...rawSkus].map(value => value.toLowerCase()))];
@@ -214,6 +216,17 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
                 stockAfter: after, createdAt: FieldValue.serverTimestamp()
               });
             }
+          });
+          removedVariants.forEach(variant => {
+            const before = Number(variant.stock ?? variant.quantity ?? 0);
+            if (!Number.isSafeInteger(before) || before <= 0) return;
+            const movementId = `web_${crypto.createHash('sha256').update(`${requestId}|variant-removed|${variant.sku}`).digest('hex')}`;
+            transaction.create(db.collection('stockMovements').doc(movementId), {
+              movementId, productId, webProductId: identity.webProductId, sku: variant.sku,
+              size: variant.size || 'One Size', color: variant.color || editableData.primaryColor || 'Standard',
+              deltaChange: -before, source: 'website', reason: 'variant_removed', externalReference: requestId,
+              stockAfter: 0, createdAt: FieldValue.serverTimestamp()
+            });
           });
         } else {
           const before = Number(oldData.stock ?? oldData.quantity ?? 0);
