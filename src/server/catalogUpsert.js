@@ -107,8 +107,8 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
         if (oldParent && oldParent !== String(productData.sku || '').trim().toLowerCase()) {
           throw Object.assign(new Error(`The product SKU (${oldData.sku}) cannot be changed after creation. Create a new product instead.`), { statusCode: 409 });
         }
-        // Variants may be added (they get new SKUs, and the POS picks them up from the
-        // product feed / shared catalog). A variant can only be removed once it holds no
+        // Variants may be added (they get new SKUs; the store POS reads this same
+        // Firestore catalog, so it sees them immediately). A variant can only be removed once it holds no
         // stock, so no physical item is left with a SKU the website no longer knows.
         const keptSkus = new Set(normalizedSkus);
         const removedWithStock = (Array.isArray(oldData.variants) ? oldData.variants : []).filter(variant => {
