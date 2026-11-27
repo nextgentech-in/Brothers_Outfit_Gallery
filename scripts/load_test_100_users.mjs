@@ -10,7 +10,7 @@ const TOTAL_REQUESTS = 1000;
 
 const PINCODES = ['383001', '110001', '400001', '560001', '700001', '600001', '500001', '380001'];
 const PLACES = ['Himatnagar', 'Ahmedabad', 'Mumbai', 'Delhi', 'Bengaluru', 'Pune'];
-const POS_TOKEN = process.env.POS_SYNC_API_TOKEN || 'ee33921811cd0fa33a0bcf056a21665a25472aeafa84cda10396323c5c37afffc55c420a827fbc461a5d74d652741df2';
+const POS_TOKEN = process.env.POS_SYNC_API_TOKEN || '';
 
 // Helper to make fast HTTP requests
 function makeRequest(path, method = 'GET', body = null, extraHeaders = {}) {

@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { checkPincodeServiceability } from '../../services/delhiveryService';
-import { isClothingProduct, getAvailableProductSizes } from '../../utils/productUtils';
+import { isClothingProduct, getAvailableProductSizes, getAvailableStock } from '../../utils/productUtils';
 import { useWishlist } from '../../context/WishlistContext';
 import SizeGuideModal from '../common/SizeGuideModal';
 import { flyProductToCart } from '../../utils/cartFlyAnimation';
-import { normalizeToStandardColor } from '../../data/colorMaster.js';
+import { normalizeToStandardColor, sameColor } from '../../data/colorMaster.js';
 import './ProductInfo.css';
 
 const COLOR_SWATCHES = [
@@ -74,6 +74,8 @@ function MiniCountdown({ targetDate }) {
   );
 }
 
+const PREPAID_FREE_DELIVERY_OFFER = { id: 'offer-prepaid-free-delivery', text: 'FREE Delivery on all Prepaid Orders!', icon: 'shipping', link: '' };
+
 export default function ProductInfo({ product, onColorChange, offersConfig }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth() || {};
@@ -133,6 +135,11 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
     onColorChange?.('All', -1);
   }, [product.id, defaultFrontVariant?.size]);
 
+  // A new colour (or product) is a new variant: start the quantity again from 1.
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedColor, product.id]);
+
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
 
@@ -141,8 +148,8 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
   }, [product.variants, product.sizes]);
 
   const productTotalStock = useMemo(() => {
-    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + (parseInt(v.stock, 10) || 0), 0) : (product.stock || 0);
-  }, [product.variants, product.stock]);
+    return product.variants?.length > 0 ? product.variants.reduce((acc, v) => acc + getAvailableStock(v), 0) : getAvailableStock(product);
+  }, [product.variants, product.stock, product.reserved]);
 
   // Available colors that have stock > 0
   const inStockColors = useMemo(() => {
@@ -153,7 +160,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         const vCol = String(v.color || '').trim().toLowerCase();
         return vCol === colName || vCol === 'standard' || vCol === 'default';
       });
-      return colVariants.length === 0 || colVariants.some(v => (parseInt(v.stock, 10) || 0) > 0);
+      return colVariants.length === 0 || colVariants.some(v => getAvailableStock(v) > 0);
     });
   }, [availableColors, product.variants]);
 
@@ -180,7 +187,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       : (availableColors[0]?.name || productColors[0] || null);
 
     return product.variants.find(v =>
-      v.size === targetSize && (!v.color || v.color === effectiveColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === targetSize && (!v.color || sameColor(v.color, effectiveColor) || sameColor(v.color, 'Standard'))
     ) || product.variants.find(v => v.size === targetSize);
   }, [product.variants, selectedSize, selectedColor, productSizes, defaultFrontVariant, availableColors, productColors]);
 
@@ -215,12 +222,17 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
   } = product;
 
   // Stock status for selected size or whole product
-  const activeVariantStock = matchedVariant ? parseInt(matchedVariant.stock ?? matchedVariant.quantity, 10) : productTotalStock;
-  const isEntirelySoldOut = productTotalStock <= 0 || product.inStock === false || product.active === false || (productSizes.length > 0 && visibleSizes.length === 0);
+  const activeVariantStock = matchedVariant ? getAvailableStock(matchedVariant) : productTotalStock;
+  const isEntirelySoldOut = productTotalStock <= 0 || product.active === false || product.isDeleted === true || (productSizes.length > 0 && visibleSizes.length === 0);
   const outOfStock = isEntirelySoldOut || (selectedSize && activeVariantStock <= 0);
   const stock = selectedSize && matchedVariant ? activeVariantStock : productTotalStock;
 
   const { addToCart, buyNowDirect } = useCart();
+
+  // Never let the chosen quantity exceed what the selected size has in stock.
+  useEffect(() => {
+    if (stock > 0 && quantity > stock) setQuantity(stock);
+  }, [stock, quantity]);
 
   const handleQuantity = (delta) => {
     setQuantity(prev => {
@@ -231,9 +243,10 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
     });
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (sizeOverride) => {
+    const chosenSize = typeof sizeOverride === 'string' ? sizeOverride : selectedSize;
     // Only require mandatory size selection if item is Clothing/Apparel and has size options
-    if (isClothing && productSizes.length > 0 && !selectedSize) {
+    if (isClothing && productSizes.length > 0 && !chosenSize) {
       setSizeError(true);
       const sizeEl = document.querySelector('.product-selector-group');
       sizeEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -241,9 +254,17 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       return;
     }
 
-    const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    const sizeToUse = chosenSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
     const colorToUse = (selectedColor && selectedColor !== 'All') ? selectedColor : (availableColors[0]?.name || productColors[0] || 'Default');
-    addToCart(product, sizeToUse, colorToUse, quantity, activeSale);
+    // Price follows the size actually added (it can differ from the one on screen).
+    const sizeVariant = sizeToUse !== selectedSize
+      ? product.variants?.find(v => v.size === sizeToUse && (!v.color || v.color === colorToUse || v.color === 'Standard' || v.color === 'Default')) || product.variants?.find(v => v.size === sizeToUse)
+      : null;
+    const sizePrice = sizeVariant && sizeVariant.price !== undefined && sizeVariant.price !== '' && !isNaN(Number(sizeVariant.price))
+      ? Number(sizeVariant.price)
+      : activeSale;
+    const qtyToAdd = sizeVariant ? Math.max(1, Math.min(quantity, getAvailableStock(sizeVariant) || 1)) : quantity;
+    addToCart(product, sizeToUse, colorToUse, qtyToAdd, sizePrice);
 
     // Trigger visual flying animation from main product gallery image to the navbar cart
     const galleryMainImg = document.querySelector('.product-gallery-main img, .image-zoom-img') || document.querySelector('.product-gallery-section img');
@@ -310,52 +331,32 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         )}
       </div>
 
-      {productRating > 0 ? (
-        <div
-          className="product-rating"
-          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-          role="button"
-          tabIndex={0}
-          aria-label={`${productRating.toFixed(1)} stars out of 5 from ${reviewCount} reviews`}
-        >
-          <span className="stars">
-            {'★'.repeat(Math.round(productRating))}{'☆'.repeat(5 - Math.round(productRating))}
-          </span>
-          <span className="rating-value">{productRating.toFixed(1)}</span>
-          {reviewCount > 0 && <span className="review-count">({reviewCount} {reviewCount === 1 ? 'Review' : 'Reviews'})</span>}
-        </div>
-      ) : (
-        <div
-          className="product-rating product-rating--empty"
-          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="rating-empty-link">★ Be the first to review this product</span>
-        </div>
-      )}
-
       <div className="product-pricing">
-        {hasDiscount ? (
+        <div className="pdp-price-row">
+          <span className={`pdp-price ${hasDiscount ? 'is-sale' : ''}`}>₹{activeSale.toLocaleString('en-IN')}</span>
+          {hasDiscount && <span className="pdp-mrp">₹{activeMrp.toLocaleString('en-IN')}</span>}
+          {hasDiscount && <span className="pdp-off">{currentDiscount}% off</span>}
+        </div>
+        <p className="pdp-tax-note">*MRP inclusive of all taxes</p>
+      </div>
+
+      <button
+        type="button"
+        className={`pdp-rating ${productRating > 0 ? '' : 'is-empty'}`}
+        onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
+        aria-label={productRating > 0 ? `${productRating.toFixed(1)} stars out of 5 from ${reviewCount} reviews` : 'Write the first review'}
+      >
+        {productRating > 0 ? (
           <>
-            <div className="price-row-top" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span className="price-original" style={{ color: '#9ca3af', textDecoration: 'line-through', fontSize: '14px' }}>
-                ₹{activeMrp.toLocaleString('en-IN')}
-              </span>
-              <span className="price-discount" style={{ background: 'var(--color-accent-gold-light)', color: 'var(--color-accent-gold-text)', border: '1px solid #E4CE9F', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
-                {currentDiscount}% OFF
-              </span>
-            </div>
-            <div className="price-current" style={{ fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)' }}>
-              ₹{activeSale.toLocaleString('en-IN')}
-            </div>
+            <span className="pdp-rating-chip">{productRating.toFixed(1)} <span aria-hidden="true">★</span></span>
+            <span className="pdp-rating-text">
+              {reviewCount > 0 ? <><strong>{reviewCount}</strong> {reviewCount === 1 ? 'Review' : 'Reviews'}</> : 'Ratings'}
+            </span>
           </>
         ) : (
-          <div className="price-current" style={{ fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)' }}>
-            ₹{activeSale.toLocaleString('en-IN')}
-          </div>
+          <span className="pdp-rating-text">★ Be the first to review this product</span>
         )}
-      </div>
+      </button>
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
 
@@ -395,11 +396,12 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         }
 
         const rawItems = effectiveConfig.items || [];
-        const items = (Array.isArray(rawItems) ? rawItems : []).filter(item => {
+        const savedItems = (Array.isArray(rawItems) ? rawItems : []).filter(item => {
           const t = typeof item === 'string' ? item : item?.text;
           return Boolean(t && String(t).trim());
         });
-        if (items.length === 0) return null;
+        // First line is always the prepaid free-delivery offer (enforced in server.js pricing).
+        const items = [PREPAID_FREE_DELIVERY_OFFER, ...savedItems.slice(1)];
 
         return (
           <div className="product-offers-container" aria-label="Special Offers">
@@ -615,7 +617,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
 
         <button
           className={`btn-add-to-cart ${added ? 'added' : ''}`}
-          onClick={handleAddToCart}
+          onClick={() => handleAddToCart()}
           disabled={outOfStock}
           style={outOfStock ? { background: '#94a3b8', borderColor: '#94a3b8', color: '#ffffff', cursor: 'not-allowed' } : {}}
         >
@@ -783,7 +785,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
             <button
               type="button"
               className={`product-sticky-bar__btn product-sticky-bar__btn--cart ${added ? 'added' : ''}`}
-              onClick={handleAddToCart}
+              onClick={() => handleAddToCart()}
               disabled={outOfStock}
             >
               {added ? 'ADDED ✓' : 'ADD TO CART'}
@@ -804,9 +806,20 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       <SizeGuideModal
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
-        category={product.categoryId || product.category || 'Shirts'}
+        category={`${product.category || ''} ${product.subCategory || ''} ${product.categoryId || ''}`}
+        productName={name}
+        image={(() => {
+          const first = product.images?.[0];
+          return (typeof first === 'object' ? first?.url : first) || product.image || '';
+        })()}
+        price={activeSale}
+        mrp={activeMrp}
+        discount={currentDiscount}
+        selectedSize={selectedSize}
+        availableSizes={productSizes.length > 0 ? visibleSizes : null}
         customSizeGuide={product.sizeGuide}
-        onSelectSize={(size) => setSelectedSize(size)}
+        onSelectSize={(size) => { setSelectedSize(size); setSizeError(false); }}
+        onAddToCart={outOfStock && !visibleSizes.length ? undefined : (size) => handleAddToCart(size)}
       />
     </div>
   );

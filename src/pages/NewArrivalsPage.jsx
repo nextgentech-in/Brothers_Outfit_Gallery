@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { getNewArrivals } from '../services/productService';
+import { getNewArrivals, selectNewArrivals, subscribeToCatalog } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/common/SEO';
 import './NewArrivalsPage.css';
@@ -40,21 +40,18 @@ export default function NewArrivalsPage() {
   const { addToCart } = useCart();
 
   useEffect(() => {
-    const loadData = async (force = true) => {
-      try {
-        const data = await getNewArrivals(12, force);
-        setNewArrivals(data);
-      } catch (err) {
-        console.error("Error loading new arrivals:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData(true);
-
-    const handleUpdate = () => loadData(true);
-    window.addEventListener('bo_products_updated', handleUpdate);
-    return () => window.removeEventListener('bo_products_updated', handleUpdate);
+    let active = true;
+    let receivedSnapshot = false;
+    const unsubscribe = subscribeToCatalog(catalog => {
+      receivedSnapshot = true;
+      setNewArrivals(selectNewArrivals(catalog, 12));
+      setLoading(false);
+    });
+    getNewArrivals(12, true).then(data => {
+      if (active && !receivedSnapshot) setNewArrivals(data);
+    }).catch(error => console.error('Error loading new arrivals:', error))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; unsubscribe(); };
   }, []);
   
   if (loading) {

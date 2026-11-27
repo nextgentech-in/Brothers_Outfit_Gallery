@@ -4,7 +4,8 @@
  *
  * Each color contains:
  * - id: unique slug identifier (e.g. 'rani', 'navy-blue')
- * - name: official standardized color name (e.g. 'Rani', 'Navy Blue')
+ * - name: official standardized color name in CAPITALS (e.g. 'RANI', 'NAVY BLUE').
+ *   The POS (D:\Brothers_Outfit_Admin\shared\colors.ts) uses the same names, so colours never conflict.
  * - slug: URL-friendly identifier
  * - hex: primary hex code
  * - aliases: alternative names / search keywords (e.g. 'rani pink', 'deep pink')
@@ -16,7 +17,7 @@
 export const DEFAULT_COLOR_MASTER = [
   {
     id: 'black',
-    name: 'Black',
+    name: 'BLACK',
     slug: 'black',
     hex: '#000000',
     aliases: ['jet black', 'pure black', 'matte black', 'noir', 'nero', 'dark black'],
@@ -27,7 +28,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'white',
-    name: 'White',
+    name: 'WHITE',
     slug: 'white',
     hex: '#FFFFFF',
     aliases: ['pure white', 'snow white', 'crisp white', 'bright white', 'milky white'],
@@ -38,7 +39,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'navy-blue',
-    name: 'Navy Blue',
+    name: 'NAVY BLUE',
     slug: 'navy-blue',
     hex: '#1F2A44',
     aliases: ['navy', 'dark blue', 'midnight blue', 'deep navy', 'marine blue', 'ink blue'],
@@ -49,7 +50,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'rani',
-    name: 'Rani',
+    name: 'RANI',
     slug: 'rani',
     hex: '#C41242',
     aliases: ['rani pink', 'deep pink', 'fuchsia', 'fuchsia pink', 'magenta', 'hot pink', 'dark pink'],
@@ -60,7 +61,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'maroon',
-    name: 'Maroon',
+    name: 'MAROON',
     slug: 'maroon',
     hex: '#800020',
     aliases: ['maron', 'dark red', 'deep red', 'blood red', 'crimson maroon', 'garnet'],
@@ -71,7 +72,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'beige',
-    name: 'Beige',
+    name: 'BEIGE',
     slug: 'beige',
     hex: '#D6C3A1',
     aliases: ['sand', 'nude', 'cream beige', 'wheat', 'biscuit', 'oatmeal'],
@@ -82,7 +83,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'grey',
-    name: 'Grey',
+    name: 'GREY',
     slug: 'grey',
     hex: '#6B7280',
     aliases: ['gray', 'slate', 'ash grey', 'silver grey', 'medium grey', 'steel grey'],
@@ -93,7 +94,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'olive',
-    name: 'Olive',
+    name: 'OLIVE',
     slug: 'olive',
     hex: '#556B2F',
     aliases: ['olive green', 'military green', 'army green', 'mehendi', 'mehndi', 'moss green'],
@@ -104,7 +105,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'off-white',
-    name: 'Off White',
+    name: 'OFF WHITE',
     slug: 'off-white',
     hex: '#FAF9F6',
     aliases: ['cream', 'ivory', 'milk white', 'eggshell', 'vanilla', 'pearl white'],
@@ -115,7 +116,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'royal-blue',
-    name: 'Royal Blue',
+    name: 'ROYAL BLUE',
     slug: 'royal-blue',
     hex: '#1E40AF',
     aliases: ['blue', 'bright blue', 'cobalt blue', 'electric blue', 'classic blue'],
@@ -126,7 +127,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'sky-blue',
-    name: 'Sky Blue',
+    name: 'SKY BLUE',
     slug: 'sky-blue',
     hex: '#7DD3FC',
     aliases: ['light blue', 'powder blue', 'baby blue', 'ice blue', 'pastel blue'],
@@ -137,7 +138,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'wine',
-    name: 'Wine',
+    name: 'WINE',
     slug: 'wine',
     hex: '#58111A',
     aliases: ['burgundy', 'dark wine', 'merlot', 'berry', 'deep burgundy'],
@@ -148,7 +149,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'bottle-green',
-    name: 'Bottle Green',
+    name: 'BOTTLE GREEN',
     slug: 'bottle-green',
     hex: '#09472A',
     aliases: ['dark green', 'emerald green', 'forest green', 'pine green', 'deep green'],
@@ -159,7 +160,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'sage-green',
-    name: 'Sage Green',
+    name: 'SAGE GREEN',
     slug: 'sage-green',
     hex: '#9CAEA9',
     aliases: ['sage', 'mint green', 'pista', 'light green', 'seafoam', 'pastel green'],
@@ -170,7 +171,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'khaki',
-    name: 'Khaki',
+    name: 'KHAKI',
     slug: 'khaki',
     hex: '#C3B091',
     aliases: ['kaki', 'chino', 'tan khaki', 'safari'],
@@ -181,7 +182,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'tan',
-    name: 'Tan',
+    name: 'TAN',
     slug: 'tan',
     hex: '#C19A6B',
     aliases: ['camel', 'caramel', 'light brown', 'cognac', 'leather tan'],
@@ -192,7 +193,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'brown',
-    name: 'Brown',
+    name: 'BROWN',
     slug: 'brown',
     hex: '#5C4033',
     aliases: ['chocolate', 'dark brown', 'coffee', 'espresso', 'mocha'],
@@ -203,7 +204,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'charcoal',
-    name: 'Charcoal Grey',
+    name: 'CHARCOAL GREY',
     slug: 'charcoal-grey',
     hex: '#374151',
     aliases: ['charcoal', 'dark grey', 'anthracite', 'graphite', 'gunmetal'],
@@ -214,7 +215,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'mustard',
-    name: 'Mustard Yellow',
+    name: 'MUSTARD YELLOW',
     slug: 'mustard-yellow',
     hex: '#D97706',
     aliases: ['mustard', 'haldi', 'ochre', 'dark yellow', 'golden yellow', 'yellow'],
@@ -225,7 +226,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'rust',
-    name: 'Rust',
+    name: 'RUST',
     slug: 'rust',
     hex: '#B45309',
     aliases: ['terracotta', 'brick red', 'copper', 'burnt orange', 'earthen red'],
@@ -236,7 +237,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'peach',
-    name: 'Peach',
+    name: 'PEACH',
     slug: 'peach',
     hex: '#F87171',
     aliases: ['coral', 'salmon', 'apricot', 'light coral'],
@@ -247,7 +248,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'lavender',
-    name: 'Lavender',
+    name: 'LAVENDER',
     slug: 'lavender',
     hex: '#A78BFA',
     aliases: ['lilac', 'light purple', 'mauve', 'pastel purple', 'violet light'],
@@ -258,7 +259,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'purple',
-    name: 'Purple',
+    name: 'PURPLE',
     slug: 'purple',
     hex: '#6B21A8',
     aliases: ['violet', 'deep purple', 'jamuni', 'eggplant', 'plum'],
@@ -269,7 +270,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'teal',
-    name: 'Teal',
+    name: 'TEAL',
     slug: 'teal',
     hex: '#0F766E',
     aliases: ['teal green', 'teal blue', 'turquoise', 'cyan', 'peacock blue'],
@@ -280,7 +281,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'red',
-    name: 'Red',
+    name: 'RED',
     slug: 'red',
     hex: '#DC2626',
     aliases: ['bright red', 'scarlet', 'ruby', 'cherry red'],
@@ -291,7 +292,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'pink',
-    name: 'Pink',
+    name: 'PINK',
     slug: 'pink',
     hex: '#F472B6',
     aliases: ['light pink', 'baby pink', 'blush pink', 'rose pink'],
@@ -302,7 +303,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'orange',
-    name: 'Orange',
+    name: 'ORANGE',
     slug: 'orange',
     hex: '#EA580C',
     aliases: ['tangerine', 'kesar', 'saffron', 'bright orange'],
@@ -313,7 +314,7 @@ export const DEFAULT_COLOR_MASTER = [
   },
   {
     id: 'gold',
-    name: 'Gold',
+    name: 'GOLD',
     slug: 'gold',
     hex: '#D4AF37',
     aliases: ['golden', 'metallic gold', 'zari gold', 'antique gold'],
@@ -323,6 +324,20 @@ export const DEFAULT_COLOR_MASTER = [
     category: 'Traditional & Festive'
   }
 ];
+
+/**
+ * Stored form of a colour name: trimmed, single-spaced CAPITALS. "Standard"/"Default" stay as the no-colour marker.
+ * Must match colorName() in the POS (shared/colors.ts).
+ */
+export function toColorName(raw) {
+  const clean = String(raw ?? '').trim().replace(/\s+/g, ' ');
+  if (!clean) return '';
+  if (/^(standard|default)$/i.test(clean)) return 'Standard';
+  return clean.toUpperCase();
+}
+
+/** Case-insensitive colour comparison ("Black" === "BLACK"). */
+export const sameColor = (a, b) => toColorName(a) === toColorName(b);
 
 const LOCAL_STORAGE_KEY_CUSTOM = 'brothers_admin_custom_colors';
 const LOCAL_STORAGE_KEY_RECENT = 'brothers_admin_recent_colors';
@@ -334,7 +349,7 @@ export function getCustomColors() {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY_CUSTOM);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? JSON.parse(raw).map(c => ({ ...c, name: toColorName(c.name) })) : [];
   } catch (err) {
     console.error('Failed to parse custom colors from localStorage:', err);
     return [];
@@ -350,10 +365,10 @@ export function saveCustomColor(colorObj) {
   const slug = colorObj.slug || colorObj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   const id = colorObj.id || slug;
 
-  const existingIdx = customColors.findIndex(c => c.id === id || c.name.toLowerCase() === colorObj.name.toLowerCase());
+  const existingIdx = customColors.findIndex(c => c.id === id || sameColor(c.name, colorObj.name));
   const entry = {
     id,
-    name: colorObj.name.trim(),
+    name: toColorName(colorObj.name),
     slug,
     hex: colorObj.hex.trim().toUpperCase(),
     aliases: Array.isArray(colorObj.aliases) ? colorObj.aliases : [colorObj.name.toLowerCase()],
@@ -468,9 +483,9 @@ export function searchColors(query) {
  * Normalize an arbitrary color (legacy string, object, or user input) to a standardized Color Master object
  *
  * Example:
- * 'rani pink' -> { id: 'rani', name: 'Rani', slug: 'rani', hex: '#C41242' }
- * 'dark blue' -> { id: 'navy-blue', name: 'Navy Blue', slug: 'navy-blue', hex: '#1F2A44' }
- * { name: 'White', hex: '#ffffff' } -> { id: 'white', name: 'White', slug: 'white', hex: '#FFFFFF' }
+ * 'rani pink' -> { id: 'rani', name: 'RANI', slug: 'rani', hex: '#C41242' }
+ * 'dark blue' -> { id: 'navy-blue', name: 'NAVY BLUE', slug: 'navy-blue', hex: '#1F2A44' }
+ * { name: 'White', hex: '#ffffff' } -> { id: 'white', name: 'WHITE', slug: 'white', hex: '#FFFFFF' }
  */
 export function normalizeToStandardColor(raw) {
   if (!raw) return null;
@@ -509,7 +524,7 @@ export function normalizeToStandardColor(raw) {
     // Preserve custom object with cleaned structure
     return {
       id: raw.id || rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
-      name: rawName,
+      name: toColorName(rawName),
       slug: raw.slug || rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       hex: raw.hex || '#6B7280'
     };
@@ -547,7 +562,7 @@ export function normalizeToStandardColor(raw) {
     // Fallback if not matched
     return {
       id: lower.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
-      name: cleanStr.charAt(0).toUpperCase() + cleanStr.slice(1),
+      name: toColorName(cleanStr),
       slug: lower.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       hex: '#6B7280'
     };

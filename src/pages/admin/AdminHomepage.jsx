@@ -12,9 +12,9 @@ const PRESET_BANNERS = [
 ];
 
 const DEFAULT_CATEGORIES = [
-  'Kurta', 'Shirts', 'T-Shirts', 'Jeans', 'Trousers', 'Shorts',
-  'Jackets', 'Hoodies', 'Vest', 'Underwear', 'Ethnic Wear', 'Perfumes', 'Slippers',
-  'Caps', 'Sunglasses', 'Watches', 'Wallets', 'Belts', 'Accessories'
+  'KURTA', 'SHIRTS', 'T-SHIRTS', 'JEANS', 'TROUSERS', 'SHORTS',
+  'JACKETS', 'HOODIES', 'VEST', 'UNDERWEAR', 'ETHNIC WEAR', 'PERFUMES', 'SLIPPERS',
+  'CAPS', 'SUNGLASSES', 'WATCHES', 'WALLETS', 'BELTS', 'ACCESSORIES'
 ];
 
 export default function AdminHomepage() {
@@ -321,7 +321,7 @@ export default function AdminHomepage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const trimmed = newCategoryName.trim();
+    const trimmed = newCategoryName.trim().toUpperCase();
     if (!trimmed) {
       showToast('Please enter a category name first.', 'warning');
       if (e.target) e.target.value = '';
@@ -395,7 +395,7 @@ export default function AdminHomepage() {
   };
 
   const handleAddCustomCategory = () => {
-    const trimmed = newCategoryName.trim();
+    const trimmed = newCategoryName.trim().toUpperCase();
     if (!trimmed) {
       showToast('Please enter a category name.', 'warning');
       return;
@@ -928,16 +928,17 @@ export default function AdminHomepage() {
                 <input
                   type="text"
                   value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onChange={(e) => setNewCategoryName(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddCustomCategory()}
-                  placeholder="New category name (e.g. Blazers, Kurtis)..."
+                  placeholder="New category name in CAPITAL (e.g. BLAZERS, KURTIS)..."
                   style={{
                     flex: '1 1 180px',
                     padding: '10px 14px',
                     borderRadius: '8px',
                     border: '1px solid #cbd5e1',
                     fontSize: '13.5px',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
+                    textTransform: 'uppercase'
                   }}
                 />
                 <button

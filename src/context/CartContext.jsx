@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { getColorPrimaryImageUrl } from '../utils/colorImages';
+import { sameColor } from '../data/colorMaster.js';
 
 const CartContext = createContext();
 
@@ -71,7 +73,7 @@ export const CartProvider = ({ children }) => {
 
         if (!product) {
           isSoldOut = true;
-        } else if (product.active === false || product.inStock === false) {
+        } else if (product.active === false || product.isDeleted === true) {
           isSoldOut = true;
         } else if (Array.isArray(product.variants) && product.variants.length > 0 && item.size) {
           const cleanSize = String(item.size).trim().toLowerCase();
@@ -181,7 +183,7 @@ export const CartProvider = ({ children }) => {
       return Number(explicitPrice);
     }
     const matched = product.variants?.find(v =>
-      v.size === safeSize && (!v.color || v.color === safeColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === safeSize && (!v.color || sameColor(v.color, safeColor) || sameColor(v.color, 'Standard'))
     ) || product.variants?.find(v => v.size === safeSize);
 
     if (matched && matched.price !== undefined && matched.price !== '' && !isNaN(Number(matched.price))) {
@@ -198,7 +200,7 @@ export const CartProvider = ({ children }) => {
 
   const resolveItemStock = (product, safeSize, safeColor) => {
     const matched = product.variants?.find(v =>
-      v.size === safeSize && (!v.color || v.color === safeColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === safeSize && (!v.color || sameColor(v.color, safeColor) || sameColor(v.color, 'Standard'))
     ) || product.variants?.find(v => v.size === safeSize);
 
     if (matched && matched.stock !== undefined && !isNaN(Number(matched.stock))) {
@@ -232,7 +234,7 @@ export const CartProvider = ({ children }) => {
         id: product.id,
         productId: product.id,
         name: product.name,
-        image: product.image || product.thumbnailUrl,
+        image: getColorPrimaryImageUrl(product, safeColor) || product.image || product.thumbnailUrl,
         slug: product.slug,
         size: safeSize,
         color: safeColor,
@@ -245,7 +247,7 @@ export const CartProvider = ({ children }) => {
     showToast({
       id: product.id,
       name: product.name,
-      image: product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
+      image: getColorPrimaryImageUrl(product, safeColor) || product.image || product.thumbnailUrl || (product.images?.[0]?.url || product.images?.[0]),
       size: safeSize,
       color: safeColor,
       price: activePrice,
@@ -265,7 +267,7 @@ export const CartProvider = ({ children }) => {
       id: product.id,
       productId: product.id,
       name: product.name,
-      image: product.image || product.thumbnailUrl,
+      image: getColorPrimaryImageUrl(product, safeColor) || product.image || product.thumbnailUrl,
       slug: product.slug,
       size: safeSize,
       color: safeColor,

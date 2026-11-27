@@ -7,11 +7,13 @@
     "dev": "concurrently \"node server.js\" \"vite\"",
     "build": "vite build",
     "lint": "oxlint",
-    "test:pos-sync": "node --test test/posSync.test.js",
-    "migrate:pos-sync": "node scripts/backfill-pos-integration.js",
+    "test:stock-sync": "node --test test/productStockSubscription.test.js",
+    "test:api-smoke": "node test/api-safe-smoke.js",
+    "test:stress": "node test/stress-and-api-test.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bwip-js/node": "^4.11.4",
     "@vercel/analytics": "^2.0.1",
     "compression": "^1.8.2",
     "concurrently": "^10.0.5",

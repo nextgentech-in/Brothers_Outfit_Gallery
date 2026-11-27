@@ -1,7 +1,5 @@
 # React + Vite
 
-Mr. Munim POS integration and rollout instructions: [docs/MR_MUNIM_POS_SYNC.md](docs/MR_MUNIM_POS_SYNC.md)
-
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

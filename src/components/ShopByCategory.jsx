@@ -12,15 +12,15 @@ const CATEGORY_DISPLAY_ORDER = [
 
 // Polished local fallbacks keep the storefront useful before every category has an admin upload.
 const CATEGORY_FALLBACK_IMAGES = {
-  Kurta: '/images/category-rail/kurta-cutout.jpg',
-  Shirts: '/images/category-rail/shirts-cutout-v2.jpg',
-  'T-Shirts': '/images/category-rail/tshirts-cutout.jpg',
-  Jeans: '/images/category-rail/jeans-cutout.jpg',
-  Trousers: '/images/category-rail/trousers-cutout.jpg',
-  Shorts: '/images/category-rail/shorts-cutout.jpg',
-  Accessories: '/images/category-rail/accessories-cutout.jpg',
-  Perfumes: '/images/category-rail/perfumes-cutout.jpg',
-  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.jpg'
+  Kurta: '/images/category-rail/kurta-cutout.png',
+  Shirts: '/images/category-rail/shirts-cutout-v2.png',
+  'T-Shirts': '/images/category-rail/tshirts-cutout.png',
+  Jeans: '/images/category-rail/jeans-cutout.png',
+  Trousers: '/images/category-rail/trousers-cutout.png',
+  Shorts: '/images/category-rail/shorts-cutout.png',
+  Accessories: '/images/category-rail/accessories-cutout.png',
+  Perfumes: '/images/category-rail/perfumes-cutout.png',
+  'Ethnic Wear': '/images/category-rail/ethnic-wear-cutout.png'
 };
 
 const CURATED_CATEGORY_NAMES = Object.keys(CATEGORY_FALLBACK_IMAGES);
@@ -92,14 +92,15 @@ export default function ShopByCategory() {
 
         // Filter to only active + in-stock products
         const activeProducts = allProducts.filter(
-          p => p.active !== false && productService.isProductInStock(p)
+          p => p.active !== false
         );
 
         // Group by categoryId
         const categoryMap = {};
         activeProducts.forEach(product => {
-          const catKey = product.categoryId || product.category || '';
-          if (!catKey) return;
+          const rawCat = (product.categoryId || product.category || '').trim();
+          if (!rawCat) return;
+          const catKey = rawCat.toLowerCase();
           if (!categoryMap[catKey]) {
             categoryMap[catKey] = [];
           }
@@ -113,7 +114,7 @@ export default function ShopByCategory() {
         // Build category entries with representative image
         const categoryEntries = Array.from(allCategoryNames)
           .map(name => {
-            const products = categoryMap[name] || [];
+            const products = categoryMap[name.toLowerCase()] || [];
             // Prefer the actual product cutout for a catalog-style category rail.
             let imageUrl = CATEGORY_FALLBACK_IMAGES[name] || getProductImageUrl(products[0]) || adminCategoryImages[name] || null;
             if (!imageUrl) {

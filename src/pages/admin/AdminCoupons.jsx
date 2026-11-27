@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAdminCoupons, createCoupon, deleteCoupon } from '../../services/adminService';
+import { getAdminCoupons, createCoupon, deleteCoupon, setTopBarCoupon } from '../../services/adminService';
 import { useAdminUI } from '../../context/AdminUIContext';
 import { useFocusTrap } from '../../utils/a11yUtils';
 import './AdminCoupons.css';
@@ -67,6 +67,19 @@ export default function AdminCoupons() {
       await deleteCoupon(id);
       showToast('Coupon deleted successfully.', 'success');
       fetchCoupons();
+    }
+  };
+
+  const handleTopBarToggle = async (coupon) => {
+    const showing = coupon.showInTopBar === true;
+    try {
+      await setTopBarCoupon(showing ? null : coupon.id, coupons);
+      showToast(showing
+        ? `${coupon.code} removed from the top bar.`
+        : `${coupon.code} is now shown in the store top bar.`, 'success');
+      fetchCoupons();
+    } catch (err) {
+      showToast(err.message || 'Failed to update top bar coupon', 'error');
     }
   };
 
@@ -162,14 +175,15 @@ export default function AdminCoupons() {
               <th>MIN ORDER</th>
               <th>EXPIRY</th>
               <th>STATUS</th>
+              <th title="Show this code in the announcement bar at the top of the store">TOP BAR</th>
               <th>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" style={{textAlign: 'center', padding: '40px'}}>Loading coupons...</td></tr>
+              <tr><td colSpan="7" style={{textAlign: 'center', padding: '40px'}}>Loading coupons...</td></tr>
             ) : coupons.length === 0 ? (
-              <tr><td colSpan="6" style={{textAlign: 'center', padding: '40px'}}>No coupons created yet. Click "+ CREATE COUPON".</td></tr>
+              <tr><td colSpan="7" style={{textAlign: 'center', padding: '40px'}}>No coupons created yet. Click "+ CREATE COUPON".</td></tr>
             ) : coupons.map(c => (
               <tr key={c.id}>
                 <td><strong>{c.code}</strong></td>
@@ -180,6 +194,18 @@ export default function AdminCoupons() {
                 <td>{c.expiryDate || 'No Expiry'}</td>
                 <td>
                   <span className="admin-badge admin-badge--active">Active</span>
+                </td>
+                <td>
+                  <button
+                    onClick={() => handleTopBarToggle(c)}
+                    className="admin-action-btn"
+                    style={c.showInTopBar === true
+                      ? { background: '#16a34a', color: '#fff', borderColor: '#16a34a' }
+                      : undefined}
+                    title={c.showInTopBar === true ? 'Click to stop showing this code in the top bar' : 'Show this code in the store top bar'}
+                  >
+                    {c.showInTopBar === true ? '✓ SHOWING' : 'SHOW'}
+                  </button>
                 </td>
                 <td>
                   <button onClick={() => handleDelete(c.id)} className="admin-action-btn delete">

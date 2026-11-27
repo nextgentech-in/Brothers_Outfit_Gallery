@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import ImageZoom from './ImageZoom';
 import ImageLightbox from './ImageLightbox';
-import { optimizeImage, getThumbnailImageUrl, getProductDetailImageUrl, getZoomImageUrl } from '../../utils/imageUtils';
+import { getThumbnailImageUrl, getProductDetailImageUrl, getZoomImageUrl } from '../../utils/imageUtils';
+import { sortColorImages } from '../../utils/colorImages';
 import './ProductGallery.css';
 
 export default function ProductGallery({ images, selectedColor, selectedColorIndex, totalColors, isOutOfStock = false, productName = 'Men’s Wear' }) {
@@ -18,12 +19,6 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     return !c || c === 'all' || c === 'general' || c === 'all colors' || c === 'standard' || c === 'default';
   };
 
-  const isColorMatch = (img, targetColor) => {
-    if (!targetColor) return false;
-    const c = extractColor(img).toLowerCase();
-    return c === String(targetColor).trim().toLowerCase();
-  };
-
   // Filter images linked specifically to the selected color or show all for 'All'
   const displayImages = useMemo(() => {
     if (!images || images.length === 0) return [];
@@ -38,7 +33,8 @@ export default function ProductGallery({ images, selectedColor, selectedColorInd
     }
 
     const target = String(selectedColor).trim().toLowerCase();
-    const colorMatched = validImages.filter(img => isColorMatch(img, target));
+    // Colour's own primary image (set in admin) comes first
+    const colorMatched = sortColorImages(validImages, target);
     const generalImages = validImages.filter(img => isGeneralImage(img));
 
     // When a specific color is chosen, include color-matched images + untagged/general images

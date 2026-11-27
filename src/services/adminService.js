@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db, auth } from '../firebase/firebaseConfig';
 import { getBackendUrl } from '../utils/apiConfig';
 import { invalidateProductCache } from './productService';
@@ -8,13 +8,24 @@ const PRODUCTS = 'products';
 async function saveProductThroughServer(productId, productData, create) {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('Admin authentication is required to save products.');
+  const body = JSON.stringify({ productId, productData, create, requestId: globalThis.crypto.randomUUID() });
+  const embeddedImages = (body.match(/data:image\//g) || []).length;
+  if (body.length > 900 * 1024) {
+    throw new Error(embeddedImages
+      ? `Product is too large to save because ${embeddedImages} image(s) failed to upload to ImageKit and were embedded directly. Remove those images and upload them again.`
+      : 'Product is too large to save (over 900 KB). Shorten the description or reduce the number of variants.');
+  }
   const response = await fetch(`${getBackendUrl()}/api/admin/products/upsert`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ productId, productData, create, requestId: globalThis.crypto.randomUUID() })
+    body
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || 'Unable to save product.');
+  if (!response.ok) {
+    if (response.status === 413) throw new Error('Product data is too large to send. Remove images that failed to upload and upload them again.');
+    if (response.status === 401 || response.status === 403) throw new Error('Your admin login has expired. Please sign out and sign in again.');
+    throw new Error(data.error || `Unable to save product (server returned ${response.status}).`);
+  }
   return data;
 }
 
@@ -26,10 +37,11 @@ export const deleteProductImage = async (fileId) => {
     const token = await auth.currentUser?.getIdToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    await fetch(`${backendUrl}/api/imagekit/delete/${fileId}`, {
+    const response = await fetch(`${backendUrl}/api/imagekit/delete/${encodeURIComponent(fileId)}`, {
       method: 'DELETE',
       headers
     });
+    if (!response.ok) throw new Error(`ImageKit cleanup failed (${response.status}).`);
   } catch (err) {
     console.error("ImageKit delete error:", err);
   }
@@ -124,7 +136,40 @@ export const invalidateAdminProductsCache = () => {
   } catch {}
 };
 
+// Sort in the browser instead of Firestore orderBy('createdAt'), which silently drops
+// products that have no createdAt field (the POS counts every product).
+const createdMillis = p => { const c = p?.createdAt; if (!c) return 0; if (typeof c.toMillis === 'function') return c.toMillis(); if (typeof c.seconds === 'number') return c.seconds * 1000; const t = Date.parse(c); return Number.isFinite(t) ? t : 0; };
+const newestFirst = (a, b) => createdMillis(b) - createdMillis(a);
+
 // Admin fetching all products with instant cache & background sync capability
+/** Live Firestore listener for product and stock changes in admin. */
+export const subscribeAdminProducts = (onUpdate, onError = () => {}) => {
+  const q = query(collection(db, PRODUCTS));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const data = snapshot.docs.map(d => {
+        const item = d.data();
+        return {
+          id: d.id,
+          ...item,
+          ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
+        };
+      }).filter(p => p.isDeleted !== true).sort(newestFirst);
+      adminProductsCache = data;
+      adminProductsCacheTimestamp = Date.now();
+      try {
+        sessionStorage.setItem('bo_admin_products_cache', JSON.stringify({
+          timestamp: adminProductsCacheTimestamp,
+          data
+        }));
+      } catch {}
+      onUpdate(data);
+    },
+    onError
+  );
+};
+
 export const getAdminProducts = async (forceRefresh = false) => {
   if (!forceRefresh) {
     const cached = getCachedAdminProducts();
@@ -134,7 +179,7 @@ export const getAdminProducts = async (forceRefresh = false) => {
 
   inFlightAdminFetch = (async () => {
     try {
-      const q = query(collection(db, PRODUCTS), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, PRODUCTS));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => {
         const item = d.data();
@@ -143,7 +188,7 @@ export const getAdminProducts = async (forceRefresh = false) => {
           ...item,
           ...(item.sizeGuide ? { sizeGuide: normalizeSizeGuideFromFirestore(item.sizeGuide) } : {})
         };
-      }).filter(p => p.isDeleted !== true);
+      }).filter(p => p.isDeleted !== true).sort(newestFirst);
       adminProductsCache = data;
       adminProductsCacheTimestamp = Date.now();
       try {
@@ -176,9 +221,6 @@ export const getAdminProductById = async (id) => {
 // Auto-detect duplicate product names and slugs
 export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = null) => {
   try {
-    const products = await getAdminProducts();
-    const otherProducts = products.filter(p => !excludeId || p.id !== excludeId);
-
     // 1. Keep original Name (Don't append numbers)
     let finalName = String(name || '').trim();
 
@@ -191,8 +233,16 @@ export const ensureUniqueProductNameAndSlug = async (name, slug, excludeId = nul
     }
     let finalSlug = baseSlug;
     if (finalSlug) {
+      // Only fetch products whose slug starts with this base (was: download the whole catalogue).
+      const snap = await getDocs(query(
+        collection(db, PRODUCTS),
+        where('slug', '>=', baseSlug),
+        where('slug', '<=', `${baseSlug}`)
+      ));
       const existingSlugs = new Set(
-        otherProducts.map(p => String(p.slug || '').trim().toLowerCase())
+        snap.docs
+          .filter(d => (!excludeId || d.id !== excludeId) && d.data().isDeleted !== true)
+          .map(d => String(d.data().slug || '').trim().toLowerCase())
       );
 
       if (existingSlugs.has(finalSlug.toLowerCase())) {
@@ -277,15 +327,16 @@ export const toggleProductTrending = async (id, isTrending) => {
 
 // Hard Delete
 export const deleteProduct = async (id) => {
-  const docRef = doc(db, PRODUCTS, id);
-  await updateDoc(docRef, {
-    active: false,
-    isDeleted: true,
-    deletedAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Admin authentication is required.');
+  const response = await fetch(`${getBackendUrl()}/api/admin/products/${encodeURIComponent(id)}/delete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }
   });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Unable to delete product.');
   invalidateProductCache();
   invalidateAdminProductsCache();
+  return result;
 };
 
 // Simple Stats Method
@@ -314,7 +365,7 @@ export const getAdminStats = async (products) => {
   let totalOrders = 0;
   try {
     const ordersSnap = await getDocs(collection(db, 'orders'));
-    totalOrders = ordersSnap.size;
+    totalOrders = ordersSnap.docs.filter(isWebsiteOrder).length;
   } catch (e) {
     console.log('No orders yet or security rule restriction:', e.message);
   }
@@ -323,11 +374,22 @@ export const getAdminStats = async (products) => {
 }
 
 // ─── ADMIN: ORDERS ────────────────────────────────────────────────────────────
-export const getAdminOrders = async () => {
+function isWebsiteOrder(snapshot) {
+  const order = snapshot.data();
+  return order.createdBy !== 'admin-pos' && String(order.channel).toLowerCase() !== 'pos' && !/^(POS|EX)-/.test(snapshot.id);
+}
+
+const adminOrdersQuery = () => query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+const adminOrderRows = (snapshot, includePOS) => snapshot.docs
+  .filter(order => includePOS || isWebsiteOrder(order))
+  .map(order => ({ ...order.data(), id: order.id, channel: isWebsiteOrder(order) ? 'Website' : 'POS' }));
+
+export const subscribeToAdminOrders = (onUpdate, onError) =>
+  onSnapshot(adminOrdersQuery(), snapshot => onUpdate(adminOrderRows(snapshot, true)), onError);
+
+export const getAdminOrders = async ({ includePOS = false } = {}) => {
   try {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return adminOrderRows(await getDocs(adminOrdersQuery()), includePOS);
   } catch (err) {
     console.error('Error fetching admin orders:', err);
     return [];
@@ -370,6 +432,10 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
 
   // 2. Direct Firestore fallback
   const docRef = doc(db, 'orders', orderId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists() || !isWebsiteOrder(snapshot)) {
+    throw new Error('Select a website order for delivery updates.');
+  }
   const firestorePayload = { status, ...extraPayload, updatedAt: serverTimestamp() };
   if (status === 'Delivered') {
     firestorePayload.shipmentStatus = 'DELIVERED';
@@ -390,6 +456,10 @@ export const updateOrderStatus = async (orderId, status, extraPayload = {}) => {
 
 export const updateOrderShipment = async (orderId, shipmentData) => {
   const docRef = doc(db, 'orders', orderId);
+  const snapshot = await getDoc(docRef);
+  if (!snapshot.exists() || !isWebsiteOrder(snapshot)) {
+    throw new Error('Select a website order for shipment.');
+  }
   await updateDoc(docRef, {
     status: 'Shipped',
     waybill: shipmentData.waybill,
@@ -530,6 +600,15 @@ export const deleteCoupon = async (id) => {
   await deleteDoc(doc(db, 'coupons', id));
 };
 
+// Only one coupon can be featured in the storefront top announcement bar.
+// Pass null to stop showing any coupon there.
+export const setTopBarCoupon = async (id, coupons = []) => {
+  await Promise.all(coupons
+    .filter(c => c.id !== id && c.showInTopBar === true)
+    .map(c => updateDoc(doc(db, 'coupons', c.id), { showInTopBar: false })));
+  if (id) await updateDoc(doc(db, 'coupons', id), { showInTopBar: true });
+};
+
 // ─── ADMIN: SETTINGS ──────────────────────────────────────────────────────────
 export const DEFAULT_OFFERS_CONFIG = {
   enabled: true,
@@ -538,8 +617,8 @@ export const DEFAULT_OFFERS_CONFIG = {
   items: [
     {
       id: 'offer-1',
-      text: 'Buy 2 & Get Flat Rs. 300 OFF',
-      icon: 'discount',
+      text: 'FREE Delivery on all Prepaid Orders!',
+      icon: 'shipping',
       link: ''
     },
     {

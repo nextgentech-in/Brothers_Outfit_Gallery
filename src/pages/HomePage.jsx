@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '../context/CartContext';
 import Hero from '../components/Hero';
 import TrendingCarousel from '../components/TrendingCarousel';
@@ -138,49 +138,43 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    const fetchHomeData = async () => {
-      try {
-        setLoading(true);
-        // Dynamically load catalog and config modules so initial bundle doesn't block on Firestore
-        const [
-          { getSaleProducts, getNewArrivals, getShopProducts },
-          { getHomepageConfig }
-        ] = await Promise.all([
-          import('../services/productService'),
-          import('../services/configService')
-        ]);
-
-        // Fetch concurrently
-        const [saleRes, newRes, shopRes, configRes] = await Promise.all([
-          getSaleProducts(4),
-          getNewArrivals(4),
-          getShopProducts('All', 'featured', null, 8),
-          getHomepageConfig()
-        ]);
-
-        setSaleProducts(saleRes);
-        setNewArrivals(newRes);
-        if (configRes && Object.keys(configRes).length > 0) {
-          setHomepageConfig(prev => ({ ...prev, ...configRes }));
-        }
-
-        const excludeIds = new Set([...saleRes, ...newRes].map(p => p.id));
-        const filteredShop = shopRes.products.filter(p => !excludeIds.has(p.id)).slice(0, 4);
-        
-        if (filteredShop.length < 4) {
-          const additional = shopRes.products.filter(p => excludeIds.has(p.id)).slice(0, 4 - filteredShop.length);
-          filteredShop.push(...additional);
-        }
-
-        setShopProducts(filteredShop);
-      } catch (err) {
-        console.error("Error fetching homepage data:", err);
-      } finally {
-        setLoading(false);
-      }
+    let active = true;
+    let unsubscribe;
+    const updateProducts = (sale, arrivals, shop) => {
+      const featuredIds = new Set([...sale, ...arrivals].map(product => product.id));
+      setSaleProducts(sale);
+      setNewArrivals(arrivals);
+      setShopProducts([
+        ...shop.filter(product => !featuredIds.has(product.id)),
+        ...shop.filter(product => featuredIds.has(product.id))
+      ].slice(0, 4));
+      setLoading(false);
     };
 
-    fetchHomeData();
+    import('../services/configService').then(({ getHomepageConfig }) => getHomepageConfig())
+      .then(config => {
+        if (active && config && Object.keys(config).length) setHomepageConfig(previous => ({ ...previous, ...config }));
+      }).catch(error => console.error('Error fetching homepage configuration:', error));
+
+    import('../services/productService').then(service => {
+      if (!active) return;
+      const showCatalog = catalog => {
+        if (active) updateProducts(service.selectSaleProducts(catalog), service.selectNewArrivals(catalog),
+          service.selectShopProducts(catalog, 'All', 'featured').products);
+      };
+      const cached = service.getCachedProducts();
+      if (cached) showCatalog(cached);
+      void service.refreshExpiredReservations();
+      unsubscribe = service.subscribeToCatalog(showCatalog, () => {
+        void service.fetchAllActiveProducts().then(showCatalog);
+      });
+    }).catch(error => {
+      if (!active) return;
+      console.error('Error fetching homepage products:', error);
+      setLoading(false);
+    });
+
+    return () => { active = false; unsubscribe?.(); };
   }, []);
 
   return (

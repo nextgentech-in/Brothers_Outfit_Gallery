@@ -353,9 +353,9 @@ export default function VisualColorSelector({
                 <input
                   id="customColorName"
                   type="text"
-                  placeholder="e.g. Peacock Green, Terracotta, Coral"
+                  placeholder="e.g. PEACOCK GREEN, TERRACOTTA, CORAL"
                   value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
+                  onChange={(e) => setCustomName(e.target.value.toUpperCase())}
                   autoFocus
                 />
               </div>
@@ -433,7 +433,7 @@ export default function VisualColorSelector({
               type="button"
               className="vcs-empty-action-btn"
               onClick={() => {
-                setCustomName(searchQuery);
+                setCustomName(searchQuery.toUpperCase());
                 setShowCustomModal(true);
               }}
             >

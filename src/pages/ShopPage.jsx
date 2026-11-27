@@ -2,35 +2,41 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useShop } from '../context/ShopContext';
 import { useCart } from '../context/CartContext';
-import { getShopProducts, isProductInStock } from '../services/productService';
+import { getShopProducts, subscribeToCatalog } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { getProductSizes, getProductColors } from '../utils/productUtils';
 import { normalizeToStandardColor } from '../data/colorMaster.js';
 import SEO from '../components/common/SEO';
 import './ShopPage.css';
 
-const CATEGORIES = ['All', 'Kurta', 'T-Shirts', 'Shirts', 'Jeans', 'Trousers', 'Shorts', 'Jackets', 'Hoodies', 'Ethnic Wear', 'Vest', 'Underwear', 'Slippers', 'Perfumes', 'Caps', 'Sunglasses', 'Accessories', 'Watches', 'Wallets', 'Belts'];
+const CATEGORIES = ['All', 'KURTA', 'T-SHIRTS', 'SHIRTS', 'JEANS', 'TROUSERS', 'SHORTS', 'JACKETS', 'HOODIES', 'ETHNIC WEAR', 'VEST', 'UNDERWEAR', 'SLIPPERS', 'PERFUMES', 'CAPS', 'SUNGLASSES', 'ACCESSORIES', 'WATCHES', 'WALLETS', 'BELTS'];
 
 const SUB_CATEGORIES = {
-  'Kurta': ['All', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
-  'T-Shirts': ['All', 'Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley', 'Full Sleeve', 'Full Sleeve Collar'],
-  'Shirts': ['All', 'Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
-  'Jeans': ['All', 'Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered'],
-  'Trousers': ['All', 'Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
-  'Shorts': ['All', 'Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
-  'Jackets': ['All', 'Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
-  'Hoodies': ['All', 'Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
-  'Ethnic Wear': ['All', 'Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
-  'Vest': ['All', 'Plain', 'Lining', 'Coloring'],
-  'Underwear': ['All', 'Long Trunk', 'Mini Trunk', 'Brief'],
-  'Slippers': ['All', 'Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['All', 'Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener'],
-  'Caps': ['All', 'Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
-  'Sunglasses': ['All', 'Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
-  'Accessories': ['All', 'Cap', 'Belt', 'Sunglasses', 'Bracelet', 'Ring', 'Chain', 'Keychain'],
-  'Watches': ['All', 'Analog', 'Digital', 'Smart Watch', 'Chronograph'],
-  'Wallets': ['All', 'Bifold', 'Trifold', 'Card Holder', 'Money Clip'],
-  'Belts': ['All', 'Leather', 'Canvas', 'Reversible', 'Auto-Lock'],
+  'KURTA': ['All', 'LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA'],
+  'T-SHIRTS': ['All', 'OVERSIZED', 'REGULAR FIT', 'SLIM FIT', 'POLO', 'GRAPHIC', 'DROP SHOULDER', 'ACID WASH', 'HENLEY', 'FULL SLEEVE', 'FULL SLEEVE COLLAR'],
+  'SHIRTS': ['All', 'CASUAL', 'FORMAL', 'PRINTED', 'LINEN', 'DENIM', 'OXFORD', 'MANDARIN COLLAR', 'HALF SLEEVE'],
+  'JEANS': ['All', 'SKINNY', 'SLIM FIT', 'REGULAR', 'BAGGY', 'WIDE LEG', 'RIPPED', 'BOOTCUT', 'TAPERED'],
+  'TROUSERS': ['All', 'CARGO', 'CHINO', 'JOGGER', 'FORMAL', 'PLEATED', 'STRAIGHT FIT', 'SLIM FIT'],
+  'SHORTS': ['All', 'CARGO', 'CHINO', 'DENIM', 'SPORTS', 'CASUAL', 'BERMUDA', 'RUNNING'],
+  'JACKETS': ['All', 'BOMBER', 'DENIM', 'PUFFER', 'WINDBREAKER', 'VARSITY', 'LEATHER', 'QUILTED'],
+  'HOODIES': ['All', 'PULLOVER', 'ZIP-UP', 'CROPPED', 'OVERSIZED', 'SLEEVELESS', 'GRAPHIC'],
+  'ETHNIC WEAR': ['All', 'KURTA', 'LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA', 'SHERWANI', 'PATHANI SUIT', 'NEHRU JACKET', 'DHOTI SET'],
+  'VEST': ['All', 'PLAIN', 'LINING', 'COLORING'],
+  'UNDERWEAR': ['All', 'LONG TRUNK', 'MINI TRUNK', 'BRIEF'],
+  'SLIPPERS': ['All', 'SLIDES', 'FLIP FLOPS', 'SPORTS', 'CASUAL', 'PLATFORM', 'MEMORY FOAM'],
+  'PERFUMES': ['All', 'EAU DE PARFUM', 'EAU DE TOILETTE', 'BODY SPRAY', 'APPAREL SPRAY', 'ATTAR', 'AIR FRESHENER', 'ROOM FRESHENER'],
+  'CAPS': ['All', 'BASEBALL CAP', 'SNAPBACK', 'TRUCKER HAT', 'BEANIE', 'BUCKET HAT', 'VISOR', 'DAD HAT'],
+  'SUNGLASSES': ['All', 'AVIATOR', 'WAYFARER', 'ROUND', 'SQUARE', 'POLARIZED', 'CLUBMASTER', 'SPORT', 'HEXAGONAL'],
+  'ACCESSORIES': ['All', 'CAP', 'BELT', 'SUNGLASSES', 'BRACELET', 'RING', 'CHAIN', 'KEYCHAIN'],
+  'WATCHES': ['All', 'ANALOG', 'DIGITAL', 'SMART WATCH', 'CHRONOGRAPH'],
+  'WALLETS': ['All', 'BIFOLD', 'TRIFOLD', 'CARD HOLDER', 'MONEY CLIP'],
+  'BELTS': ['All', 'LEATHER', 'CANVAS', 'REVERSIBLE', 'AUTO-LOCK'],
+};
+
+const getSubCategoriesForCat = (cat) => {
+  if (!cat || cat.toLowerCase() === 'all') return ['All'];
+  const matchKey = Object.keys(SUB_CATEGORIES).find(k => k.toLowerCase() === cat.toLowerCase());
+  return matchKey ? SUB_CATEGORIES[matchKey] : ['All'];
 };
 
 const PRICE_RANGES = [
@@ -139,10 +145,11 @@ export default function ShopPage() {
     }
   };
 
-  // Initial load or restore position + SWR fresh inventory refresh
+  // Listen for POS inventory changes while the shop is open. Keep the cached
+  // initial render, but replace it with live Firebase snapshots as they arrive.
   useEffect(() => {
     if (products.length === 0) {
-      fetchProducts(true);
+      setLoading(true);
     } else {
       // Products already exist in context, restore scroll position smoothly
       const position = scrollPosition || 0;
@@ -152,9 +159,17 @@ export default function ShopPage() {
           behavior: 'instant'
         });
       });
-      // SWR background refresh to ensure newly out-of-stock sizes and products update smoothly
-      fetchProducts(false);
     }
+    return subscribeToCatalog((catalog) => {
+      setProducts(catalog.filter(p => p.active !== false));
+      setHasMore(false);
+      setLoading(false);
+      setLoadingMore(false);
+    }, (error) => {
+      console.error('Live inventory updates unavailable:', error);
+      // Preserve the existing unordered-query fallback when the live query fails.
+      fetchProducts(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -174,7 +189,7 @@ export default function ShopPage() {
 
   // Comprehensive catalog filtering for category, search, price ranges, sizes, colors, and sorting
   const filtered = useMemo(() => {
-    let result = products.filter(p => p.active !== false && isProductInStock(p));
+    let result = products.filter(p => p.active !== false);
 
     // Category Filter
     if (category && category !== 'All') {
@@ -282,7 +297,7 @@ export default function ShopPage() {
     products.forEach(p => {
       const c = (p.category || p.categoryId || '').trim();
       if (c && !CATEGORIES.some(base => base.toLowerCase() === c.toLowerCase())) {
-        extra.add(c);
+        extra.add(c.toUpperCase());
       }
     });
     return [...CATEGORIES, ...Array.from(extra)];
@@ -290,12 +305,12 @@ export default function ShopPage() {
 
   const activeSubCategories = useMemo(() => {
     if (category === 'All') return null;
-    const baseSubs = SUB_CATEGORIES[category] || ['All'];
+    const baseSubs = getSubCategoriesForCat(category);
     const extraSubs = new Set(baseSubs);
     products.forEach(p => {
       const pCat = (p.category || p.categoryId || '').trim().toLowerCase();
       if (pCat === category.toLowerCase() && p.subCategory && typeof p.subCategory === 'string') {
-        const sub = p.subCategory.trim();
+        const sub = p.subCategory.trim().toUpperCase();
         if (sub && !Array.from(extraSubs).some(s => s.toLowerCase() === sub.toLowerCase())) {
           extraSubs.add(sub);
         }
@@ -314,15 +329,16 @@ export default function ShopPage() {
     setSubCategory('All');
   };
 
-  const hasActiveFilters = Boolean(
-    search ||
+  const hasFilterTags = Boolean(
+    (search && search.trim()) ||
     category !== 'All' ||
     priceRange !== 0 ||
     (selectedSizes && selectedSizes.length > 0) ||
     (selectedColors && selectedColors.length > 0) ||
-    sortBy !== 'featured' ||
     (subCategory && subCategory !== 'All')
   );
+
+  const hasActiveFilters = hasFilterTags || sortBy !== 'featured';
 
   const handleAddToCart = (productData) => {
     const size = productData.selectedSize || (productData.sizes && productData.sizes[0]) || 'Default';
@@ -483,6 +499,57 @@ export default function ShopPage() {
             {filtered.length} {filtered.length === 1 ? 'Product' : 'Products'}{hasActiveFilters ? ' Found' : ''}
           </span>
         </div>
+
+        {/* Active Filter Tags */}
+        {hasFilterTags && (
+          <div className="shop-active-filters" role="region" aria-label="Active filters">
+            <span className="shop-active-filters__label">Active Filters:</span>
+            {search.trim() && (
+              <span className="shop-active-tag">
+                Search: "{search.trim()}"
+                <button type="button" onClick={() => setSearch('')} aria-label="Clear search">✕</button>
+              </span>
+            )}
+            {category !== 'All' && (
+              <span className="shop-active-tag">
+                Category: {category}
+                <button type="button" onClick={() => { setCategory('All'); setSubCategory('All'); }} aria-label="Clear category">✕</button>
+              </span>
+            )}
+            {subCategory && subCategory !== 'All' && (
+              <span className="shop-active-tag">
+                Type: {subCategory}
+                <button type="button" onClick={() => setSubCategory('All')} aria-label="Clear type filter">✕</button>
+              </span>
+            )}
+            {priceRange !== 0 && PRICE_RANGES[priceRange] && (
+              <span className="shop-active-tag">
+                Price: {PRICE_RANGES[priceRange].label}
+                <button type="button" onClick={() => setPriceRange(0)} aria-label="Clear price filter">✕</button>
+              </span>
+            )}
+            {selectedSizes.map(size => (
+              <span key={size} className="shop-active-tag">
+                Size: {size}
+                <button type="button" onClick={() => toggleSize(size)} aria-label={`Remove size ${size}`}>✕</button>
+              </span>
+            ))}
+            {selectedColors.map(color => (
+              <span key={color} className="shop-active-tag">
+                Color: {color}
+                <button type="button" onClick={() => toggleColor(color)} aria-label={`Remove color ${color}`}>✕</button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="shop-active-filters__reset"
+              aria-label="Reset all filters"
+            >
+              Reset All
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -643,46 +710,6 @@ export default function ShopPage() {
           </button>
         )}
       </div>
-
-      {/* Active Filter Tags Bar */}
-      {hasActiveFilters && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', padding: '0 24px 16px', maxWidth: '1440px', margin: '0 auto' }}>
-          <span style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#64748b' }}>
-            Active Filters:
-          </span>
-          {category !== 'All' && (
-            <span style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Category: {category}
-              <button type="button" onClick={() => setCategory('All')} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          )}
-          {priceRange !== 0 && PRICE_RANGES[priceRange] && (
-            <span style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Price: {PRICE_RANGES[priceRange].label}
-              <button type="button" onClick={() => setPriceRange(0)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          )}
-          {selectedSizes.map(size => (
-            <span key={size} style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Size: {size}
-              <button type="button" onClick={() => toggleSize(size)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          ))}
-          {selectedColors.map(color => (
-            <span key={color} style={{ fontSize: '12px', background: '#0f172a', color: '#ffffff', padding: '3px 10px', borderRadius: '14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              Color: {color}
-              <button type="button" onClick={() => toggleColor(color)} style={{ background: 'none', border: 'none', color: '#fbbf24', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: 0 }}>✕</button>
-            </span>
-          ))}
-          <button 
-            type="button" 
-            onClick={clearFilters}
-            style={{ fontSize: '11.5px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', padding: '3px 10px', borderRadius: '14px', cursor: 'pointer', fontWeight: '700' }}
-          >
-            Reset All
-          </button>
-        </div>
-      )}
 
       {/* Loading Initial Data */}
       {loading && products.length === 0 ? (

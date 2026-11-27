@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { getUserOrders } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
@@ -200,6 +200,16 @@ export default function TrackOrderPage() {
       performTrack(initialQuery);
     }
   }, [queryParam, performTrack]);
+
+  useEffect(() => {
+    if (!currentUser?.uid || !orders.length) return;
+    const unsubscribers = orders.slice(0, 10).map(order => onSnapshot(doc(db, 'orders', order.id), snapshot => {
+      if (!snapshot.exists() || snapshot.data().userId !== currentUser.uid) return;
+      const updated = formatClientOrder({ id: snapshot.id, ...snapshot.data() });
+      setOrders(previous => previous.map(item => item.id === updated.id ? updated : item));
+    }, error => console.warn('Live tracking unavailable:', error.message)));
+    return () => unsubscribers.forEach(unsubscribe => unsubscribe());
+  }, [currentUser?.uid, orders.map(order => order.id).join('|')]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

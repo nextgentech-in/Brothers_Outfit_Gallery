@@ -237,116 +237,140 @@ export const createCompressedDataUrl = async (file, maxWidth = 900, maxHeight = 
  * @param {string} folder - Destination folder (e.g. 'products/prod_123')
  * @returns {Promise<{ url: string, fileId: string, thumbnailUrl: string }>}
  */
+/**
+ * Copies a picked file into memory. A File from <input type="file"> is only a
+ * pointer to the file on disk: if it is moved, renamed, re-saved, deleted, or is
+ * an online-only OneDrive/Google Drive file, the browser can no longer read it and
+ * every upload attempt fails. Reading it once at pick time avoids that.
+ */
+export const readFileIntoMemory = async (file) => {
+  try {
+    const bytes = await file.arrayBuffer();
+    if (!bytes || bytes.byteLength === 0) throw new Error('empty file');
+    return new File([bytes], file.name || 'image', { type: file.type || 'application/octet-stream', lastModified: file.lastModified || Date.now() });
+  } catch {
+    const unreadable = new Error(`${file?.name || 'Image'} could not be read from this device.`);
+    unreadable.code = 'FILE_UNREADABLE';
+    throw unreadable;
+  }
+};
+
 export const uploadImageToImageKit = async (file, folder = 'categories') => {
   if (!file) throw new Error("No image file provided.");
 
+  // Fail clearly (instead of three silent fallbacks) when the browser cannot read the file.
+  const readableFile = await readFileIntoMemory(file);
+
   // Pre-compress image client-side: turns 10MB into ~100KB in 40ms
-  let fileToUpload = file;
+  let fileToUpload = readableFile;
   try {
-    fileToUpload = await compressImageFile(file, 1200, 1200, 0.85);
+    fileToUpload = await compressImageFile(readableFile, 1200, 1200, 0.85);
   } catch (compErr) {
     console.warn("Client pre-compression skipped:", compErr);
   }
 
   const backendUrl = getBackendUrl();
   const cleanFolder = folder.replace(/^\/+|\/+$/g, '') || 'categories';
+  // Why each tier failed, so the admin sees the real cause instead of a guess.
+  const reasons = [];
+  // Slow shop connections upload 3 photos at once: allow ~20s per MB, never under 30s.
+  const uploadTimeoutMs = Math.max(30000, Math.round((fileToUpload.size || 0) / 1024 / 1024 * 20000));
 
-  // 1. ImageKit CDN with quick auth and fast timeout
-  try {
-    let authParams = null;
+  const withTimeout = async (ms, run) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
     try {
-      const { auth } = await import('../firebase/firebaseAuth');
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error('Admin authentication is required for uploads.');
-      const controller = new AbortController();
-      const authTimeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${backendUrl}/api/imagekit/auth`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-        signal: controller.signal
-      });
-      clearTimeout(authTimeout);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.configured !== false && data.token && data.signature && data.expire) {
-          authParams = data;
+      return await run(controller.signal);
+    } catch (err) {
+      if (err?.name === 'AbortError') throw new Error(`timed out after ${Math.round(ms / 1000)}s`);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  // 1. ImageKit CDN (signed by our backend), with one retry for network hiccups
+  try {
+    const { auth } = await import('../firebase/firebaseAuth');
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken) throw new Error('not signed in as admin');
+    const authRes = await withTimeout(10000, signal => fetch(`${backendUrl}/api/imagekit/auth`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+      cache: 'no-store',
+      signal
+    }));
+    const authParams = await authRes.json().catch(() => ({}));
+    if (!authRes.ok || !authParams.signature || !authParams.token || !authParams.expire || !authParams.publicKey) {
+      throw new Error(authParams.error || `upload signing failed (HTTP ${authRes.status})`);
+    }
+
+    const uniqueFileName = `${cleanFolder.replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}-${(fileToUpload.name || 'image').replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    let lastError = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const formData = new FormData();
+        formData.append("file", fileToUpload);
+        formData.append("publicKey", authParams.publicKey);
+        formData.append("signature", authParams.signature);
+        formData.append("expire", authParams.expire);
+        formData.append("token", authParams.token);
+        formData.append("fileName", uniqueFileName);
+        formData.append("folder", `/${cleanFolder}`);
+        const uploadRes = await withTimeout(uploadTimeoutMs, signal => fetch("https://upload.imagekit.io/api/v1/files/upload", {
+          method: "POST",
+          body: formData,
+          signal
+        }));
+        const uploadData = await uploadRes.json().catch(() => ({}));
+        if (uploadRes.ok && uploadData.url) {
+          return { url: uploadData.url, fileId: uploadData.fileId, thumbnailUrl: uploadData.thumbnailUrl || uploadData.url, source: 'imagekit' };
         }
-      }
-    } catch {
-      // Backend not running or timeout - proceed to fallback
-    }
-
-    if (authParams?.signature && authParams?.token && authParams?.expire && authParams?.publicKey) {
-      const uniqueFileName = `${cleanFolder.replace(/[^a-zA-Z0-9]/g, '_')}-${Date.now()}-${(fileToUpload.name || 'image').replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const formData = new FormData();
-      formData.append("file", fileToUpload);
-      formData.append("publicKey", authParams.publicKey);
-      formData.append("signature", authParams.signature);
-      formData.append("expire", authParams.expire);
-      formData.append("token", authParams.token);
-      formData.append("fileName", uniqueFileName);
-      formData.append("folder", `/${cleanFolder}`);
-
-      const uploadController = new AbortController();
-      const uploadTimeout = setTimeout(() => uploadController.abort(), 7000);
-      const uploadRes = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-        method: "POST",
-        body: formData,
-        signal: uploadController.signal
-      });
-      clearTimeout(uploadTimeout);
-
-      if (uploadRes.ok) {
-        const uploadData = await uploadRes.json();
-        return {
-          url: uploadData.url,
-          fileId: uploadData.fileId,
-          thumbnailUrl: uploadData.thumbnailUrl || uploadData.url
-        };
+        lastError = new Error(uploadData.message || `HTTP ${uploadRes.status}`);
+        // ImageKit refuses the same signature token twice and 4xx errors won't change on retry.
+        if (uploadRes.status < 500) break;
+      } catch (err) {
+        lastError = err;
       }
     }
+    throw lastError || new Error('upload failed');
   } catch (imageKitErr) {
-    console.warn("ImageKit upload bypassed or failed, using fast fallback:", imageKitErr.message);
+    reasons.push(`ImageKit: ${imageKitErr.message}`);
+    console.warn("ImageKit upload failed, trying Firebase Storage:", imageKitErr.message);
   }
 
-  // 2. High-reliability Fallback: Direct Firebase Storage Upload (with 6s timeout)
+  // 2. Fallback: direct Firebase Storage upload
   try {
     const { getStorage, ref: fbStorageRef, uploadBytes, getDownloadURL } = await import('firebase/storage');
     const { app: fbApp } = await import('../firebase/firebaseConfig');
-    if (fbApp) {
-      const storage = getStorage(fbApp);
-      const safeFileName = `${cleanFolder}/${Date.now()}_${(fileToUpload.name || 'image').replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const fileRef = fbStorageRef(storage, safeFileName);
-      
-      const storageUploadPromise = (async () => {
-        const uploadSnapshot = await uploadBytes(fileRef, fileToUpload);
-        return await getDownloadURL(uploadSnapshot.ref);
-      })();
-
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Storage timeout")), 6000)
-      );
-
-      const downloadUrl = await Promise.race([storageUploadPromise, timeoutPromise]);
-      if (downloadUrl) {
-        return {
-          url: downloadUrl,
-          fileId: safeFileName,
-          thumbnailUrl: downloadUrl
-        };
-      }
-    }
+    if (!fbApp) throw new Error('Firebase is not configured');
+    const storage = getStorage(fbApp);
+    const safeFileName = `${cleanFolder}/${Date.now()}_${(fileToUpload.name || 'image').replace(/[^a-zA-Z0-9.]/g, '_')}`;
+    const fileRef = fbStorageRef(storage, safeFileName);
+    const downloadUrl = await Promise.race([
+      (async () => getDownloadURL((await uploadBytes(fileRef, fileToUpload)).ref))(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out after ${Math.round(uploadTimeoutMs / 1000)}s`)), uploadTimeoutMs))
+    ]);
+    if (downloadUrl) return { url: downloadUrl, fileId: safeFileName, thumbnailUrl: downloadUrl, source: 'firebase' };
   } catch (storageErr) {
-    console.warn("Firebase Storage fallback skipped:", storageErr.message);
+    reasons.push(`Storage: ${storageErr.code || storageErr.message}`);
+    console.warn("Firebase Storage fallback failed:", storageErr.message);
   }
 
   // 3. Ultra-fast, Guaranteed Fallback: Canvas compressed Data URL (<60KB)
   // Ensures instant publishing and keeps Firestore document size well within limits
   const compressedDataUrl = await createCompressedDataUrl(fileToUpload, 900, 900, 0.72);
+  if (!compressedDataUrl) {
+    const failed = new Error(reasons.join('; ') || 'could not be processed');
+    failed.reasons = reasons;
+    throw failed;
+  }
   const localId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
   return {
     url: compressedDataUrl,
     fileId: localId,
-    thumbnailUrl: compressedDataUrl
+    thumbnailUrl: compressedDataUrl,
+    source: 'embedded',
+    reasons
   };
 };

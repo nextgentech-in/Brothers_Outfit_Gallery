@@ -13,99 +13,100 @@ import {
 import { useAdminUI } from '../../context/AdminUIContext';
 import { invalidateProductCache } from '../../services/productService';
 import './AdminProductForm.css';
-import { uploadImageToImageKit } from '../../utils/imageUtils';
+import { uploadImageToImageKit, readFileIntoMemory } from '../../utils/imageUtils';
 import {
   convertMeasurementValue,
   convertColumnHeader
 } from '../../components/common/SizeGuideModal';
 import VisualColorSelector from '../../components/admin/VisualColorSelector.jsx';
 import { detectDominantColor } from '../../utils/imageColorDetector.js';
-import { normalizeToStandardColor } from '../../data/colorMaster.js';
+import { normalizeColorPrimaries } from '../../utils/colorImages.js';
+import { normalizeToStandardColor, toColorName } from '../../data/colorMaster.js';
 
 const CATEGORY_SIZES_MAP = {
-  'Kurta': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  'Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
-  'T-Shirts': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
-  'Jeans': ['28', '30', '32', '34', '36', '38', '40', '42'],
-  'Trousers': ['28', '30', '32', '34', '36', '38', '40', '42'],
-  'Shorts': ['28', '30', '32', '34', '36', '38', '40', '42'],
-  'Jackets': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  'Hoodies': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  'Ethnic Wear': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
-  'Vest': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', 'Free Size'],
-  'Underwear': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', '28', '30', '32', '34', '36', '38', '40'],
-  'Perfumes': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
-  'Slippers': ['6', '7', '8', '9', '10', '11', 'Custom'],
-  'Wallets': ['Standard', 'Slim', 'Bifold', 'Trifold'],
-  'Watches': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
-  'Belts': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
-  'Caps': ['Free Size', 'Adjustable', 'S/M', 'L/XL', 'Snapback', 'Standard'],
-  'Sunglasses': ['Standard', 'Free Size', 'Medium (54mm)', 'Large (58mm)', 'Small (50mm)'],
+  'KURTA': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'SHIRTS': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL', '6XL'],
+  'T-SHIRTS': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'],
+  'JEANS': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'TROUSERS': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'SHORTS': ['28', '30', '32', '34', '36', '38', '40', '42'],
+  'JACKETS': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'HOODIES': ['S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  'ETHNIC WEAR': ['36', '38', '40', '42', '44', '46', 'M', 'L', 'XL', 'XXL'],
+  'VEST': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', 'Free Size'],
+  'UNDERWEAR': ['S', 'M', 'L', 'XL', 'XXL', '3XL', '75cm', '80cm', '85cm', '90cm', '95cm', '100cm', '105cm', '110cm', '28', '30', '32', '34', '36', '38', '40'],
+  'PERFUMES': ['10ml', '20ml', '30ml', '50ml', '75ml', '100ml', '120ml', '150ml', '200ml'],
+  'SLIPPERS': ['6', '7', '8', '9', '10', '11', 'Custom'],
+  'WALLETS': ['Standard', 'Slim', 'Bifold', 'Trifold'],
+  'WATCHES': ['Standard', 'Dial 40mm', 'Dial 42mm', 'Adjustable Strap'],
+  'BELTS': ['28-32', '32-36', '36-40', '40-44', 'Free Size', 'Adjustable'],
+  'CAPS': ['Free Size', 'Adjustable', 'S/M', 'L/XL', 'Snapback', 'Standard'],
+  'SUNGLASSES': ['Standard', 'Free Size', 'Medium (54mm)', 'Large (58mm)', 'Small (50mm)'],
   'DEFAULT': ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', 'Free Size']
 };
 
 const SUB_CATEGORY_MAP = {
-  'Kurta': ['Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta'],
-  'T-Shirts': ['Oversized', 'Regular Fit', 'Slim Fit', 'Polo', 'Graphic', 'Drop Shoulder', 'Acid Wash', 'Henley', 'Full Sleeve', 'Full Sleeve Collar'],
-  'Shirts': ['Casual', 'Formal', 'Printed', 'Linen', 'Denim', 'Oxford', 'Mandarin Collar', 'Half Sleeve'],
-  'Jeans': ['Skinny', 'Slim Fit', 'Regular', 'Baggy', 'Wide Leg', 'Ripped', 'Bootcut', 'Tapered', 'Mom Fit', 'Straight Fit', 'Narrow Fit'],
-  'Trousers': ['Cargo', 'Chino', 'Jogger', 'Formal', 'Pleated', 'Straight Fit', 'Slim Fit'],
-  'Shorts': ['Cargo', 'Chino', 'Denim', 'Sports', 'Casual', 'Bermuda', 'Running'],
-  'Jackets': ['Bomber', 'Denim', 'Puffer', 'Windbreaker', 'Varsity', 'Leather', 'Quilted'],
-  'Hoodies': ['Pullover', 'Zip-Up', 'Cropped', 'Oversized', 'Sleeveless', 'Graphic'],
-  'Ethnic Wear': ['Kurta', 'Lakhnavi Kurta', 'Printed Kurta', 'Daman Work Kurta', 'Plain Kurta', 'Kachi Work Kurta', 'Bandhani Kurta', 'Koti Kurta', 'Embroidery Kurta', 'Sherwani', 'Pathani Suit', 'Nehru Jacket', 'Dhoti Set'],
-  'Vest': ['Plain', 'Lining', 'Coloring'],
-  'Underwear': ['Long Trunk', 'Mini Trunk', 'Brief'],
-  'Slippers': ['Slides', 'Flip Flops', 'Sports', 'Casual', 'Platform', 'Memory Foam'],
-  'Perfumes': ['Eau de Parfum', 'Eau de Toilette', 'Body Spray', 'Apparel Spray', 'Attar', 'Air Freshener', 'Room Freshener', 'Deodorant', 'Gift Set'],
-  'Wallets': ['Bifold', 'Trifold', 'Card Holder', 'Money Clip', 'Chain Wallet'],
-  'Watches': ['Analog', 'Digital', 'Smart Watch', 'Chronograph', 'Dress Watch'],
-  'Belts': ['Leather', 'Canvas', 'Reversible', 'Auto-Lock', 'Braided'],
-  'Caps': ['Baseball Cap', 'Snapback', 'Trucker Hat', 'Beanie', 'Bucket Hat', 'Visor', 'Dad Hat'],
-  'Sunglasses': ['Aviator', 'Wayfarer', 'Round', 'Square', 'Polarized', 'Clubmaster', 'Sport', 'Hexagonal'],
+  'KURTA': ['LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA'],
+  'T-SHIRTS': ['OVERSIZED', 'REGULAR FIT', 'SLIM FIT', 'POLO', 'GRAPHIC', 'DROP SHOULDER', 'ACID WASH', 'HENLEY', 'FULL SLEEVE', 'FULL SLEEVE COLLAR'],
+  'SHIRTS': ['CASUAL', 'FORMAL', 'PRINTED', 'LINEN', 'DENIM', 'OXFORD', 'MANDARIN COLLAR', 'HALF SLEEVE'],
+  'JEANS': ['SKINNY', 'SLIM FIT', 'REGULAR', 'BAGGY', 'WIDE LEG', 'RIPPED', 'BOOTCUT', 'TAPERED', 'MOM FIT', 'STRAIGHT FIT', 'NARROW FIT'],
+  'TROUSERS': ['CARGO', 'CHINO', 'JOGGER', 'FORMAL', 'PLEATED', 'STRAIGHT FIT', 'SLIM FIT'],
+  'SHORTS': ['CARGO', 'CHINO', 'DENIM', 'SPORTS', 'CASUAL', 'BERMUDA', 'RUNNING'],
+  'JACKETS': ['BOMBER', 'DENIM', 'PUFFER', 'WINDBREAKER', 'VARSITY', 'LEATHER', 'QUILTED'],
+  'HOODIES': ['PULLOVER', 'ZIP-UP', 'CROPPED', 'OVERSIZED', 'SLEEVELESS', 'GRAPHIC'],
+  'ETHNIC WEAR': ['KURTA', 'LAKHNAVI KURTA', 'PRINTED KURTA', 'DAMAN WORK KURTA', 'PLAIN KURTA', 'KACHI WORK KURTA', 'BANDHANI KURTA', 'KOTI KURTA', 'EMBROIDERY KURTA', 'SHERWANI', 'PATHANI SUIT', 'NEHRU JACKET', 'DHOTI SET'],
+  'VEST': ['PLAIN', 'LINING', 'COLORING'],
+  'UNDERWEAR': ['LONG TRUNK', 'MINI TRUNK', 'BRIEF'],
+  'SLIPPERS': ['SLIDES', 'FLIP FLOPS', 'SPORTS', 'CASUAL', 'PLATFORM', 'MEMORY FOAM'],
+  'PERFUMES': ['EAU DE PARFUM', 'EAU DE TOILETTE', 'BODY SPRAY', 'APPAREL SPRAY', 'ATTAR', 'AIR FRESHENER', 'ROOM FRESHENER', 'DEODORANT', 'GIFT SET'],
+  'WALLETS': ['BIFOLD', 'TRIFOLD', 'CARD HOLDER', 'MONEY CLIP', 'CHAIN WALLET'],
+  'WATCHES': ['ANALOG', 'DIGITAL', 'SMART WATCH', 'CHRONOGRAPH', 'DRESS WATCH'],
+  'BELTS': ['LEATHER', 'CANVAS', 'REVERSIBLE', 'AUTO-LOCK', 'BRAIDED'],
+  'CAPS': ['BASEBALL CAP', 'SNAPBACK', 'TRUCKER HAT', 'BEANIE', 'BUCKET HAT', 'VISOR', 'DAD HAT'],
+  'SUNGLASSES': ['AVIATOR', 'WAYFARER', 'ROUND', 'SQUARE', 'POLARIZED', 'CLUBMASTER', 'SPORT', 'HEXAGONAL'],
 };
 
 const COMMON_BATCH_SIZES = {
-  'Kurta': ['36', '38', '40', '42', '44', '46'],
-  'Vest': ['S', 'M', 'L', 'XL', 'XXL'],
-  'Underwear': ['S', 'M', 'L', 'XL', 'XXL'],
-  'Perfumes': ['30ml', '50ml', '100ml'],
-  'Jeans': ['30', '32', '34', '36', '38'],
-  'Trousers': ['30', '32', '34', '36', '38'],
-  'Shorts': ['30', '32', '34', '36', '38'],
-  'Slippers': ['7', '8', '9', '10', '11'],
-  'Wallets': ['Standard', 'Slim'],
-  'Watches': ['Standard', 'Dial 40mm'],
-  'Belts': ['32-36', '36-40'],
-  'Caps': ['Free Size', 'Adjustable'],
-  'Sunglasses': ['Standard', 'Free Size'],
+  'KURTA': ['36', '38', '40', '42', '44', '46'],
+  'VEST': ['S', 'M', 'L', 'XL', 'XXL'],
+  'UNDERWEAR': ['S', 'M', 'L', 'XL', 'XXL'],
+  'PERFUMES': ['30ml', '50ml', '100ml'],
+  'JEANS': ['30', '32', '34', '36', '38'],
+  'TROUSERS': ['30', '32', '34', '36', '38'],
+  'SHORTS': ['30', '32', '34', '36', '38'],
+  'SLIPPERS': ['7', '8', '9', '10', '11'],
+  'WALLETS': ['Standard', 'Slim'],
+  'WATCHES': ['Standard', 'Dial 40mm'],
+  'BELTS': ['32-36', '36-40'],
+  'CAPS': ['Free Size', 'Adjustable'],
+  'SUNGLASSES': ['Standard', 'Free Size'],
   'DEFAULT': ['S', 'M', 'L', 'XL', 'XXL']
 };
 
 const BASE_CATEGORIES = [
-  'Kurta',
-  'Shirts',
-  'T-Shirts',
-  'Jeans',
-  'Trousers',
-  'Shorts',
-  'Jackets',
-  'Hoodies',
-  'Ethnic Wear',
-  'Vest',
-  'Underwear',
-  'Perfumes',
-  'Wallets',
-  'Slippers',
-  'Watches',
-  'Belts',
-  'Caps',
-  'Sunglasses'
+  'KURTA',
+  'SHIRTS',
+  'T-SHIRTS',
+  'JEANS',
+  'TROUSERS',
+  'SHORTS',
+  'JACKETS',
+  'HOODIES',
+  'ETHNIC WEAR',
+  'VEST',
+  'UNDERWEAR',
+  'PERFUMES',
+  'WALLETS',
+  'SLIPPERS',
+  'WATCHES',
+  'BELTS',
+  'CAPS',
+  'SUNGLASSES',
+  'ACCESSORIES'
 ];
-
 // Prebuilt size guide templates per category
 const SIZE_GUIDE_TEMPLATES = {
-  'Shirts': {
+  'SHIRTS': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -115,7 +116,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['XXL', '', '', '', ''],
     ]
   },
-  'T-Shirts': {
+  'T-SHIRTS': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -126,7 +127,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL', '', '', '', ''],
     ]
   },
-  'Jeans': {
+  'JEANS': {
     columns: ['Size', 'Waist (in)', 'Hip (in)', 'Inseam (in)', 'Length (in)', 'Thigh (in)'],
     rows: [
       ['28', '', '', '', '', ''],
@@ -137,7 +138,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['38', '', '', '', '', ''],
     ]
   },
-  'Trousers': {
+  'TROUSERS': {
     columns: ['Size', 'Waist (in)', 'Hip (in)', 'Inseam (in)', 'Length (in)'],
     rows: [
       ['28', '', '', '', ''],
@@ -148,7 +149,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['38', '', '', '', ''],
     ]
   },
-  'Shorts': {
+  'SHORTS': {
     columns: ['Size', 'Waist (in)', 'Hip (in)', 'Length (in)', 'Thigh (in)'],
     rows: [
       ['28', '', '', '', ''],
@@ -158,7 +159,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['36', '', '', '', ''],
     ]
   },
-  'Jackets': {
+  'JACKETS': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -169,7 +170,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL', '', '', '', ''],
     ]
   },
-  'Hoodies': {
+  'HOODIES': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['S', '', '', '', ''],
@@ -180,7 +181,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL', '', '', '', ''],
     ]
   },
-  'Kurta': {
+  'KURTA': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['36', '38', '40', '17', '24'],
@@ -195,7 +196,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['XXL', '46', '46', '19', '26'],
     ]
   },
-  'Ethnic Wear': {
+  'ETHNIC WEAR': {
     columns: ['Size', 'Chest (in)', 'Length (in)', 'Shoulder (in)', 'Sleeve (in)'],
     rows: [
       ['M', '', '', '', ''],
@@ -208,7 +209,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['42', '', '', '', ''],
     ]
   },
-  'Slippers': {
+  'SLIPPERS': {
     columns: ['UK / IND Size', 'US Size', 'EU Size', 'Foot Length (cm)'],
     rows: [
       ['6', '', '', ''],
@@ -219,7 +220,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['11', '', '', ''],
     ]
   },
-  'Belts': {
+  'BELTS': {
     columns: ['Trouser Waist', 'Recommended Belt Size', 'Adjustment Range'],
     rows: [
       ['28"-30"', '', ''],
@@ -228,7 +229,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['40"-42"', '', ''],
     ]
   },
-  'Vest': {
+  'VEST': {
     columns: ['Size', 'Chest (in)', 'Length (in)'],
     rows: [
       ['S (80cm)', '32', '26'],
@@ -239,7 +240,7 @@ const SIZE_GUIDE_TEMPLATES = {
       ['3XL (105cm)', '42', '31'],
     ]
   },
-  'Underwear': {
+  'UNDERWEAR': {
     columns: ['Size', 'Waist (in)', 'Waist (cm)'],
     rows: [
       ['S (75cm)', '28-30', '70-75'],
@@ -261,6 +262,30 @@ const SIZE_GUIDE_TEMPLATES = {
   }
 };
 
+const getCategorySizes = (cat) => {
+  if (!cat) return CATEGORY_SIZES_MAP['DEFAULT'];
+  const upper = String(cat).trim().toUpperCase();
+  return CATEGORY_SIZES_MAP[upper] || CATEGORY_SIZES_MAP['DEFAULT'];
+};
+
+const getSubCategories = (cat) => {
+  if (!cat) return [];
+  const upper = String(cat).trim().toUpperCase();
+  return SUB_CATEGORY_MAP[upper] || [];
+};
+
+const getCommonBatchSizes = (cat) => {
+  if (!cat) return COMMON_BATCH_SIZES['DEFAULT'];
+  const upper = String(cat).trim().toUpperCase();
+  return COMMON_BATCH_SIZES[upper] || COMMON_BATCH_SIZES['DEFAULT'];
+};
+
+const getSizeGuideTemplate = (cat) => {
+  if (!cat) return SIZE_GUIDE_TEMPLATES['SHIRTS'];
+  const upper = String(cat).trim().toUpperCase();
+  return SIZE_GUIDE_TEMPLATES[upper] || SIZE_GUIDE_TEMPLATES['SHIRTS'] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
+};
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const normalizeSkuPart = (value, fallback = '') => String(value || fallback)
@@ -276,8 +301,9 @@ const buildVariantSku = (productSku, color, size, fallbackProductId = '') => {
   return `${base}-${colorPart}-${sizePart}`;
 };
 
-export default function AdminProductForm() {
-  const { id } = useParams();
+export default function AdminProductForm({ modalProductId, isModal = false, onClose, onSaved } = {}) {
+  const routeParams = useParams();
+  const id = modalProductId !== undefined ? modalProductId : routeParams.id;
   const navigate = useNavigate();
   const isEdit = Boolean(id);
   const { showToast } = useAdminUI();
@@ -292,12 +318,14 @@ export default function AdminProductForm() {
     name: '',
     slug: '',
     sku: '',
-    categoryId: 'Shirts',
+    categoryId: 'SHIRTS',
     shortDescription: '',
     description: '',
     mrp: '',
     salePrice: '',
     costPrice: '',
+    gstEnabled: false,
+    gstPercent: '5',
     colors: [],
     variants: [],
     offerEnabled: false,
@@ -314,7 +342,7 @@ export default function AdminProductForm() {
       useCustomOffers: false,
       title: 'OFFERS FOR YOU – SHOP MORE, SAVE MORE!',
       items: [
-        'Buy 2 & Get Flat Rs. 300 OFF',
+        'FREE Delivery on all Prepaid Orders!',
         'Buy 4 & get Flat Rs. 1250 OFF',
         'Enjoy an Additional 5% OFF on prepaid orders!',
         'International Orders? WhatsApp Us on +91 84602 33020 for Assistance!'
@@ -338,7 +366,7 @@ export default function AdminProductForm() {
 
   // Size Guide Builder States
   const [newColumnName, setNewColumnName] = useState('');
-  const [selectedSgTemplate, setSelectedSgTemplate] = useState('Shirts');
+  const [selectedSgTemplate, setSelectedSgTemplate] = useState('SHIRTS');
   const [sgInputMode, setSgInputMode] = useState('dual'); // 'dual' | 'in' | 'cm'
   const [rawDualInputs, setRawDualInputs] = useState({});
 
@@ -364,7 +392,7 @@ export default function AdminProductForm() {
         prods.forEach(p => {
           const c = (p.categoryId || p.category || '').trim();
           if (c && !BASE_CATEGORIES.some(b => b.toLowerCase() === c.toLowerCase())) {
-            extraCats.add(c);
+            extraCats.add(c.toUpperCase());
           }
         });
         if (extraCats.size > 0) {
@@ -378,10 +406,17 @@ export default function AdminProductForm() {
     if (isEdit) {
       getAdminProductById(id).then(data => {
         if (data) {
-          let loadedVariants = (data.variants || []).map((v) => ({
+          let loadedVariants = (data.variants || []).map((v) => {
+            // A saved variant rate of 0 means "not set" (old blank saves). Load it empty so the
+            // variant inherits the product Purchase Rate instead of overriding it with ₹0.
+            const savedCost = v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? '';
+            return {
             ...v,
+            color: toColorName(v.color) || v.color,
+            costPrice: Number(savedCost) > 0 ? savedCost : '',
             isDefaultPrice: v.isDefaultPrice !== undefined ? !!v.isDefaultPrice : false
-          }));
+            };
+          });
 
           if (loadedVariants.length > 0 && !loadedVariants.some(v => v.isDefaultPrice)) {
             const matchedIdx = loadedVariants.findIndex(v => Number(v.price) === Number(data.salePrice || data.price));
@@ -392,7 +427,30 @@ export default function AdminProductForm() {
             }
           }
 
-          const prodCat = data.categoryId || data.category || 'Shirts';
+          // POS purchases update only the received variant's rate, so the product-level rate can
+          // still be ₹0. Fall back to the default variant's rate, then any variant with a rate.
+          const productCost = [data.costPrice, data.cost_price, data.purchasePrice, data.purchase_price]
+            .map(Number).find(n => n > 0);
+          const variantCost = [loadedVariants.find(v => v.isDefaultPrice), ...loadedVariants]
+            .map(v => Number(v?.costPrice)).find(n => n > 0);
+          const loadedCost = productCost || variantCost || '';
+
+          // Keep saved colour names as stored, in CAPITALS (only fill in a missing swatch hex).
+          // Renaming "Dark Indigo Blue" to a standard alias broke the link with its images.
+          const loadedColors = (data.colors || []).map(c => {
+            const raw = typeof c === 'object' && c ? c : { name: String(c || '') };
+            const std = normalizeToStandardColor(raw);
+            if (!std) return raw;
+            const sameName = String(std.name).trim().toLowerCase() === String(raw.name || '').trim().toLowerCase();
+            return sameName ? std : { ...std, ...raw, name: toColorName(raw.name), hex: raw.hex || std.hex };
+          }).map(c => ({ ...c, name: toColorName(c.name) })).filter(c => c.name);
+          const canonicalColor = (name) => {
+            const n = toColorName(name);
+            const hit = loadedColors.find(c => c.name === n);
+            return hit ? hit.name : n;
+          };
+
+          const prodCat = (data.categoryId || data.category || 'SHIRTS').toUpperCase();
           const isKnownCat = BASE_CATEGORIES.some(b => b.toLowerCase() === prodCat.toLowerCase());
           if (!isKnownCat && prodCat) {
             setIsCustomCategory(true);
@@ -402,11 +460,12 @@ export default function AdminProductForm() {
             setCustomCategoryInput('');
           }
 
-          const knownSubs = SUB_CATEGORY_MAP[prodCat] || [];
-          const isKnownSub = knownSubs.some(s => s.toLowerCase() === (data.subCategory || '').toLowerCase());
-          if (data.subCategory && !isKnownSub) {
+          const knownSubs = getSubCategories(prodCat);
+          const currentSub = (data.subCategory || '').toUpperCase();
+          const isKnownSub = knownSubs.some(s => s.toLowerCase() === currentSub.toLowerCase());
+          if (currentSub && !isKnownSub) {
             setIsCustomSubCategory(true);
-            setCustomSubCategoryInput(data.subCategory);
+            setCustomSubCategoryInput(currentSub);
           } else {
             setIsCustomSubCategory(false);
             setCustomSubCategoryInput('');
@@ -415,13 +474,17 @@ export default function AdminProductForm() {
           setFormData({
             ...data,
             categoryId: prodCat,
+            subCategory: currentSub,
             subCategory: data.subCategory || '',
+            productNumber: data.productNumber, barcode: data.barcode || '',
             gsl: data.gsl || '',
             mrp: data.mrp || data.compareAtPrice || '',
             salePrice: data.salePrice || data.price || '',
-            costPrice: data.costPrice ?? data.cost_price ?? data.purchase_price ?? '',
+            costPrice: loadedCost,
+            gstEnabled: data.gstEnabled === true,
+            gstPercent: data.gstPercent ?? '5',
             variants: loadedVariants,
-            colors: (data.colors || []).map(c => normalizeToStandardColor(c) || c),
+            colors: loadedColors,
             isTrending: data.isTrending !== undefined ? !!data.isTrending : false,
             sizeGuide: normalizeSizeGuideFromFirestore(data.sizeGuide),
             offersConfig: data.offersConfig ? {
@@ -474,10 +537,11 @@ export default function AdminProductForm() {
                 url: img.url,
                 publicId: img.publicId || img.path,
                 isPrimary: img.isPrimary || (idx === 0 && !data.images?.some(i => i.isPrimary)),
-                color: img.color || ''
+                color: canonicalColor(img.color),
+                isColorPrimary: !!img.isColorPrimary
               };
             });
-            setExistingImages(mappedImages);
+            setExistingImages(normalizeColorPrimaries(mappedImages));
           }
         }
         setLoading(false);
@@ -493,6 +557,18 @@ export default function AdminProductForm() {
         [name]: type === 'checkbox' ? checked : value
       };
 
+      // The storefront price comes from the size marked "Front Price", so a change to
+      // the main Sale Price must reach the sizes or it is silently lost on save.
+      // Sizes still on the old price (or with no own price) follow; sizes given
+      // their own special price keep it.
+      if (name === 'salePrice' && Array.isArray(prev.variants) && prev.variants.length > 0) {
+        const oldPrice = prev.salePrice === '' ? null : Number(prev.salePrice);
+        const nextPrice = value === '' || isNaN(Number(value)) ? '' : Number(value);
+        updated.variants = prev.variants.map(variant => {
+          const own = variant.price === undefined || variant.price === '' ? null : Number(variant.price);
+          return own === null || own === oldPrice ? { ...variant, price: nextPrice, salePrice: nextPrice } : variant;
+        });
+      }
       if (name === 'name' && !isEdit) {
         updated.slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
       }
@@ -784,8 +860,8 @@ export default function AdminProductForm() {
   };
 
   const handleLoadSizeGuideTemplate = (templateKey = null) => {
-    const keyToUse = templateKey || selectedSgTemplate || formData.categoryId || 'Shirts';
-    const template = SIZE_GUIDE_TEMPLATES[keyToUse] || SIZE_GUIDE_TEMPLATES['Shirts'] || SIZE_GUIDE_TEMPLATES['DEFAULT'];
+    const keyToUse = templateKey || selectedSgTemplate || formData.categoryId || 'SHIRTS';
+    const template = getSizeGuideTemplate(keyToUse);
     const currentBaseUnit = formData.sizeGuide?.unit === 'cm' ? 'cm' : 'in';
     const targetUnit = sgInputMode === 'cm' ? 'cm' : currentBaseUnit;
 
@@ -937,8 +1013,21 @@ export default function AdminProductForm() {
   // IMAGE HANDLING & COLOR LINKING LOGIC
   // -------------------------------------------------------------
 
-  const onSelectFiles = (e) => {
-    const files = Array.from(e.target.files);
+  const onSelectFiles = async (e) => {
+    const input = e.target;
+    const picked = Array.from(input.files || []);
+    // Reset input so the same files can be selected again later
+    input.value = '';
+    if (!picked.length) return;
+
+    // Copy each photo into memory now, so moving/renaming/re-saving it on disk
+    // (or an online-only cloud file) cannot break the upload when Save is pressed.
+    const unreadable = [];
+    const files = (await Promise.all(picked.map(file => readFileIntoMemory(file).catch(() => { unreadable.push(file.name); return null; }))))
+      .filter(Boolean);
+    if (unreadable.length > 0) {
+      showToast(`${unreadable.length} photo(s) could not be read: ${unreadable.join(', ')}. If they are in OneDrive/Google Drive, download them to this computer first, then add them again.`, 'error');
+    }
     if (!files.length) return;
 
     const newPending = [];
@@ -984,22 +1073,39 @@ export default function AdminProductForm() {
       // Auto-analyze uploaded product image for dominant color suggestion (client-side, non-blocking)
       triggerColorDetectionForFile(newPending[0].file);
     }
-
-    // Reset input so the same files can be selected again later
-    e.target.value = '';
   };
 
   const handleImageColorChange = (type, index, newColor) => {
     if (type === 'existing') {
-      setExistingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor } : img));
+      setExistingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor, isColorPrimary: false } : img));
     } else {
-      setPendingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor } : img));
+      setPendingImages(prev => prev.map((img, i) => i === index ? { ...img, color: newColor, isColorPrimary: false } : img));
     }
   };
 
+  // Mark one image as the cover photo for its linked colour (one per colour across stored + new images)
+  const setColorPrimaryImage = (type, index) => {
+    const list = type === 'existing' ? existingImages : pendingImages;
+    const color = String(list[index]?.color || '').trim().toLowerCase();
+    if (!color) return;
+    const update = (isTarget) => (img, i) => {
+      if (String(img.color || '').trim().toLowerCase() !== color) return img;
+      return { ...img, isColorPrimary: isTarget(i) };
+    };
+    setExistingImages(prev => prev.map(update(i => type === 'existing' && i === index)));
+    setPendingImages(prev => prev.map(update(i => type === 'pending' && i === index)));
+    showToast(`Set as primary image for ${list[index].color}`, 'success');
+  };
+
+  const isColorPrimaryShown = (type, index) => {
+    const all = normalizeColorPrimaries([...existingImages, ...pendingImages]);
+    const offset = type === 'existing' ? 0 : existingImages.length;
+    return !!all[offset + index]?.isColorPrimary;
+  };
+
   const handleBulkTagAllImages = (targetColor) => {
-    setExistingImages(prev => prev.map(img => ({ ...img, color: targetColor })));
-    setPendingImages(prev => prev.map(img => ({ ...img, color: targetColor })));
+    setExistingImages(prev => prev.map(img => ({ ...img, color: targetColor, isColorPrimary: false })));
+    setPendingImages(prev => prev.map(img => ({ ...img, color: targetColor, isColorPrimary: false })));
     showToast(`Tagged all product images with color "${targetColor || 'All Colors'}"`, 'success');
   };
 
@@ -1052,17 +1158,23 @@ export default function AdminProductForm() {
   const handleSave = async (saveAndNew = false) => {
     // Validations
     if (!formData.name) return setError("Name is required.");
-    const productSku = String(formData.sku || '').trim();
+    const productSku = isEdit ? String(formData.sku || '').trim() : 'AUTO';
     if (!productSku) return setError("Product SKU is required. Enter a unique SKU such as SHT-BLK-001.");
     const mrp = parseFloat(formData.mrp);
     const sale = parseFloat(formData.salePrice);
     if (!mrp || mrp <= 0) return setError("MRP must be > 0.");
     if (!sale || sale <= 0) return setError("Sale Price must be > 0.");
     if (sale > mrp) return setError("Sale price cannot be greater than MRP.");
-    const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && !isNaN(Number(formData.costPrice))
+    const costVal = formData.costPrice !== '' && formData.costPrice !== undefined && formData.costPrice !== null && !isNaN(Number(formData.costPrice))
       ? parseFloat(formData.costPrice)
       : null;
-    if (costVal !== null && costVal < 0) return setError("Cost Price cannot be negative.");
+    // Purchase Rate is required: stock value (web inventory and POS) is calculated from it.
+    if (costVal === null || costVal <= 0) return setError("Purchase Rate is required and must be greater than ₹0. Stock value is calculated from it.");
+    const badVariantCost = (formData.variants || []).find(v => Number(v.costPrice) < 0);
+    if (badVariantCost) return setError(`Purchase Rate for ${[badVariantCost.color, badVariantCost.size].filter(Boolean).join(' / ') || 'a variant'} cannot be negative.`);
+    const gstPercent = Number(formData.gstPercent);
+    if (formData.gstEnabled && (!Number.isFinite(gstPercent) || gstPercent <= 0 || gstPercent > 100))
+      return setError('Enter a GST percentage from 0.01 to 100.');
 
     if (existingImages.length === 0 && pendingImages.length === 0) {
       return setError("Please upload at least one valid product image.");
@@ -1092,33 +1204,67 @@ export default function AdminProductForm() {
     try {
       const finalProductId = isEdit ? id : productId;
 
-      // 1. Delete removed images from ImageKit
-      for (const publicId of imagesToDelete) {
-        await deleteProductImage(publicId);
-      }
-
-      // 2. Upload pending images with resilient multi-tier pipeline (ImageKit -> Firebase Storage -> Canvas <60KB)
-      const newlyUploaded = [];
-      if (pendingImages.length > 0) {
-        for (let i = 0; i < pendingImages.length; i++) {
+      // Upload pending images with resilient multi-tier pipeline (ImageKit -> Firebase Storage -> Canvas <60KB)
+      // Upload 3 images at a time instead of one by one; keep the original order.
+      const uploadedSlots = new Array(pendingImages.length).fill(null);
+      const failedUploads = [];
+      const unreadableUploads = [];
+      let doneCount = 0;
+      let nextIndex = 0;
+      const uploadWorker = async () => {
+        while (nextIndex < pendingImages.length) {
+          const i = nextIndex++;
           const item = pendingImages[i];
-          setUploadStatus(`Optimizing & uploading image ${i + 1} of ${pendingImages.length}...`);
           try {
             const uploadResult = await uploadImageToImageKit(item.file, `products/${finalProductId}`);
-            if (uploadResult?.url) {
-              newlyUploaded.push({
+            if (uploadResult?.source === 'embedded') {
+              // Neither ImageKit nor Storage took it; embedding product photos would only
+              // push the product over Firestore's 1 MB limit. Report the real reason.
+              failedUploads.push({ name: item.name, reason: (uploadResult.reasons || []).join('; ') || 'image service unavailable' });
+            } else if (uploadResult?.url) {
+              uploadedSlots[i] = {
                 url: uploadResult.url,
                 publicId: uploadResult.fileId || null,
                 alt: formData.name + ' - ' + (i + 1),
                 isPrimary: item.isPrimary,
-                color: item.color || ''
-              });
+                color: item.color || '',
+                isColorPrimary: !!item.isColorPrimary
+              };
+            } else {
+              failedUploads.push({ name: item.name, reason: 'no image URL returned' });
             }
           } catch (uploadErr) {
             console.warn(`Upload error for ${item.name}:`, uploadErr);
+            if (uploadErr?.code === 'FILE_UNREADABLE') unreadableUploads.push(i);
+            else failedUploads.push({ name: item.name, reason: uploadErr?.message || 'unknown error' });
           }
+          doneCount += 1;
+          setUploadStatus(`Uploading images… ${doneCount} of ${pendingImages.length} done`);
         }
+      };
+      if (pendingImages.length > 0) {
+        setUploadStatus(`Uploading images… 0 of ${pendingImages.length} done`);
+        await Promise.all(Array.from({ length: Math.min(3, pendingImages.length) }, uploadWorker));
       }
+      // Photos the browser can no longer read never succeed on retry: drop them so
+      // the admin can add them again, and say exactly why.
+      if (unreadableUploads.length > 0) {
+        const names = unreadableUploads.map(i => pendingImages[i]?.name).filter(Boolean);
+        setPendingImages(prev => {
+          const left = prev.filter((_, i) => !unreadableUploads.includes(i));
+          if (left.length > 0 && !left.some(p => p.isPrimary) && !existingImages.some(img => img.isPrimary)) left[0] = { ...left[0], isPrimary: true };
+          return left;
+        });
+        throw new Error(`${names.length} photo(s) could not be read from this computer (${names.join(', ')}). They were probably moved, renamed or re-saved after you picked them, or are online-only OneDrive/Google Drive files. They have been removed from the list. Add them again, then press Save. Nothing was saved.`);
+      }
+      // Stop instead of silently saving the product without the photos that failed.
+      if (failedUploads.length > 0) {
+        const byReason = new Map();
+        failedUploads.forEach(({ name, reason }) => byReason.set(reason, [...(byReason.get(reason) || []), name]));
+        const details = [...byReason].map(([reason, names]) => `${names.join(', ')} — ${reason}`).join(' | ');
+        throw new Error(`${failedUploads.length} photo(s) did not upload, so nothing was saved. ${details}. Press Save to try again; photos already added stay in the list.`);
+      }
+      const newlyUploaded = uploadedSlots.filter(Boolean);
       setUploadStatus('Publishing product to store catalog...');
 
       // 3. Combine images and fix sort ordering with primary image guaranteed first (index 0)
@@ -1136,11 +1282,12 @@ export default function AdminProductForm() {
         return 0;
       });
 
-      combinedImages = combinedImages.map((img, idx) => ({
+      combinedImages = normalizeColorPrimaries(combinedImages).map((img, idx) => ({
         url: img.url,
         publicId: img.publicId || null,
         isPrimary: idx === 0, // First item is primary
-        color: img.color || '',
+        color: toColorName(img.color),
+        isColorPrimary: !!img.isColorPrimary,
         alt: img.alt || `${formData.name} - ${idx + 1}`,
         sortOrder: idx
       }));
@@ -1159,12 +1306,12 @@ export default function AdminProductForm() {
         const vPrice = (v.price !== undefined && v.price !== '' && !isNaN(Number(v.price)))
           ? parseFloat(v.price)
           : sale;
-        const vCost = (v.costPrice !== undefined && v.costPrice !== '' && !isNaN(Number(v.costPrice)))
-          ? parseFloat(v.costPrice)
-          : finalCostPrice;
+        // Empty or ₹0 variant rate = inherit the product Purchase Rate.
+        const vCost = Number(v.costPrice) > 0 ? parseFloat(v.costPrice) : finalCostPrice;
         const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
+          color: toColorName(v.color) || v.color,
           sku: isEdit ? String(v.sku || '').trim() : buildVariantSku(productSku, v.color, v.size, productId),
           price: vPrice,
           salePrice: vPrice,
@@ -1203,8 +1350,10 @@ export default function AdminProductForm() {
         items: cleanOffersItems
       };
 
-      const finalCategory = (isCustomCategory ? customCategoryInput.trim() : formData.categoryId) || 'Shirts';
-      const finalSubCategory = (isCustomSubCategory ? customSubCategoryInput.trim() : (formData.subCategory || '')).trim();
+      const rawCategory = (isCustomCategory ? customCategoryInput.trim() : formData.categoryId) || 'SHIRTS';
+      const finalCategory = rawCategory.toUpperCase();
+      const rawSubCategory = (isCustomSubCategory ? customSubCategoryInput.trim() : (formData.subCategory || '')).trim();
+      const finalSubCategory = rawSubCategory ? rawSubCategory.toUpperCase() : '';
       const finalCategoryKey = finalCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const finalSubCategoryKey = finalSubCategory ? finalSubCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
 
@@ -1224,6 +1373,8 @@ export default function AdminProductForm() {
         salePrice: finalFrontPrice,
         price: finalFrontPrice,
         costPrice: finalCostPrice,
+        gstEnabled: formData.gstEnabled === true,
+        gstPercent: formData.gstEnabled ? gstPercent : 0,
         cost_price: finalCostPrice,
         purchasePrice: finalCostPrice,
         purchase_price: finalCostPrice,
@@ -1245,6 +1396,9 @@ export default function AdminProductForm() {
       } else {
         result = await createProduct(payload, finalProductId); // Passing explicit ID
       }
+      // Remove old files only after the product no longer references them.
+      // Clean up removed files in the background; the save itself is already done.
+      Promise.allSettled(imagesToDelete.map(fileId => deleteProductImage(fileId)));
       invalidateProductCache();
 
       if (saveAndNew) {
@@ -1258,12 +1412,14 @@ export default function AdminProductForm() {
           name: '',
           slug: '',
           sku: '',
-          categoryId: formData.categoryId || 'Shirts',
+          categoryId: formData.categoryId || 'SHIRTS',
           shortDescription: '',
           description: '',
           mrp: '',
           salePrice: '',
           costPrice: '',
+          gstEnabled: false,
+          gstPercent: '5',
           colors: [],
           variants: [],
           offerEnabled: false,
@@ -1281,7 +1437,10 @@ export default function AdminProductForm() {
         setImageColorSuggestion(null);
         setError(null);
         setSubmitting(false);
-        if (isEdit) navigate('/admin/products/new');
+        if (isEdit) {
+          if (isModal && onSaved) onSaved();
+          else navigate('/admin/products/new');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1291,7 +1450,11 @@ export default function AdminProductForm() {
       } else {
         showToast(`Product ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
       }
-      navigate('/admin/products');
+      if (isModal && onSaved) {
+        onSaved();
+      } else {
+        navigate('/admin/products');
+      }
     } catch (err) {
       console.error('Save Error:', err);
       if (err.message && err.code?.includes('storage/unauthorized')) {
@@ -1318,12 +1481,15 @@ export default function AdminProductForm() {
   const calculatedTotalStock = formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0);
 
   return (
-    <div className="admin-product-form-container">
+    <div className={`admin-product-form-container ${isModal ? 'admin-product-form-container--modal' : ''}`}>
       <div className="admin-form-header-bar">
         <div className="admin-header-title-wrap">
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              else navigate('/admin/products');
+            }}
             className="admin-top-back-link"
             style={{
               background: 'none',
@@ -1390,7 +1556,10 @@ export default function AdminProductForm() {
 
           <button
             type="button"
-            onClick={() => navigate('/admin/products')}
+            onClick={() => {
+              if (isModal && onClose) onClose();
+              else navigate('/admin/products');
+            }}
             className="admin-btn-secondary admin-top-cancel-btn"
             disabled={submitting}
           >
@@ -1478,14 +1647,15 @@ export default function AdminProductForm() {
                   name="sku"
                   value={formData.sku}
                   onChange={handleChange}
-                  placeholder="e.g. SHT-BLK-001"
-                  readOnly={isEdit}
-                  title={isEdit ? 'SKU identity cannot be changed after product creation.' : 'Use a unique SKU; variant SKUs are generated from it.'}
+                  placeholder="Assigned automatically when saved"
+                  readOnly
+                  title={isEdit ? 'SKU identity cannot be changed after product creation.' : 'Sequential SKU and barcodes are assigned when saved.'}
                 />
                 <small style={{ color: '#64748b' }}>
-                  {isEdit ? 'SKU is locked after publishing.' : 'Must be unique. Variant SKUs update automatically.'}
+                  {isEdit ? 'SKU is locked after publishing.' : 'Auto sequence: BOG-000001. Assigned safely when saved.'}
                 </small>
               </div>
+              <div className="admin-form-group"><label>Barcode number</label><input readOnly value={formData.barcode || ''} placeholder="Assigned automatically when saved" /></div>
               <div className="admin-form-group">
                 <label>Slug (URL Friendly)</label>
                 <input type="text" name="slug" value={formData.slug} onChange={handleChange} />
@@ -1513,7 +1683,7 @@ export default function AdminProductForm() {
                       onClick={() => {
                         setIsCustomCategory(false);
                         setCustomCategoryInput('');
-                        setFormData(prev => ({ ...prev, categoryId: 'Shirts', category: 'Shirts' }));
+                        setFormData(prev => ({ ...prev, categoryId: 'SHIRTS', category: 'SHIRTS' }));
                       }}
                     >
                       ✕ Choose From List
@@ -1524,18 +1694,19 @@ export default function AdminProductForm() {
                 {!isCustomCategory ? (
                   <select
                     name="categoryId"
-                    value={formData.categoryId}
+                    value={(formData.categoryId || 'SHIRTS').toUpperCase()}
                     onChange={(e) => {
                       if (e.target.value === '__custom__') {
                         setIsCustomCategory(true);
                         setCustomCategoryInput('');
                         setIsCustomSubCategory(false);
                       } else {
+                        const val = e.target.value.toUpperCase();
                         handleChange(e);
                         setFormData(prev => ({
                           ...prev,
-                          categoryId: e.target.value,
-                          category: e.target.value,
+                          categoryId: val,
+                          category: val,
                           subCategory: ''
                         }));
                         setIsCustomSubCategory(false);
@@ -1543,7 +1714,7 @@ export default function AdminProductForm() {
                     }}
                   >
                     {availableCategories.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat} value={cat.toUpperCase()}>{cat.toUpperCase()}</option>
                     ))}
                     <option value="__custom__">+ Custom Category...</option>
                   </select>
@@ -1551,10 +1722,11 @@ export default function AdminProductForm() {
                   <div className="admin-custom-input-group">
                     <input
                       type="text"
-                      placeholder="Enter custom category (e.g. Vest, Underwear, Gym Wear)"
+                      placeholder="Enter custom category in CAPITAL (e.g. VEST, UNDERWEAR, GYM WEAR)"
                       value={customCategoryInput}
+                      style={{ textTransform: 'uppercase' }}
                       onChange={(e) => {
-                        const val = e.target.value;
+                        const val = e.target.value.toUpperCase();
                         setCustomCategoryInput(val);
                         setFormData(prev => ({ ...prev, categoryId: val, category: val }));
                       }}
@@ -1566,7 +1738,7 @@ export default function AdminProductForm() {
                       onClick={() => {
                         setIsCustomCategory(false);
                         setCustomCategoryInput('');
-                        setFormData(prev => ({ ...prev, categoryId: 'Shirts', category: 'Shirts' }));
+                        setFormData(prev => ({ ...prev, categoryId: 'SHIRTS', category: 'SHIRTS' }));
                       }}
                     >
                       Cancel
@@ -1579,14 +1751,14 @@ export default function AdminProductForm() {
               <div className="admin-form-group">
                 <div className="admin-field-header">
                   <label style={{ margin: 0 }}>Sub-Category / Fit Type</label>
-                  {SUB_CATEGORY_MAP[formData.categoryId] && (
+                  {getSubCategories(formData.categoryId).length > 0 && (
                     !isCustomSubCategory ? (
                       <button
                         type="button"
                         className="admin-toggle-custom-btn"
                         onClick={() => {
                           setIsCustomSubCategory(true);
-                          setCustomSubCategoryInput(formData.subCategory || '');
+                          setCustomSubCategoryInput((formData.subCategory || '').toUpperCase());
                         }}
                       >
                         + Custom Sub-Category
@@ -1607,23 +1779,24 @@ export default function AdminProductForm() {
                   )}
                 </div>
 
-                {SUB_CATEGORY_MAP[formData.categoryId] && !isCustomSubCategory ? (
+                {getSubCategories(formData.categoryId).length > 0 && !isCustomSubCategory ? (
                   <select
                     name="subCategory"
-                    value={formData.subCategory || ''}
+                    value={(formData.subCategory || '').toUpperCase()}
                     onChange={(e) => {
                       if (e.target.value === '__custom__') {
                         setIsCustomSubCategory(true);
                         setCustomSubCategoryInput('');
                         setFormData(prev => ({ ...prev, subCategory: '' }));
                       } else {
-                        handleChange(e);
+                        const val = e.target.value.toUpperCase();
+                        setFormData(prev => ({ ...prev, subCategory: val }));
                       }
                     }}
                   >
                     <option value="">— Select Sub-Category —</option>
-                    {SUB_CATEGORY_MAP[formData.categoryId].map(sub => (
-                      <option key={sub} value={sub}>{sub}</option>
+                    {getSubCategories(formData.categoryId).map(sub => (
+                      <option key={sub} value={sub.toUpperCase()}>{sub.toUpperCase()}</option>
                     ))}
                     <option value="__custom__">+ Custom Sub-Category...</option>
                   </select>
@@ -1632,21 +1805,22 @@ export default function AdminProductForm() {
                     <input
                       type="text"
                       name="subCategory"
+                      style={{ textTransform: 'uppercase' }}
                       placeholder={
-                        formData.categoryId === 'Vest'
-                          ? 'e.g. Plain, Lining, Coloring or custom type'
-                          : formData.categoryId === 'Underwear'
-                          ? 'e.g. Long Trunk, Mini Trunk, Brief or custom type'
-                          : 'Enter custom sub-category or fit type'
+                        (formData.categoryId || '').toUpperCase() === 'VEST'
+                          ? 'e.g. PLAIN, LINING, COLORING or custom type'
+                          : (formData.categoryId || '').toUpperCase() === 'UNDERWEAR'
+                          ? 'e.g. LONG TRUNK, MINI TRUNK, BRIEF or custom type'
+                          : 'Enter custom sub-category or fit type (in CAPITAL)'
                       }
                       value={formData.subCategory || ''}
                       onChange={(e) => {
-                        const val = e.target.value;
+                        const val = e.target.value.toUpperCase();
                         setCustomSubCategoryInput(val);
-                        handleChange(e);
+                        setFormData(prev => ({ ...prev, subCategory: val }));
                       }}
                     />
-                    {SUB_CATEGORY_MAP[formData.categoryId] && (
+                    {getSubCategories(formData.categoryId).length > 0 && (
                       <button
                         type="button"
                         className="admin-custom-cancel-btn"
@@ -1664,7 +1838,7 @@ export default function AdminProductForm() {
               </div>
             </div>
             {/* GSL Field for Shirts and T-Shirts */}
-            {(formData.categoryId === 'T-Shirts' || formData.categoryId === 'Shirts') && (
+            {((formData.categoryId || '').toUpperCase() === 'T-SHIRTS' || (formData.categoryId || '').toUpperCase() === 'SHIRTS') && (
               <div className="admin-form-group">
                 <label>GSL (Garment Spec Label — GSM / Fabric Weight / Quality)</label>
                 <input
@@ -1701,7 +1875,7 @@ export default function AdminProductForm() {
                 </div>
               </div>
               <div className="admin-form-group price-field cost-field">
-                <label>COST PRICE (Synced to POS)</label>
+                <label>PURCHASE RATE (Synced to POS) <span style={{ color: '#dc2626' }} aria-hidden="true">*</span></label>
                 <div className="price-input-wrapper">
                   <span>₹</span>
                   <input
@@ -1710,15 +1884,30 @@ export default function AdminProductForm() {
                     value={formData.costPrice}
                     onChange={handleChange}
                     placeholder="e.g. 750"
-                    min="0"
+                    min="0.01"
                     step="any"
+                    aria-required="true"
                   />
                 </div>
                 <span style={{ fontSize: '11px', color: '#166534', fontWeight: 600, marginTop: '6px', display: 'block' }}>
-                  Purchase/Mfg cost. Synced to POS system.
+                  Purchase/Mfg rate. Synced to POS system.
                 </span>
               </div>
             </div>
+
+            <div className="admin-form-row" style={{ marginTop: 16, alignItems: 'end' }}>
+              <label className="admin-form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" name="gstEnabled" checked={formData.gstEnabled === true}
+                  onChange={e => setFormData(prev => ({ ...prev, gstEnabled: e.target.checked }))} />
+                Include GST in stock value
+              </label>
+              {formData.gstEnabled && <div className="admin-form-group price-field">
+                <label htmlFor="gstPercent">GST percentage</label>
+                <input id="gstPercent" type="number" min="0.01" max="100" step="0.01"
+                  value={formData.gstPercent} onChange={e => setFormData(prev => ({ ...prev, gstPercent: e.target.value }))} />
+              </div>}
+            </div>
+            <p style={{ fontSize: 12, color: '#64748b' }}>Matches POS stock valuation. GST is not added to retail bills.</p>
 
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
               {currentDiscount > 0 && (
@@ -1852,6 +2041,9 @@ export default function AdminProductForm() {
                         {formData.colors.map(c => (
                           <option key={c.name} value={c.name}>{c.name}</option>
                         ))}
+                        {img.color && !formData.colors.some(c => c.name === img.color) && (
+                          <option value={img.color}>{img.color} (not in colour list)</option>
+                        )}
                       </select>
                     </div>
 
@@ -1869,6 +2061,10 @@ export default function AdminProductForm() {
                         <button onClick={() => setPrimaryImage('existing', idx)} className="btn-set-primary">Make Primary</button>
                       )}
                       {img.isPrimary && <span className="primary-label">PRIMARY</span>}
+                      {img.color && (isColorPrimaryShown('existing', idx)
+                        ? <span className="color-primary-label" title={`Shown first when customers pick ${img.color}`}>★ {img.color} cover</span>
+                        : <button type="button" onClick={() => setColorPrimaryImage('existing', idx)} className="btn-set-color-primary" title={`Show this image first when customers pick ${img.color}`}>☆ Set as {img.color} cover</button>
+                      )}
                       <button onClick={() => removeExistingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
                   </div>
@@ -1902,6 +2098,9 @@ export default function AdminProductForm() {
                         {formData.colors.map(c => (
                           <option key={c.name} value={c.name}>{c.name}</option>
                         ))}
+                        {fileObj.color && !formData.colors.some(c => c.name === fileObj.color) && (
+                          <option value={fileObj.color}>{fileObj.color} (not in colour list)</option>
+                        )}
                       </select>
                     </div>
 
@@ -1919,6 +2118,10 @@ export default function AdminProductForm() {
                         <button onClick={() => setPrimaryImage('pending', idx)} className="btn-set-primary">Make Primary</button>
                       )}
                       {fileObj.isPrimary && <span className="primary-label">PRIMARY</span>}
+                      {fileObj.color && (isColorPrimaryShown('pending', idx)
+                        ? <span className="color-primary-label" title={`Shown first when customers pick ${fileObj.color}`}>★ {fileObj.color} cover</span>
+                        : <button type="button" onClick={() => setColorPrimaryImage('pending', idx)} className="btn-set-color-primary" title={`Show this image first when customers pick ${fileObj.color}`}>☆ Set as {fileObj.color} cover</button>
+                      )}
                       <button onClick={() => removePendingImage(idx)} className="btn-remove-image">Remove</button>
                     </div>
                   </div>
@@ -1957,7 +2160,7 @@ export default function AdminProductForm() {
                 </p>
               </div>
               <span style={{ padding: '4px 10px', background: '#f1f5f9', color: '#0f172a', borderRadius: '6px', fontSize: '12px', fontWeight: 700, border: '1px solid #cbd5e1' }}>
-                Mode: {formData.categoryId || 'Shirts'} ({((formData.categoryId || '').toLowerCase().includes('perfume')) ? 'Volumes in ml' : (formData.categoryId === 'Jeans' || formData.categoryId === 'Trousers') ? 'Waist Inches' : 'Apparel / Standard'})
+                Mode: {formData.categoryId || 'SHIRTS'} ({((formData.categoryId || '').toLowerCase().includes('perfume')) ? 'Volumes in ml' : ((formData.categoryId || '').toUpperCase() === 'JEANS' || (formData.categoryId || '').toUpperCase() === 'TROUSERS') ? 'Waist Inches' : 'Apparel / Standard'})
               </span>
             </div>
 
@@ -1993,8 +2196,8 @@ export default function AdminProductForm() {
 
             {/* Step 1: 1-Click Quick Add Common Sizes */}
             {(() => {
-              const activeCat = formData.categoryId || 'Shirts';
-              const batchPresets = COMMON_BATCH_SIZES[activeCat] || COMMON_BATCH_SIZES['DEFAULT'];
+              const activeCat = (formData.categoryId || 'SHIRTS').toUpperCase();
+              const batchPresets = getCommonBatchSizes(activeCat);
               return (
                 <div style={{ padding: '16px 20px', background: '#fafaf9', border: '1px solid #e7e5e4', borderRadius: '10px', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -2040,8 +2243,8 @@ export default function AdminProductForm() {
 
             {/* Step 2: Category Preset Chips & Custom Size Input */}
             {(() => {
-              const activeCat = formData.categoryId || 'Shirts';
-              const catSizes = CATEGORY_SIZES_MAP[activeCat] || CATEGORY_SIZES_MAP['Shirts'];
+              const activeCat = (formData.categoryId || 'SHIRTS').toUpperCase();
+              const catSizes = getCategorySizes(activeCat);
               const isPerfume = (activeCat || '').toLowerCase().includes('perfume');
               return (
                 <div style={{ marginBottom: '24px' }}>
@@ -2180,7 +2383,7 @@ export default function AdminProductForm() {
                         <th>SIZE / VOLUME</th>
                         <th>SKU</th>
                         <th>PRICE (₹)</th>
-                        <th>COST (₹)</th>
+                        <th>PURCHASE RATE (₹)</th>
                         <th>STOCK QUANTITY (LIVE)</th>
                         <th>STATUS</th>
                         <th>ACTIONS</th>
@@ -2225,7 +2428,7 @@ export default function AdminProductForm() {
                               {v.size}
                             </span>
                           </td>
-                          <td style={{ fontSize: '12px', color: '#64748b' }}>{v.sku}</td>
+                          <td style={{ fontSize: '12px', color: '#64748b' }}>{isEdit ? v.sku : 'Assigned on save'}<small style={{ display: 'block' }}>Barcode: {v.barcode || 'Assigned on save'}</small></td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>₹</span>
@@ -2246,10 +2449,10 @@ export default function AdminProductForm() {
                                 type="number"
                                 min="0"
                                 step="any"
-                                placeholder={formData.costPrice || "Cost"}
+                                placeholder={formData.costPrice || "Purchase Rate"}
                                 value={v.costPrice !== undefined ? v.costPrice : ''}
                                 onChange={(e) => updateVariantCost(v.id, e.target.value)}
-                                title="Variant cost price synced to POS"
+                                title="Variant purchase rate synced to POS"
                                 style={{ width: '85px', padding: '6px 8px', borderRadius: '6px', border: '1px solid #bbf7d0', fontWeight: 700, fontSize: '14px', background: '#f0fdf4', color: '#14532d' }}
                               />
                             </div>
@@ -2859,7 +3062,10 @@ export default function AdminProductForm() {
             )}
             <button
               type="button"
-              onClick={() => navigate('/admin/products')}
+              onClick={() => {
+                if (isModal && onClose) onClose();
+                else navigate('/admin/products');
+              }}
               className="admin-btn-secondary"
               style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '14px' }}
               disabled={submitting}

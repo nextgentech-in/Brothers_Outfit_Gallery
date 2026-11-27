@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import './WhatsAppFloat.css';
 
@@ -6,49 +5,12 @@ const WA_NUMBER = '918460233020';
 const WA_MESSAGE = "Hi Brothers Outfit Gallery! I'd like styling and sizing assistance.";
 
 export default function WhatsAppFloat() {
-  const [showPrompt, setShowPrompt] = useState(true);
   const location = useLocation();
   const isProductPage = location.pathname.startsWith('/product/');
   const waUrl = `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(WA_MESSAGE)}`;
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowPrompt(false);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className={`whatsapp-float-container ${isProductPage ? 'whatsapp-float-container--product-page' : ''}`}>
-      {showPrompt && (
-        <div className="whatsapp-concierge-pill">
-          <button 
-            className="concierge-close-btn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowPrompt(false);
-            }}
-            aria-label="Dismiss message"
-          >
-            ✕
-          </button>
-          <div className="concierge-header">
-            <span className="concierge-dot"></span>
-            <strong>Stylist Online</strong>
-          </div>
-          <p>Need sizing or style recommendations? We're on WhatsApp!</p>
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="concierge-chat-link"
-          >
-            Ask Us Now 💬
-          </a>
-        </div>
-      )}
-
       <a
         href={waUrl}
         target="_blank"

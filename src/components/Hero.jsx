@@ -1,16 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { optimizeImage, getOptimizedImageSrcSet } from '../utils/imageUtils';
 import TrustBar from './TrustBar';
 import './Hero.css';
 
 export default function Hero({ heroConfig: propConfig }) {
-  const heroRef = useRef(null);
-  const [visible, setVisible] = useState(false);
-
   // Read local cache immediately to guarantee 0ms first-paint render
-  const [heroConfig, setHeroConfig] = useState(() => {
-    if (propConfig) return propConfig;
+  const [cachedConfig] = useState(() => {
     try {
       const raw = localStorage.getItem('bo_homepage_config');
       if (raw) {
@@ -21,17 +17,7 @@ export default function Hero({ heroConfig: propConfig }) {
     return null;
   });
 
-  useEffect(() => {
-    if (propConfig) {
-      setHeroConfig(propConfig);
-    }
-  }, [propConfig]);
-
-  useEffect(() => {
-    /* Trigger entrance animations after mount */
-    const timer = setTimeout(() => setVisible(true), 80);
-    return () => clearTimeout(timer);
-  }, []);
+  const heroConfig = propConfig || cachedConfig;
 
   // Bulletproof fallbacks ensuring 0 errors & zero broken UI
   // Older saved homepage settings point at the large PNG. Serve its compact
@@ -53,7 +39,7 @@ export default function Hero({ heroConfig: propConfig }) {
 
   return (
     <>
-      <section className={`hero ${visible ? 'hero--visible' : ''}`} ref={heroRef}>
+      <section className="hero">
         {/* Background Image with Auto Optimization & Robust Error Fallback */}
         <div className="hero__image-wrap">
           <picture>
@@ -72,16 +58,18 @@ export default function Hero({ heroConfig: propConfig }) {
               loading="eager"
               fetchPriority="high"
               onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = defaultHeroImage;
+                const image = e.currentTarget;
+                const source = image.parentElement?.querySelector('source[srcset]');
+                if (image.getAttribute('src') === defaultHeroImage && !image.srcset && !source) return;
+                source?.removeAttribute('srcset');
+                image.removeAttribute('srcset');
+                image.src = defaultHeroImage;
               }}
             />
           </picture>
           <div 
             className="hero__overlay" 
-            style={{
-              background: `linear-gradient(to right, rgba(0, 0, 0, ${Math.min(overlayOpacity + 0.2, 0.9)}) 0%, rgba(0, 0, 0, ${overlayOpacity}) 45%, rgba(0, 0, 0, ${Math.max(overlayOpacity - 0.25, 0.1)}) 100%)`
-            }} 
+            style={{ '--hero-overlay': Math.min(1, Math.max(0, overlayOpacity)) }}
           />
         </div>
 
@@ -121,10 +109,6 @@ export default function Hero({ heroConfig: propConfig }) {
           </div>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="hero__scroll-indicator">
-          <div className="hero__scroll-line" />
-        </div>
       </section>
 
       <TrustBar placement="top" />

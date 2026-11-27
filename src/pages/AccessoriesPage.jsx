@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchAllActiveProducts, isProductInStock } from '../services/productService';
+import { fetchAllActiveProducts } from '../services/productService';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
 import SEO from '../components/common/SEO';
@@ -64,7 +64,7 @@ export default function AccessoriesPage() {
       setLoading(true);
       try {
         const rawItems = await fetchAllActiveProducts();
-        const firestoreItems = rawItems.filter(p => p.active !== false && isProductInStock(p));
+        const firestoreItems = rawItems.filter(p => p.active !== false);
 
         // Use the assigned category only. Name matching previously leaked Kurtas and
         // wallets into this page even when they belong to their own collections.
