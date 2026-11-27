@@ -21,7 +21,7 @@ import {
 import VisualColorSelector from '../../components/admin/VisualColorSelector.jsx';
 import { detectDominantColor } from '../../utils/imageColorDetector.js';
 import { normalizeColorPrimaries } from '../../utils/colorImages.js';
-import { normalizeToStandardColor } from '../../data/colorMaster.js';
+import { normalizeToStandardColor, toColorName } from '../../data/colorMaster.js';
 
 const CATEGORY_SIZES_MAP = {
   'KURTA': ['36', '38', '40', '42', '44', '46', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
@@ -412,6 +412,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             const savedCost = v.costPrice ?? v.cost_price ?? v.purchasePrice ?? v.purchase_price ?? '';
             return {
             ...v,
+            color: toColorName(v.color) || v.color,
             costPrice: Number(savedCost) > 0 ? savedCost : '',
             isDefaultPrice: v.isDefaultPrice !== undefined ? !!v.isDefaultPrice : false
             };
@@ -434,18 +435,18 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             .map(v => Number(v?.costPrice)).find(n => n > 0);
           const loadedCost = productCost || variantCost || '';
 
-          // Keep saved colour names exactly as stored (only fill in a missing swatch hex).
+          // Keep saved colour names as stored, in CAPITALS (only fill in a missing swatch hex).
           // Renaming "Dark Indigo Blue" to a standard alias broke the link with its images.
           const loadedColors = (data.colors || []).map(c => {
             const raw = typeof c === 'object' && c ? c : { name: String(c || '') };
             const std = normalizeToStandardColor(raw);
             if (!std) return raw;
             const sameName = String(std.name).trim().toLowerCase() === String(raw.name || '').trim().toLowerCase();
-            return sameName ? std : { ...std, ...raw, name: String(raw.name).trim(), hex: raw.hex || std.hex };
-          }).filter(c => c.name);
+            return sameName ? std : { ...std, ...raw, name: toColorName(raw.name), hex: raw.hex || std.hex };
+          }).map(c => ({ ...c, name: toColorName(c.name) })).filter(c => c.name);
           const canonicalColor = (name) => {
-            const n = String(name || '').trim();
-            const hit = loadedColors.find(c => c.name.toLowerCase() === n.toLowerCase());
+            const n = toColorName(name);
+            const hit = loadedColors.find(c => c.name === n);
             return hit ? hit.name : n;
           };
 
@@ -1273,7 +1274,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         url: img.url,
         publicId: img.publicId || null,
         isPrimary: idx === 0, // First item is primary
-        color: img.color || '',
+        color: toColorName(img.color),
         isColorPrimary: !!img.isColorPrimary,
         alt: img.alt || `${formData.name} - ${idx + 1}`,
         sortOrder: idx
@@ -1298,6 +1299,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
         const isDefault = defaultVariant ? !!v.isDefaultPrice : (idx === 0);
         return {
           ...v,
+          color: toColorName(v.color) || v.color,
           sku: isEdit ? String(v.sku || '').trim() : buildVariantSku(productSku, v.color, v.size, productId),
           price: vPrice,
           salePrice: vPrice,

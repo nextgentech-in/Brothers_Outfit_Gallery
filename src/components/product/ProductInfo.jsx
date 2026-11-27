@@ -7,7 +7,7 @@ import { isClothingProduct, getAvailableProductSizes, getAvailableStock } from '
 import { useWishlist } from '../../context/WishlistContext';
 import SizeGuideModal from '../common/SizeGuideModal';
 import { flyProductToCart } from '../../utils/cartFlyAnimation';
-import { normalizeToStandardColor } from '../../data/colorMaster.js';
+import { normalizeToStandardColor, sameColor } from '../../data/colorMaster.js';
 import './ProductInfo.css';
 
 const COLOR_SWATCHES = [
@@ -187,7 +187,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       : (availableColors[0]?.name || productColors[0] || null);
 
     return product.variants.find(v =>
-      v.size === targetSize && (!v.color || v.color === effectiveColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === targetSize && (!v.color || sameColor(v.color, effectiveColor) || sameColor(v.color, 'Standard'))
     ) || product.variants.find(v => v.size === targetSize);
   }, [product.variants, selectedSize, selectedColor, productSizes, defaultFrontVariant, availableColors, productColors]);
 

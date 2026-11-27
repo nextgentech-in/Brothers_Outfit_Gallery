@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import { getColorPrimaryImageUrl } from '../utils/colorImages';
+import { sameColor } from '../data/colorMaster.js';
 
 const CartContext = createContext();
 
@@ -182,7 +183,7 @@ export const CartProvider = ({ children }) => {
       return Number(explicitPrice);
     }
     const matched = product.variants?.find(v =>
-      v.size === safeSize && (!v.color || v.color === safeColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === safeSize && (!v.color || sameColor(v.color, safeColor) || sameColor(v.color, 'Standard'))
     ) || product.variants?.find(v => v.size === safeSize);
 
     if (matched && matched.price !== undefined && matched.price !== '' && !isNaN(Number(matched.price))) {
@@ -199,7 +200,7 @@ export const CartProvider = ({ children }) => {
 
   const resolveItemStock = (product, safeSize, safeColor) => {
     const matched = product.variants?.find(v =>
-      v.size === safeSize && (!v.color || v.color === safeColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === safeSize && (!v.color || sameColor(v.color, safeColor) || sameColor(v.color, 'Standard'))
     ) || product.variants?.find(v => v.size === safeSize);
 
     if (matched && matched.stock !== undefined && !isNaN(Number(matched.stock))) {
