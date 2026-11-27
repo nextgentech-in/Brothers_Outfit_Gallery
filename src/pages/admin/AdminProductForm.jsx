@@ -13,7 +13,7 @@ import {
 import { useAdminUI } from '../../context/AdminUIContext';
 import { invalidateProductCache } from '../../services/productService';
 import './AdminProductForm.css';
-import { uploadImageToImageKit } from '../../utils/imageUtils';
+import { uploadImageToImageKit, readFileIntoMemory } from '../../utils/imageUtils';
 import {
   convertMeasurementValue,
   convertColumnHeader
@@ -1000,8 +1000,21 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
   // IMAGE HANDLING & COLOR LINKING LOGIC
   // -------------------------------------------------------------
 
-  const onSelectFiles = (e) => {
-    const files = Array.from(e.target.files);
+  const onSelectFiles = async (e) => {
+    const input = e.target;
+    const picked = Array.from(input.files || []);
+    // Reset input so the same files can be selected again later
+    input.value = '';
+    if (!picked.length) return;
+
+    // Copy each photo into memory now, so moving/renaming/re-saving it on disk
+    // (or an online-only cloud file) cannot break the upload when Save is pressed.
+    const unreadable = [];
+    const files = (await Promise.all(picked.map(file => readFileIntoMemory(file).catch(() => { unreadable.push(file.name); return null; }))))
+      .filter(Boolean);
+    if (unreadable.length > 0) {
+      showToast(`${unreadable.length} photo(s) could not be read: ${unreadable.join(', ')}. If they are in OneDrive/Google Drive, download them to this computer first, then add them again.`, 'error');
+    }
     if (!files.length) return;
 
     const newPending = [];
@@ -1047,9 +1060,6 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       // Auto-analyze uploaded product image for dominant color suggestion (client-side, non-blocking)
       triggerColorDetectionForFile(newPending[0].file);
     }
-
-    // Reset input so the same files can be selected again later
-    e.target.value = '';
   };
 
   const handleImageColorChange = (type, index, newColor) => {
@@ -1185,6 +1195,7 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       // Upload 3 images at a time instead of one by one; keep the original order.
       const uploadedSlots = new Array(pendingImages.length).fill(null);
       const failedUploads = [];
+      const unreadableUploads = [];
       let doneCount = 0;
       let nextIndex = 0;
       const uploadWorker = async () => {
@@ -1207,7 +1218,8 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
             }
           } catch (uploadErr) {
             console.warn(`Upload error for ${item.name}:`, uploadErr);
-            failedUploads.push(item.name);
+            if (uploadErr?.code === 'FILE_UNREADABLE') unreadableUploads.push(i);
+            else failedUploads.push(item.name);
           }
           doneCount += 1;
           setUploadStatus(`Uploading images… ${doneCount} of ${pendingImages.length} done`);
@@ -1216,6 +1228,17 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       if (pendingImages.length > 0) {
         setUploadStatus(`Uploading images… 0 of ${pendingImages.length} done`);
         await Promise.all(Array.from({ length: Math.min(3, pendingImages.length) }, uploadWorker));
+      }
+      // Photos the browser can no longer read never succeed on retry: drop them so
+      // the admin can add them again, and say exactly why.
+      if (unreadableUploads.length > 0) {
+        const names = unreadableUploads.map(i => pendingImages[i]?.name).filter(Boolean);
+        setPendingImages(prev => {
+          const left = prev.filter((_, i) => !unreadableUploads.includes(i));
+          if (left.length > 0 && !left.some(p => p.isPrimary) && !existingImages.some(img => img.isPrimary)) left[0] = { ...left[0], isPrimary: true };
+          return left;
+        });
+        throw new Error(`${names.length} photo(s) could not be read from this computer (${names.join(', ')}). They were probably moved, renamed or re-saved after you picked them, or are online-only OneDrive/Google Drive files. They have been removed from the list. Add them again, then press Save. Nothing was saved.`);
       }
       // Stop instead of silently saving the product without the photos that failed.
       if (failedUploads.length > 0) {

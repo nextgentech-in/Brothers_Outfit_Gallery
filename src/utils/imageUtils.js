@@ -237,13 +237,34 @@ export const createCompressedDataUrl = async (file, maxWidth = 900, maxHeight = 
  * @param {string} folder - Destination folder (e.g. 'products/prod_123')
  * @returns {Promise<{ url: string, fileId: string, thumbnailUrl: string }>}
  */
+/**
+ * Copies a picked file into memory. A File from <input type="file"> is only a
+ * pointer to the file on disk: if it is moved, renamed, re-saved, deleted, or is
+ * an online-only OneDrive/Google Drive file, the browser can no longer read it and
+ * every upload attempt fails. Reading it once at pick time avoids that.
+ */
+export const readFileIntoMemory = async (file) => {
+  try {
+    const bytes = await file.arrayBuffer();
+    if (!bytes || bytes.byteLength === 0) throw new Error('empty file');
+    return new File([bytes], file.name || 'image', { type: file.type || 'application/octet-stream', lastModified: file.lastModified || Date.now() });
+  } catch {
+    const unreadable = new Error(`${file?.name || 'Image'} could not be read from this device.`);
+    unreadable.code = 'FILE_UNREADABLE';
+    throw unreadable;
+  }
+};
+
 export const uploadImageToImageKit = async (file, folder = 'categories') => {
   if (!file) throw new Error("No image file provided.");
 
+  // Fail clearly (instead of three silent fallbacks) when the browser cannot read the file.
+  const readableFile = await readFileIntoMemory(file);
+
   // Pre-compress image client-side: turns 10MB into ~100KB in 40ms
-  let fileToUpload = file;
+  let fileToUpload = readableFile;
   try {
-    fileToUpload = await compressImageFile(file, 1200, 1200, 0.85);
+    fileToUpload = await compressImageFile(readableFile, 1200, 1200, 0.85);
   } catch (compErr) {
     console.warn("Client pre-compression skipped:", compErr);
   }
@@ -342,6 +363,7 @@ export const uploadImageToImageKit = async (file, folder = 'categories') => {
   // 3. Ultra-fast, Guaranteed Fallback: Canvas compressed Data URL (<60KB)
   // Ensures instant publishing and keeps Firestore document size well within limits
   const compressedDataUrl = await createCompressedDataUrl(fileToUpload, 900, 900, 0.72);
+  if (!compressedDataUrl) throw new Error(`${file.name || 'Image'} could not be processed.`);
   const localId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
   return {
