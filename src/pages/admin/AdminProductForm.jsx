@@ -1204,7 +1204,11 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
           const item = pendingImages[i];
           try {
             const uploadResult = await uploadImageToImageKit(item.file, `products/${finalProductId}`);
-            if (uploadResult?.url) {
+            if (uploadResult?.source === 'embedded') {
+              // Neither ImageKit nor Storage took it; embedding product photos would only
+              // push the product over Firestore's 1 MB limit. Report the real reason.
+              failedUploads.push({ name: item.name, reason: (uploadResult.reasons || []).join('; ') || 'image service unavailable' });
+            } else if (uploadResult?.url) {
               uploadedSlots[i] = {
                 url: uploadResult.url,
                 publicId: uploadResult.fileId || null,
@@ -1214,12 +1218,12 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
                 isColorPrimary: !!item.isColorPrimary
               };
             } else {
-              failedUploads.push(item.name);
+              failedUploads.push({ name: item.name, reason: 'no image URL returned' });
             }
           } catch (uploadErr) {
             console.warn(`Upload error for ${item.name}:`, uploadErr);
             if (uploadErr?.code === 'FILE_UNREADABLE') unreadableUploads.push(i);
-            else failedUploads.push(item.name);
+            else failedUploads.push({ name: item.name, reason: uploadErr?.message || 'unknown error' });
           }
           doneCount += 1;
           setUploadStatus(`Uploading images… ${doneCount} of ${pendingImages.length} done`);
@@ -1242,7 +1246,10 @@ export default function AdminProductForm({ modalProductId, isModal = false, onCl
       }
       // Stop instead of silently saving the product without the photos that failed.
       if (failedUploads.length > 0) {
-        throw new Error(`${failedUploads.length} image(s) failed to upload (${failedUploads.join(', ')}). Nothing was saved — check your connection and press Save again.`);
+        const byReason = new Map();
+        failedUploads.forEach(({ name, reason }) => byReason.set(reason, [...(byReason.get(reason) || []), name]));
+        const details = [...byReason].map(([reason, names]) => `${names.join(', ')} — ${reason}`).join(' | ');
+        throw new Error(`${failedUploads.length} photo(s) did not upload, so nothing was saved. ${details}. Press Save to try again; photos already added stay in the list.`);
       }
       const newlyUploaded = uploadedSlots.filter(Boolean);
       setUploadStatus('Publishing product to store catalog...');

@@ -7,7 +7,41 @@ import AdminToast from '../../components/admin/AdminToast';
 import SEO from '../../components/common/SEO';
 import './AdminLayout.css';
 
+// Admin tabs stay open for days in the shop. After a deploy, an old tab keeps
+// running old code (and its old bugs) until it is reloaded, so tell the admin.
+const LIVE_SCRIPT = /src="(\/assets\/index-[^"]+\.js)"/;
+function useNewVersionAvailable() {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    const current = document.querySelector('script[type="module"][src*="/assets/index-"]')?.getAttribute('src');
+    if (!current) return undefined; // dev server: no hashed bundle to compare
+    let cancelled = false;
+    const check = async () => {
+      if (document.visibilityState === 'hidden') return;
+      try {
+        const html = await (await fetch('/', { cache: 'no-store' })).text();
+        const live = html.match(LIVE_SCRIPT)?.[1];
+        if (!cancelled && live && live !== current) setAvailable(true);
+      } catch {
+        // offline: try again on the next tick
+      }
+    };
+    check();
+    const timer = setInterval(check, 2 * 60 * 1000);
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
+  return available;
+}
+
 export default function AdminLayout() {
+  const newVersionAvailable = useNewVersionAvailable();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -177,6 +211,12 @@ export default function AdminLayout() {
         </aside>
 
         <main className="admin-main">
+          {newVersionAvailable && (
+            <div className="admin-update-banner" role="status">
+              <span><strong>A new version of the admin panel is available.</strong> Reload to use it — unsaved changes on this page will be lost.</span>
+              <button type="button" onClick={() => window.location.reload()}>Reload now</button>
+            </div>
+          )}
           {/* Inline Header Bar with Order Alert Bell */}
           <div className="admin-inline-header">
             <div className="admin-inline-notif-container">
