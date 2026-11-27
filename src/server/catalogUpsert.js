@@ -2,6 +2,44 @@ import crypto from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { websiteProductIdentity } from './productNumbering.js';
 
+const skuPart = value => String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+// Edits keep every existing variant SKU/barcode. New variants on a sequentially
+// numbered product continue its sequence (BOG-000123-V004 / BOG-000123-004);
+// legacy products keep the SKU the admin form generated for them.
+export function editedProductIdentity(data, oldData, otherProducts) {
+  const variants = Array.isArray(data.variants) ? data.variants : [];
+  const previous = Array.isArray(oldData.variants) ? oldData.variants : [];
+  const previousSkus = new Set(previous.map(variant => String(variant?.sku || '').trim().toLowerCase()).filter(Boolean));
+  const productSku = String(oldData.sku || data.sku || '').trim();
+  const sequential = Number.isSafeInteger(Number(oldData.productNumber)) && Number(oldData.productNumber) > 0 && /^BOG-\d{6}$/i.test(productSku);
+  const used = new Set([...otherProducts.flatMap(product => [product.sku, product.barcode,
+    ...(Array.isArray(product.variants) ? product.variants : []).flatMap(variant => [variant.sku, variant.barcode])]),
+    ...previous.flatMap(variant => [variant.sku, variant.barcode])].filter(Boolean).map(code => String(code).toLowerCase()));
+  let next = Math.max(Number(oldData.nextVariantSequence) || 0, previous.length + 1,
+    ...previous.map(variant => (Number(variant.variantSequence) || 0) + 1));
+  let added = false;
+  const nextVariants = variants.map(variant => {
+    const sku = String(variant?.sku || '').trim();
+    if (sku && previousSkus.has(sku.toLowerCase())) return variant;
+    added = true;
+    if (sequential) {
+      while (used.has(`${productSku}-V${String(next).padStart(3, '0')}`.toLowerCase()) || used.has(`${productSku}-${String(next).padStart(3, '0')}`.toLowerCase())) next++;
+      if (next > 999) throw Object.assign(new Error('A product supports at most 999 variant barcodes.'), { statusCode: 422 });
+      const seq = String(next).padStart(3, '0');
+      const identity = { sku: `${productSku}-V${seq}`, barcode: `${productSku}-${seq}`, variantSequence: next };
+      used.add(identity.sku.toLowerCase()); used.add(identity.barcode.toLowerCase());
+      next++;
+      return { ...variant, ...identity };
+    }
+    const fallback = sku || [skuPart(productSku) || 'PRD', skuPart(variant?.color) || 'STANDARD', skuPart(variant?.size) || 'ONE-SIZE'].join('-');
+    return { ...variant, sku: fallback };
+  });
+  // Never trust a client-sent sequence; only the server advances it.
+  const { nextVariantSequence: _clientSequence, ...rest } = data;
+  return { ...rest, sku: data.sku || oldData.sku, variants: nextVariants, ...(sequential && added ? { nextVariantSequence: next } : {}) };
+}
+
 export function registerCatalogUpsert(app, { getDb, requireAdminAuth, invalidateCatalog = () => {} }) {
 app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminAuth, async (req, res) => {
   try {
@@ -33,7 +71,9 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
       const sequenceRef = db.collection('erp_sequences').doc('productNumber');
       const counter = create ? await transaction.get(sequenceRef) : null;
       const catalog = await transaction.get(db.collection('products'));
-      const productData = create ? websiteProductIdentity(req.body.productData, counter?.data()?.lastNumber, catalog.docs.map(doc => doc.data())) : req.body.productData;
+      const productData = create
+        ? websiteProductIdentity(req.body.productData, counter?.data()?.lastNumber, catalog.docs.map(doc => doc.data()))
+        : editedProductIdentity(req.body.productData, oldData, catalog.docs.filter(doc => doc.id !== productId).map(doc => doc.data()));
     const variants = Array.isArray(productData.variants) ? productData.variants : [];
     const rawSkus = [productData.sku, ...variants.map(variant => variant?.sku)].map(value => String(value || '').trim()).filter(Boolean);
     if (!String(productData.sku || '').trim() || variants.some(variant => !String(variant?.sku || '').trim())) {
@@ -62,12 +102,23 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
       const oldSkus = [oldData.sku, ...(Array.isArray(oldData.variants) ? oldData.variants.map(variant => variant?.sku) : [])]
         .map(value => String(value || '').trim()).filter(Boolean);
       if (!create) {
-        const oldSet = [...new Set(oldSkus.map(value => value.toLowerCase()))].sort();
-        const newSet = [...new Set(normalizedSkus)].sort();
-        if (JSON.stringify(oldSet) !== JSON.stringify(newSet)) {
-          const identityConflict = new Error('Changing product or variant SKUs is not supported after creation because the POS contract has no product-update feed. Create a new product or perform a coordinated migration.');
-          identityConflict.statusCode = 409;
-          throw identityConflict;
+        // The parent SKU is the product's identity in the POS and on printed tags.
+        const oldParent = String(oldData.sku || '').trim().toLowerCase();
+        if (oldParent && oldParent !== String(productData.sku || '').trim().toLowerCase()) {
+          throw Object.assign(new Error(`The product SKU (${oldData.sku}) cannot be changed after creation. Create a new product instead.`), { statusCode: 409 });
+        }
+        // Variants may be added (they get new SKUs, and the POS picks them up from the
+        // product feed / shared catalog). A variant can only be removed once it holds no
+        // stock, so no physical item is left with a SKU the website no longer knows.
+        const keptSkus = new Set(normalizedSkus);
+        const removedWithStock = (Array.isArray(oldData.variants) ? oldData.variants : []).filter(variant => {
+          const sku = String(variant?.sku || '').trim().toLowerCase();
+          if (!sku || keptSkus.has(sku)) return false;
+          return Number(variant.stock ?? variant.quantity ?? 0) > 0 || Number(variant.reserved ?? 0) > 0;
+        });
+        if (removedWithStock.length > 0) {
+          const names = removedWithStock.map(variant => [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku).join(', ');
+          throw Object.assign(new Error(`Set stock to 0 before removing ${names}. Variants that still hold stock cannot be deleted.`), { statusCode: 409 });
         }
       }
       const allNormalized = [...new Set([...oldSkus, ...rawSkus].map(value => value.toLowerCase()))];
@@ -120,7 +171,8 @@ app.post(['/api/admin/products/upsert', '/admin/products/upsert'], requireAdminA
         editableData.reserved = reserved;
       }
       if (!create) {
-        delete editableData.productNumber; delete editableData.nextVariantSequence;
+        delete editableData.productNumber;
+        if (!Number.isSafeInteger(editableData.nextVariantSequence)) delete editableData.nextVariantSequence;
         if (oldData.barcode) editableData.barcode = oldData.barcode;
         editableData.variants = (editableData.variants || []).map(variant => {
           const saved = (oldData.variants || []).find(item => item.sku === variant.sku);

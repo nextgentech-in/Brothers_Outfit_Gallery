@@ -103,7 +103,7 @@ Errors are JSON and include a safe `code` and `correlation_id`. Expected identit
 - POS product slugs are normalized and receive a numeric suffix on collision.
 - Money is stored using the website's existing two-decimal number convention.
 - Re-delivering a known product is a no-op when its product ID and SKU set match. It returns `created_count: 0`, does not reset stock, and does not overwrite admin-managed text, prices, images, or other website edits. Reusing the ID with a different SKU set returns `409`.
-- Website admin creates/edits now pass through a trusted transaction and the same SKU registry. SKU identity changes after creation are rejected because the current POS contract has no product-update/delete feed; use a new product or a coordinated migration. Ordinary text/price/image edits remain available, and stock edits create signed `admin_adjustment` movements.
+- Website admin creates/edits now pass through a trusted transaction and the same SKU registry. Existing product and variant SKUs never change. Edits may add variants: on sequentially numbered products they continue the product's sequence (`BOG-000123-V004`, barcode `BOG-000123-004`). The edited product reappears in `products-sync` (its `updatedAt` advances), so the POS upserts the new SKUs by `web_product_id`. A variant can be removed only when its stock and reservations are 0; the parent SKU cannot be changed. Stock edits create signed `admin_adjustment` movements, including the opening stock of an added variant.
 - The source specification contains no image fields. POS products use the existing `/images/hero.png` storefront fallback. An admin should add real images in the existing product editor after import.
 
 Only active website-origin products are returned to the POS. POS-origin products are never echoed through the new-website-product feed.
@@ -272,7 +272,7 @@ Server logs contain endpoint/correlation IDs and safe counts/IDs, never bearer t
 ## Known limitations and rollout gates
 
 - The POS must implement persistent `event_id`, `sync_id`, incoming `movement_id` deduplication, signed restoration deltas, and cursor paging before production enablement. The legacy payload alone is not production-safe.
-- The contract has no product update/delete feed. SKU identity edits are therefore blocked after website creation; price/text/image changes are website-only until a versioned update contract is agreed.
+- There is no separate product-update endpoint: edited website products are re-sent through `products-sync`, which consumers must upsert. Existing SKUs are immutable, so an upsert only ever adds variants or drops empty ones.
 - Full/partial returns are not a current website feature. Define accepted-QC timing and item quantities before adding `return_received` movements.
 - The application-level rate limiter follows the project's existing in-memory design. On a multi-instance deployment, add a gateway/distributed rate limiter for a global quota; authentication and idempotency remain enforced in Firestore.
 - Feed queries use a stable application cursor but scan the applicable Firestore collection before paging. If the catalog/ledger grows substantially, add indexed cursor fields and a migration without changing the response contract.

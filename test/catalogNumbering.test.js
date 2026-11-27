@@ -27,8 +27,10 @@ const server = app.listen(0, '127.0.0.1'); let base;
 before(async () => { if (!server.listening) await new Promise(resolve => server.once('listening', resolve)); base = `http://127.0.0.1:${server.address().port}`; });
 after(() => new Promise(resolve => server.close(resolve)));
 const product = slug => ({ name: slug, slug, salePrice: 800, mrp: 1000, variants: [{ size: 'M', color: 'Black', stock: 2, price: 800 }] });
+let saveCount = 0;
 async function save(id, data, create = true) {
-  const response = await fetch(base + '/api/admin/products/upsert', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer admin-fixture' }, body: JSON.stringify({ productId: id, requestId: `request-${id}`, create, productData: data }) });
+  saveCount += 1;
+  const response = await fetch(base + '/api/admin/products/upsert', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer admin-fixture' }, body: JSON.stringify({ productId: id, requestId: `request-${id}-${saveCount}`, create, productData: data }) });
   return { status: response.status, body: await response.json() };
 }
 test('concurrent website creates assign consecutive shared SKUs, variant barcodes and mappings atomically', async () => {
@@ -60,4 +62,30 @@ test('legacy barcode collisions are skipped and website numbering continues afte
   assert.equal(records.get('products/product-004').sku, 'BOG-000081');
   assert.equal((await save('product-005', product('shirt-four'))).status, 409);
   assert.equal(records.has('products/product-005'), false); assert.equal(records.get('erp_sequences/productNumber').lastNumber, 81);
+});
+test('edits can add variants with the next sequential SKU and remove only empty variants', async () => {
+  const row = records.get('products/product-001');
+  const withNew = await save('product-001', { ...row, nextVariantSequence: 500, variants: [...row.variants, { size: 'L', color: 'Black', stock: 3, price: 800, sku: 'BOG-000041-BLACK-L' }] }, false);
+  assert.equal(withNew.status, 200, JSON.stringify(withNew.body));
+  let saved = records.get('products/product-001');
+  assert.equal(saved.variants[0].sku, 'BOG-000041-V001');
+  assert.equal(saved.variants[1].sku, 'BOG-000041-V002'); assert.equal(saved.variants[1].barcode, 'BOG-000041-002');
+  assert.equal(saved.nextVariantSequence, 3);
+  assert.ok([...records.keys()].some(key => key.startsWith('stockMovements/') && records.get(key).sku === 'BOG-000041-V002' && records.get(key).deltaChange === 3));
+
+  const removeStocked = await save('product-001', { ...saved, variants: [saved.variants[0]] }, false);
+  assert.equal(removeStocked.status, 409); assert.match(removeStocked.body.error, /Set stock to 0/);
+
+  const emptied = await save('product-001', { ...saved, variants: [saved.variants[0], { ...saved.variants[1], stock: 0 }] }, false);
+  assert.equal(emptied.status, 200, JSON.stringify(emptied.body));
+  saved = records.get('products/product-001');
+  const removed = await save('product-001', { ...saved, variants: [saved.variants[0]] }, false);
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+  assert.equal(records.get('products/product-001').variants.length, 1);
+
+  const readded = await save('product-001', { ...records.get('products/product-001'), variants: [records.get('products/product-001').variants[0], { size: 'XL', color: 'Black', stock: 1, price: 800 }] }, false);
+  assert.equal(readded.status, 200, JSON.stringify(readded.body));
+  assert.equal(records.get('products/product-001').variants[1].sku, 'BOG-000041-V003', 'removed sequence numbers are never reused');
+
+  assert.equal((await save('product-001', { ...records.get('products/product-001'), sku: 'NEW-SKU' }, false)).status, 409);
 });
