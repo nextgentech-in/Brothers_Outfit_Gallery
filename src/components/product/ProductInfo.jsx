@@ -7,7 +7,7 @@ import { isClothingProduct, getAvailableProductSizes, getAvailableStock } from '
 import { useWishlist } from '../../context/WishlistContext';
 import SizeGuideModal from '../common/SizeGuideModal';
 import { flyProductToCart } from '../../utils/cartFlyAnimation';
-import { normalizeToStandardColor } from '../../data/colorMaster.js';
+import { normalizeToStandardColor, sameColor } from '../../data/colorMaster.js';
 import './ProductInfo.css';
 
 const COLOR_SWATCHES = [
@@ -135,6 +135,11 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
     onColorChange?.('All', -1);
   }, [product.id, defaultFrontVariant?.size]);
 
+  // A new colour (or product) is a new variant: start the quantity again from 1.
+  useEffect(() => {
+    setQuantity(1);
+  }, [selectedColor, product.id]);
+
   // Determine if item is Clothing (where size selection is mandatory) vs Accessories
   const isClothing = isClothingProduct(product);
 
@@ -182,7 +187,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       : (availableColors[0]?.name || productColors[0] || null);
 
     return product.variants.find(v =>
-      v.size === targetSize && (!v.color || v.color === effectiveColor || v.color === 'Standard' || v.color === 'Default')
+      v.size === targetSize && (!v.color || sameColor(v.color, effectiveColor) || sameColor(v.color, 'Standard'))
     ) || product.variants.find(v => v.size === targetSize);
   }, [product.variants, selectedSize, selectedColor, productSizes, defaultFrontVariant, availableColors, productColors]);
 
@@ -224,6 +229,11 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
 
   const { addToCart, buyNowDirect } = useCart();
 
+  // Never let the chosen quantity exceed what the selected size has in stock.
+  useEffect(() => {
+    if (stock > 0 && quantity > stock) setQuantity(stock);
+  }, [stock, quantity]);
+
   const handleQuantity = (delta) => {
     setQuantity(prev => {
       const next = prev + delta;
@@ -233,9 +243,10 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
     });
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (sizeOverride) => {
+    const chosenSize = typeof sizeOverride === 'string' ? sizeOverride : selectedSize;
     // Only require mandatory size selection if item is Clothing/Apparel and has size options
-    if (isClothing && productSizes.length > 0 && !selectedSize) {
+    if (isClothing && productSizes.length > 0 && !chosenSize) {
       setSizeError(true);
       const sizeEl = document.querySelector('.product-selector-group');
       sizeEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -243,9 +254,17 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       return;
     }
 
-    const sizeToUse = selectedSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
+    const sizeToUse = chosenSize || defaultFrontVariant?.size || (productSizes.length > 0 ? productSizes[0] : 'One Size');
     const colorToUse = (selectedColor && selectedColor !== 'All') ? selectedColor : (availableColors[0]?.name || productColors[0] || 'Default');
-    addToCart(product, sizeToUse, colorToUse, quantity, activeSale);
+    // Price follows the size actually added (it can differ from the one on screen).
+    const sizeVariant = sizeToUse !== selectedSize
+      ? product.variants?.find(v => v.size === sizeToUse && (!v.color || v.color === colorToUse || v.color === 'Standard' || v.color === 'Default')) || product.variants?.find(v => v.size === sizeToUse)
+      : null;
+    const sizePrice = sizeVariant && sizeVariant.price !== undefined && sizeVariant.price !== '' && !isNaN(Number(sizeVariant.price))
+      ? Number(sizeVariant.price)
+      : activeSale;
+    const qtyToAdd = sizeVariant ? Math.max(1, Math.min(quantity, getAvailableStock(sizeVariant) || 1)) : quantity;
+    addToCart(product, sizeToUse, colorToUse, qtyToAdd, sizePrice);
 
     // Trigger visual flying animation from main product gallery image to the navbar cart
     const galleryMainImg = document.querySelector('.product-gallery-main img, .image-zoom-img') || document.querySelector('.product-gallery-section img');
@@ -312,52 +331,32 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
         )}
       </div>
 
-      {productRating > 0 ? (
-        <div
-          className="product-rating"
-          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-          role="button"
-          tabIndex={0}
-          aria-label={`${productRating.toFixed(1)} stars out of 5 from ${reviewCount} reviews`}
-        >
-          <span className="stars">
-            {'★'.repeat(Math.round(productRating))}{'☆'.repeat(5 - Math.round(productRating))}
-          </span>
-          <span className="rating-value">{productRating.toFixed(1)}</span>
-          {reviewCount > 0 && <span className="review-count">({reviewCount} {reviewCount === 1 ? 'Review' : 'Reviews'})</span>}
-        </div>
-      ) : (
-        <div
-          className="product-rating product-rating--empty"
-          onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
-          role="button"
-          tabIndex={0}
-        >
-          <span className="rating-empty-link">★ Be the first to review this product</span>
-        </div>
-      )}
-
       <div className="product-pricing">
-        {hasDiscount ? (
+        <div className="pdp-price-row">
+          <span className={`pdp-price ${hasDiscount ? 'is-sale' : ''}`}>₹{activeSale.toLocaleString('en-IN')}</span>
+          {hasDiscount && <span className="pdp-mrp">₹{activeMrp.toLocaleString('en-IN')}</span>}
+          {hasDiscount && <span className="pdp-off">{currentDiscount}% off</span>}
+        </div>
+        <p className="pdp-tax-note">*MRP inclusive of all taxes</p>
+      </div>
+
+      <button
+        type="button"
+        className={`pdp-rating ${productRating > 0 ? '' : 'is-empty'}`}
+        onClick={() => { const el = document.getElementById('reviews') || document.querySelector('.reviews-module-wrapper'); el?.scrollIntoView({ behavior: 'smooth' }); }}
+        aria-label={productRating > 0 ? `${productRating.toFixed(1)} stars out of 5 from ${reviewCount} reviews` : 'Write the first review'}
+      >
+        {productRating > 0 ? (
           <>
-            <div className="price-row-top" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span className="price-original" style={{ color: '#9ca3af', textDecoration: 'line-through', fontSize: '14px' }}>
-                ₹{activeMrp.toLocaleString('en-IN')}
-              </span>
-              <span className="price-discount" style={{ background: 'var(--color-accent-gold-light)', color: 'var(--color-accent-gold-text)', border: '1px solid #E4CE9F', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: '700' }}>
-                {currentDiscount}% OFF
-              </span>
-            </div>
-            <div className="price-current" style={{ fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)' }}>
-              ₹{activeSale.toLocaleString('en-IN')}
-            </div>
+            <span className="pdp-rating-chip">{productRating.toFixed(1)} <span aria-hidden="true">★</span></span>
+            <span className="pdp-rating-text">
+              {reviewCount > 0 ? <><strong>{reviewCount}</strong> {reviewCount === 1 ? 'Review' : 'Reviews'}</> : 'Ratings'}
+            </span>
           </>
         ) : (
-          <div className="price-current" style={{ fontSize: '28px', fontWeight: '800', color: 'var(--color-charcoal, #111111)' }}>
-            ₹{activeSale.toLocaleString('en-IN')}
-          </div>
+          <span className="pdp-rating-text">★ Be the first to review this product</span>
         )}
-      </div>
+      </button>
 
       {offer_enabled && <MiniCountdown targetDate={offer_end_at} />}
 
@@ -618,7 +617,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
 
         <button
           className={`btn-add-to-cart ${added ? 'added' : ''}`}
-          onClick={handleAddToCart}
+          onClick={() => handleAddToCart()}
           disabled={outOfStock}
           style={outOfStock ? { background: '#94a3b8', borderColor: '#94a3b8', color: '#ffffff', cursor: 'not-allowed' } : {}}
         >
@@ -786,7 +785,7 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
             <button
               type="button"
               className={`product-sticky-bar__btn product-sticky-bar__btn--cart ${added ? 'added' : ''}`}
-              onClick={handleAddToCart}
+              onClick={() => handleAddToCart()}
               disabled={outOfStock}
             >
               {added ? 'ADDED ✓' : 'ADD TO CART'}
@@ -807,9 +806,20 @@ export default function ProductInfo({ product, onColorChange, offersConfig }) {
       <SizeGuideModal
         isOpen={sizeGuideOpen}
         onClose={() => setSizeGuideOpen(false)}
-        category={product.categoryId || product.category || 'Shirts'}
+        category={`${product.category || ''} ${product.subCategory || ''} ${product.categoryId || ''}`}
+        productName={name}
+        image={(() => {
+          const first = product.images?.[0];
+          return (typeof first === 'object' ? first?.url : first) || product.image || '';
+        })()}
+        price={activeSale}
+        mrp={activeMrp}
+        discount={currentDiscount}
+        selectedSize={selectedSize}
+        availableSizes={productSizes.length > 0 ? visibleSizes : null}
         customSizeGuide={product.sizeGuide}
-        onSelectSize={(size) => setSelectedSize(size)}
+        onSelectSize={(size) => { setSelectedSize(size); setSizeError(false); }}
+        onAddToCart={outOfStock && !visibleSizes.length ? undefined : (size) => handleAddToCart(size)}
       />
     </div>
   );

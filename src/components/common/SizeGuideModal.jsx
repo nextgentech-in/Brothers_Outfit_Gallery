@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import HowToMeasureDiagram from './HowToMeasureDiagram';
+import { GARMENTS, GarmentView } from './GarmentDiagrams';
 import './SizeGuideModal.css';
 
 // Cleanly convert any custom size guide value (single number, decimals, ranges, or labels)
@@ -41,7 +41,7 @@ export const convertMeasurementValue = (val, fromUnit, toUnit) => {
 
 // Convert column header unit label dynamically (e.g. Chest (in) -> Chest (cm))
 export const convertColumnHeader = (colName, activeUnit) => {
-  if (!colName || typeof colName !== 'string') return '';
+  if (!colName || typeof colName !== 'string') return colName;
   const trimmed = colName.trim();
   // Don't modify Size / Tag name columns
   if (/^(?:size|tag|uk|us|eu)/i.test(trimmed)) return trimmed;
@@ -74,578 +74,757 @@ export const detectBaseUnit = (columns = [], customSizeGuide = {}) => {
   return 'in'; // Standard default in Indian menswear
 };
 
-// Master sizing data for all categories
+/* ───────────────────────── Master size charts ─────────────────────────
+ * All measurements are garment measurements in inches. Columns flagged
+ * `text: true` are labels (US / EU sizes, etc.) and are never converted. */
+
 const SIZE_CHARTS = {
-  shirts: {
-    title: 'Shirts & T-Shirts',
-    subtitle: 'Standard Indian apparel measurements for regular and oversized fits',
-    icon: '👕',
-    columns: ['Size', 'Chest', 'Length', 'Shoulder', 'Sleeve'],
-    data: [
-      { size: 'XS', chestIn: 37, chestCm: 94.0, lengthIn: 26, lengthCm: 66.0, shoulderIn: 16, shoulderCm: 40.6, sleeveIn: 24.5, sleeveCm: 62.2 },
-      { size: 'S', chestIn: 39.5, chestCm: 100.3, lengthIn: 27, lengthCm: 68.6, shoulderIn: 17, shoulderCm: 43.2, sleeveIn: 25, sleeveCm: 63.5 },
-      { size: 'M', chestIn: 41.75, chestCm: 106.0, lengthIn: 28, lengthCm: 71.1, shoulderIn: 18, shoulderCm: 45.7, sleeveIn: 25.5, sleeveCm: 64.8 },
-      { size: 'L', chestIn: 45, chestCm: 114.3, lengthIn: 29, lengthCm: 73.7, shoulderIn: 19, shoulderCm: 48.3, sleeveIn: 26, sleeveCm: 66.0 },
-      { size: 'XL', chestIn: 47.5, chestCm: 120.7, lengthIn: 30, lengthCm: 76.2, shoulderIn: 20, shoulderCm: 50.8, sleeveIn: 26.88, sleeveCm: 68.3 },
-      { size: 'XXL', chestIn: 50.5, chestCm: 128.3, lengthIn: 30.63, lengthCm: 77.8, shoulderIn: 21.25, shoulderCm: 54.0, sleeveIn: 27.13, sleeveCm: 68.9 },
-      { size: '3XL', chestIn: 51, chestCm: 129.5, lengthIn: 30, lengthCm: 76.2, shoulderIn: 20.5, shoulderCm: 52.1, sleeveIn: 26, sleeveCm: 66.0 },
-      { size: '4XL', chestIn: 53, chestCm: 134.6, lengthIn: 31, lengthCm: 78.7, shoulderIn: 21.25, shoulderCm: 54.0, sleeveIn: 26.5, sleeveCm: 67.3 },
-      { size: '5XL', chestIn: 55, chestCm: 139.7, lengthIn: 31.5, lengthCm: 80.0, shoulderIn: 22, shoulderCm: 55.9, sleeveIn: 27, sleeveCm: 68.6 },
-      { size: '6XL', chestIn: 57, chestCm: 144.8, lengthIn: 32, lengthCm: 81.3, shoulderIn: 22.75, shoulderCm: 57.8, sleeveIn: 27.5, sleeveCm: 69.9 },
+  tshirts: {
+    title: 'T-Shirts & Polos',
+    garment: 'tee',
+    fitKey: 'chest',
+    fitEase: true,
+    columns: [
+      { key: 'chest', label: 'Chest' },
+      { key: 'length', label: 'Length' },
+      { key: 'shoulder', label: 'Shoulder' },
+      { key: 'sleeve', label: 'Sleeve' },
     ],
-    fitTip: '💡 For an Oversized / Drop-Shoulder aesthetic, order one size up. For a tailored slim look, order your standard size.'
+    rows: [
+      ['XS', 36, 26, 16, 7.5],
+      ['S', 38, 27, 17, 8],
+      ['M', 40, 28, 18, 8.5],
+      ['L', 42, 29, 19, 9],
+      ['XL', 44, 30, 20, 9.5],
+      ['XXL', 46, 31, 21, 10],
+      ['3XL', 48, 31.5, 22, 10.5],
+    ],
+    fitTip: 'Regular fit. For an oversized / drop-shoulder look, go one size up.',
+  },
+  shirts: {
+    title: 'Shirts',
+    garment: 'shirt',
+    fitKey: 'chest',
+    fitEase: true,
+    columns: [
+      { key: 'chest', label: 'Chest' },
+      { key: 'length', label: 'Length' },
+      { key: 'shoulder', label: 'Shoulder' },
+      { key: 'sleeve', label: 'Sleeve' },
+    ],
+    rows: [
+      ['XS', 37, 26, 16, 24.5],
+      ['S', 39.5, 27, 17, 25],
+      ['M', 41.75, 28, 18, 25.5],
+      ['L', 45, 29, 19, 26],
+      ['XL', 47.5, 30, 20, 26.88],
+      ['XXL', 50.5, 30.63, 21.25, 27.13],
+      ['3XL', 52.5, 31, 22, 27.5],
+      ['4XL', 54.5, 31.5, 22.75, 27.75],
+      ['5XL', 56.5, 32, 23.5, 28],
+      ['6XL', 58.5, 32.5, 24.25, 28.25],
+    ],
+    fitTip: 'Order your usual size for a tailored look, one size up for a relaxed fit.',
   },
   kurta: {
     title: 'Kurta & Ethnic Wear',
-    subtitle: 'Standard Indian chest, length, shoulder & sleeve measurements for Kurtas',
-    icon: '🥻',
-    columns: ['Size', 'Chest', 'Length', 'Shoulder', 'Sleeve'],
-    data: [
-      { size: '36 (S)', chestIn: 38, chestCm: 96.5, lengthIn: 40, lengthCm: 101.6, shoulderIn: 17, shoulderCm: 43.2, sleeveIn: 24, sleeveCm: 61.0 },
-      { size: '38 (M)', chestIn: 40, chestCm: 101.6, lengthIn: 42, lengthCm: 106.7, shoulderIn: 17.5, shoulderCm: 44.5, sleeveIn: 24.5, sleeveCm: 62.2 },
-      { size: '40 (L)', chestIn: 42, chestCm: 106.7, lengthIn: 44, lengthCm: 111.8, shoulderIn: 18, shoulderCm: 45.7, sleeveIn: 25, sleeveCm: 63.5 },
-      { size: '42 (XL)', chestIn: 44, chestCm: 111.8, lengthIn: 45, lengthCm: 114.3, shoulderIn: 18.5, shoulderCm: 47.0, sleeveIn: 25.5, sleeveCm: 64.8 },
-      { size: '44 (XXL)', chestIn: 46, chestCm: 116.8, lengthIn: 46, lengthCm: 116.8, shoulderIn: 19, shoulderCm: 48.3, sleeveIn: 26, sleeveCm: 66.0 },
-      { size: '46 (3XL)', chestIn: 48, chestCm: 121.9, lengthIn: 46, lengthCm: 116.8, shoulderIn: 19.5, shoulderCm: 49.5, sleeveIn: 26, sleeveCm: 66.0 },
+    garment: 'kurta',
+    fitKey: 'chest',
+    fitEase: true,
+    columns: [
+      { key: 'chest', label: 'Chest' },
+      { key: 'length', label: 'Length' },
+      { key: 'shoulder', label: 'Shoulder' },
+      { key: 'sleeve', label: 'Sleeve' },
     ],
-    fitTip: '💡 For Kurtas, order 2-4 inches larger than your bare chest measurement for comfortable drape and movement.'
+    rows: [
+      ['36 (S)', 38, 40, 17, 24],
+      ['38 (M)', 40, 42, 17.5, 24.5],
+      ['40 (L)', 42, 44, 18, 25],
+      ['42 (XL)', 44, 45, 18.5, 25.5],
+      ['44 (XXL)', 46, 46, 19, 26],
+      ['46 (3XL)', 48, 46, 19.5, 26],
+    ],
+    fitTip: 'Kurtas are cut with 2–4" of ease over your body chest for an easy drape.',
   },
   jeans: {
     title: 'Jeans & Trousers',
-    subtitle: 'Waist and length measurements across standard Indian sizes',
-    icon: '👖',
-    columns: ['Size', 'Waist', 'Hip', 'Inseam', 'Length', 'Thigh'],
-    data: [
-      { size: '28', waistIn: 28, waistCm: 71.1, hipIn: 36, hipCm: 91.4, inseamIn: 30, inseamCm: 76.2, lengthIn: 40, lengthCm: 101.6, thighIn: 22, thighCm: 55.9 },
-      { size: '30', waistIn: 30, waistCm: 76.2, hipIn: 38, hipCm: 96.5, inseamIn: 31, inseamCm: 78.7, lengthIn: 41, lengthCm: 104.1, thighIn: 23, thighCm: 58.4 },
-      { size: '32', waistIn: 32, waistCm: 81.3, hipIn: 40, hipCm: 101.6, inseamIn: 32, inseamCm: 81.3, lengthIn: 42, lengthCm: 106.7, thighIn: 24, thighCm: 61.0 },
-      { size: '34', waistIn: 34, waistCm: 86.4, hipIn: 42, hipCm: 106.7, inseamIn: 32, inseamCm: 81.3, lengthIn: 42, lengthCm: 106.7, thighIn: 25, thighCm: 63.5 },
-      { size: '36', waistIn: 36, waistCm: 91.4, hipIn: 44, hipCm: 111.8, inseamIn: 32, inseamCm: 81.3, lengthIn: 42, lengthCm: 106.7, thighIn: 26, thighCm: 66.0 },
-      { size: '38', waistIn: 38, waistCm: 96.5, hipIn: 46, hipCm: 116.8, inseamIn: 32, inseamCm: 81.3, lengthIn: 42.5, lengthCm: 108.0, thighIn: 27, thighCm: 68.6 },
-      { size: '40', waistIn: 40, waistCm: 101.6, hipIn: 48, hipCm: 121.9, inseamIn: 32, inseamCm: 81.3, lengthIn: 43, lengthCm: 109.2, thighIn: 28, thighCm: 71.1 },
-      { size: '42', waistIn: 42, waistCm: 106.7, hipIn: 50, hipCm: 127.0, inseamIn: 32, inseamCm: 81.3, lengthIn: 43, lengthCm: 109.2, thighIn: 29, thighCm: 73.7 }
+    garment: 'jeans',
+    fitKey: 'waist',
+    columns: [
+      { key: 'waist', label: 'Waist' },
+      { key: 'hip', label: 'Hip' },
+      { key: 'thigh', label: 'Thigh' },
+      { key: 'inseam', label: 'Inseam' },
+      { key: 'outseam', label: 'Outseam' },
     ],
-    fitTip: '💡 Measure your waist at the point where you naturally wear your trousers or jeans.'
+    rows: [
+      ['28', 28, 36, 22, 30, 40],
+      ['30', 30, 38, 23, 31, 41],
+      ['32', 32, 40, 24, 32, 42],
+      ['34', 34, 42, 25, 32, 42],
+      ['36', 36, 44, 26, 32, 42],
+      ['38', 38, 46, 27, 32, 42.5],
+      ['40', 40, 48, 28, 32, 43],
+      ['42', 42, 50, 29, 32, 43],
+    ],
+    fitTip: 'Pick the size that matches where you normally wear your waistband.',
+  },
+  shorts: {
+    title: 'Shorts',
+    garment: 'shorts',
+    fitKey: 'waist',
+    columns: [
+      { key: 'waist', label: 'Waist' },
+      { key: 'hip', label: 'Hip' },
+      { key: 'inseam', label: 'Inseam' },
+      { key: 'length', label: 'Length' },
+    ],
+    rows: [
+      ['28', 28, 37, 7, 18],
+      ['30', 30, 39, 7, 18.5],
+      ['32', 32, 41, 7.5, 19],
+      ['34', 34, 43, 7.5, 19.5],
+      ['36', 36, 45, 8, 20],
+      ['38', 38, 47, 8, 20.5],
+      ['40', 40, 49, 8, 21],
+    ],
+    fitTip: 'Elasticated waists stretch about 2" — stay with your jeans size.',
   },
   jackets: {
-    title: 'Jackets & Hoodies',
-    subtitle: 'Outerwear sizing designed for layering over t-shirts and shirts',
-    icon: '🧥',
-    columns: ['Size', 'Chest', 'Length', 'Shoulder', 'Sleeve'],
-    data: [
-      { size: 'S', chestIn: 40, chestCm: 101.6, lengthIn: 26.5, lengthCm: 67.3, shoulderIn: 17.5, shoulderCm: 44.5, sleeveIn: 24.5, sleeveCm: 62.2 },
-      { size: 'M', chestIn: 42, chestCm: 106.7, lengthIn: 27.5, lengthCm: 69.9, shoulderIn: 18.5, shoulderCm: 47.0, sleeveIn: 25, sleeveCm: 63.5 },
-      { size: 'L', chestIn: 44, chestCm: 111.8, lengthIn: 28.5, lengthCm: 72.4, shoulderIn: 19.5, shoulderCm: 49.5, sleeveIn: 25.5, sleeveCm: 64.8 },
-      { size: 'XL', chestIn: 46, chestCm: 116.8, lengthIn: 29.5, lengthCm: 74.9, shoulderIn: 20.5, shoulderCm: 52.1, sleeveIn: 26, sleeveCm: 66.0 },
-      { size: 'XXL', chestIn: 48, chestCm: 121.9, lengthIn: 30.5, lengthCm: 77.5, shoulderIn: 21.5, shoulderCm: 54.6, sleeveIn: 26.5, sleeveCm: 67.3 },
-      { size: '3XL', chestIn: 50, chestCm: 127.0, lengthIn: 31, lengthCm: 78.7, shoulderIn: 22.5, shoulderCm: 57.2, sleeveIn: 27, sleeveCm: 68.6 }
+    title: 'Jackets, Hoodies & Sweatshirts',
+    garment: 'hoodie',
+    fitKey: 'chest',
+    fitEase: true,
+    columns: [
+      { key: 'chest', label: 'Chest' },
+      { key: 'length', label: 'Length' },
+      { key: 'shoulder', label: 'Shoulder' },
+      { key: 'sleeve', label: 'Sleeve' },
     ],
-    fitTip: '💡 Jackets and hoodies feature extra ease around the chest to allow comfortable layering.'
+    rows: [
+      ['S', 40, 26.5, 17.5, 24.5],
+      ['M', 42, 27.5, 18.5, 25],
+      ['L', 44, 28.5, 19.5, 25.5],
+      ['XL', 46, 29.5, 20.5, 26],
+      ['XXL', 48, 30.5, 21.5, 26.5],
+      ['3XL', 50, 31, 22.5, 27],
+    ],
+    fitTip: 'Cut with extra room through the chest so you can layer a tee or shirt underneath.',
   },
   footwear: {
-    title: 'Footwear & Slippers',
-    subtitle: 'Indian / UK standard shoe sizing with conversion to US & EU',
-    icon: '🩴',
-    columns: ['UK / IND Size', 'US Size', 'EU Size', 'Foot Length (CM)', 'Foot Length (IN)'],
-    data: [
-      { size: 'UK 6', us: 'US 7', eu: 'EU 40', lengthCm: 24.5, lengthIn: 9.6 },
-      { size: 'UK 7', us: 'US 8', eu: 'EU 41', lengthCm: 25.4, lengthIn: 10.0 },
-      { size: 'UK 8', us: 'US 9', eu: 'EU 42', lengthCm: 26.2, lengthIn: 10.3 },
-      { size: 'UK 9', us: 'US 10', eu: 'EU 43', lengthCm: 27.1, lengthIn: 10.6 },
-      { size: 'UK 10', us: 'US 11', eu: 'EU 44', lengthCm: 27.9, lengthIn: 11.0 },
-      { size: 'UK 11', us: 'US 12', eu: 'EU 45', lengthCm: 28.8, lengthIn: 11.3 },
-      { size: 'UK 12', us: 'US 13', eu: 'EU 46', lengthCm: 29.6, lengthIn: 11.6 }
+    title: 'Footwear',
+    garment: 'foot',
+    fitKey: 'length',
+    columns: [
+      { key: 'us', label: 'US', text: true },
+      { key: 'eu', label: 'EU', text: true },
+      { key: 'length', label: 'Foot Length' },
     ],
-    fitTip: '💡 Step firmly on a white paper, mark your heel and longest toe with a pen, and measure the distance in cm.'
+    rows: [
+      ['UK 6', 'US 7', 'EU 40', 9.6],
+      ['UK 7', 'US 8', 'EU 41', 10],
+      ['UK 8', 'US 9', 'EU 42', 10.3],
+      ['UK 9', 'US 10', 'EU 43', 10.6],
+      ['UK 10', 'US 11', 'EU 44', 11],
+      ['UK 11', 'US 12', 'EU 45', 11.3],
+      ['UK 12', 'US 13', 'EU 46', 11.6],
+    ],
+    fitTip: 'Between sizes? Go half a size up — our footwear runs true to UK sizing.',
+  },
+  belts: {
+    title: 'Belts',
+    garment: 'belt',
+    columns: [
+      { key: 'fits', label: 'Fits Waist' },
+      { key: 'length', label: 'Belt Length' },
+    ],
+    rows: [
+      ['30', '28 - 29', 30],
+      ['32', '30 - 31', 32],
+      ['34', '32 - 33', 34],
+      ['36', '34 - 35', 36],
+      ['38', '36 - 37', 38],
+      ['40', '38 - 39', 40],
+      ['42', '40 - 41', 42],
+      ['44', '42 - 43', 44],
+    ],
+    fitTip: 'Choose a belt 2" larger than your trouser waist size.',
   },
   perfumes: {
-    title: 'Perfume Volume & Longevity Guide',
-    subtitle: 'Understand bottle capacities, number of sprays, and fragrance duration',
-    icon: '🧴',
+    title: 'Perfume Volume Guide',
     isPerfume: true,
     tiers: [
-      { volume: '10ml', sprays: '~120 Sprays', duration: '2 - 3 Weeks', bestFor: 'Pocket spray, gym bag, travel & trial scent', badge: 'TRAVEL / POCKET' },
-      { volume: '20ml', sprays: '~240 Sprays', duration: '1 Month', bestFor: 'Compact spray, quick refresh anywhere', badge: 'COMPACT' },
-      { volume: '30ml', sprays: '~360 Sprays', duration: '1 - 2 Months', bestFor: 'Daily carry, rotation perfume', badge: 'PORTABLE' },
-      { volume: '50ml', sprays: '~600 Sprays', duration: '3 - 4 Months', bestFor: 'Daily signature scent, work & university wear', badge: 'POPULAR' },
-      { volume: '75ml', sprays: '~900 Sprays', duration: '4 - 5 Months', bestFor: 'Mid-size favorite bottle', badge: 'BALANCED' },
-      { volume: '100ml', sprays: '~1,200 Sprays', duration: '6 - 8 Months', bestFor: 'Full-size flagship bottle, best price per ml', badge: 'BEST VALUE' },
-      { volume: '150ml', sprays: '~1,800 Sprays', duration: '9 - 10 Months', bestFor: 'Heavy daily users', badge: 'EXTENDED' },
-      { volume: '200ml', sprays: '~2,400 Sprays', duration: '12+ Months', bestFor: 'All-season signature aroma', badge: 'JUMBO' },
+      { volume: '10ml', sprays: '~120', duration: '2–3 weeks', bestFor: 'Pocket & travel, try a new scent' },
+      { volume: '20ml', sprays: '~240', duration: '1 month', bestFor: 'Compact refresh anywhere' },
+      { volume: '30ml', sprays: '~360', duration: '1–2 months', bestFor: 'Daily carry, rotation perfume' },
+      { volume: '50ml', sprays: '~600', duration: '3–4 months', bestFor: 'Everyday signature scent', badge: 'Popular' },
+      { volume: '75ml', sprays: '~900', duration: '4–5 months', bestFor: 'Mid-size favourite' },
+      { volume: '100ml', sprays: '~1,200', duration: '6–8 months', bestFor: 'Full size, best price per ml', badge: 'Best value' },
+      { volume: '150ml', sprays: '~1,800', duration: '9–10 months', bestFor: 'Heavy daily users' },
+      { volume: '200ml', sprays: '~2,400', duration: '12+ months', bestFor: 'All-season signature' },
     ],
-    applicationTips: [
-      { title: 'Pulse Points', desc: 'Apply to pulse points where blood flows closest to the skin: wrists, neck, collarbones, and behind the ears for maximum sillage.' },
-      { title: 'Concentration', desc: 'Brothers Outfit fragrances are crafted as Eau de Parfum (EDP) with 18-22% perfume oils, delivering 8 to 12 hours of projection.' },
-      { title: 'Longevity Trick', desc: 'Hydrate your skin with an unscented moisturizer before applying fragrance; moisturized skin holds scent molecules twice as long.' }
-    ]
+    tips: [
+      { title: 'Pulse points', desc: 'Wrists, neck, collarbones and behind the ears — warm skin projects scent best.' },
+      { title: 'Concentration', desc: 'Our Eau de Parfums carry 18–22% perfume oil for 8–12 hours of wear.' },
+      { title: 'Last longer', desc: 'Moisturise with an unscented lotion first; hydrated skin holds fragrance longer.' },
+    ],
   },
   accessories: {
-    title: 'Belts & Accessories Guide',
-    subtitle: 'Quick guidelines for belts, wallets, and standard accessories',
-    icon: '🧣',
-    isAccessory: true,
-    beltData: [
-      { pantWaist: '28" - 30"', recommendedBelt: '32', range: '28 - 32' },
-      { pantWaist: '32" - 34"', recommendedBelt: '36', range: '32 - 36' },
-      { pantWaist: '36" - 38"', recommendedBelt: '40', range: '36 - 40' },
-      { pantWaist: '40" - 42"', recommendedBelt: '44', range: '40 - 44' },
+    title: 'Accessories',
+    isInfo: true,
+    notes: [
+      { title: 'Caps', desc: 'Adjustable snapback / buckle strap. Free size, fits head circumference 54–60 cm.' },
+      { title: 'Sunglasses', desc: 'Lightweight frames with UV400 protection, sized for a universal fit.' },
+      { title: 'Wallets', desc: 'Fits Indian currency notes flat and holds up to 8 cards without bulk.' },
+      { title: 'Watches', desc: 'Straps are adjustable and fit wrists from roughly 15 to 21 cm.' },
     ],
-    fitTip: '💡 Rule of thumb for belts: Order 2 inches larger than your current trouser waist size.'
-  }
+  },
 };
 
-export default function SizeGuideModal({ isOpen, onClose, category = 'Shirts', onSelectSize, customSizeGuide }) {
-  // Determine tab strictly based on product category
-  const detectCategoryTab = (cat) => {
-    const c = (cat || '').toLowerCase();
-    if (c.includes('kurta') || c.includes('ethnic')) return 'kurta';
-    if (c.includes('perfume') || c.includes('fragrance')) return 'perfumes';
-    if (c.includes('jean') || c.includes('trouser') || c.includes('pant') || c.includes('short')) return 'jeans';
-    if (c.includes('jacket') || c.includes('hoodie')) return 'jackets';
-    if (c.includes('slipper') || c.includes('shoe') || c.includes('footwear')) return 'footwear';
-    if (c.includes('belt') || c.includes('wallet') || c.includes('accessory') || c.includes('accessories')) return 'accessories';
-    return 'shirts';
+const HOW_TO_MEASURE = {
+  chest: 'Lay the garment flat and measure straight across, 1" below the armholes. Shown as the full round.',
+  length: 'From the highest point of the shoulder, next to the collar, straight down to the hem.',
+  shoulder: 'Straight across the back, from one shoulder seam to the other.',
+  sleeve: 'From the shoulder seam down to the end of the sleeve or cuff.',
+  waist: 'Around the top edge of the waistband with the button done up.',
+  hip: 'Around the fullest part of the seat, about 7" below the waistband.',
+  thigh: 'Around the widest part of the leg, just below the crotch seam.',
+  inseam: 'From the crotch seam down the inside of the leg to the hem.',
+  outseam: 'From the top of the waistband down the outer side seam to the hem.',
+  fits: 'Your usual trouser waist size.',
+  footLength: 'Stand on paper, mark your heel and longest toe, and measure the distance between them.',
+  beltLength: 'From where the leather meets the buckle to the middle hole.',
+};
+
+// Pick the chart from category first, then product name — many catalogue
+// categories are colour or occasion groups ("Blues", "Traditional & Festive").
+export function detectSizeChart(category = '', name = '') {
+  const match = (raw) => {
+    const c = String(raw || '').toLowerCase();
+    if (!c) return null;
+    if (/perfume|fragrance|attar|deo/.test(c)) return 'perfumes';
+    if (/slipper|shoe|sneaker|footwear|sandal|loafer|flip/.test(c)) return 'footwear';
+    if (/belt/.test(c)) return 'belts';
+    if (/wallet|watch|cap\b|caps|sunglass|goggle|accessor/.test(c)) return 'accessories';
+    if (/kurta|ethnic|sherwani|festive|traditional/.test(c)) return 'kurta';
+    if (/short(s)?\b|bermuda/.test(c) && !/shirt/.test(c)) return 'shorts';
+    if (/jean|trouser|pant|denim|cargo|jogger|chino|bottom/.test(c)) return 'jeans';
+    if (/jacket|hoodie|sweatshirt|blazer|coat|sweater|outerwear/.test(c)) return 'jackets';
+    if (/t-shirt|tshirt|t shirt|tee|polo|oversized/.test(c)) return 'tshirts';
+    if (/shirt/.test(c)) return 'shirts';
+    return null;
   };
+  return match(category) || match(name) || 'tshirts';
+}
 
-  const [activeTab, setActiveTab] = useState(() => detectCategoryTab(category));
+const normSize = (s) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, '');
+const sizeTokens = (s) => String(s ?? '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 
-  // Sync activeTab when category prop changes
-  useEffect(() => {
-    setActiveTab(detectCategoryTab(category));
-  }, [category]);
+// "38 (M)" matches product size "M" or "38"; "UK 8" matches "UK 8" or "8".
+function sizesMatch(rowLabel, productSize) {
+  if (!rowLabel || !productSize) return false;
+  if (normSize(rowLabel) === normSize(productSize)) return true;
+  const rowT = sizeTokens(rowLabel);
+  const prodT = sizeTokens(productSize);
+  if (prodT.length === 1 && rowT.includes(prodT[0])) return true;
+  if (rowT.length === 1 && prodT.includes(rowT[0])) return true;
+  return false;
+}
 
-  const [unit, setUnit] = useState('in'); // 'in' or 'cm'
-  const [measurementInput, setMeasurementInput] = useState('');
-  const [fitPreference, setFitPreference] = useState('regular'); // 'slim', 'regular', 'relaxed'
+// Map a free-text custom column header ("Chest (in)", "Front Length") to a diagram key.
+function keyForHeader(header) {
+  const h = String(header || '').toLowerCase();
+  const keys = ['chest', 'shoulder', 'sleeve', 'waist', 'hip', 'thigh', 'inseam', 'outseam', 'length'];
+  return keys.find((k) => h.includes(k)) || h.replace(/\(.*?\)/g, '').trim();
+}
 
-  // Handle ESC key to close modal
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+const fmt = (n) => {
+  const v = Math.round(Number(n) * 10) / 10;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, '');
+};
 
-  // Prevent background body scroll when modal is open
+export default function SizeGuideModal({
+  isOpen,
+  onClose,
+  category = '',
+  productName = '',
+  product,
+  price,
+  mrp,
+  discount,
+  image,
+  selectedSize,
+  availableSizes,
+  onSelectSize,
+  onAddToCart,
+  customSizeGuide,
+}) {
+  const chartKey = useMemo(
+    () => detectSizeChart(category || product?.category, productName || product?.name),
+    [category, productName, product?.category, product?.name]
+  );
+  const chart = SIZE_CHARTS[chartKey];
+
+  const [tab, setTab] = useState('chart');
+  const [unit, setUnit] = useState('in');
+  const [picked, setPicked] = useState(selectedSize || null);
+  const [viewIdx, setViewIdx] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [dragY, setDragY] = useState(0);
+  const dragStart = useRef(null);
+  const carouselRef = useRef(null);
+
+  // Fit finder
+  const [bodyInput, setBodyInput] = useState('');
+  const [fitPref, setFitPref] = useState('regular');
+
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      setPicked(selectedSize || null);
+      setTab('chart');
+      setViewIdx(0);
+      setExpanded(false);
+      setClosing(false);
+      setDragY(0);
     }
-    return () => {
-      document.body.style.overflow = '';
+  }, [isOpen, selectedSize]);
+
+  const requestClose = useCallback(() => {
+    setClosing(true);
+    setTimeout(() => {
+      setClosing(false);
+      onClose?.();
+    }, 220);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (expanded) setExpanded(false);
+      else requestClose();
     };
-  }, [isOpen]);
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen, expanded, requestClose]);
 
-  const currentChart = SIZE_CHARTS[activeTab] || SIZE_CHARTS.shirts;
+  /* ── Build one normalised table: columns [{key,label,text}] + rows [{size, cells[]}] in base unit ── */
+  const table = useMemo(() => {
+    const custom = customSizeGuide?.enabled && Array.isArray(customSizeGuide?.columns) && customSizeGuide.columns.length > 1
+      && Array.isArray(customSizeGuide?.rows) && customSizeGuide.rows.length > 0;
 
-  // Fit Finder Recommendation Engine
+    if (custom) {
+      const cols = customSizeGuide.columns;
+      const rows = customSizeGuide.rows.map((row) => {
+        if (Array.isArray(row)) return row;
+        if (row && typeof row === 'object') {
+          if (Array.isArray(row.cells)) return row.cells;
+          return cols.map((col, idx) => row[`c${idx}`] ?? row[idx] ?? row[col] ?? '');
+        }
+        return [];
+      }).filter((r) => r.length && String(r[0] ?? '').trim());
+      return {
+        custom: true,
+        baseUnit: detectBaseUnit(cols, customSizeGuide),
+        sizeLabel: String(cols[0] || 'Size').replace(/\(.*?\)/g, '').trim() || 'Size',
+        columns: cols.slice(1).map((c) => ({
+          key: keyForHeader(c),
+          label: String(c).replace(/\s*\((?:in|inches|cm)\)\s*/gi, '').trim(),
+          text: /^(?:us|eu|uk)\b/i.test(String(c).trim()),
+        })),
+        rows: rows.map((r) => ({ size: String(r[0]).trim(), cells: r.slice(1) })),
+      };
+    }
+
+    if (!chart || !chart.columns) return null;
+    return {
+      custom: false,
+      baseUnit: 'in',
+      sizeLabel: chartKey === 'footwear' ? 'UK / IND' : 'Size',
+      columns: chart.columns,
+      rows: chart.rows.map((r) => ({ size: r[0], cells: r.slice(1) })),
+    };
+  }, [customSizeGuide, chart, chartKey]);
+
+  const displayCell = useCallback((col, val) => {
+    if (val === null || val === undefined || String(val).trim() === '') return '–';
+    if (col.text) return String(val);
+    if (!table) return String(val);
+    if (table.custom) return convertMeasurementValue(val, table.baseUnit, unit) || '–';
+    if (typeof val === 'number') return unit === 'cm' ? fmt(val * 2.54) : fmt(val);
+    return convertMeasurementValue(val, 'in', unit);
+  }, [table, unit]);
+
+  const productSizeFor = useCallback((rowLabel) => {
+    if (!Array.isArray(availableSizes)) return rowLabel;
+    return availableSizes.find((s) => sizesMatch(rowLabel, s)) || null;
+  }, [availableSizes]);
+
+  const pickedRow = useMemo(() => {
+    if (!table || !picked) return null;
+    return table.rows.find((r) => sizesMatch(r.size, picked)) || null;
+  }, [table, picked]);
+
+  // Diagram key -> table column (custom charts often call the outseam "Length").
+  const columnIndexFor = useCallback((key) => {
+    if (!table) return -1;
+    const cols = table.columns;
+    let idx = cols.findIndex((c) => c.key === key);
+    if (idx < 0 && key === 'length') idx = cols.findIndex((c) => /length/.test(c.key));
+    if (idx < 0 && key === 'outseam') idx = cols.findIndex((c) => c.key === 'length' || /length/.test(c.key));
+    return idx;
+  }, [table]);
+
+  const hasMeasure = useCallback((key) => columnIndexFor(key) >= 0, [columnIndexFor]);
+
+  const valueFor = useCallback((key) => {
+    if (!pickedRow || !table) return null;
+    const idx = columnIndexFor(key);
+    if (idx < 0) return null;
+    const v = displayCell(table.columns[idx], pickedRow.cells[idx]);
+    if (!v || v === '–') return null;
+    return unit === 'in' ? `${v}"` : `${v}cm`;
+  }, [pickedRow, table, displayCell, unit, columnIndexFor]);
+
+  /* ── Fit finder recommendation ── */
   const recommendation = useMemo(() => {
-    const val = parseFloat(measurementInput);
-    if (!val || isNaN(val) || val <= 0) return null;
+    const val = parseFloat(bodyInput);
+    if (!table || !chart?.fitKey || !val || val <= 0) return null;
+    const colIdx = table.columns.findIndex((c) => c.key === chart.fitKey);
+    if (colIdx < 0) return null;
+    let target = unit === 'cm' ? val / 2.54 : val;
+    if (chart.fitEase) target += fitPref === 'slim' ? 1 : fitPref === 'relaxed' ? 4 : 2;
+    const toIn = (cell) => {
+      const n = parseFloat(String(cell));
+      if (isNaN(n)) return NaN;
+      return table.custom && table.baseUnit === 'cm' ? n / 2.54 : n;
+    };
+    const candidates = table.rows.filter((r) => !isNaN(toIn(r.cells[colIdx])));
+    if (!candidates.length) return null;
+    return (candidates.find((r) => toIn(r.cells[colIdx]) >= target - 0.25) || candidates[candidates.length - 1]).size;
+  }, [bodyInput, table, chart, unit, fitPref]);
 
-    if (activeTab === 'shirts' || activeTab === 'jackets') {
-      const chestInches = unit === 'cm' ? (val / 2.54) : val;
-      let targetInches = chestInches;
-      if (fitPreference === 'slim') targetInches -= 1;
-      if (fitPreference === 'relaxed') targetInches += 2;
+  const garment = chart?.garment ? GARMENTS[chart.garment] : null;
+  const views = garment?.views || [];
 
-      const chart = SIZE_CHARTS[activeTab];
-      const match = chart.data.find(row => row.chestIn >= targetInches) || chart.data[chart.data.length - 1];
-      return {
-        size: match.size,
-        text: `Based on your ${val} ${unit.toUpperCase()} chest measurement (${fitPreference} fit):`,
-        recommendedSize: match.size
-      };
-    }
+  const programmaticScroll = useRef(null);
+  const onCarouselScroll = () => {
+    const el = carouselRef.current;
+    if (!el || programmaticScroll.current) return;
+    const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+    if (idx !== viewIdx) setViewIdx(idx);
+  };
+  const goToView = (idx) => {
+    const el = carouselRef.current;
+    clearTimeout(programmaticScroll.current);
+    programmaticScroll.current = setTimeout(() => { programmaticScroll.current = null; }, 600);
+    if (el) el.scrollTo({ left: idx * el.clientWidth, behavior: 'smooth' });
+    setViewIdx(idx);
+  };
 
-    if (activeTab === 'jeans') {
-      const waistInches = unit === 'cm' ? Math.round(val / 2.54) : Math.round(val);
-      const chart = SIZE_CHARTS.jeans;
-      const match = chart.data.find(row => row.waistIn >= waistInches) || chart.data[chart.data.length - 1];
-      return {
-        size: match.size,
-        text: `Based on your ${val} ${unit.toUpperCase()} waist measurement:`,
-        recommendedSize: match.size
-      };
-    }
+  // Swipe the sheet down from its handle to dismiss (mobile).
+  const onDragStart = (e) => { dragStart.current = e.touches[0].clientY; };
+  const onDragMove = (e) => {
+    if (dragStart.current === null) return;
+    setDragY(Math.max(0, e.touches[0].clientY - dragStart.current));
+  };
+  const onDragEnd = () => {
+    if (dragY > 110) requestClose();
+    else setDragY(0);
+    dragStart.current = null;
+  };
 
-    if (activeTab === 'footwear') {
-      const lengthCm = unit === 'in' ? (val * 2.54) : val;
-      const match = SIZE_CHARTS.footwear.data.find(row => row.lengthCm >= lengthCm) || SIZE_CHARTS.footwear.data[SIZE_CHARTS.footwear.data.length - 1];
-      return {
-        size: match.size,
-        text: `Based on your ${val} ${unit.toUpperCase()} foot length:`,
-        recommendedSize: match.size
-      };
-    }
+  if (!isOpen || typeof document === 'undefined') return null;
 
-    return null;
-  }, [measurementInput, activeTab, unit, fitPreference]);
+  const pickedProductSize = picked ? productSizeFor(pickedRow?.size || picked) : null;
+  const unitWord = unit === 'in' ? 'Inches' : 'Centimetres';
+  const showPrice = Number(price) > 0;
 
-  // Normalize custom size guide rows to support both Firestore map schema ({ cells: [...] }) and legacy 2D arrays
-  const customRows = useMemo(() => {
-    if (!customSizeGuide?.enabled || !Array.isArray(customSizeGuide?.rows)) return [];
-    return customSizeGuide.rows.map(row => {
-      if (Array.isArray(row)) return row;
-      if (row && typeof row === 'object') {
-        if (Array.isArray(row.cells)) return row.cells;
-        const cols = customSizeGuide.columns || [];
-        return cols.map((col, idx) => row[`c${idx}`] ?? row[idx] ?? row[col] ?? '');
-      }
-      return [];
-    });
-  }, [customSizeGuide]);
+  const measureKeys = (() => {
+    if (chart?.garment === 'foot') return [['Foot Length', HOW_TO_MEASURE.footLength]];
+    if (chart?.garment === 'belt') return [['Belt Length', HOW_TO_MEASURE.beltLength]];
+    const cols = table?.columns || [];
+    return cols.filter((c) => HOW_TO_MEASURE[c.key]).map((c) => [c.label, HOW_TO_MEASURE[c.key]]);
+  })();
 
-  // Detect base unit of custom size guide (default is inches)
-  const customBaseUnit = useMemo(() => {
-    return detectBaseUnit(customSizeGuide?.columns || [], customSizeGuide);
-  }, [customSizeGuide]);
+  const footerLabel = (() => {
+    if (!picked) return chart?.isPerfume ? 'Select a volume' : 'Select a size';
+    if (!pickedProductSize) return `Size ${pickedRow?.size || picked} is sold out`;
+    return onAddToCart ? 'Add to cart' : `Select size ${pickedProductSize}`;
+  })();
 
-  // Display columns with converted unit headers
-  const displayCustomColumns = useMemo(() => {
-    if (!customSizeGuide?.columns || !Array.isArray(customSizeGuide.columns)) return [];
-    return customSizeGuide.columns.map((col, idx) => {
-      if (idx === 0) return col;
-      return convertColumnHeader(col, unit);
-    });
-  }, [customSizeGuide?.columns, unit]);
+  const confirm = () => {
+    if (!pickedProductSize) return;
+    onSelectSize?.(pickedProductSize);
+    if (onAddToCart) onAddToCart(pickedProductSize);
+    requestClose();
+  };
 
-  // Display rows with auto-calculated values (error rate 0)
-  const displayCustomRows = useMemo(() => {
-    return customRows.map(row => {
-      if (!Array.isArray(row)) return [];
-      return row.map((cell, idx) => {
-        if (idx === 0) return cell; // Size label e.g. "S", "M", "38"
-        return convertMeasurementValue(cell, customBaseUnit, unit);
-      });
-    });
-  }, [customRows, customBaseUnit, unit]);
+  const renderSizeTable = () => (
+    <div className="sg-table-wrap">
+      <table className="sg-table">
+        <thead>
+          <tr>
+            <th className="sg-col-size">{table.sizeLabel}</th>
+            {table.columns.map((c) => <th key={c.key + c.label}>{c.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row) => {
+            const available = productSizeFor(row.size);
+            const isPicked = pickedRow?.size === row.size;
+            const isRec = recommendation === row.size;
+            return (
+              <tr
+                key={row.size}
+                className={`${isPicked ? 'is-picked' : ''} ${!available ? 'is-unavailable' : ''}`}
+                onClick={() => setPicked(row.size)}
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPicked(row.size); } }}
+                aria-selected={isPicked}
+              >
+                <td className="sg-col-size">
+                  <span className="sg-radio" aria-hidden="true" />
+                  <span className="sg-size-label">{row.size}</span>
+                  {isRec && <span className="sg-rec-chip">Your fit</span>}
+                  {!available && <span className="sg-oos-chip">Sold out</span>}
+                </td>
+                {table.columns.map((c, i) => <td key={c.key + i}>{displayCell(c, row.cells[i])}</td>)}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
-  if (!isOpen) return null;
-  if (typeof document === 'undefined') return null;
+  const renderDiagrams = () => views.length > 0 && (
+    <div className={`sg-figure ${expanded ? 'is-expanded' : ''}`}>
+      <button
+        type="button"
+        className="sg-figure-expand"
+        onClick={() => setExpanded((v) => !v)}
+        aria-label={expanded ? 'Close full screen diagram' : 'Open diagram full screen'}
+      >
+        {expanded ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+        )}
+      </button>
+      <div className="sg-carousel" ref={carouselRef} onScroll={onCarouselScroll}>
+        {views.map((v) => (
+          <div className="sg-slide" key={v.name}>
+            <GarmentView garment={chart.garment} view={v} valueFor={valueFor} hasMeasure={table?.custom ? hasMeasure : null} />
+          </div>
+        ))}
+      </div>
+      {views.length > 1 && (
+        <div className="sg-view-switch" role="tablist" aria-label="Diagram view">
+          {views.map((v, i) => (
+            <button
+              key={v.name}
+              type="button"
+              role="tab"
+              aria-selected={viewIdx === i}
+              className={viewIdx === i ? 'active' : ''}
+              onClick={() => goToView(i)}
+            >
+              {v.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {pickedRow && !chart.isPerfume && (
+        <p className="sg-figure-caption">Showing measurements for size <strong>{pickedRow.size}</strong></p>
+      )}
+    </div>
+  );
 
   return createPortal(
-    <div className="size-guide-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Size Guide">
-      <div className="size-guide-modal" onClick={(e) => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div className="size-guide-header">
-          <div className="size-guide-title-wrap">
-            <h2 className="size-guide-title">
-              <span className="size-guide-icon">{currentChart.icon}</span>
-              {currentChart.title}
-            </h2>
-            <p className="size-guide-subtitle">{currentChart.subtitle}</p>
-
-            {/* Category Presets Switcher */}
-            <div className="size-guide-cat-tabs" style={{ display: 'flex', gap: '6px', overflowX: 'auto', padding: '8px 0 2px', scrollbarWidth: 'none' }}>
-              {[
-                { key: 'shirts', label: '👕 Shirts & Tees' },
-                { key: 'kurta', label: '🥻 Kurta & Ethnic' },
-                { key: 'jeans', label: '👖 Jeans & Trousers' },
-                { key: 'jackets', label: '🧥 Jackets & Hoodies' },
-                { key: 'footwear', label: '🩴 Footwear' },
-                { key: 'perfumes', label: '🧴 Perfumes' },
-                { key: 'accessories', label: '🧣 Belts & Wallets' }
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    border: activeTab === tab.key ? '1px solid #111827' : '1px solid #e2e8f0',
-                    background: activeTab === tab.key ? '#111827' : '#ffffff',
-                    color: activeTab === tab.key ? '#ffffff' : '#64748b',
-                    fontSize: '11.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <button className="size-guide-close-btn" onClick={onClose} aria-label="Close size guide">
-            ✕
-          </button>
+    <div
+      className={`sg-overlay ${closing ? 'is-closing' : ''}`}
+      onClick={requestClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Size guide"
+    >
+      <div
+        className="sg-sheet"
+        onClick={(e) => e.stopPropagation()}
+        style={dragY ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
+      >
+        <div className="sg-handle-zone" onTouchStart={onDragStart} onTouchMove={onDragMove} onTouchEnd={onDragEnd}>
+          <span className="sg-handle" />
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="size-guide-body">
-          
-          {/* Section 1: Apparel / Footwear Tables */}
-          {!currentChart.isPerfume && !currentChart.isAccessory && (
-            <>
-              {/* Controls Bar: Unit Switcher & Fit Tip */}
-              <div className="size-guide-controls">
-                <div className="unit-toggle-group">
-                  <span className="unit-label">Unit of Measure:</span>
-                  <div className="unit-buttons">
-                    <button 
-                      type="button"
-                      className={`unit-btn ${unit === 'in' ? 'active' : ''}`}
-                      onClick={() => setUnit('in')}
-                    >
-                      Inches (in)
-                    </button>
-                    <button 
-                      type="button"
-                      className={`unit-btn ${unit === 'cm' ? 'active' : ''}`}
-                      onClick={() => setUnit('cm')}
-                    >
-                      Centimeters (cm)
-                    </button>
-                  </div>
-                </div>
-
-                {currentChart.fitTip && (
-                  <div className="size-guide-fit-tip">
-                    {currentChart.fitTip}
-                  </div>
-                )}
-              </div>
-
-              {/* Interactive Fit Finder / Recommender Tool */}
-              <div className="fit-finder-box">
-                <div className="fit-finder-header">
-                  <span className="fit-finder-title">🎯 Instant Fit Finder</span>
-                  <span className="fit-finder-sub">Enter your measurement to find your perfect size</span>
-                </div>
-
-                <div className="fit-finder-inputs">
-                  <div className="fit-input-field">
-                    <label>
-                      {activeTab === 'jeans' ? `Your Waist (${unit.toUpperCase()})` : activeTab === 'footwear' ? `Foot Length (${unit.toUpperCase()})` : `Chest Size (${unit.toUpperCase()})`}:
-                    </label>
-                    <input 
-                      type="number"
-                      placeholder={activeTab === 'jeans' ? (unit === 'in' ? 'e.g. 32' : 'e.g. 81') : activeTab === 'footwear' ? (unit === 'in' ? 'e.g. 10.3' : 'e.g. 26.2') : (unit === 'in' ? 'e.g. 40' : 'e.g. 102')}
-                      value={measurementInput}
-                      onChange={(e) => setMeasurementInput(e.target.value)}
-                    />
-                  </div>
-
-                  {(activeTab === 'shirts' || activeTab === 'jackets') && (
-                    <div className="fit-input-field">
-                      <label>Preferred Fit:</label>
-                      <select value={fitPreference} onChange={(e) => setFitPreference(e.target.value)}>
-                        <option value="slim">Tailored / Slim Fit</option>
-                        <option value="regular">Regular Comfortable Fit</option>
-                        <option value="relaxed">Relaxed / Oversized Fit</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {recommendation && (
-                  <div className="fit-recommendation-result">
-                    <span>{recommendation.text}</span>
-                    <strong className="recommendation-badge">{recommendation.recommendedSize}</strong>
-                  </div>
-                )}
-              </div>
-
-              {/* Data Table */}
-              {customSizeGuide?.enabled && customSizeGuide?.columns?.length > 0 && customRows.length > 0 ? (
-                <div className="size-table-container">
-                  <div className="custom-size-guide-header-row">
-                    <div className="custom-size-guide-title-pill">
-                      <span className="custom-table-badge">📋 Item Specific Size Chart</span>
-                      <span className="custom-verified-pill">Verified Dimensions</span>
-                    </div>
-                    <div className="custom-auto-calc-indicator">
-                      <span className="auto-calc-dot"></span>
-                      Auto-calculated in <strong>{unit === 'cm' ? 'Centimeters (cm)' : 'Inches (in)'}</strong>
-                    </div>
-                  </div>
-                  <table className="size-guide-table">
-                    <thead>
-                      <tr>
-                        {displayCustomColumns.map((col, idx) => (
-                          <th key={idx}>{col}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayCustomRows.map((row, rIdx) => (
-                        <tr 
-                          key={rIdx}
-                          style={{ cursor: onSelectSize && row[0] ? 'pointer' : 'default' }}
-                          onClick={() => {
-                            if (onSelectSize && row[0]) {
-                              onSelectSize(row[0]);
-                              onClose();
-                            }
-                          }}
-                          title={onSelectSize && row[0] ? `Select size ${row[0]}` : ''}
-                        >
-                          {row.map((cell, cIdx) => (
-                            <td key={cIdx}>
-                              {cIdx === 0 ? <strong>{cell}</strong> : (cell ? `${cell} ${unit}` : '-')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <p style={{ marginTop: '8px', fontSize: '0.75rem', color: '#6b7280' }}>
-                    * Tip: Click on any row to automatically select that size.
-                  </p>
-                </div>
-              ) : (
-                <div className="size-table-container">
-                  <table className="size-guide-table">
-                    <thead>
-                      <tr>
-                        {currentChart.columns.map((col, idx) => (
-                          <th key={idx}>{col}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeTab === 'footwear' ? (
-                        currentChart.data.map((row) => (
-                          <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
-                            <td><strong>{row.size}</strong></td>
-                            <td>{row.us}</td>
-                            <td>{row.eu}</td>
-                            <td>{row.lengthCm} cm</td>
-                            <td>{row.lengthIn} in</td>
-                          </tr>
-                        ))
-                      ) : activeTab === 'jeans' ? (
-                        currentChart.data.map((row) => (
-                          <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
-                            <td><strong>{row.size}</strong></td>
-                            <td>{unit === 'in' ? `${row.waistIn}"` : `${row.waistCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.hipIn}"` : `${row.hipCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.inseamIn}"` : `${row.inseamCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.thighIn}"` : `${row.thighCm} cm`}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        currentChart.data.map((row) => (
-                          <tr key={row.size} className={recommendation?.recommendedSize === row.size ? 'highlighted-row' : ''}>
-                            <td><strong>{row.size}</strong></td>
-                            <td>{unit === 'in' ? `${row.chestIn}"` : `${row.chestCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.lengthIn}"` : `${row.lengthCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.shoulderIn}"` : `${row.shoulderCm} cm`}</td>
-                            <td>{unit === 'in' ? `${row.sleeveIn}"` : `${row.sleeveCm} cm`}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+        <header className="sg-header">
+          <div className="sg-product">
+            {image && <img src={image} alt="" className="sg-product-img" loading="lazy" />}
+            <div className="sg-product-meta">
+              <p className="sg-eyebrow">{chart?.isPerfume ? 'Volume guide' : 'Size guide'} · {chart?.title}</p>
+              {(productName || product?.name) && <h2 className="sg-product-name">{productName || product?.name}</h2>}
+              {showPrice && (
+                <div className="sg-price-row">
+                  <span className="sg-price">₹{Number(price).toLocaleString('en-IN')}</span>
+                  {Number(mrp) > Number(price) && <span className="sg-mrp">₹{Number(mrp).toLocaleString('en-IN')}</span>}
+                  {discount > 0 && <span className="sg-off">{discount}% off</span>}
                 </div>
               )}
+            </div>
+          </div>
+          <button type="button" className="sg-close" onClick={requestClose} aria-label="Close size guide">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </header>
 
-              {/* How to Measure Section with High-Quality Vector Technical Diagram */}
-              <HowToMeasureDiagram category={category || activeTab} />
+        {table && (
+          <div className="sg-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === 'chart'} className={tab === 'chart' ? 'active' : ''} onClick={() => setTab('chart')}>
+              Size Chart
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'measure'} className={tab === 'measure' ? 'active' : ''} onClick={() => setTab('measure')}>
+              How to Measure
+            </button>
+          </div>
+        )}
+
+        <div className="sg-body">
+          {/* ───────── Apparel / footwear / belts ───────── */}
+          {table && tab === 'chart' && (
+            <>
+              <div className="sg-unit-row">
+                <span className="sg-unit-note">Measurements are in {unitWord}</span>
+                <div className="sg-unit-toggle" role="group" aria-label="Measurement unit">
+                  <button type="button" className={unit === 'in' ? 'active' : ''} onClick={() => setUnit('in')} aria-pressed={unit === 'in'}>in</button>
+                  <button type="button" className={unit === 'cm' ? 'active' : ''} onClick={() => setUnit('cm')} aria-pressed={unit === 'cm'}>cm</button>
+                </div>
+              </div>
+              {renderSizeTable()}
+              {chart?.fitTip && <p className="sg-fit-tip">{chart.fitTip}</p>}
+              {renderDiagrams()}
             </>
           )}
 
-          {/* Section 2: Perfumes Volume Guide */}
-          {currentChart.isPerfume && (
-            <div className="perfume-guide-section">
-              <div className="perfume-tiers-grid">
-                {currentChart.tiers.map((t, idx) => (
-                  <div key={idx} className="perfume-tier-card">
-                    <div className="perfume-tier-header">
-                      <span className="perfume-vol">{t.volume}</span>
-                      <span className="perfume-badge">{t.badge}</span>
+          {table && tab === 'measure' && (
+            <>
+              {renderDiagrams()}
+              <ol className="sg-steps">
+                {measureKeys.map(([label, desc], i) => (
+                  <li key={label}>
+                    <span className="sg-step-num">{i + 1}</span>
+                    <div>
+                      <strong>{label}</strong>
+                      <p>{desc}</p>
                     </div>
-                    <div className="perfume-stats">
-                      <div className="perfume-stat-item">
-                        <span className="stat-label">Spray Count</span>
-                        <strong className="stat-value">{t.sprays}</strong>
-                      </div>
-                      <div className="perfume-stat-item">
-                        <span className="stat-label">Estimated Duration</span>
-                        <strong className="stat-value">{t.duration}</strong>
-                      </div>
+                  </li>
+                ))}
+              </ol>
+
+              {chart?.fitKey && (
+                <div className="sg-finder">
+                  <h3>Find your size</h3>
+                  <p>
+                    {chart.fitKey === 'waist' ? 'Enter your body waist' : chart.fitKey === 'length' ? 'Enter your foot length' : 'Enter your body chest'}
+                    {' '}in {unitWord.toLowerCase()}.
+                  </p>
+                  <div className="sg-finder-row">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      value={bodyInput}
+                      onChange={(e) => setBodyInput(e.target.value)}
+                      placeholder={chart.fitKey === 'waist' ? (unit === 'in' ? 'e.g. 32' : 'e.g. 81') : chart.fitKey === 'length' ? (unit === 'in' ? 'e.g. 10.3' : 'e.g. 26') : (unit === 'in' ? 'e.g. 38' : 'e.g. 97')}
+                      aria-label="Your measurement"
+                    />
+                    <div className="sg-unit-toggle" role="group" aria-label="Measurement unit">
+                      <button type="button" className={unit === 'in' ? 'active' : ''} onClick={() => setUnit('in')}>in</button>
+                      <button type="button" className={unit === 'cm' ? 'active' : ''} onClick={() => setUnit('cm')}>cm</button>
                     </div>
-                    <p className="perfume-desc">{t.bestFor}</p>
                   </div>
+                  {chart.fitEase && (
+                    <div className="sg-fit-pref" role="group" aria-label="Preferred fit">
+                      {[['slim', 'Slim'], ['regular', 'Regular'], ['relaxed', 'Relaxed']].map(([k, l]) => (
+                        <button key={k} type="button" className={fitPref === k ? 'active' : ''} onClick={() => setFitPref(k)}>{l}</button>
+                      ))}
+                    </div>
+                  )}
+                  {recommendation && (
+                    <button type="button" className="sg-rec-result" onClick={() => { setPicked(recommendation); setTab('chart'); }}>
+                      <span>We recommend</span>
+                      <strong>{recommendation}</strong>
+                      <span className="sg-rec-link">Select →</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ───────── Perfumes ───────── */}
+          {chart?.isPerfume && (
+            <>
+              <div className="sg-perfume-grid">
+                {chart.tiers.map((t) => {
+                  const available = productSizeFor(t.volume);
+                  const isPicked = picked && sizesMatch(t.volume, picked);
+                  return (
+                    <button
+                      key={t.volume}
+                      type="button"
+                      className={`sg-perfume-card ${isPicked ? 'is-picked' : ''} ${!available ? 'is-unavailable' : ''}`}
+                      onClick={() => setPicked(t.volume)}
+                    >
+                      <span className="sg-perfume-top">
+                        <strong>{t.volume}</strong>
+                        {t.badge && <em>{t.badge}</em>}
+                      </span>
+                      <span className="sg-perfume-stat">{t.sprays} sprays · {t.duration}</span>
+                      <span className="sg-perfume-desc">{t.bestFor}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="sg-notes">
+                {chart.tips.map((t) => (
+                  <div key={t.title} className="sg-note"><strong>{t.title}</strong><p>{t.desc}</p></div>
                 ))}
               </div>
+            </>
+          )}
 
-              {/* Fragrance Longevity & Projection Advice */}
-              <div className="perfume-tips-box">
-                <h4>✨ Fragrance Tips from Brothers Outfit Master Perfumers</h4>
-                <div className="perfume-tips-grid">
-                  {currentChart.applicationTips.map((tip, idx) => (
-                    <div key={idx} className="perfume-tip-item">
-                      <strong>{tip.title}</strong>
-                      <p>{tip.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {/* ───────── Other accessories ───────── */}
+          {chart?.isInfo && (
+            <div className="sg-notes">
+              {chart.notes.map((t) => (
+                <div key={t.title} className="sg-note"><strong>{t.title}</strong><p>{t.desc}</p></div>
+              ))}
             </div>
           )}
 
-          {/* Section 3: Accessories & Belts Guide */}
-          {currentChart.isAccessory && (
-            <div className="accessory-guide-section">
-              <div className="size-guide-fit-tip" style={{ marginBottom: '20px' }}>
-                {currentChart.fitTip}
-              </div>
-
-              <div className="size-table-container">
-                <table className="size-guide-table">
-                  <thead>
-                    <tr>
-                      <th>Trouser / Pant Waist</th>
-                      <th>Recommended Belt Size</th>
-                      <th>Belt Buckle Adjustment Range</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentChart.beltData.map((b, idx) => (
-                      <tr key={idx}>
-                        <td><strong>{b.pantWaist}</strong></td>
-                        <td><strong style={{ color: '#0f172a' }}>{b.recommendedBelt}</strong></td>
-                        <td>{b.range} inches</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="accessory-faq">
-                <h4>👜 Wallets & Everyday Carry (EDC)</h4>
-                <p>All Brothers Outfit genuine leather wallets are crafted with RFID blocking and calibrated to comfortably fit Indian currency notes (₹500, ₹200, ₹100) and up to 8 cards without excessive pocket bulk.</p>
-              </div>
-
-              <div className="accessory-faq" style={{ marginTop: '12px' }}>
-                <h4>🧢 Caps & Sunglasses</h4>
-                <p><strong>Caps:</strong> Feature premium adjustable snapbacks / brass buckles designed for universal Free Size fit (head circumferences 54–60 cm).<br /><strong>Sunglasses:</strong> Feature lightweight ergonomic frames with 100% UV400 polarized protection, sized for universal facial comfort.</p>
-              </div>
-            </div>
-          )}
-
+          <p className="sg-guarantee">Still unsure about your size? Chat with us on WhatsApp and we’ll help you pick.</p>
         </div>
 
-        {/* Footer */}
-        <div className="size-guide-footer">
-          <span className="size-guide-guarantee">
-            🔄 <strong>100% Fit Guarantee:</strong> Hassle-free 7-day size exchanges available on all unworn items.
-          </span>
-          <button type="button" className="size-guide-btn-done" onClick={onClose}>
-            Got It
-          </button>
-        </div>
-
+        {!chart?.isInfo && (onSelectSize || onAddToCart) && (
+          <footer className="sg-footer">
+            {picked && (
+              <span className="sg-footer-size">
+                Size <strong>{pickedRow?.size || picked}</strong>
+              </span>
+            )}
+            <button type="button" className="sg-cta" disabled={!pickedProductSize} onClick={confirm}>
+              {footerLabel}
+            </button>
+          </footer>
+        )}
       </div>
     </div>,
     document.body
